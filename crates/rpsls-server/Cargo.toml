@@ -1,0 +1,34 @@
+[package]
+name = "rpsls-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "RPSLS multiplayer server — Axum + WebSocket"
+
+[[bin]]
+name = "rpsls-server"
+path = "src/main.rs"
+
+[dependencies]
+rpsls-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Async runtime
+tokio = { version = "1.40", features = ["full"] }
+
+# Web framework + WebSocket
+axum = { version = "0.7", features = ["ws", "macros"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+
+# Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Concurrency primitives
+dashmap = "6.1"
+uuid = { version = "1.10", features = ["v4"] }
+rand = "0.8"
+futures-util = "0.3"

@@ -4,6 +4,7 @@ import { useStore } from "./store";
 import { applyTheme } from "./theme";
 import { Sidebar, MobileShell, type Page } from "./Sidebar";
 import { PlayPage } from "./PlayPage";
+import { OnlinePage } from "./OnlinePage";
 import { ProfilePage } from "./ProfilePage";
 import { HistoryPage } from "./HistoryPage";
 import { QuestsPage } from "./QuestsPage";
@@ -63,6 +64,7 @@ export default function App() {
               <main className="flex-1 flex flex-col pt-16 md:pt-0">
                 <AnimatePresence mode="wait">
                   {page === "play"    && <PageWrap key="play"><PlayPage /></PageWrap>}
+                  {page === "online"  && <PageWrap key="online"><OnlinePage /></PageWrap>}
                   {page === "quests"  && <PageWrap key="quests"><QuestsPage /></PageWrap>}
                   {page === "packs"   && <PageWrap key="packs"><PacksPage /></PageWrap>}
                   {page === "profile" && <PageWrap key="profile"><ProfilePage /></PageWrap>}

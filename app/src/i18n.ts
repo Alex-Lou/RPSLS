@@ -23,6 +23,7 @@ type Dict = Record<string, string>;
 const en: Dict = {
   // ── Nav / shell ──
   "nav.play": "Play",
+  "nav.online": "Online",
   "nav.quests": "Quests",
   "nav.packs": "Variants",
   "nav.profile": "Profile",
@@ -477,6 +478,7 @@ const en: Dict = {
 const fr: Dict = {
   // ── Nav / shell ──
   "nav.play": "Jouer",
+  "nav.online": "En ligne",
   "nav.quests": "Quêtes",
   "nav.packs": "Variantes",
   "nav.profile": "Profil",
@@ -930,6 +932,7 @@ const fr: Dict = {
 /* ════════════ SPANISH ════════════ */
 const es: Dict = {
   "nav.play": "Jugar",
+  "nav.online": "En línea",
   "nav.quests": "Misiones",
   "nav.packs": "Variantes",
   "nav.profile": "Perfil",
@@ -1344,6 +1347,7 @@ const es: Dict = {
 /* ════════════ GERMAN ════════════ */
 const de: Dict = {
   "nav.play": "Spielen",
+  "nav.online": "Online",
   "nav.quests": "Quests",
   "nav.packs": "Varianten",
   "nav.profile": "Profil",
@@ -1757,6 +1761,7 @@ const de: Dict = {
 /* ════════════ ITALIAN ════════════ */
 const it: Dict = {
   "nav.play": "Gioca",
+  "nav.online": "Online",
   "nav.quests": "Missioni",
   "nav.packs": "Varianti",
   "nav.profile": "Profilo",

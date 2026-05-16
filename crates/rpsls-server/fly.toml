@@ -1,0 +1,35 @@
+# Fly.io configuration for the RPSLS multiplayer server.
+#
+# Deploy from the repo root with:
+#   fly launch --config crates/rpsls-server/fly.toml --dockerfile crates/rpsls-server/Dockerfile --name rpsls-server
+# Subsequent deploys:
+#   fly deploy --config crates/rpsls-server/fly.toml --dockerfile crates/rpsls-server/Dockerfile
+
+app = "rpsls-server"
+primary_region = "cdg"   # Paris — change to "iad" / "lhr" / etc. if you prefer
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  RUST_LOG = "info,rpsls_server=debug"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 200
+    soft_limit = 150
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1

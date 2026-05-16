@@ -6,7 +6,7 @@ import { THEMES } from "./theme";
 import { useT } from "./i18n";
 import { LanguagePicker } from "./LanguagePicker";
 
-export type Page = "play" | "quests" | "packs" | "profile" | "history" | "about" | "contact";
+export type Page = "play" | "online" | "quests" | "packs" | "profile" | "history" | "about" | "contact";
 
 interface NavItem {
   id: Page;
@@ -16,6 +16,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { id: "play",    labelKey: "nav.play",    icon: "🎯" },
+  { id: "online",  labelKey: "nav.online",  icon: "🌐" },
   { id: "quests",  labelKey: "nav.quests",  icon: "🏅" },
   { id: "packs",   labelKey: "nav.packs",   icon: "🎴" },
   { id: "profile", labelKey: "nav.profile", icon: "👤" },
