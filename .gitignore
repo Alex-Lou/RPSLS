@@ -1,0 +1,37 @@
+## ────── Rust / Cargo ──────
+target/
+**/target/
+Cargo.lock.bak
+
+## ────── Node / pnpm / Vite ──────
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.pnpm-store/
+.vite/
+.npmrc.local
+
+## ────── Tauri ──────
+# Generated Android/iOS Tauri projects — they're scaffolded by `tauri android init`.
+# Keep MainActivity.kt overrides and tauri.conf.json, exclude the rest.
+src-tauri/gen/android/.gradle/
+src-tauri/gen/android/.idea/
+src-tauri/gen/android/build/
+src-tauri/gen/android/local.properties
+src-tauri/gen/android/app/build/
+src-tauri/gen/android/app/.cxx/
+src-tauri/gen/android/app/src/main/jniLibs/
+
+## ────── IDE ──────
+.idea/
+.vscode/
+*.iml
+
+## ────── OS ──────
+.DS_Store
+Thumbs.db
+
+## ────── Build artifacts / temp ──────
+*.apk
+logo-source.png

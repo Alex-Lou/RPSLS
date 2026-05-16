@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+:root {
+  --theme-primary:   #7c5cff;
+  --theme-secondary: #2dd4bf;
+  --theme-bg:        #0b0d12;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  color: #e5e7eb;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  -webkit-font-smoothing: antialiased;
+  /* Disable touch tap-zoom on mobile */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background:
+    radial-gradient(1200px 600px at 20% -10%, color-mix(in oklab, var(--theme-primary) 25%, transparent), transparent 60%),
+    radial-gradient(900px 500px at 110% 110%, color-mix(in oklab, var(--theme-secondary) 18%, transparent), transparent 60%),
+    var(--theme-bg);
+  background-attachment: fixed;
+}
+
+/* Respect Android status bar / nav bar.
+   Tauri's Android WebView doesn't always propagate env(safe-area-inset-*),
+   so we use max(env, sensible fallback) — at least 28px top, 36px bottom. */
+#root {
+  padding-top:    max(env(safe-area-inset-top),    28px);
+  padding-right:  max(env(safe-area-inset-right),  0px);
+  padding-bottom: max(env(safe-area-inset-bottom), 36px);
+  padding-left:   max(env(safe-area-inset-left),   0px);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+/* On desktop, no fallback needed */
+@media (min-width: 768px) {
+  #root {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+/* Smooth scrollbar in panels */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }

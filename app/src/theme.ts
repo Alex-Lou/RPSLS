@@ -1,0 +1,26 @@
+import type { ThemeId } from "./types";
+
+export interface ThemeDef {
+  id: ThemeId;
+  label: string;
+  emoji: string;
+  primary: string;
+  secondary: string;
+  bg: string;
+}
+
+export const THEMES: Record<ThemeId, ThemeDef> = {
+  violet: { id: "violet", label: "Violet",  emoji: "🔮", primary: "#7c5cff", secondary: "#2dd4bf", bg: "#0b0d12" },
+  neon:   { id: "neon",   label: "Neon",    emoji: "⚡", primary: "#22d3ee", secondary: "#ec4899", bg: "#0a0a12" },
+  pastel: { id: "pastel", label: "Pastel",  emoji: "🌸", primary: "#fda4af", secondary: "#86efac", bg: "#1a1620" },
+  sunset: { id: "sunset", label: "Sunset",  emoji: "🌅", primary: "#fb923c", secondary: "#f43f5e", bg: "#1a0f12" },
+  forest: { id: "forest", label: "Forest",  emoji: "🌲", primary: "#34d399", secondary: "#fbbf24", bg: "#0a1410" },
+};
+
+export function applyTheme(themeId: ThemeId) {
+  const t = THEMES[themeId];
+  const root = document.documentElement;
+  root.style.setProperty("--theme-primary", t.primary);
+  root.style.setProperty("--theme-secondary", t.secondary);
+  root.style.setProperty("--theme-bg", t.bg);
+}

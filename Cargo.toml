@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/rpsls-core",
+    "app/src-tauri",
+]
+exclude = []
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Alex <alex.guennad@gmail.com>"]
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rpsls-core = { path = "crates/rpsls-core" }
