@@ -92,7 +92,7 @@ export class OnlineClient {
   status: "idle" | "connecting" | "open" | "closed" | "error" = "idle";
   onStatus?: (s: OnlineClient["status"]) => void;
 
-  connect(url: string): Promise<void> {
+  connect(url: string, openTimeoutMs = 60_000): Promise<void> {
     this.closedByUser = false;
     this.setStatus("connecting");
     return new Promise((resolve, reject) => {
@@ -106,15 +106,29 @@ export class OnlineClient {
         const wsUrl = normalized.replace(/\/+$/, "") + "/ws";
         const ws = new WebSocket(wsUrl);
         this.ws = ws;
+        let settled = false;
+        const guard = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          try { ws.close(); } catch { /* ignore */ }
+          this.setStatus("error");
+          reject(new Error(`connect timeout (${openTimeoutMs / 1000}s)`));
+        }, openTimeoutMs);
         ws.onopen = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(guard);
           this.setStatus("open");
           // App-level keepalive every 25s.
           this.pingTimer = setInterval(() => this.send({ type: "ping" }), 25_000);
           resolve();
         };
         ws.onerror = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(guard);
           this.setStatus("error");
-          reject(new Error("ws error"));
+          reject(new Error("WebSocket error (server unreachable, firewall, or wrong URL)"));
         };
         ws.onclose = () => {
           if (this.pingTimer) {

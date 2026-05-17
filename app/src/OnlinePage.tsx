@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useStore } from "./store";
 import { useT } from "./i18n";
@@ -42,6 +42,70 @@ interface MatchState {
   ended: null | { winner: PlayerSlot | null; forfeit: boolean };
 }
 
+/* ──────────── useServerStatus hook ──────────── */
+
+type ConnStatus = "idle" | "checking" | "waking" | "online" | "offline";
+
+function useServerStatus(url: string): {
+  status: ConnStatus;
+  latencyMs: number | null;
+  refresh: () => void;
+} {
+  const [status, setStatus] = useState<ConnStatus>("idle");
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const refresh = useCallback(async () => {
+    abortRef.current?.abort();
+    if (!url.trim()) {
+      setStatus("offline");
+      setLatencyMs(null);
+      return;
+    }
+    const normalized = normalizeServerUrl(url);
+    const httpUrl =
+      normalized.replace(/^wss:\/\//, "https://").replace(/^ws:\/\//, "http://") +
+      "/health";
+
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setStatus("checking");
+
+    // First quick attempt: 3.5s. If it succeeds in <2s, server was warm.
+    // If it takes longer or times out, flip to "waking" and wait up to 60s.
+    const t0 = performance.now();
+    const quickT = setTimeout(() => {
+      if (!ctrl.signal.aborted) setStatus("waking");
+    }, 2_500);
+    const hardT = setTimeout(() => ctrl.abort(), 60_000);
+
+    try {
+      const res = await fetch(httpUrl, { signal: ctrl.signal, cache: "no-store" });
+      clearTimeout(quickT);
+      clearTimeout(hardT);
+      if (res.ok) {
+        setLatencyMs(Math.round(performance.now() - t0));
+        setStatus("online");
+      } else {
+        setStatus("offline");
+      }
+    } catch {
+      clearTimeout(quickT);
+      clearTimeout(hardT);
+      if (!ctrl.signal.aborted || ctrl.signal.reason !== undefined) {
+        setStatus("offline");
+      }
+    }
+  }, [url]);
+
+  useEffect(() => {
+    refresh();
+    return () => abortRef.current?.abort();
+  }, [refresh]);
+
+  return { status, latencyMs, refresh };
+}
+
 function emptyMatch(): MatchState {
   return {
     matchId: "",
@@ -74,6 +138,11 @@ export function OnlinePage() {
   const [serverPickerOpen, setServerPickerOpen] = useState(false);
 
   const clientRef = useRef<OnlineClient | null>(null);
+
+  const activeServerUrl =
+    serverConfig.mode === "cloud" ? serverConfig.cloudUrl : serverConfig.lanUrl;
+  const { status: connStatus, latencyMs, refresh: refreshStatus } =
+    useServerStatus(activeServerUrl);
 
   /* ── Lazy create client ── */
   function ensureClient(): Promise<OnlineClient> {
@@ -282,7 +351,7 @@ export function OnlinePage() {
   /* ── Render ── */
   return (
     <div className="px-4 py-6 max-w-3xl w-full mx-auto flex-1 flex flex-col">
-      <div className="flex items-baseline justify-between gap-3 mb-4">
+      <div className="flex items-baseline justify-between gap-3 mb-3">
         <div className="flex items-baseline gap-3">
           <h1 className="text-3xl font-black tracking-tight">🌐 {t("nav.online")}</h1>
           <span className="text-xs text-zinc-500">Beta · {player.nickname}</span>
@@ -297,6 +366,15 @@ export function OnlinePage() {
           </button>
         )}
       </div>
+
+      {/* Live server status badge */}
+      <ServerStatusBadge
+        mode={serverConfig.mode}
+        url={activeServerUrl}
+        status={connStatus}
+        latencyMs={latencyMs}
+        onRefresh={refreshStatus}
+      />
 
       {/* Server picker — collapsible */}
       <AnimatePresence>
@@ -374,7 +452,15 @@ export function OnlinePage() {
         )}
 
         {(phase === "connecting" || phase === "creating" || phase === "joining") && (
-          <Waiting key="wait" label="Connecting…" onCancel={cancel} />
+          <Waiting
+            key="wait"
+            label={
+              connStatus === "waking" && serverConfig.mode === "cloud"
+                ? "Waking up free server (~30–50s, only on first connect)…"
+                : "Connecting…"
+            }
+            onCancel={cancel}
+          />
         )}
 
         {phase === "lobby_open" && (
@@ -581,6 +667,78 @@ export function OnlinePage() {
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/* ──────────── Server status badge ──────────── */
+
+function ServerStatusBadge({
+  mode,
+  url,
+  status,
+  latencyMs,
+  onRefresh,
+}: {
+  mode: "cloud" | "lan";
+  url: string;
+  status: ConnStatus;
+  latencyMs: number | null;
+  onRefresh: () => void;
+}) {
+  const palette: Record<ConnStatus, { dot: string; text: string; bg: string }> = {
+    idle:     { dot: "bg-zinc-500",   text: "text-zinc-400",   bg: "bg-white/5 border-white/10" },
+    checking: { dot: "bg-sky-400",    text: "text-sky-200",    bg: "bg-sky-500/10 border-sky-500/30" },
+    waking:   { dot: "bg-amber-400",  text: "text-amber-200",  bg: "bg-amber-500/10 border-amber-500/30" },
+    online:   { dot: "bg-emerald-400",text: "text-emerald-200",bg: "bg-emerald-500/10 border-emerald-500/30" },
+    offline:  { dot: "bg-rose-500",   text: "text-rose-200",   bg: "bg-rose-500/10 border-rose-500/30" },
+  };
+  const p = palette[status];
+
+  const label = (() => {
+    switch (status) {
+      case "idle":     return "Idle";
+      case "checking": return "Pinging…";
+      case "waking":   return mode === "cloud"
+        ? "Waking up free instance (~30–50s)…"
+        : "Connecting…";
+      case "online":   return latencyMs != null ? `Online · ${latencyMs} ms` : "Online";
+      case "offline":  return "Unreachable";
+    }
+  })();
+
+  const prettyUrl = url.replace(/^wss?:\/\//, "");
+
+  return (
+    <div
+      className={
+        "mb-4 px-3 py-2 rounded-xl border flex items-center gap-2 text-xs " + p.bg
+      }
+    >
+      <motion.span
+        className={"w-2 h-2 rounded-full " + p.dot}
+        animate={
+          status === "checking" || status === "waking"
+            ? { opacity: [0.3, 1, 0.3] }
+            : { opacity: 1 }
+        }
+        transition={{ duration: 1, repeat: Infinity }}
+      />
+      <span className={"font-semibold " + p.text}>
+        {mode === "cloud" ? "☁️ Cloud" : "📶 LAN"}
+      </span>
+      <span className="text-zinc-500">·</span>
+      <span className={"truncate flex-1 min-w-0 " + p.text}>{label}</span>
+      <span className="hidden sm:inline text-zinc-500 truncate max-w-[40%] font-mono text-[10px]">
+        {prettyUrl}
+      </span>
+      <button
+        onClick={onRefresh}
+        title="Ping again"
+        className="ml-1 px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-zinc-300 text-[10px] transition"
+      >
+        ↻
+      </button>
     </div>
   );
 }
