@@ -18,11 +18,16 @@ Then open <http://localhost:5500>.
 
 ## Deploy (100% free)
 
-Drop the `landing/` folder on any static host. No build step.
+This repo auto-deploys `landing/` to **GitHub Pages** via the workflow
+`.github/workflows/landing.yml` on every push to `main` that touches
+`landing/**`.
+
+URL: <https://alex-lou.github.io/RPSLS/>
+
+To deploy elsewhere instead, drop the folder on any static host:
 
 - **Cloudflare Pages** — connect the GitHub repo, build command empty, output directory `landing`.
 - **Netlify** — drag-and-drop the folder onto https://app.netlify.com/drop.
-- **GitHub Pages** — set Pages → source = `develop`/`landing` (or move the contents under `docs/`).
 
 ## Tech
 
