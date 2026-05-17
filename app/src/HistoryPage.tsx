@@ -105,6 +105,14 @@ function Row({
             <span className={"text-sm font-bold uppercase tracking-wider " + outcomeColor.text}>
               {match.outcome}
             </span>
+            {match.forfeit && (
+              <span
+                className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 flex items-center gap-0.5"
+                title="Forfeit — match abandoned mid-way"
+              >
+                🏳️ Forfeit
+              </span>
+            )}
             <span className="text-zinc-500 text-xs">·</span>
             <span className="text-xs text-zinc-400">{MODE_META[match.mode].label}</span>
             <span className="text-zinc-500 text-xs">·</span>

@@ -111,8 +111,10 @@ async fn run_match(
         a.send(msg.clone());
         b.send(msg);
 
-        // Tiny pause so clients can render the reveal before the next round.
-        tokio::time::sleep(Duration::from_millis(1200)).await;
+        // Pause so clients can play the full reveal sequence (countdown
+        // "Rock-Paper-Scissors-SHOOT!" ≈1.4s + verdict savouring ≈1.5s)
+        // before we kick off the next round.
+        tokio::time::sleep(Duration::from_millis(3500)).await;
     }
 
     if m.status() != MatchStatus::InProgress {

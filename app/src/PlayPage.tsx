@@ -477,6 +477,53 @@ function Game({
     else setPhase({ kind: "p1-pick" });
   };
 
+  /** User confirmed Quit mid-match → record as a forfeit loss, then unmount. */
+  const handleQuit = () => {
+    // If the match already ended naturally, the recordMatch effect handled it.
+    if (recorded || phase.kind === "match-end") {
+      onQuit();
+      return;
+    }
+    const tgt = target(match);
+    const opponent: Opponent = isHotseat
+      ? { kind: "human", nickname: "Guest" }
+      : { kind: "cpu", mood };
+    const r = REWARDS[mode];
+    const rec: MatchRecord = {
+      id:
+        globalThis.crypto && "randomUUID" in globalThis.crypto
+          ? (globalThis.crypto as Crypto).randomUUID()
+          : `${Date.now()}-${Math.random()}`,
+      mode,
+      bestOf,
+      opponent,
+      scorePlayer: match.scoreA,
+      // Treat the opponent as crossing the finish line — that's what a
+      // forfeit means in the match history.
+      scoreOpponent: tgt,
+      outcome: "loss",
+      rounds: match.history.map((rd) => ({
+        playerMove: rd.move_a,
+        opponentMove: rd.move_b,
+        result:
+          rd.outcome.kind === "a_wins"
+            ? "win"
+            : rd.outcome.kind === "b_wins"
+            ? "loss"
+            : "draw",
+      })),
+      // No XP from forfeits (you don't get rewarded for bailing).
+      xpDelta: 0,
+      // Ranked still pays the loss penalty so players can't ditch to dodge LP.
+      lpDelta: r.lpLoss,
+      timestamp: Date.now(),
+      forfeit: true,
+    };
+    recordMatch(rec);
+    setRecorded(true);
+    onQuit();
+  };
+
   // Record match on end (once)
   useEffect(() => {
     if (phase.kind !== "match-end" || recorded) return;
@@ -557,7 +604,7 @@ function Game({
         streakA={streaks.a}
         streakB={streaks.b}
         mood={!isHotseat ? mood : null}
-        onQuit={onQuit}
+        onQuit={handleQuit}
       />
 
       {/* Board: pad as canvas, takes ALL remaining vertical space */}
@@ -822,20 +869,22 @@ function QuitConfirmModal({
           {t("match.quitConfirm")}
         </p>
         <div className="flex items-center gap-3 w-full">
+          {/* ✓ green: YES, quit (recorded as forfeit loss). */}
           <motion.button
             whileTap={{ scale: 0.95 }}
-            onClick={onCancel}
-            aria-label="Cancel"
+            onClick={onConfirm}
+            aria-label="Yes, quit (forfeit)"
             className="flex-1 h-12 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold flex items-center justify-center shadow-lg"
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12" />
             </svg>
           </motion.button>
+          {/* ✗ rose: NO, stay in the match. */}
           <motion.button
             whileTap={{ scale: 0.95 }}
-            onClick={onConfirm}
-            aria-label="Confirm quit"
+            onClick={onCancel}
+            aria-label="No, stay in the match"
             className="flex-1 h-12 rounded-2xl bg-rose-500 hover:bg-rose-400 text-white font-bold flex items-center justify-center shadow-lg"
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
