@@ -290,7 +290,7 @@ export function OnlinePage() {
         }));
         setPhase("reveal");
         setRevealRevealed(false);
-        // 1.2s of "Rock... Paper... Scissors... SHOOT!" suspense before
+        // 1.4s of "Rock... Paper... Scissors... SHOOT!" suspense before
         // the verdict actually shows. Haptic fires *after* the suspense so
         // the buzz lands with the reveal animation, not before it.
         if (revealTimer.current) window.clearTimeout(revealTimer.current);
@@ -309,7 +309,7 @@ export function OnlinePage() {
             else hapticLoss();
             return cur;
           });
-        }, 1200);
+        }, 1400);
         break;
       case "match_end":
         setM((cur) => {
@@ -1338,16 +1338,19 @@ function LockedStage({ move }: { move: Move }) {
 }
 
 function RevealCountdown() {
+  const t = useT();
   return (
     <motion.div
       key="revealcd"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex flex-col items-center gap-4"
+      className="flex flex-col items-center justify-center gap-3 w-full px-4 text-center"
     >
-      <div className="text-xs uppercase tracking-[0.4em] text-zinc-500">Reveal</div>
-      <div className="flex items-center gap-3 text-3xl sm:text-5xl font-black">
-        {["Rock", "Paper", "Scissors"].map((w, i) => (
+      <div className="text-[10px] uppercase tracking-[0.4em] text-zinc-500">
+        {t("online.reveal.label")}
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xl sm:text-3xl font-black max-w-full leading-tight">
+        {[t("online.reveal.rock"), t("online.reveal.paper"), t("online.reveal.scissors")].map((w, i) => (
           <motion.span
             key={w}
             initial={{ opacity: 0, y: 8 }}
@@ -1363,9 +1366,9 @@ function RevealCountdown() {
         initial={{ opacity: 0, scale: 0.7 }}
         animate={{ opacity: 1, scale: [0.7, 1.3, 1] }}
         transition={{ delay: 0.78, duration: 0.4 }}
-        className="text-4xl sm:text-6xl font-black bg-gradient-to-br from-amber-300 to-rose-400 bg-clip-text text-transparent"
+        className="text-3xl sm:text-5xl font-black bg-gradient-to-br from-amber-300 to-rose-400 bg-clip-text text-transparent"
       >
-        SHOOT!
+        {t("online.reveal.shoot")}
       </motion.div>
     </motion.div>
   );
@@ -1384,71 +1387,167 @@ function RevealStage({
   verb: string | null;
   opponentName: string;
 }) {
+  const t = useT();
+  // Hit-shake when the verdict lands — only on win/loss, not draw.
+  const shake =
+    outcomeForYou === "win" || outcomeForYou === "loss"
+      ? { x: [0, -6, 6, -4, 4, 0], y: [0, 2, -2, 1, -1, 0] }
+      : {};
   return (
     <motion.div
       key="reveal"
       initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="flex flex-col items-center gap-3 w-full"
+      animate={{ opacity: 1, scale: 1, ...shake }}
+      transition={{ duration: 0.5 }}
+      className="flex flex-col items-center gap-3 w-full px-2"
     >
-      <div className="flex items-center justify-around w-full">
+      <div className="flex items-center justify-around w-full max-w-md mx-auto">
+        {/* Your hand */}
         <motion.div
-          initial={{ x: -50, opacity: 0, rotate: -15 }}
-          animate={{ x: 0, opacity: 1, rotate: 0 }}
-          transition={{ type: "spring", stiffness: 200, damping: 14 }}
-          className={outcomeForYou === "win" ? "scale-110" : outcomeForYou === "loss" ? "opacity-60" : ""}
+          initial={{ x: -40, opacity: 0, rotate: -12 }}
+          animate={{
+            x: 0,
+            opacity: 1,
+            rotate: 0,
+            scale: outcomeForYou === "win" ? [1, 1.15, 1.05] : outcomeForYou === "loss" ? 0.92 : 1,
+          }}
+          transition={{ type: "spring", stiffness: 220, damping: 14 }}
+          className="relative"
         >
-          {youMove && <Hand move={youMove} size="xl"
-            emphasis={outcomeForYou === "win" ? "winner" : outcomeForYou === "loss" ? "loser" : "default"} />}
+          {/* Winner glow halo */}
+          {outcomeForYou === "win" && youMove && (
+            <motion.div
+              aria-hidden
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: [0, 0.6, 0.25], scale: [0.5, 1.4, 1.2] }}
+              transition={{ duration: 0.9 }}
+              className="absolute inset-0 -z-10 rounded-3xl blur-2xl"
+              style={{
+                background: `radial-gradient(circle, ${MOVE_PALETTE[youMove].hex}90, transparent 70%)`,
+              }}
+            />
+          )}
+          {youMove && (
+            <Hand
+              move={youMove}
+              size="md"
+              emphasis={
+                outcomeForYou === "win" ? "winner" :
+                outcomeForYou === "loss" ? "loser" : "default"
+              }
+            />
+          )}
         </motion.div>
+
+        {/* Center VS — pulses on impact */}
         <motion.div
           initial={{ scale: 0, rotate: -90 }}
-          animate={{ scale: 1, rotate: 0 }}
-          transition={{ delay: 0.1, type: "spring", stiffness: 220, damping: 12 }}
-          className="text-3xl font-black text-zinc-600"
+          animate={{
+            scale: outcomeForYou === "draw" ? 1 : [0, 1.4, 1],
+            rotate: 0,
+          }}
+          transition={{ delay: 0.05, type: "spring", stiffness: 280, damping: 12 }}
+          className="text-2xl sm:text-3xl font-black text-zinc-600 shrink-0 px-1"
         >
           VS
         </motion.div>
+
+        {/* Opponent hand — mirrored */}
         <motion.div
-          initial={{ x: 50, opacity: 0, rotate: 15 }}
-          animate={{ x: 0, opacity: 1, rotate: 0 }}
-          transition={{ type: "spring", stiffness: 200, damping: 14 }}
-          className={
-            (outcomeForYou === "loss" ? "scale-110" : outcomeForYou === "win" ? "opacity-60" : "") +
-            " scale-x-[-1]"
-          }
+          initial={{ x: 40, opacity: 0, rotate: 12 }}
+          animate={{
+            x: 0,
+            opacity: 1,
+            rotate: 0,
+            scale: outcomeForYou === "loss" ? [1, 1.15, 1.05] : outcomeForYou === "win" ? 0.92 : 1,
+          }}
+          transition={{ type: "spring", stiffness: 220, damping: 14 }}
+          className="relative scale-x-[-1]"
         >
+          {outcomeForYou === "loss" && oppMove && (
+            <motion.div
+              aria-hidden
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: [0, 0.6, 0.25], scale: [0.5, 1.4, 1.2] }}
+              transition={{ duration: 0.9 }}
+              className="absolute inset-0 -z-10 rounded-3xl blur-2xl scale-x-[-1]"
+              style={{
+                background: `radial-gradient(circle, ${MOVE_PALETTE[oppMove].hex}90, transparent 70%)`,
+              }}
+            />
+          )}
           {oppMove && (
             <div className="scale-x-[-1]">
-              <Hand move={oppMove} size="xl"
-                emphasis={outcomeForYou === "loss" ? "winner" : outcomeForYou === "win" ? "loser" : "default"} />
+              <Hand
+                move={oppMove}
+                size="md"
+                emphasis={
+                  outcomeForYou === "loss" ? "winner" :
+                  outcomeForYou === "win" ? "loser" : "default"
+                }
+              />
             </div>
           )}
         </motion.div>
       </div>
+
+      {/* Sparkle/burst particles on win — pure emoji, no extra deps. */}
+      {outcomeForYou === "win" && <SparkBurst color="emerald" />}
+      {outcomeForYou === "loss" && <SparkBurst color="rose" />}
+
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3, duration: 0.3 }}
-        className="text-center mt-2"
+        transition={{ delay: 0.35, duration: 0.3 }}
+        className="text-center mt-1 px-2 max-w-md"
       >
         {outcomeForYou === "draw" && (
-          <div className="text-zinc-300 text-lg font-bold">🤝 Draw — same move</div>
+          <div className="text-zinc-300 text-base sm:text-lg font-bold">
+            🤝 {t("online.verdict.draw")}
+          </div>
         )}
         {outcomeForYou === "win" && verb && (
-          <div className="text-emerald-300 text-lg font-bold">
-            ✨ You win — your <span className="text-emerald-100">{youMove}</span> {verb}{" "}
+          <div className="text-emerald-300 text-base sm:text-lg font-bold leading-snug">
+            ✨ {t("online.verdict.youWin")}{" "}
+            <span className="text-emerald-100">{youMove}</span> {verb}{" "}
             <span className="text-emerald-100">{oppMove}</span>
           </div>
         )}
         {outcomeForYou === "loss" && verb && (
-          <div className="text-rose-300 text-lg font-bold">
-            💥 You lose — {opponentName}'s <span className="text-rose-100">{oppMove}</span>{" "}
-            {verb} <span className="text-rose-100">{youMove}</span>
+          <div className="text-rose-300 text-base sm:text-lg font-bold leading-snug">
+            💥 {t("online.verdict.youLose", { opp: opponentName })}{" "}
+            <span className="text-rose-100">{oppMove}</span> {verb}{" "}
+            <span className="text-rose-100">{youMove}</span>
           </div>
         )}
       </motion.div>
     </motion.div>
+  );
+}
+
+/** Tiny celebratory/sad burst — 8 emojis flying outward in a star pattern. */
+function SparkBurst({ color }: { color: "emerald" | "rose" }) {
+  const emoji = color === "emerald" ? "✨" : "💥";
+  return (
+    <div className="relative h-0 w-full pointer-events-none">
+      {Array.from({ length: 8 }).map((_, i) => {
+        const angle = (i / 8) * Math.PI * 2;
+        const dx = Math.cos(angle) * 90;
+        const dy = Math.sin(angle) * 60;
+        return (
+          <motion.span
+            key={i}
+            initial={{ opacity: 0, x: 0, y: 0, scale: 0.3 }}
+            animate={{ opacity: [0, 1, 0], x: dx, y: dy, scale: [0.3, 1.2, 0.6] }}
+            transition={{ duration: 0.9, delay: 0.05 * i, ease: "easeOut" }}
+            className="absolute left-1/2 top-0 text-lg"
+            style={{ translate: "-50% 0" }}
+          >
+            {emoji}
+          </motion.span>
+        );
+      })}
+    </div>
   );
 }
 
