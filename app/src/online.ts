@@ -83,18 +83,33 @@ export function normalizeServerUrl(input: string): string {
 
 export type Listener = (msg: ServerMessage) => void;
 
+/** Backoff schedule (ms) for reconnection attempts after an unexpected drop. */
+const RECONNECT_DELAYS = [400, 1_200, 3_000];
+
 export class OnlineClient {
   private ws: WebSocket | null = null;
   private listeners = new Set<Listener>();
   private pingTimer: ReturnType<typeof setInterval> | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private closedByUser = false;
+  private lastUrl: string | null = null;
+  private reconnectAttempt = 0;
   /** Last seen connection state. */
-  status: "idle" | "connecting" | "open" | "closed" | "error" = "idle";
+  status: "idle" | "connecting" | "open" | "reconnecting" | "closed" | "error" = "idle";
   onStatus?: (s: OnlineClient["status"]) => void;
+  /** Called whenever a reconnect succeeds — callers should re-issue any
+   *  state-setup messages (e.g. hello) since the server has lost the session. */
+  onReconnect?: () => void;
 
   connect(url: string, openTimeoutMs = 60_000): Promise<void> {
     this.closedByUser = false;
+    this.lastUrl = url;
+    this.reconnectAttempt = 0;
     this.setStatus("connecting");
+    return this.openSocket(url, openTimeoutMs);
+  }
+
+  private openSocket(url: string, openTimeoutMs: number): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
         const normalized = normalizeServerUrl(url);
@@ -118,9 +133,13 @@ export class OnlineClient {
           if (settled) return;
           settled = true;
           clearTimeout(guard);
+          const wasReconnect = this.reconnectAttempt > 0;
+          this.reconnectAttempt = 0;
           this.setStatus("open");
           // App-level keepalive every 25s.
+          if (this.pingTimer) clearInterval(this.pingTimer);
           this.pingTimer = setInterval(() => this.send({ type: "ping" }), 25_000);
+          if (wasReconnect) this.onReconnect?.();
           resolve();
         };
         ws.onerror = () => {
@@ -135,7 +154,12 @@ export class OnlineClient {
             clearInterval(this.pingTimer);
             this.pingTimer = null;
           }
-          this.setStatus(this.closedByUser ? "closed" : "error");
+          // Unexpected drop? Schedule a reconnect.
+          if (!this.closedByUser && this.lastUrl) {
+            this.scheduleReconnect(openTimeoutMs);
+          } else {
+            this.setStatus(this.closedByUser ? "closed" : "error");
+          }
         };
         ws.onmessage = (ev) => {
           let parsed: ServerMessage | null = null;
@@ -153,6 +177,24 @@ export class OnlineClient {
     });
   }
 
+  private scheduleReconnect(openTimeoutMs: number) {
+    if (this.reconnectAttempt >= RECONNECT_DELAYS.length || !this.lastUrl) {
+      this.setStatus("error");
+      return;
+    }
+    const delay = RECONNECT_DELAYS[this.reconnectAttempt];
+    this.reconnectAttempt += 1;
+    this.setStatus("reconnecting");
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.closedByUser || !this.lastUrl) return;
+      this.openSocket(this.lastUrl, openTimeoutMs).catch(() => {
+        // openSocket already set "error"; onclose will re-trigger schedule.
+      });
+    }, delay);
+  }
+
   on(l: Listener): () => void {
     this.listeners.add(l);
     return () => this.listeners.delete(l);
@@ -166,6 +208,10 @@ export class OnlineClient {
 
   disconnect(): void {
     this.closedByUser = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     if (this.ws) {
       try {
         this.ws.close();
