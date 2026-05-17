@@ -53,54 +53,63 @@ function useServerStatus(url: string): {
 } {
   const [status, setStatus] = useState<ConnStatus>("idle");
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  const probeRef = useRef<WebSocket | null>(null);
 
-  const refresh = useCallback(async () => {
-    abortRef.current?.abort();
+  const refresh = useCallback(() => {
+    // Tear down any running probe.
+    try { probeRef.current?.close(); } catch { /* ignore */ }
+    probeRef.current = null;
+
     if (!url.trim()) {
       setStatus("offline");
       setLatencyMs(null);
       return;
     }
-    const normalized = normalizeServerUrl(url);
-    const httpUrl =
-      normalized.replace(/^wss:\/\//, "https://").replace(/^ws:\/\//, "http://") +
-      "/health";
-
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
+    const wsUrl = normalizeServerUrl(url).replace(/\/+$/, "") + "/ws";
     setStatus("checking");
 
-    // Cold-start budget for Render free tier: up to ~90s. We flip to
-    // "waking" after 2.5s so the user sees we're aware it's slow.
-    const t0 = performance.now();
-    const quickT = setTimeout(() => {
-      if (!ctrl.signal.aborted) setStatus("waking");
-    }, 2_500);
-    const hardT = setTimeout(() => ctrl.abort(), 90_000);
-
+    let ws: WebSocket;
     try {
-      const res = await fetch(httpUrl, { signal: ctrl.signal, cache: "no-store" });
-      clearTimeout(quickT);
-      clearTimeout(hardT);
-      if (res.ok) {
-        setLatencyMs(Math.round(performance.now() - t0));
-        setStatus("online");
-      } else {
-        setStatus("offline");
-      }
+      ws = new WebSocket(wsUrl);
     } catch {
-      clearTimeout(quickT);
-      clearTimeout(hardT);
-      if (!ctrl.signal.aborted || ctrl.signal.reason !== undefined) {
-        setStatus("offline");
-      }
+      setStatus("offline");
+      return;
     }
+    probeRef.current = ws;
+
+    // Cold-start budget for Render free tier: up to ~90s. Flip to "waking"
+    // after 2.5s so the user sees we know it's slow.
+    const t0 = performance.now();
+    const wakingT = setTimeout(() => {
+      if (probeRef.current === ws) setStatus("waking");
+    }, 2_500);
+    const hardT = setTimeout(() => {
+      try { ws.close(); } catch { /* ignore */ }
+      if (probeRef.current === ws) setStatus("offline");
+    }, 90_000);
+
+    ws.onopen = () => {
+      clearTimeout(wakingT);
+      clearTimeout(hardT);
+      const dt = Math.round(performance.now() - t0);
+      try { ws.close(); } catch { /* ignore */ }
+      if (probeRef.current === ws) {
+        setLatencyMs(dt);
+        setStatus("online");
+      }
+    };
+    ws.onerror = () => {
+      clearTimeout(wakingT);
+      clearTimeout(hardT);
+      if (probeRef.current === ws) setStatus("offline");
+    };
   }, [url]);
 
   useEffect(() => {
     refresh();
-    return () => abortRef.current?.abort();
+    return () => {
+      try { probeRef.current?.close(); } catch { /* ignore */ }
+    };
   }, [refresh]);
 
   // Auto-retry every 15s while we're stuck offline so a slow first
@@ -772,35 +781,44 @@ function ServerPicker({
   const previewLan = normalizeServerUrl(lan);
   const previewCloud = normalizeServerUrl(cloud);
 
-  async function testConnection() {
+  function testConnection() {
     setTestStatus("testing");
     setTestMsg("");
-    const ws = cfg.mode === "lan" ? previewLan : previewCloud;
-    // Derive HTTP URL for /health: replace ws->http, wss->https.
-    const httpUrl =
-      ws.replace(/^wss:\/\//, "https://").replace(/^ws:\/\//, "http://") + "/health";
+    const wsUrlRaw = cfg.mode === "lan" ? previewLan : previewCloud;
+    const wsUrl = wsUrlRaw.replace(/\/+$/, "") + "/ws";
+    let ws: WebSocket;
     try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 4000);
-      const res = await fetch(httpUrl, { signal: ctrl.signal });
-      clearTimeout(t);
-      if (res.ok) {
-        setTestStatus("ok");
-        setTestMsg(`Server reachable (HTTP ${res.status}).`);
-        // Sync the global badge so it reflects this successful probe.
-        onRefreshStatus?.();
-      } else {
-        setTestStatus("fail");
-        setTestMsg(`Server replied HTTP ${res.status} — check the URL.`);
-      }
+      ws = new WebSocket(wsUrl);
     } catch (e) {
       setTestStatus("fail");
-      setTestMsg(
-        e instanceof Error && e.name === "AbortError"
-          ? "Timeout — no response in 4s. Is the server running? Firewall?"
-          : `Cannot reach: ${e instanceof Error ? e.message : String(e)}`
-      );
+      setTestMsg(`Invalid URL: ${e instanceof Error ? e.message : String(e)}`);
+      return;
     }
+    const t0 = performance.now();
+    const t = setTimeout(() => {
+      try { ws.close(); } catch { /* ignore */ }
+      setTestStatus("fail");
+      setTestMsg(
+        cfg.mode === "cloud"
+          ? "No response in 90s. The free instance may be down."
+          : "No response in 90s. Is the server running? Same Wi-Fi? Firewall?"
+      );
+    }, 90_000);
+    ws.onopen = () => {
+      clearTimeout(t);
+      const dt = Math.round(performance.now() - t0);
+      try { ws.close(); } catch { /* ignore */ }
+      setTestStatus("ok");
+      setTestMsg(`Server reachable (WebSocket opened in ${dt} ms).`);
+      onRefreshStatus?.();
+    };
+    ws.onerror = () => {
+      clearTimeout(t);
+      setTestStatus("fail");
+      setTestMsg(
+        "Cannot open WebSocket — server unreachable, wrong URL, or firewall."
+      );
+    };
   }
 
   return (
