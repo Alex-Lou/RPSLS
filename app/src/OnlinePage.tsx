@@ -10,6 +10,16 @@ import {
   type ServerMessage,
   type PlayerSlot,
 } from "./online";
+import {
+  hapticTap,
+  hapticLock,
+  hapticMatchStart,
+  hapticWin,
+  hapticLoss,
+  hapticMatchWin,
+  hapticMatchLoss,
+  hapticAlert,
+} from "./haptic";
 
 type Phase =
   | "menu"
@@ -162,6 +172,9 @@ export function OnlinePage() {
   const splashTimer = useRef<number | null>(null);
   const revealTimer = useRef<number | null>(null);
 
+  // Connection drop tracking — keeps the UI sane during wifi hiccups.
+  const [connDropped, setConnDropped] = useState(false);
+
   const clientRef = useRef<OnlineClient | null>(null);
 
   const activeServerUrl =
@@ -189,6 +202,23 @@ export function OnlinePage() {
     const c = new OnlineClient();
     clientRef.current = c;
     c.on(onMessage);
+    c.onStatus = (s) => {
+      // Surface only the "reconnecting" → "open" cycle in the UI banner.
+      if (s === "reconnecting") {
+        setConnDropped(true);
+        hapticAlert();
+      } else if (s === "open") {
+        setConnDropped(false);
+      } else if (s === "error" || s === "closed") {
+        // After all retries exhausted, OnlineClient flips to "error".
+        // Leave the banner up — the user can cancel/retry manually.
+      }
+    };
+    c.onReconnect = () => {
+      // Server session reset on reconnect — re-introduce ourselves so the
+      // server has our nickname for the next match.
+      c.send({ type: "hello", nickname: player.nickname || "Anonymous" });
+    };
     return c.connect(url).then(() => {
       // Send Hello once on connection.
       c.send({ type: "hello", nickname: player.nickname || "Anonymous" });
@@ -231,6 +261,7 @@ export function OnlinePage() {
         });
         setPhase("matched");
         setQueueStartAt(null);
+        hapticMatchStart();
         // Show fullscreen "MATCH FOUND" splash for 2.5s.
         setShowMatchFoundSplash(true);
         if (splashTimer.current) window.clearTimeout(splashTimer.current);
@@ -260,17 +291,39 @@ export function OnlinePage() {
         setPhase("reveal");
         setRevealRevealed(false);
         // 1.2s of "Rock... Paper... Scissors... SHOOT!" suspense before
-        // the verdict actually shows.
+        // the verdict actually shows. Haptic fires *after* the suspense so
+        // the buzz lands with the reveal animation, not before it.
         if (revealTimer.current) window.clearTimeout(revealTimer.current);
-        revealTimer.current = window.setTimeout(() => setRevealRevealed(true), 1200);
+        revealTimer.current = window.setTimeout(() => {
+          setRevealRevealed(true);
+          // Latest message captured in closure to derive win/loss/draw.
+          const youAreA = msg.outcome.kind === "a_wins";
+          const youAreB = msg.outcome.kind === "b_wins";
+          // We need our own slot — read from current state ref-ish via setter.
+          setM((cur) => {
+            const win =
+              (cur.youAre === "a" && youAreA) || (cur.youAre === "b" && youAreB);
+            const draw = msg.outcome.kind === "draw";
+            if (draw) hapticTap();
+            else if (win) hapticWin();
+            else hapticLoss();
+            return cur;
+          });
+        }, 1200);
         break;
       case "match_end":
-        setM((cur) => ({
-          ...cur,
-          scoreA: msg.score_a,
-          scoreB: msg.score_b,
-          ended: { winner: msg.winner, forfeit: msg.forfeit },
-        }));
+        setM((cur) => {
+          const won = msg.winner === cur.youAre;
+          if (won) hapticMatchWin();
+          else if (msg.winner !== null) hapticMatchLoss();
+          else hapticTap();
+          return {
+            ...cur,
+            scoreA: msg.score_a,
+            scoreB: msg.score_b,
+            ended: { winner: msg.winner, forfeit: msg.forfeit },
+          };
+        });
         setPhase("match_end");
         break;
       case "opponent_left":
@@ -350,6 +403,7 @@ export function OnlinePage() {
 
   function playMove(mv: Move) {
     if (m.myMove) return;
+    hapticLock();
     setM((cur) => ({ ...cur, myMove: mv }));
     clientRef.current?.send({ type: "play_move", mv });
   }
@@ -429,6 +483,29 @@ export function OnlinePage() {
         latencyMs={latencyMs}
         onRefresh={refreshStatus}
       />
+
+      {/* Transient reconnect banner — only shown while the WS is mid-retry. */}
+      <AnimatePresence>
+        {connDropped && (
+          <motion.div
+            key="reconn"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="mb-3 px-3 py-2 rounded-xl border bg-amber-500/10 border-amber-500/30 text-amber-200 text-xs flex items-center gap-2"
+          >
+            <motion.span
+              className="w-2 h-2 rounded-full bg-amber-400"
+              animate={{ opacity: [0.3, 1, 0.3] }}
+              transition={{ duration: 1, repeat: Infinity }}
+            />
+            <span className="font-semibold">Reconnecting…</span>
+            <span className="text-amber-300/70">
+              your connection blinked — we're getting back online
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Server picker — collapsible */}
       <AnimatePresence>
