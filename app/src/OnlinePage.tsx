@@ -71,13 +71,13 @@ function useServerStatus(url: string): {
     abortRef.current = ctrl;
     setStatus("checking");
 
-    // First quick attempt: 3.5s. If it succeeds in <2s, server was warm.
-    // If it takes longer or times out, flip to "waking" and wait up to 60s.
+    // Cold-start budget for Render free tier: up to ~90s. We flip to
+    // "waking" after 2.5s so the user sees we're aware it's slow.
     const t0 = performance.now();
     const quickT = setTimeout(() => {
       if (!ctrl.signal.aborted) setStatus("waking");
     }, 2_500);
-    const hardT = setTimeout(() => ctrl.abort(), 60_000);
+    const hardT = setTimeout(() => ctrl.abort(), 90_000);
 
     try {
       const res = await fetch(httpUrl, { signal: ctrl.signal, cache: "no-store" });
@@ -102,6 +102,14 @@ function useServerStatus(url: string): {
     refresh();
     return () => abortRef.current?.abort();
   }, [refresh]);
+
+  // Auto-retry every 15s while we're stuck offline so a slow first
+  // wake-up eventually self-recovers without the user touching ↻.
+  useEffect(() => {
+    if (status !== "offline") return;
+    const id = setInterval(refresh, 15_000);
+    return () => clearInterval(id);
+  }, [status, refresh]);
 
   return { status, latencyMs, refresh };
 }
@@ -390,6 +398,7 @@ export function OnlinePage() {
               cfg={serverConfig}
               onChange={setServerConfig}
               onClose={() => setServerPickerOpen(false)}
+              onRefreshStatus={refreshStatus}
             />
           </motion.div>
         )}
@@ -456,7 +465,7 @@ export function OnlinePage() {
             key="wait"
             label={
               connStatus === "waking" && serverConfig.mode === "cloud"
-                ? "Waking up free server (~30–50s, only on first connect)…"
+                ? "Waking up free server (up to ~90s, only on first connect)…"
                 : "Connecting…"
             }
             onCancel={cancel}
@@ -700,7 +709,7 @@ function ServerStatusBadge({
       case "idle":     return "Idle";
       case "checking": return "Pinging…";
       case "waking":   return mode === "cloud"
-        ? "Waking up free instance (~30–50s)…"
+        ? "Waking up free instance (up to ~90s on first ping)…"
         : "Connecting…";
       case "online":   return latencyMs != null ? `Online · ${latencyMs} ms` : "Online";
       case "offline":  return "Unreachable";
@@ -749,10 +758,12 @@ function ServerPicker({
   cfg,
   onChange,
   onClose,
+  onRefreshStatus,
 }: {
   cfg: { mode: "cloud" | "lan"; cloudUrl: string; lanUrl: string };
   onChange: (p: Partial<{ mode: "cloud" | "lan"; cloudUrl: string; lanUrl: string }>) => void;
   onClose: () => void;
+  onRefreshStatus?: () => void;
 }) {
   const [lan, setLan] = useState(cfg.lanUrl);
   const [cloud, setCloud] = useState(cfg.cloudUrl);
@@ -776,6 +787,8 @@ function ServerPicker({
       if (res.ok) {
         setTestStatus("ok");
         setTestMsg(`Server reachable (HTTP ${res.status}).`);
+        // Sync the global badge so it reflects this successful probe.
+        onRefreshStatus?.();
       } else {
         setTestStatus("fail");
         setTestMsg(`Server replied HTTP ${res.status} — check the URL.`);
@@ -893,6 +906,8 @@ cargo run -p rpsls-server --release
         <button
           onClick={() => {
             onChange({ lanUrl: lan, cloudUrl: cloud });
+            // Defer to next tick so the store update lands before refresh.
+            setTimeout(() => onRefreshStatus?.(), 0);
             onClose();
           }}
           className="px-4 py-1.5 rounded-lg bg-emerald-500/90 hover:bg-emerald-500 text-sm text-white font-semibold transition"
