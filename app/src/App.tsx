@@ -142,7 +142,7 @@ function Splash({ onDone }: { onDone: () => void }) {
           }}
         />
         <motion.img
-          src="/logo.png"
+          src="/Logo-RLSPS.png"
           alt="RPSLS"
           className="w-44 h-44 sm:w-56 sm:h-56 md:w-64 md:h-64 drop-shadow-2xl"
           animate={{ y: [0, -6, 0] }}
