@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store";
 import { applyTheme } from "./theme";
+import { RTL_LOCALES } from "./i18n";
 import { Sidebar, MobileShell, type Page } from "./Sidebar";
 import { PlayPage } from "./PlayPage";
 import { OnlinePage } from "./OnlinePage";
@@ -18,6 +19,7 @@ type Stage = "splash" | "welcome" | "shell";
 export default function App() {
   const themeId = useStore((s) => s.player.themeId);
   const onboarded = useStore((s) => s.onboarded);
+  const locale = useStore((s) => s.locale);
   const [stage, setStage] = useState<Stage>("splash");
   const [page, setPage] = useState<Page>("play");
 
@@ -25,6 +27,14 @@ export default function App() {
   useEffect(() => {
     applyTheme(themeId);
   }, [themeId]);
+
+  // Mirror the locale onto <html> so Tailwind / browser can pick up text
+  // direction and language-aware features (forms, hyphenation, screen reader).
+  useEffect(() => {
+    const root = document.documentElement;
+    root.lang = locale;
+    root.dir = RTL_LOCALES.has(locale) ? "rtl" : "ltr";
+  }, [locale]);
 
   // Android back button handling:
   // - On Play: default behavior (Android closes app)
@@ -63,7 +73,7 @@ export default function App() {
             <div className="flex-1 flex flex-col min-w-0">
               <main className="flex-1 flex flex-col pt-16 md:pt-0">
                 <AnimatePresence mode="wait">
-                  {page === "play"    && <PageWrap key="play"><PlayPage /></PageWrap>}
+                  {page === "play"    && <PageWrap key="play"><PlayPage onNavigate={setPage} /></PageWrap>}
                   {page === "online"  && <PageWrap key="online"><OnlinePage /></PageWrap>}
                   {page === "quests"  && <PageWrap key="quests"><QuestsPage /></PageWrap>}
                   {page === "packs"   && <PageWrap key="packs"><PacksPage /></PageWrap>}

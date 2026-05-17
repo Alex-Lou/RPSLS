@@ -29,12 +29,13 @@ import {
 import { THEMES } from "./theme";
 import { todayChallenge, type DailyChallenge } from "./daily";
 import { useT } from "./i18n";
+import type { Page } from "./Sidebar";
 
 type View =
   | { kind: "select" }
   | { kind: "game"; mode: GameMode; bestOf: number; daily?: DailyChallenge };
 
-export function PlayPage() {
+export function PlayPage({ onNavigate }: { onNavigate?: (p: Page) => void }) {
   const [view, setView] = useState<View>({ kind: "select" });
 
   return (
@@ -47,6 +48,7 @@ export function PlayPage() {
             onStartDaily={(daily) =>
               setView({ kind: "game", mode: daily.mode, bestOf: daily.bestOf, daily })
             }
+            onGoOnline={onNavigate ? () => onNavigate("online") : undefined}
           />
         )}
         {view.kind === "game" && (
@@ -65,14 +67,22 @@ export function PlayPage() {
 
 /* ─────────── Mode Select ─────────── */
 
-const ALL_MODES: GameMode[] = ["training", "casual", "ranked", "hotseat"];
+// "online" is a UI-only card on the home grid that navigates to OnlinePage
+// — it's not a GameMode (which represents local CPU/hotseat match records).
+type ModeCardId = GameMode | "online";
+
+// Order matches user preference: Online slotted right after Casual so it's
+// visible without scrolling.
+const ALL_CARDS: ModeCardId[] = ["training", "casual", "online", "ranked", "hotseat"];
 
 function ModeSelect({
   onStart,
   onStartDaily,
+  onGoOnline,
 }: {
   onStart: (mode: GameMode, bestOf: number) => void;
   onStartDaily: (daily: DailyChallenge) => void;
+  onGoOnline?: () => void;
 }) {
   const [mode, setMode] = useState<GameMode>("casual");
   const [bestOf, setBestOf] = useState(3);
@@ -102,9 +112,43 @@ function ModeSelect({
 
       <DailyBanner daily={daily} done={dailyDone} onStart={() => onStartDaily(daily)} />
 
-      {/* Mode tiles — tap to open confirmation modal */}
+      {/* Mode tiles — tap to open confirmation modal (Online navigates instead) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {ALL_MODES.map((m, i) => {
+        {ALL_CARDS.map((m, i) => {
+          if (m === "online") {
+            return (
+              <motion.button
+                key="online"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05 * i, duration: 0.25 }}
+                whileHover={{ y: -3 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => onGoOnline?.()}
+                disabled={!onGoOnline}
+                className={
+                  "text-left p-4 rounded-2xl border transition flex items-start gap-3 relative overflow-hidden " +
+                  "border-violet-400/30 bg-gradient-to-br from-violet-500/15 via-fuchsia-500/10 to-cyan-500/15 " +
+                  "hover:from-violet-500/25 hover:via-fuchsia-500/20 hover:to-cyan-500/25 hover:border-violet-400/60 " +
+                  "shadow-lg shadow-violet-500/10"
+                }
+              >
+                <span className="text-3xl">🌐</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold">{t("mode.online")}</span>
+                    <span className="text-[10px] uppercase tracking-wider text-violet-200 bg-violet-500/25 px-1.5 rounded-full">
+                      LIVE
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-300 mt-0.5">{t("mode.online.tag")}</p>
+                  <p className="text-[10px] text-violet-300/80 mt-1.5">
+                    {t("mode.online.cta")} →
+                  </p>
+                </div>
+              </motion.button>
+            );
+          }
           const rewards = REWARDS[m];
           return (
             <motion.button
