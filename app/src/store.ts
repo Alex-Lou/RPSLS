@@ -66,8 +66,12 @@ interface AppState {
 function detectLocale(): Locale {
   const nav = (typeof navigator !== "undefined" && navigator.language) || "en";
   const code = nav.slice(0, 2).toLowerCase();
-  if (code === "fr" || code === "es" || code === "de" || code === "it") return code;
-  return "en";
+  const supported: Locale[] = [
+    "en", "fr", "es", "de", "it",
+    "pt", "zh", "ja", "ru", "ar",
+    "ko", "hi", "tr", "pl", "nl",
+  ];
+  return (supported as string[]).includes(code) ? (code as Locale) : "en";
 }
 
 /** Public Render.com deploy of crates/rpsls-server. Free tier, sleeps after
