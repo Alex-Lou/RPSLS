@@ -74,6 +74,8 @@ export interface MatchRecord {
   xpDelta: number;
   lpDelta: number;
   timestamp: number;
+  /** True when the player abandoned the match mid-way (counted as a loss). */
+  forfeit?: boolean;
 }
 
 /** XP/LP rewards table per mode. */
