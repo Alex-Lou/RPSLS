@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>RPSLS · Rock · Paper · Scissors · Lizard · Spock</title>
+  <meta name="description" content="The classic hand game extended with two new moves. Play online against humans, vs AI, with quests, 15 languages and 5 themes. Free, no ads, no tracking." />
+
+  <!-- Social cards -->
+  <meta property="og:title" content="RPSLS — Rock · Paper · Scissors · Lizard · Spock" />
+  <meta property="og:description" content="The classic, expanded. Online multiplayer, 15 languages, hand-crafted variants." />
+  <meta property="og:image" content="/logo.png" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <link rel="icon" type="image/png" href="/logo.png" />
+  <link rel="preconnect" href="https://cdn.tailwindcss.com" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            display: ['Space Grotesk', 'Inter', 'sans-serif'],
+          },
+          animation: {
+            'gradient-x': 'gradient-x 8s ease infinite',
+            'float': 'float 5s ease-in-out infinite',
+            'spin-slow': 'spin 18s linear infinite',
+            'glow-pulse': 'glow-pulse 3s ease-in-out infinite',
+          },
+          keyframes: {
+            'gradient-x': {
+              '0%, 100%': { 'background-position': '0% 50%' },
+              '50%': { 'background-position': '100% 50%' },
+            },
+            'float': {
+              '0%, 100%': { transform: 'translateY(0)' },
+              '50%': { transform: 'translateY(-12px)' },
+            },
+            'glow-pulse': {
+              '0%, 100%': { opacity: '0.6' },
+              '50%': { opacity: '1' },
+            },
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    html { scroll-behavior: smooth; background: #07080d; }
+    body {
+      background:
+        radial-gradient(ellipse at top left,  rgba(168,85,247,0.25), transparent 50%),
+        radial-gradient(ellipse at top right, rgba(45,212,191,0.18), transparent 50%),
+        radial-gradient(ellipse at bottom,    rgba(244,63,94,0.12), transparent 60%),
+        #07080d;
+      color: #e7e9ee;
+      min-height: 100vh;
+      overflow-x: hidden;
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+    .grain {
+      position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: 0.04;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+    .grid-floor {
+      position: absolute; inset: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(167,139,250,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(167,139,250,0.06) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 100%, black 0%, transparent 75%);
+    }
+    .reveal { opacity: 0; transform: translateY(28px); transition: opacity .8s cubic-bezier(.2,.7,.2,1), transform .8s cubic-bezier(.2,.7,.2,1); }
+    .reveal.in { opacity: 1; transform: translateY(0); }
+    .reveal.delay-1 { transition-delay: 0.1s; }
+    .reveal.delay-2 { transition-delay: 0.2s; }
+    .reveal.delay-3 { transition-delay: 0.3s; }
+    .reveal.delay-4 { transition-delay: 0.4s; }
+    .reveal.delay-5 { transition-delay: 0.5s; }
+
+    /* Animated headline gradient */
+    .grad-text {
+      background: linear-gradient(120deg, #c4b5fd, #f0abfc, #5eead4, #fcd34d, #c4b5fd);
+      background-size: 300% 100%;
+      -webkit-background-clip: text; background-clip: text;
+      color: transparent;
+      animation: gradient-x 8s ease infinite;
+    }
+
+    /* Hover lift card */
+    .lift { transition: transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s, border-color .35s; }
+    .lift:hover { transform: translateY(-6px); }
+
+    /* Move ring halo */
+    .halo::before {
+      content: ''; position: absolute; inset: -25%;
+      background: radial-gradient(circle, var(--halo) 0%, transparent 65%);
+      filter: blur(20px); z-index: -1; opacity: 0.55;
+    }
+
+    /* Mouse parallax target */
+    #parallax-bg > * { will-change: transform; }
+
+    /* CTA shimmer */
+    .shimmer {
+      position: relative; overflow: hidden;
+    }
+    .shimmer::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%);
+      transform: translateX(-100%);
+      transition: transform .6s;
+    }
+    .shimmer:hover::after { transform: translateX(100%); }
+
+    .move-card { --halo: rgba(167,139,250,0.45); }
+    .move-rock     { --halo: rgba(251,191,36,0.5); }
+    .move-paper    { --halo: rgba(186,230,253,0.5); }
+    .move-scissors { --halo: rgba(251,146,60,0.5); }
+    .move-lizard   { --halo: rgba(52,211,153,0.5); }
+    .move-spock    { --halo: rgba(139,92,246,0.55); }
+
+    /* Tasteful scroll progress bar */
+    #scroll-progress {
+      position: fixed; top: 0; left: 0; height: 2px; width: 0%;
+      background: linear-gradient(90deg, #a78bfa, #f0abfc, #5eead4);
+      z-index: 50; transition: width .12s linear;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="grain"></div>
+  <div id="scroll-progress"></div>
+
+  <!-- Floating background ornaments -->
+  <div id="parallax-bg" class="fixed inset-0 z-0 pointer-events-none">
+    <div class="absolute top-[10%] left-[5%] w-72 h-72 rounded-full blur-3xl opacity-30"
+         style="background: radial-gradient(circle, rgba(167,139,250,0.6), transparent 60%);"></div>
+    <div class="absolute top-[40%] right-[8%] w-96 h-96 rounded-full blur-3xl opacity-25"
+         style="background: radial-gradient(circle, rgba(94,234,212,0.5), transparent 60%);"></div>
+    <div class="absolute bottom-[10%] left-[20%] w-80 h-80 rounded-full blur-3xl opacity-25"
+         style="background: radial-gradient(circle, rgba(244,63,94,0.4), transparent 60%);"></div>
+  </div>
+
+  <!-- Nav -->
+  <nav class="relative z-20 max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+    <a href="#top" class="flex items-center gap-3 group">
+      <img src="logo.png" alt="" class="w-10 h-10 drop-shadow-[0_4px_12px_rgba(167,139,250,0.5)]" />
+      <span class="font-display font-bold text-lg tracking-wide group-hover:tracking-wider transition-all">
+        RPSLS
+      </span>
+    </a>
+    <div class="flex items-center gap-3 text-sm">
+      <a href="#moves" class="hidden sm:inline text-zinc-400 hover:text-white transition">Moves</a>
+      <a href="#features" class="hidden sm:inline text-zinc-400 hover:text-white transition">Features</a>
+      <a href="#download"
+         class="px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/30 transition font-semibold">
+        Get it
+      </a>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <header id="top" class="relative z-10 max-w-5xl mx-auto px-6 pt-10 sm:pt-20 pb-24 text-center">
+    <div class="reveal inline-flex items-center gap-2 mb-6 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs uppercase tracking-[0.25em] text-zinc-300">
+      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+      Online multiplayer · 15 languages · free
+    </div>
+
+    <div class="relative reveal delay-1">
+      <!-- Logo with halo and slow rotation -->
+      <div class="relative mx-auto w-40 h-40 sm:w-48 sm:h-48 mb-8">
+        <div class="absolute inset-0 rounded-full blur-3xl opacity-70 animate-glow-pulse"
+             style="background: radial-gradient(circle, rgba(167,139,250,0.65), rgba(94,234,212,0.4) 50%, transparent 75%);"></div>
+        <div class="absolute inset-[-8%] rounded-full border border-white/5 animate-spin-slow"
+             style="border-style: dashed;"></div>
+        <img src="logo.png" alt="RPSLS logo"
+             class="relative w-full h-full object-contain drop-shadow-[0_8px_30px_rgba(168,85,247,0.4)] animate-float" />
+      </div>
+    </div>
+
+    <h1 class="reveal delay-2 font-display font-black text-5xl sm:text-7xl md:text-8xl leading-[0.95] tracking-tight">
+      <span class="grad-text">RPSLS</span>
+    </h1>
+    <p class="reveal delay-3 mt-4 text-zinc-400 text-sm sm:text-base tracking-[0.4em] uppercase">
+      Rock · Paper · Scissors · Lizard · Spock
+    </p>
+
+    <p class="reveal delay-3 mt-8 max-w-2xl mx-auto text-zinc-300 text-base sm:text-lg leading-relaxed">
+      The classic hand game, <span class="text-violet-200 font-semibold">extended with two extra moves</span>.
+      Lizard poisons Spock, Spock vaporizes Rock. Every move beats two others and loses to two others.
+      Total balance — and a lot more fun.
+    </p>
+
+    <div class="reveal delay-4 mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
+      <a href="#download"
+         class="shimmer group relative inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl font-bold text-base
+                bg-gradient-to-r from-violet-500 via-fuchsia-500 to-teal-400
+                shadow-lg shadow-violet-500/30 hover:shadow-violet-500/50 hover:scale-[1.03] transition-all
+                text-white">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+        Download for Android
+      </a>
+      <a href="#moves"
+         class="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl border border-white/15 bg-white/5 hover:bg-white/10 hover:border-white/30 transition font-semibold text-white">
+        See the moves
+      </a>
+    </div>
+
+    <div class="reveal delay-5 mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-zinc-500">
+      <span class="flex items-center gap-1.5"><span>🚀</span> Tauri 2 (≈40MB native)</span>
+      <span class="flex items-center gap-1.5"><span>🌐</span> WebSocket multiplayer</span>
+      <span class="flex items-center gap-1.5"><span>🎨</span> 5 themes · 5 boards</span>
+      <span class="flex items-center gap-1.5"><span>🛡️</span> No ads, no tracking</span>
+    </div>
+  </header>
+
+  <!-- MOVES -->
+  <section id="moves" class="relative z-10 max-w-6xl mx-auto px-6 py-20">
+    <div class="grid-floor"></div>
+
+    <div class="text-center mb-14">
+      <div class="reveal text-xs uppercase tracking-[0.4em] text-violet-300/80 mb-3">The 5 moves</div>
+      <h2 class="reveal delay-1 font-display font-black text-3xl sm:text-5xl">
+        <span class="grad-text">Every move beats two, loses to two.</span>
+      </h2>
+      <p class="reveal delay-2 mt-4 text-zinc-400 max-w-2xl mx-auto">
+        Total balance. Hover a move to see what it crushes and what crushes it.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 sm:gap-6">
+      <!-- ROCK -->
+      <div class="reveal move-card move-rock lift halo relative rounded-3xl p-5 sm:p-6 bg-gradient-to-br from-stone-300 to-amber-400 text-zinc-900 border border-amber-200/40 shadow-xl shadow-amber-500/20">
+        <div class="text-5xl sm:text-6xl mb-3">🪨</div>
+        <div class="font-display font-black text-xl">Rock</div>
+        <div class="text-xs mt-2 opacity-80">crushes Lizard & Scissors</div>
+        <div class="text-[10px] mt-1 opacity-50 uppercase tracking-wider">loses to Paper · Spock</div>
+      </div>
+      <!-- PAPER -->
+      <div class="reveal delay-1 move-card move-paper lift halo relative rounded-3xl p-5 sm:p-6 bg-gradient-to-br from-zinc-100 to-sky-200 text-zinc-900 border border-sky-200/40 shadow-xl shadow-sky-300/20">
+        <div class="text-5xl sm:text-6xl mb-3">📄</div>
+        <div class="font-display font-black text-xl">Paper</div>
+        <div class="text-xs mt-2 opacity-80">covers Rock, disproves Spock</div>
+        <div class="text-[10px] mt-1 opacity-50 uppercase tracking-wider">loses to Scissors · Lizard</div>
+      </div>
+      <!-- SCISSORS -->
+      <div class="reveal delay-2 move-card move-scissors lift halo relative rounded-3xl p-5 sm:p-6 bg-gradient-to-br from-rose-300 to-orange-400 text-zinc-900 border border-orange-200/40 shadow-xl shadow-orange-500/20">
+        <div class="text-5xl sm:text-6xl mb-3">✂️</div>
+        <div class="font-display font-black text-xl">Scissors</div>
+        <div class="text-xs mt-2 opacity-80">cuts Paper, decapitates Lizard</div>
+        <div class="text-[10px] mt-1 opacity-50 uppercase tracking-wider">loses to Rock · Spock</div>
+      </div>
+      <!-- LIZARD -->
+      <div class="reveal delay-3 move-card move-lizard lift halo relative rounded-3xl p-5 sm:p-6 bg-gradient-to-br from-lime-300 to-emerald-500 text-zinc-900 border border-emerald-200/40 shadow-xl shadow-emerald-500/20">
+        <div class="text-5xl sm:text-6xl mb-3">🦎</div>
+        <div class="font-display font-black text-xl">Lizard</div>
+        <div class="text-xs mt-2 opacity-80">poisons Spock, eats Paper</div>
+        <div class="text-[10px] mt-1 opacity-50 uppercase tracking-wider">loses to Rock · Scissors</div>
+      </div>
+      <!-- SPOCK -->
+      <div class="reveal delay-4 move-card move-spock lift halo relative rounded-3xl p-5 sm:p-6 bg-gradient-to-br from-cyan-300 to-violet-500 text-zinc-50 border border-violet-200/40 shadow-xl shadow-violet-500/30">
+        <div class="text-5xl sm:text-6xl mb-3">🖖</div>
+        <div class="font-display font-black text-xl">Spock</div>
+        <div class="text-xs mt-2 opacity-90">vaporizes Rock, smashes Scissors</div>
+        <div class="text-[10px] mt-1 opacity-60 uppercase tracking-wider">loses to Paper · Lizard</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="features" class="relative z-10 max-w-6xl mx-auto px-6 py-20">
+    <div class="text-center mb-14">
+      <div class="reveal text-xs uppercase tracking-[0.4em] text-violet-300/80 mb-3">Why you'll stay</div>
+      <h2 class="reveal delay-1 font-display font-black text-3xl sm:text-5xl">
+        <span class="grad-text">Polished, deep, fast.</span>
+      </h2>
+    </div>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="reveal lift rounded-3xl p-6 bg-white/[0.03] border border-white/10 hover:border-violet-400/40 hover:bg-white/[0.05]">
+        <div class="text-3xl mb-3">🌐</div>
+        <div class="font-display font-bold text-lg mb-1">Real-time multiplayer</div>
+        <p class="text-sm text-zinc-400 leading-relaxed">
+          WebSocket rooms with random matchmaking, private 6-letter lobby codes,
+          auto-reconnect on Wi-Fi hiccups, and haptic feedback on every reveal.
+        </p>
+      </div>
+      <div class="reveal delay-1 lift rounded-3xl p-6 bg-white/[0.03] border border-white/10 hover:border-fuchsia-400/40 hover:bg-white/[0.05]">
+        <div class="text-3xl mb-3">🤖</div>
+        <div class="font-display font-bold text-lg mb-1">Three AI difficulties</div>
+        <p class="text-sm text-zinc-400 leading-relaxed">
+          Easy plays into your hand, Normal is mood-weighted random,
+          Hard reads your last 5 moves and counters your habits.
+        </p>
+      </div>
+      <div class="reveal delay-2 lift rounded-3xl p-6 bg-white/[0.03] border border-white/10 hover:border-teal-400/40 hover:bg-white/[0.05]">
+        <div class="text-3xl mb-3">🎴</div>
+        <div class="font-display font-bold text-lg mb-1">Hand-crafted variants</div>
+        <p class="text-sm text-zinc-400 leading-relaxed">
+          Three packs: canonical RPSLS, Monsters (Vampire/Unicorn/Clown/Zombie/Ghost),
+          and Arsenal (Bow/Sword/Hammer/Spear/Shield). Each pair has its own verb.
+        </p>
+      </div>
+      <div class="reveal delay-3 lift rounded-3xl p-6 bg-white/[0.03] border border-white/10 hover:border-amber-400/40 hover:bg-white/[0.05]">
+        <div class="text-3xl mb-3">🏅</div>
+        <div class="font-display font-bold text-lg mb-1">Quests & daily challenge</div>
+        <p class="text-sm text-zinc-400 leading-relaxed">
+          12 trackable objectives, plus a different daily match every day with a +50% XP bonus.
+        </p>
+      </div>
+      <div class="reveal delay-4 lift rounded-3xl p-6 bg-white/[0.03] border border-white/10 hover:border-rose-400/40 hover:bg-white/[0.05]">
+        <div class="text-3xl mb-3">🌍</div>
+        <div class="font-display font-bold text-lg mb-1">15 languages</div>
+        <p class="text-sm text-zinc-400 leading-relaxed">
+          English, Français, Español, Deutsch, Italiano, Português, 中文, 日本語, Русский,
+          العربية (RTL), 한국어, हिन्दी, Türkçe, Polski, Nederlands.
+        </p>
+      </div>
+      <div class="reveal delay-5 lift rounded-3xl p-6 bg-white/[0.03] border border-white/10 hover:border-cyan-400/40 hover:bg-white/[0.05]">
+        <div class="text-3xl mb-3">🎨</div>
+        <div class="font-display font-bold text-lg mb-1">5 themes · 5 boards</div>
+        <p class="text-sm text-zinc-400 leading-relaxed">
+          Violet, Neon, Pastel, Sunset, Forest — paired with five hand-illustrated battle pads
+          from Blackboard to Cosmos to Comics.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- DOWNLOAD -->
+  <section id="download" class="relative z-10 max-w-4xl mx-auto px-6 py-20">
+    <div class="reveal relative rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-br from-violet-500/15 via-fuchsia-500/10 to-teal-500/15 p-8 sm:p-12 text-center">
+      <div class="absolute inset-0 opacity-30 pointer-events-none"
+           style="background-image: radial-gradient(circle at 30% 20%, rgba(167,139,250,0.5), transparent 50%), radial-gradient(circle at 70% 80%, rgba(94,234,212,0.4), transparent 50%);"></div>
+
+      <div class="relative">
+        <img src="logo.png" alt="" class="mx-auto w-20 h-20 drop-shadow-[0_8px_30px_rgba(168,85,247,0.5)] mb-4 animate-float" />
+        <h2 class="font-display font-black text-3xl sm:text-5xl mb-3">
+          <span class="grad-text">Ready when you are.</span>
+        </h2>
+        <p class="text-zinc-300 max-w-xl mx-auto">
+          Single APK, debug build, ~230 MB unstripped. Drop it on your phone, allow installs
+          from unknown sources, and you're in.
+        </p>
+
+        <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <a href="https://github.com/Alex-Lou/RPSLS/releases/latest"
+             class="shimmer inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl font-bold text-base bg-white text-zinc-900 hover:scale-[1.03] transition shadow-xl shadow-white/10">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+            Download APK
+          </a>
+          <a href="https://github.com/Alex-Lou/RPSLS"
+             class="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl border border-white/15 bg-white/5 hover:bg-white/10 hover:border-white/30 transition font-semibold">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5A12 12 0 0 0 .5 12.5c0 5.3 3.4 9.8 8.2 11.4.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.5-1.3-1.3-1.7-1.3-1.7-1.1-.8.1-.8.1-.8 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2.9-.3 1.9-.4 2.9-.4 1 0 2 .1 2.9.4 2.3-1.5 3.3-1.2 3.3-1.2.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.3v3.4c0 .3.2.7.8.6A12 12 0 0 0 23.5 12.5 12 12 0 0 0 12 .5Z"/></svg>
+            Source on GitHub
+          </a>
+        </div>
+
+        <div class="mt-6 text-xs text-zinc-400">
+          Android · iOS coming after release signing · Desktop builds via <code class="px-1 py-0.5 rounded bg-white/10 text-zinc-200">cargo</code>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="relative z-10 max-w-6xl mx-auto px-6 py-12 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-zinc-500 border-t border-white/5">
+    <div class="flex items-center gap-2">
+      <img src="logo.png" alt="" class="w-6 h-6 opacity-70" />
+      <span>RPSLS · <span class="text-zinc-400">v0.3</span></span>
+    </div>
+    <div class="text-xs text-zinc-600">
+      Built with Tauri 2 · Rust · React · Axum · Tailwind · Motion. Made with care, not metrics.
+    </div>
+  </footer>
+
+  <script>
+    /* Reveal on scroll */
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) {
+          e.target.classList.add('in');
+          io.unobserve(e.target);
+        }
+      }
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.reveal').forEach((n) => io.observe(n));
+
+    /* Scroll progress bar */
+    const bar = document.getElementById('scroll-progress');
+    const onScroll = () => {
+      const h = document.documentElement;
+      const scrolled = (h.scrollTop) / (h.scrollHeight - h.clientHeight);
+      bar.style.width = (scrolled * 100).toFixed(2) + '%';
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+
+    /* Mouse parallax on background ornaments (subtle) */
+    const bg = document.getElementById('parallax-bg');
+    const ornaments = bg.children;
+    let mouseX = 0.5, mouseY = 0.5, targetX = 0.5, targetY = 0.5;
+    window.addEventListener('pointermove', (ev) => {
+      targetX = ev.clientX / window.innerWidth;
+      targetY = ev.clientY / window.innerHeight;
+    });
+    function tick() {
+      mouseX += (targetX - mouseX) * 0.06;
+      mouseY += (targetY - mouseY) * 0.06;
+      for (let i = 0; i < ornaments.length; i++) {
+        const depth = 30 * (i + 1);
+        const dx = (mouseX - 0.5) * depth;
+        const dy = (mouseY - 0.5) * depth;
+        ornaments[i].style.transform = `translate3d(${dx.toFixed(1)}px, ${dy.toFixed(1)}px, 0)`;
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>
