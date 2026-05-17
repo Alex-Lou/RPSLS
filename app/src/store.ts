@@ -70,11 +70,15 @@ function detectLocale(): Locale {
   return "en";
 }
 
+/** Public Render.com deploy of crates/rpsls-server. Free tier, sleeps after
+ *  15 min of inactivity (first request after a sleep takes ~30-50s to wake). */
+export const DEFAULT_CLOUD_URL = "wss://rpsls-server-tptj.onrender.com";
+
 export function defaultServerConfig(): ServerConfig {
   return {
-    mode: "lan",
-    cloudUrl: "",                  // TBD: filled once we have a public URL
-    lanUrl: "ws://localhost:8080", // works out-of-the-box on the host PC
+    mode: "cloud",
+    cloudUrl: DEFAULT_CLOUD_URL,
+    lanUrl: "ws://localhost:8080", // host PC default; joiners type the LAN IP
   };
 }
 
@@ -144,7 +148,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "rpsls-app-state",
-      version: 10,
+      version: 11,
       migrate: (persisted: unknown, version: number): AppState => {
         const state = persisted as {
           player?: Partial<Player> & { customVariants?: unknown };
@@ -186,6 +190,14 @@ export const useStore = create<AppState>()(
           if (state.serverConfig.lanUrl === "ws://192.168.1.1:8080") {
             state.serverConfig.lanUrl = "ws://localhost:8080";
           }
+        }
+        // v11: flip the default mode to "cloud" and fill the Render URL for
+        // users who never set a cloud URL.
+        if (version < 11 && state?.serverConfig) {
+          if (!state.serverConfig.cloudUrl) {
+            state.serverConfig.cloudUrl = DEFAULT_CLOUD_URL;
+          }
+          state.serverConfig.mode = "cloud";
         }
         return state as AppState;
       },
