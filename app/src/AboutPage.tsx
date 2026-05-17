@@ -38,7 +38,7 @@ export function AboutPage() {
       <div className="text-center sm:text-left">
         <div className="flex justify-center sm:justify-start mb-3">
           <img
-            src="/logo.png"
+            src="/Logo-RLSPS.png"
             alt="RPSLS"
             className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl shadow-lg"
           />
