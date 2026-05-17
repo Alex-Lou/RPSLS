@@ -57,15 +57,27 @@ export type ServerMessage =
   | { type: "error"; code: string; message: string }
   | { type: "pong" };
 
-/* ──────────── Server URL ──────────── */
+/* ──────────── URL helpers ──────────── */
 
-/** Server URL.
- *  - In dev (Vite), set VITE_RPSLS_SERVER to ws://localhost:8080
- *  - In production we point at the Fly.io deploy.
+/** Normalize a user-typed URL into a complete ws://host:port URL.
+ *  Accepts:
+ *    "192.168.1.42"           → "ws://192.168.1.42:8080"
+ *    "192.168.1.42:8080"      → "ws://192.168.1.42:8080"
+ *    "ws://host:port"         → unchanged
+ *    "wss://host"             → unchanged
+ *    "https://host"           → "wss://host"
+ *    "http://host:8080"       → "ws://host:8080"
  */
-export const SERVER_URL: string =
-  (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_RPSLS_SERVER ||
-  "wss://rpsls-server.fly.dev";
+export function normalizeServerUrl(input: string): string {
+  const raw = input.trim();
+  if (!raw) return "";
+  if (raw.startsWith("ws://") || raw.startsWith("wss://")) return raw;
+  if (raw.startsWith("https://")) return "wss://" + raw.slice("https://".length);
+  if (raw.startsWith("http://")) return "ws://" + raw.slice("http://".length);
+  // Bare host[:port] — assume LAN, ws, port 8080 if missing.
+  const hasPort = /:\d+$/.test(raw);
+  return "ws://" + (hasPort ? raw : raw + ":8080");
+}
 
 /* ──────────── Minimal WS client ──────────── */
 
@@ -80,12 +92,19 @@ export class OnlineClient {
   status: "idle" | "connecting" | "open" | "closed" | "error" = "idle";
   onStatus?: (s: OnlineClient["status"]) => void;
 
-  connect(url: string = SERVER_URL): Promise<void> {
+  connect(url: string): Promise<void> {
     this.closedByUser = false;
     this.setStatus("connecting");
     return new Promise((resolve, reject) => {
       try {
-        const ws = new WebSocket(url + "/ws");
+        const normalized = normalizeServerUrl(url);
+        if (!normalized) {
+          this.setStatus("error");
+          reject(new Error("empty server URL"));
+          return;
+        }
+        const wsUrl = normalized.replace(/\/+$/, "") + "/ws";
+        const ws = new WebSocket(wsUrl);
         this.ws = ws;
         ws.onopen = () => {
           this.setStatus("open");

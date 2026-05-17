@@ -6,6 +6,7 @@ import { Hand, MysteryHand, MOVE_ICON } from "./icons";
 import { MOVES, type Move } from "./game";
 import {
   OnlineClient,
+  normalizeServerUrl,
   type ServerMessage,
   type PlayerSlot,
 } from "./online";
@@ -60,6 +61,8 @@ function emptyMatch(): MatchState {
 export function OnlinePage() {
   const t = useT();
   const player = useStore((s) => s.player);
+  const serverConfig = useStore((s) => s.serverConfig);
+  const setServerConfig = useStore((s) => s.setServerConfig);
 
   const [phase, setPhase] = useState<Phase>("menu");
   const [bestOf, setBestOf] = useState(3);
@@ -68,6 +71,7 @@ export function OnlinePage() {
   const [queuePosition, setQueuePosition] = useState(0);
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [m, setM] = useState<MatchState>(emptyMatch());
+  const [serverPickerOpen, setServerPickerOpen] = useState(false);
 
   const clientRef = useRef<OnlineClient | null>(null);
 
@@ -76,10 +80,22 @@ export function OnlinePage() {
     if (clientRef.current && clientRef.current.status === "open") {
       return Promise.resolve(clientRef.current);
     }
+    // Disconnect any previous closed client.
+    clientRef.current?.disconnect();
+    const url = serverConfig.mode === "cloud" ? serverConfig.cloudUrl : serverConfig.lanUrl;
+    if (!url.trim()) {
+      return Promise.reject(
+        new Error(
+          serverConfig.mode === "cloud"
+            ? "No cloud server URL set. Open Server settings."
+            : "No LAN server URL set. Open Server settings."
+        )
+      );
+    }
     const c = new OnlineClient();
     clientRef.current = c;
     c.on(onMessage);
-    return c.connect().then(() => {
+    return c.connect(url).then(() => {
       // Send Hello once on connection.
       c.send({ type: "hello", nickname: player.nickname || "Anonymous" });
       return c;
@@ -252,10 +268,40 @@ export function OnlinePage() {
   /* ── Render ── */
   return (
     <div className="px-4 py-6 max-w-3xl w-full mx-auto flex-1 flex flex-col">
-      <div className="flex items-baseline gap-3 mb-6">
-        <h1 className="text-3xl font-black tracking-tight">🌐 {t("nav.online")}</h1>
-        <span className="text-xs text-zinc-500">Beta · {player.nickname}</span>
+      <div className="flex items-baseline justify-between gap-3 mb-4">
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-3xl font-black tracking-tight">🌐 {t("nav.online")}</h1>
+          <span className="text-xs text-zinc-500">Beta · {player.nickname}</span>
+        </div>
+        {phase === "menu" && (
+          <button
+            onClick={() => setServerPickerOpen((v) => !v)}
+            className="text-xs px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 transition"
+            title="Server settings"
+          >
+            ⚙️ {serverConfig.mode === "cloud" ? "Cloud" : "LAN"}
+          </button>
+        )}
       </div>
+
+      {/* Server picker — collapsible */}
+      <AnimatePresence>
+        {serverPickerOpen && phase === "menu" && (
+          <motion.div
+            key="srv"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <ServerPicker
+              cfg={serverConfig}
+              onChange={setServerConfig}
+              onClose={() => setServerPickerOpen(false)}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence mode="wait">
         {phase === "menu" && (
@@ -521,6 +567,114 @@ export function OnlinePage() {
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/* ──────────── Server picker ──────────── */
+
+function ServerPicker({
+  cfg,
+  onChange,
+  onClose,
+}: {
+  cfg: { mode: "cloud" | "lan"; cloudUrl: string; lanUrl: string };
+  onChange: (p: Partial<{ mode: "cloud" | "lan"; cloudUrl: string; lanUrl: string }>) => void;
+  onClose: () => void;
+}) {
+  const [lan, setLan] = useState(cfg.lanUrl);
+  const [cloud, setCloud] = useState(cfg.cloudUrl);
+  const previewLan = normalizeServerUrl(lan);
+  const previewCloud = normalizeServerUrl(cloud);
+
+  return (
+    <div className="rounded-2xl bg-black/40 border border-white/10 p-4 mb-4">
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => onChange({ mode: "lan" })}
+          className={
+            "flex-1 py-2 rounded-xl font-semibold transition " +
+            (cfg.mode === "lan"
+              ? "bg-emerald-500/90 text-white"
+              : "bg-white/5 hover:bg-white/10 text-zinc-300")
+          }
+        >
+          📶 Local network
+        </button>
+        <button
+          onClick={() => onChange({ mode: "cloud" })}
+          className={
+            "flex-1 py-2 rounded-xl font-semibold transition " +
+            (cfg.mode === "cloud"
+              ? "bg-violet-500/90 text-white"
+              : "bg-white/5 hover:bg-white/10 text-zinc-300")
+          }
+        >
+          ☁️ Cloud
+        </button>
+      </div>
+
+      {cfg.mode === "lan" ? (
+        <div className="flex flex-col gap-2">
+          <label className="text-xs uppercase tracking-wider text-zinc-500">
+            Host's address (LAN)
+          </label>
+          <input
+            value={lan}
+            onChange={(e) => setLan(e.target.value)}
+            placeholder="192.168.1.42"
+            className="px-3 py-2 rounded-lg bg-black/40 border border-white/10 font-mono text-sm"
+          />
+          <div className="text-[11px] text-zinc-500 break-all">
+            → {previewLan || "—"}
+          </div>
+          <div className="text-xs text-zinc-400 mt-2 leading-relaxed">
+            <b>Host setup:</b> on the host PC, open a terminal in the project and run:
+            <pre className="mt-1 px-2 py-1 rounded bg-black/50 text-zinc-200 font-mono text-[11px] overflow-x-auto">
+cargo run -p rpsls-server --release
+            </pre>
+            Then find your local IP with <code className="bg-black/40 px-1 rounded">ipconfig</code>{" "}
+            (Windows) or <code className="bg-black/40 px-1 rounded">ip a</code> (Linux/Mac) and
+            share it with the joiner.
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <label className="text-xs uppercase tracking-wider text-zinc-500">
+            Cloud server URL
+          </label>
+          <input
+            value={cloud}
+            onChange={(e) => setCloud(e.target.value)}
+            placeholder="wss://your-server.example.com"
+            className="px-3 py-2 rounded-lg bg-black/40 border border-white/10 font-mono text-sm"
+          />
+          <div className="text-[11px] text-zinc-500 break-all">
+            → {previewCloud || "—"}
+          </div>
+          <div className="text-xs text-zinc-400 mt-2">
+            Use any public host (Cloudflare Tunnel, Render, your VPS…).
+          </div>
+        </div>
+      )}
+
+      <div className="flex justify-end gap-2 mt-4">
+        <button
+          onClick={onClose}
+          className="px-4 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-sm text-zinc-300 transition"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => {
+            onChange({ lanUrl: lan, cloudUrl: cloud });
+            onClose();
+          }}
+          className="px-4 py-1.5 rounded-lg bg-emerald-500/90 hover:bg-emerald-500 text-sm text-white font-semibold transition"
+        >
+          Save
+        </button>
+      </div>
     </div>
   );
 }

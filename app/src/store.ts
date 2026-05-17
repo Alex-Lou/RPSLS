@@ -36,11 +36,22 @@ export function defaultPlayer(): Player {
   };
 }
 
+export type ServerMode = "cloud" | "lan";
+
+export interface ServerConfig {
+  mode: ServerMode;
+  /** Cloud URL (Koyeb / Cloudflare Tunnel / etc.). */
+  cloudUrl: string;
+  /** LAN URL — typically ws://192.168.x.y:8080 */
+  lanUrl: string;
+}
+
 interface AppState {
   player: Player;
   history: MatchRecord[];
   onboarded: boolean;
   locale: Locale;
+  serverConfig: ServerConfig;
 
   updateProfile: (patch: Partial<Pick<Player, "nickname" | "avatar" | "themeId" | "padId" | "difficulty">>) => void;
   recordMatch: (m: MatchRecord) => void;
@@ -48,6 +59,7 @@ interface AppState {
   recordDailyComplete: (date: string) => void;
   setOnboarded: (value: boolean) => void;
   setLocale: (locale: Locale) => void;
+  setServerConfig: (patch: Partial<ServerConfig>) => void;
   resetProfile: () => void;
 }
 
@@ -56,6 +68,14 @@ function detectLocale(): Locale {
   const code = nav.slice(0, 2).toLowerCase();
   if (code === "fr" || code === "es" || code === "de" || code === "it") return code;
   return "en";
+}
+
+export function defaultServerConfig(): ServerConfig {
+  return {
+    mode: "lan",
+    cloudUrl: "",                       // TBD: filled once we have a public URL
+    lanUrl: "ws://192.168.1.1:8080",    // user overrides with their host's IP
+  };
 }
 
 const HISTORY_LIMIT = 100;
@@ -67,9 +87,12 @@ export const useStore = create<AppState>()(
       history: [],
       onboarded: false,
       locale: detectLocale(),
+      serverConfig: defaultServerConfig(),
 
       setOnboarded: (value) => set({ onboarded: value }),
       setLocale: (locale) => set({ locale }),
+      setServerConfig: (patch) =>
+        set((s) => ({ serverConfig: { ...s.serverConfig, ...patch } })),
 
       updateProfile: (patch) =>
         set((s) => ({ player: { ...s.player, ...patch } })),
@@ -121,13 +144,14 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "rpsls-app-state",
-      version: 8,
+      version: 9,
       migrate: (persisted: unknown, version: number): AppState => {
         const state = persisted as {
           player?: Partial<Player> & { customVariants?: unknown };
           history?: MatchRecord[];
           onboarded?: boolean;
           locale?: Locale;
+          serverConfig?: Partial<ServerConfig>;
         };
         if (state?.player) {
           if (version < 2 && !("padId" in state.player)) {
@@ -150,6 +174,9 @@ export const useStore = create<AppState>()(
         }
         if (version < 7 && state && !state.locale) {
           state.locale = detectLocale();
+        }
+        if (version < 9 && state) {
+          state.serverConfig = { ...defaultServerConfig(), ...(state.serverConfig ?? {}) };
         }
         return state as AppState;
       },

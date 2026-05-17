@@ -1,5 +1,5 @@
 # ─────────────── Builder ───────────────
-FROM rust:1.81-bookworm AS builder
+FROM rust:1.85-bookworm AS builder
 
 WORKDIR /app
 
@@ -18,6 +18,7 @@ RUN printf '%s\n' \
   'version = "0.1.0"' \
   'edition = "2021"' \
   'license = "MIT"' \
+  'authors = ["Alex <alex.guennad@gmail.com>"]' \
   '' \
   '[workspace.dependencies]' \
   'serde = { version = "1", features = ["derive"] }' \
