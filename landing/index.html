@@ -177,10 +177,13 @@
     .atom-wrap { position: relative; width: 320px; height: 320px; }
     @media (min-width: 768px) { .atom-wrap { width: 420px; height: 420px; } }
     .atom-wrap svg { width: 100%; height: 100%; overflow: visible; }
+    /* Soft circular halo behind the atom — kept smaller than the orbits and
+       very diffuse so it never shows through the logo's transparent corners. */
     .atom-glow {
-      position: absolute; inset: 8%; border-radius: 50%; pointer-events: none;
-      background: radial-gradient(circle, rgba(167,139,250,0.45) 0%, rgba(94,234,212,0.18) 35%, transparent 70%);
-      filter: blur(28px); animation: glow-pulse 4s ease-in-out infinite;
+      position: absolute; left: 50%; top: 50%; width: 60%; height: 60%;
+      transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
+      background: radial-gradient(circle, rgba(167,139,250,0.25) 0%, rgba(94,234,212,0.10) 40%, transparent 70%);
+      filter: blur(40px); animation: glow-pulse 4s ease-in-out infinite;
     }
 
     /* ── Mini-demo board ── */
@@ -289,7 +292,7 @@
   <!-- ════════════ NAV ════════════ -->
   <nav class="relative z-30 max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
     <a href="#top" class="flex items-center gap-3 group">
-      <img src="Logo-RLSPS.png" alt="" class="w-10 h-10 drop-shadow-[0_4px_12px_rgba(167,139,250,0.5)]" />
+      <img src="Logo-RLSPS.png" alt="" class="w-10 h-10" />
       <span class="font-display font-bold text-lg tracking-wide group-hover:tracking-wider transition-all">RPSLS</span>
     </a>
     <div class="flex items-center gap-2 sm:gap-3 text-sm">
@@ -407,11 +410,11 @@
             </circle>
           </g>
 
-          <!-- Nucleus -->
-          <circle r="38" fill="url(#nucleus-grad)" class="animate-nucleus-pulse"/>
+          <!-- Nucleus removed — the logo (transparent PNG) is now the atom's center. -->
         </svg>
-        <!-- Logo on top of the atom, sitting inside the nucleus -->
-        <img src="Logo-RLSPS.png" alt="" class="absolute inset-0 m-auto w-20 h-20 sm:w-24 sm:h-24 drop-shadow-[0_4px_18px_rgba(0,0,0,0.7)] animate-float pointer-events-none" />
+        <!-- The logo IS the nucleus. Nothing behind: any colored shape would
+             bleed through the PNG's transparent corners and read as a frame. -->
+        <img src="Logo-RLSPS.png" alt="" class="absolute inset-0 m-auto w-36 h-36 sm:w-44 sm:h-44 animate-float pointer-events-none" />
       </div>
     </div>
   </header>
@@ -637,7 +640,7 @@
     <div class="reveal relative rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-br from-violet-500/15 via-fuchsia-500/10 to-teal-500/15 p-8 sm:p-12 text-center">
       <div class="absolute inset-0 opacity-30 pointer-events-none" style="background-image: radial-gradient(circle at 30% 20%, rgba(167,139,250,0.5), transparent 50%), radial-gradient(circle at 70% 80%, rgba(94,234,212,0.4), transparent 50%);"></div>
       <div class="relative">
-        <img src="Logo-RLSPS.png" alt="" class="mx-auto w-20 h-20 drop-shadow-[0_8px_30px_rgba(168,85,247,0.5)] mb-4 animate-float" />
+        <img src="Logo-RLSPS.png" alt="" class="mx-auto w-24 h-24 mb-4 animate-float" />
         <h2 class="font-display font-black text-3xl sm:text-5xl mb-3"><span class="grad-text" data-i18n="cta.title">Ready when you are.</span></h2>
         <p class="text-zinc-300 max-w-xl mx-auto" data-i18n="cta.sub">Free, open-source, no ads. Grab the APK or build native from source for any platform.</p>
 
