@@ -73,8 +73,8 @@ function detectLocale(): Locale {
 export function defaultServerConfig(): ServerConfig {
   return {
     mode: "lan",
-    cloudUrl: "",                       // TBD: filled once we have a public URL
-    lanUrl: "ws://192.168.1.1:8080",    // user overrides with their host's IP
+    cloudUrl: "",                  // TBD: filled once we have a public URL
+    lanUrl: "ws://localhost:8080", // works out-of-the-box on the host PC
   };
 }
 
@@ -144,7 +144,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "rpsls-app-state",
-      version: 9,
+      version: 10,
       migrate: (persisted: unknown, version: number): AppState => {
         const state = persisted as {
           player?: Partial<Player> & { customVariants?: unknown };
@@ -177,6 +177,15 @@ export const useStore = create<AppState>()(
         }
         if (version < 9 && state) {
           state.serverConfig = { ...defaultServerConfig(), ...(state.serverConfig ?? {}) };
+        }
+        // v10: the v9 default lanUrl "ws://192.168.1.1:8080" was a bad guess
+        // (it's the typical router). Replace with the localhost default so
+        // the host PC works out-of-the-box and joiners only have to type
+        // the IP once.
+        if (version < 10 && state?.serverConfig) {
+          if (state.serverConfig.lanUrl === "ws://192.168.1.1:8080") {
+            state.serverConfig.lanUrl = "ws://localhost:8080";
+          }
         }
         return state as AppState;
       },

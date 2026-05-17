@@ -177,6 +177,23 @@ export function OnlinePage() {
   }
 
   /* ── Actions ── */
+  function activeUrl(): string {
+    return serverConfig.mode === "cloud" ? serverConfig.cloudUrl : serverConfig.lanUrl;
+  }
+
+  function handleConnectError(e: unknown) {
+    const url = activeUrl();
+    const reason = e instanceof Error ? e.message : String(e);
+    setErrMsg(
+      `Couldn't reach ${normalizeServerUrl(url) || "(no URL set)"}.\n${reason}\n\n` +
+        `→ Check that the server is running and the address is correct.\n` +
+        `→ On the host PC: \`pnpm server\` (from app/) or run the rpsls-server binary.\n` +
+        `→ From another device on the same Wi-Fi: use the host's local IP, not localhost.`
+    );
+    setServerPickerOpen(true);
+    setPhase("error");
+  }
+
   async function createLobby() {
     setErrMsg(null);
     setPhase("connecting");
@@ -185,8 +202,7 @@ export function OnlinePage() {
       c.send({ type: "create_lobby", best_of: bestOf });
       setPhase("creating");
     } catch (e) {
-      setErrMsg(String(e));
-      setPhase("error");
+      handleConnectError(e);
     }
   }
 
@@ -199,8 +215,7 @@ export function OnlinePage() {
       c.send({ type: "join_lobby", code: joinCode.trim().toUpperCase() });
       setPhase("joining");
     } catch (e) {
-      setErrMsg(String(e));
-      setPhase("error");
+      handleConnectError(e);
     }
   }
 
@@ -211,8 +226,7 @@ export function OnlinePage() {
       const c = await ensureClient();
       c.send({ type: "join_queue", best_of: bestOf });
     } catch (e) {
-      setErrMsg(String(e));
-      setPhase("error");
+      handleConnectError(e);
     }
   }
 
@@ -552,17 +566,17 @@ export function OnlinePage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="flex flex-col items-center gap-4 py-10"
+            className="flex flex-col items-center gap-4 py-6"
           >
             <div className="text-4xl">⚠️</div>
-            <div className="text-rose-300 font-semibold text-center">
+            <pre className="text-rose-200/90 text-xs sm:text-sm whitespace-pre-wrap text-center max-w-prose font-sans leading-relaxed">
               {errMsg || "Something went wrong."}
-            </div>
+            </pre>
             <button
               onClick={backToMenu}
               className="mt-2 px-5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm transition"
             >
-              Back
+              Back to menu
             </button>
           </motion.div>
         )}
@@ -584,8 +598,39 @@ function ServerPicker({
 }) {
   const [lan, setLan] = useState(cfg.lanUrl);
   const [cloud, setCloud] = useState(cfg.cloudUrl);
+  const [testStatus, setTestStatus] = useState<"" | "testing" | "ok" | "fail">("");
+  const [testMsg, setTestMsg] = useState<string>("");
   const previewLan = normalizeServerUrl(lan);
   const previewCloud = normalizeServerUrl(cloud);
+
+  async function testConnection() {
+    setTestStatus("testing");
+    setTestMsg("");
+    const ws = cfg.mode === "lan" ? previewLan : previewCloud;
+    // Derive HTTP URL for /health: replace ws->http, wss->https.
+    const httpUrl =
+      ws.replace(/^wss:\/\//, "https://").replace(/^ws:\/\//, "http://") + "/health";
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 4000);
+      const res = await fetch(httpUrl, { signal: ctrl.signal });
+      clearTimeout(t);
+      if (res.ok) {
+        setTestStatus("ok");
+        setTestMsg(`Server reachable (HTTP ${res.status}).`);
+      } else {
+        setTestStatus("fail");
+        setTestMsg(`Server replied HTTP ${res.status} — check the URL.`);
+      }
+    } catch (e) {
+      setTestStatus("fail");
+      setTestMsg(
+        e instanceof Error && e.name === "AbortError"
+          ? "Timeout — no response in 4s. Is the server running? Firewall?"
+          : `Cannot reach: ${e instanceof Error ? e.message : String(e)}`
+      );
+    }
+  }
 
   return (
     <div className="rounded-2xl bg-black/40 border border-white/10 p-4 mb-4">
@@ -658,7 +703,29 @@ cargo run -p rpsls-server --release
         </div>
       )}
 
-      <div className="flex justify-end gap-2 mt-4">
+      {testStatus !== "" && (
+        <div
+          className={
+            "mt-3 px-3 py-2 rounded-lg text-xs " +
+            (testStatus === "ok"
+              ? "bg-emerald-500/15 text-emerald-200 border border-emerald-500/30"
+              : testStatus === "fail"
+              ? "bg-rose-500/15 text-rose-200 border border-rose-500/30"
+              : "bg-white/5 text-zinc-300 border border-white/10")
+          }
+        >
+          {testStatus === "testing" ? "Testing…" : testMsg}
+        </div>
+      )}
+
+      <div className="flex flex-wrap justify-end gap-2 mt-4">
+        <button
+          onClick={testConnection}
+          disabled={testStatus === "testing"}
+          className="px-4 py-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/40 text-sky-100 text-sm transition disabled:opacity-50"
+        >
+          Test connection
+        </button>
         <button
           onClick={onClose}
           className="px-4 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-sm text-zinc-300 transition"
