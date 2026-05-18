@@ -35,7 +35,7 @@ import {
 
 const LANE_COUNT = 3;
 const PICK_DEADLINE_MS = 13_500;          // matches server PICK_DEADLINE
-const ROUND_PAUSE_MS = 5_500;              // matches server inter-round sleep
+const ROUND_PAUSE_MS = 7_500;              // matches server inter-round sleep
 const REVEAL_SUSPENSE_MS = 1_400;
 const MATCH_FOUND_SPLASH_MS = 2_500;
 

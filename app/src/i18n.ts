@@ -195,6 +195,22 @@ const en: Dict = {
   "combo.wipeout.tag": "All three lanes lost. Reset your nerves.",
   "combo.stalemate.name": "STALEMATE",
   "combo.stalemate.tag": "Three lanes, three minds, no winner.",
+  // Combo preview during pick
+  "lanes.potentialCombo": "Potential combo",
+  // Help / Lexicon modal
+  "lanes.help.button": "How to play",
+  "lanes.help.title": "How to play Constellation",
+  "lanes.help.close": "Got it",
+  "lanes.help.rules.title": "The 3-lane round",
+  "lanes.help.rules.body": "Each round, you place one move on each of the 3 lanes. Both sides reveal simultaneously. The side that wins at least 2 of the 3 lanes wins the round. First to {target} round-wins takes the match.",
+  "lanes.help.rps.title": "The RPSLS rules — who beats who",
+  "lanes.help.rps.body": "Scissors cuts Paper, Paper covers Rock, Rock crushes Lizard, Lizard poisons Spock, Spock smashes Scissors, Scissors decapitates Lizard, Lizard eats Paper, Paper disproves Spock, Spock vaporizes Rock, Rock crushes Scissors.",
+  "lanes.help.identity.title": "Lane Identities",
+  "lanes.help.identity.body": "Each lane has a static personality. Placing a favoured move on its lane earns you a ✨ badge on reveal — pure visual hint for now, a real point bonus is planned.",
+  "lanes.help.combos.title": "Combos",
+  "lanes.help.combos.body": "Special lineups trigger named combos in the reveal banner. Triples (3 of a kind) give every move its own animation. Mixed lineups can trigger CLASSIC TRINITY or SHELDON'S CURVE. Sweeping 3-0 fires the epic FLAWLESS SWEEP.",
+  "lanes.help.timer.title": "The countdown",
+  "lanes.help.timer.body": "13.5s per round. At 3s left the bar goes amber, at 1s it pulses red. If you don't lock 3 picks in time, you lose THIS round only — the match goes on.",
 
   // ── Moods ──
   "mood.random": "Random",
@@ -725,6 +741,20 @@ const fr: Dict = {
   "combo.wipeout.tag": "Les 3 couloirs perdus. Reprends ton souffle.",
   "combo.stalemate.name": "IMPASSE",
   "combo.stalemate.tag": "Trois couloirs, trois esprits, aucun vainqueur.",
+  "lanes.potentialCombo": "Combo en vue",
+  "lanes.help.button": "Comment jouer",
+  "lanes.help.title": "Comment jouer à Constellation",
+  "lanes.help.close": "Compris",
+  "lanes.help.rules.title": "La manche en 3 couloirs",
+  "lanes.help.rules.body": "À chaque manche, tu poses un coup sur chacun des 3 couloirs. Les deux camps révèlent en même temps. Le camp qui gagne au moins 2 couloirs sur 3 gagne la manche. Premier à {target} manches gagnées remporte le match.",
+  "lanes.help.rps.title": "Les règles RPSLS — qui bat qui",
+  "lanes.help.rps.body": "Ciseaux coupent Papier, Papier couvre Pierre, Pierre écrase Lézard, Lézard empoisonne Spock, Spock brise Ciseaux, Ciseaux décapitent Lézard, Lézard mange Papier, Papier réfute Spock, Spock vaporise Pierre, Pierre écrase Ciseaux.",
+  "lanes.help.identity.title": "Identités des Couloirs",
+  "lanes.help.identity.body": "Chaque couloir a une personnalité fixe. Placer un coup favori sur son couloir gagne un badge ✨ à la révélation — pour l'instant purement visuel, un vrai bonus de points est prévu.",
+  "lanes.help.combos.title": "Combos",
+  "lanes.help.combos.body": "Des combinaisons spéciales déclenchent des combos nommés dans la bannière de révélation. Les triples (3 fois la même main) ont chacun leur animation. Les compositions mixtes peuvent déclencher TRINITÉ CLASSIQUE ou COURBE DE SHELDON. Un balayage 3-0 lance le BALAYAGE PARFAIT épique.",
+  "lanes.help.timer.title": "Le compte à rebours",
+  "lanes.help.timer.body": "13,5 s par manche. À 3 s restants la barre devient orange, à 1 s elle pulse rouge. Si tu ne verrouilles pas tes 3 coups à temps, tu perds UNIQUEMENT cette manche — le match continue.",
 
   // ── Moods ──
   "mood.random": "Aléatoire",
