@@ -11,14 +11,37 @@ export interface OpponentInfo {
   nickname: string;
 }
 
+/* ──────────── Constellation Lanes (Phase 1+) ──────────── */
+
+/** One placement on one lane. Phase 1 only reads `mv`; `mana`/`modifier`
+ *  are placeholders that the protocol already accepts so phase 2/5 won't
+ *  require a wire bump. */
+export interface LanePlay {
+  mv: Move;
+  mana?: number;
+  modifier?: string | null;
+}
+
+export type LaneWinner = "a" | "b" | "draw";
+
+export interface LaneResult {
+  a_play: LanePlay;
+  b_play: LanePlay;
+  outcome: Outcome;
+  winner: LaneWinner;
+  points: number;
+}
+
 /* Client → Server */
 export type ClientMessage =
   | { type: "hello"; nickname: string }
   | { type: "create_lobby"; best_of: number }
   | { type: "join_lobby"; code: string }
   | { type: "join_queue"; best_of: number }
+  | { type: "join_lanes_queue"; win_to: number }
   | { type: "cancel" }
   | { type: "play_move"; mv: Move }
+  | { type: "play_lanes"; plays: LanePlay[] }
   | { type: "leave_match" }
   | { type: "chat"; emoji: string }
   | { type: "ping" };
@@ -55,7 +78,35 @@ export type ServerMessage =
   | { type: "opponent_left" }
   | { type: "chat"; from: PlayerSlot; emoji: string }
   | { type: "error"; code: string; message: string }
-  | { type: "pong" };
+  | { type: "pong" }
+  /* Lanes variants */
+  | {
+      type: "lanes_match_found";
+      match_id: string;
+      opponent: OpponentInfo;
+      you_are: PlayerSlot;
+      lanes: number;
+      win_to: number;
+    }
+  | { type: "lanes_round_start"; round_no: number; deadline_ms: number }
+  | {
+      type: "lanes_round_result";
+      round_no: number;
+      a_plays: LanePlay[];
+      b_plays: LanePlay[];
+      lane_results: LaneResult[];
+      a_points: number;
+      b_points: number;
+      round_wins_a: number;
+      round_wins_b: number;
+    }
+  | {
+      type: "lanes_match_end";
+      winner: PlayerSlot | null;
+      round_wins_a: number;
+      round_wins_b: number;
+      forfeit: boolean;
+    };
 
 /* ──────────── URL helpers ──────────── */
 
