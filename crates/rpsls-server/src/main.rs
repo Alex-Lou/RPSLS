@@ -25,11 +25,13 @@ use tower_http::trace::TraceLayer;
 use tracing::{info, warn};
 use uuid::Uuid;
 
+use crate::lanes_engine::{start_lanes_match, LanesCommand};
 use crate::lobby::LobbyManager;
 use crate::match_engine::{start_match, MatchCommand};
 use crate::protocol::{ClientMessage, PlayerSlot, ServerMessage};
 use crate::session::Session;
 
+mod lanes_engine;
 mod lobby;
 mod match_engine;
 mod protocol;
@@ -37,8 +39,10 @@ mod session;
 
 struct AppState {
     lobbies: Arc<LobbyManager>,
-    /// session_id → (match_tx, our_slot)
+    /// session_id → (match_tx, our_slot) — classic 1v1 mode.
     in_match: DashMap<String, (mpsc::UnboundedSender<MatchCommand>, PlayerSlot)>,
+    /// session_id → (lanes_tx, our_slot) — Constellation Lanes mode (Phase 1+).
+    in_lanes: DashMap<String, (mpsc::UnboundedSender<LanesCommand>, PlayerSlot)>,
 }
 
 #[tokio::main]
@@ -53,6 +57,7 @@ async fn main() {
     let state = Arc::new(AppState {
         lobbies: Arc::new(LobbyManager::new()),
         in_match: DashMap::new(),
+        in_lanes: DashMap::new(),
     });
 
     let cors = CorsLayer::new().allow_origin(Any).allow_methods(Any);
@@ -147,8 +152,12 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
     // Cleanup.
     state.lobbies.remove_lobby_by_host(&session_id);
     state.lobbies.leave_queue(&session_id).await;
+    state.lobbies.leave_lanes_queue(&session_id).await;
     if let Some((_, (match_tx, slot))) = state.in_match.remove(&session_id) {
         let _ = match_tx.send(MatchCommand::Leave { slot });
+    }
+    if let Some((_, (lanes_tx, slot))) = state.in_lanes.remove(&session_id) {
+        let _ = lanes_tx.send(LanesCommand::Leave { slot });
     }
     drop(outgoing);
     info!(%session_id, "socket closed");
@@ -204,8 +213,31 @@ async fn handle_client_message(
             }
         }
 
+        ClientMessage::JoinLanesQueue { win_to } => {
+            if !validate_win_to(win_to) {
+                return reply_error(session, "bad_win_to", "win_to must be in 1..=5");
+            }
+            if let Some(opp) = state
+                .lobbies
+                .join_or_match_lanes(session.clone(), win_to)
+                .await
+            {
+                let lanes_tx = start_lanes_match(opp.clone(), session.clone(), win_to);
+                state
+                    .in_lanes
+                    .insert(opp.id.clone(), (lanes_tx.clone(), PlayerSlot::A));
+                state
+                    .in_lanes
+                    .insert(session.id.clone(), (lanes_tx, PlayerSlot::B));
+            } else {
+                let pos = state.lobbies.lanes_queue_position(&session.id).await;
+                session.send(ServerMessage::Queued { position: pos });
+            }
+        }
+
         ClientMessage::Cancel => {
             state.lobbies.leave_queue(&session.id).await;
+            state.lobbies.leave_lanes_queue(&session.id).await;
             state.lobbies.remove_lobby_by_host(&session.id);
         }
 
@@ -216,9 +248,19 @@ async fn handle_client_message(
             }
         }
 
+        ClientMessage::PlayLanes { plays } => {
+            if let Some(entry) = state.in_lanes.get(&session.id) {
+                let (tx, slot) = entry.value().clone();
+                let _ = tx.send(LanesCommand::Play { slot, plays });
+            }
+        }
+
         ClientMessage::LeaveMatch => {
             if let Some((_, (tx, slot))) = state.in_match.remove(&session.id) {
                 let _ = tx.send(MatchCommand::Leave { slot });
+            }
+            if let Some((_, (tx, slot))) = state.in_lanes.remove(&session.id) {
+                let _ = tx.send(LanesCommand::Leave { slot });
             }
         }
 
@@ -242,4 +284,9 @@ fn reply_error(session: &Arc<Session>, code: &str, msg: &str) {
 
 fn validate_best_of(n: u8) -> bool {
     n >= 1 && n <= 9 && n % 2 == 1
+}
+
+/// Number of round-wins to take a Lanes match (3 → bo5, 5 → bo9, etc.).
+fn validate_win_to(n: u8) -> bool {
+    (1..=5).contains(&n)
 }
