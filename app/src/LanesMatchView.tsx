@@ -420,6 +420,8 @@ function PickStage({
         {t("lanes.pickInstruction")}
       </div>
 
+      <AmbientFlavor />
+
       <PickerBar onPickInNextEmpty={onPick} />
 
       {/* Combo preview: shown as soon as the 3 picks form a known combo. */}
@@ -802,6 +804,26 @@ function RevealStage({ result }: { result: LanesRoundResultData }) {
           <ComboBanner combo={headlineCombo} />
         )}
       </AnimatePresence>
+
+      {/* Opponent-combo reveal line — pedagogic. Only shows when they had
+          a named combo AND it's different from the headline (otherwise
+          the banner already covered it). */}
+      <AnimatePresence>
+        {revealedLanes >= 3 && oppCombo && oppCombo.id !== headlineCombo?.id && (
+          <motion.div
+            key="opp-combo"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ delay: 0.4, duration: 0.3 }}
+            className="text-[11px] text-zinc-400 mt-1 text-center px-3"
+          >
+            {t("lanes.opponentCombo", {
+              combo: `${oppCombo.glyph} ${t(`combo.${oppCombo.id}.name`)}`,
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
@@ -1038,6 +1060,42 @@ function MatchEndScene({
   );
 }
 
+/* ──────────── Ambient flavor (subtle geek quote) ──────────── */
+
+/**
+ * Random tiny one-liner drawn from the `lanes.flavor.*` i18n bucket and
+ * rotated every ~3.5s. Intentionally subtle — it's atmosphere, not signal.
+ * 10 quotes cycle through pseudo-randomly per mount.
+ */
+const FLAVOR_COUNT = 10;
+function AmbientFlavor() {
+  const t = useT();
+  const [idx, setIdx] = useState(() => Math.floor(Math.random() * FLAVOR_COUNT));
+  useEffect(() => {
+    const id = setInterval(
+      () => setIdx((cur) => (cur + 1 + Math.floor(Math.random() * (FLAVOR_COUNT - 1))) % FLAVOR_COUNT),
+      3500,
+    );
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div className="min-h-[1.4em] flex items-center justify-center px-4 text-center">
+      <AnimatePresence mode="wait">
+        <motion.span
+          key={idx}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 0.55, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.4 }}
+          className="text-[10px] italic text-zinc-500 font-light tracking-wide"
+        >
+          {t(`lanes.flavor.${idx}`)}
+        </motion.span>
+      </AnimatePresence>
+    </div>
+  );
+}
+
 /* ──────────── Help / Lexicon modal ──────────── */
 
 function HelpModal({ target, onClose }: { target: number; onClose: () => void }) {
@@ -1071,11 +1129,53 @@ function HelpModal({ target, onClose }: { target: number; onClose: () => void })
             body={t("lanes.help.rules.body", { target })}
             accent="violet"
           />
+
+          {/* Per-move grid — much clearer than a paragraph of "X cuts Y, Y…" */}
           <Section
             title={t("lanes.help.rps.title")}
             body={t("lanes.help.rps.body")}
             accent="cyan"
-          />
+          >
+            <div className="mt-3 grid grid-cols-1 gap-2">
+              {RPSLS_MOVES_HELP.map(({ id, glyph, color }) => (
+                <div
+                  key={id}
+                  className="rounded-xl bg-white/5 border border-white/10 p-2.5 flex items-center gap-3"
+                >
+                  <div
+                    className={
+                      "shrink-0 w-9 h-9 rounded-lg bg-gradient-to-br " + color +
+                      " flex items-center justify-center text-zinc-900 text-lg shadow"
+                    }
+                  >
+                    {glyph}
+                  </div>
+                  <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-200">
+                      {t(`move.${id}.label`)}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]">
+                      <span className="text-emerald-300/90">
+                        ✓ {t("lanes.help.rps.beats")}
+                      </span>
+                      <span className="text-zinc-300">
+                        {t(`lanes.help.rps.${id}.beats`)}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]">
+                      <span className="text-rose-300/90">
+                        ✗ {t("lanes.help.rps.losesTo")}
+                      </span>
+                      <span className="text-zinc-400">
+                        {t(`lanes.help.rps.${id}.losesTo`)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Section>
+
           <Section
             title={t("lanes.help.identity.title")}
             body={t("lanes.help.identity.body")}
@@ -1112,11 +1212,14 @@ function HelpModal({ target, onClose }: { target: number; onClose: () => void })
               {COMBO_LEXICON.map(({ id, glyph }) => (
                 <div
                   key={id}
-                  className="rounded-xl bg-white/5 border border-white/10 p-2 flex items-center gap-2"
+                  className="rounded-xl bg-white/5 border border-white/10 p-2 flex flex-col items-center gap-1 text-center"
                 >
-                  <span className="text-lg">{glyph}</span>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-200">
+                  <span className="text-xl">{glyph}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-200 leading-tight">
                     {t(`combo.${id}.name`)}
+                  </span>
+                  <span className="text-[10px] text-zinc-500 leading-tight line-clamp-2">
+                    {t(`combo.${id}.tag`)}
                   </span>
                 </div>
               ))}
@@ -1139,6 +1242,15 @@ function HelpModal({ target, onClose }: { target: number; onClose: () => void })
     </motion.div>
   );
 }
+
+/** Move list used in the Help modal — gradient colours mirror MOVE_PALETTE. */
+const RPSLS_MOVES_HELP: { id: "rock" | "paper" | "scissors" | "lizard" | "spock"; glyph: string; color: string }[] = [
+  { id: "rock",     glyph: "🪨", color: "from-stone-300 to-amber-400"   },
+  { id: "paper",    glyph: "📄", color: "from-zinc-100 to-sky-200"      },
+  { id: "scissors", glyph: "✂️", color: "from-rose-300 to-orange-400"   },
+  { id: "lizard",   glyph: "🦎", color: "from-lime-300 to-emerald-500"  },
+  { id: "spock",    glyph: "🖖", color: "from-cyan-300 to-violet-500"   },
+];
 
 const COMBO_LEXICON: { id: string; glyph: string }[] = [
   { id: "rockslide",     glyph: "🪨" },
