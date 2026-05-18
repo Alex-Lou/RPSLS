@@ -32,6 +32,9 @@ pub struct LobbyManager {
     /// Public matchmaking queue. Simple FIFO per `best_of` bucket would be
     /// nicer but a single Vec is fine for an MVP — we scan it.
     queue: Mutex<Vec<QueueEntry>>,
+    /// Separate queue for Constellation Lanes matches — same shape but a
+    /// different bucket so it never crosses with classic match queueing.
+    lanes_queue: Mutex<Vec<QueueEntry>>,
 }
 
 impl LobbyManager {
@@ -105,6 +108,40 @@ impl LobbyManager {
 
     pub async fn queue_position(&self, session_id: &str) -> u32 {
         let q = self.queue.lock().await;
+        q.iter()
+            .position(|e| e.player.id == session_id)
+            .map(|i| (i + 1) as u32)
+            .unwrap_or(0)
+    }
+
+    /* ──────────── Lanes queue (Phase 1) ──────────── */
+
+    /// Same semantics as [`join_or_match`] but for the Constellation Lanes
+    /// queue. `win_to` is the number of round-wins required (3 → bo5).
+    pub async fn join_or_match_lanes(
+        &self,
+        player: Arc<Session>,
+        win_to: u8,
+    ) -> Option<Arc<Session>> {
+        let mut q = self.lanes_queue.lock().await;
+        if let Some(idx) = q
+            .iter()
+            .position(|e| e.best_of == win_to && e.player.id != player.id)
+        {
+            let entry = q.remove(idx);
+            return Some(entry.player);
+        }
+        q.push(QueueEntry { player, best_of: win_to });
+        None
+    }
+
+    pub async fn leave_lanes_queue(&self, session_id: &str) {
+        let mut q = self.lanes_queue.lock().await;
+        q.retain(|e| e.player.id != session_id);
+    }
+
+    pub async fn lanes_queue_position(&self, session_id: &str) -> u32 {
+        let q = self.lanes_queue.lock().await;
         q.iter()
             .position(|e| e.player.id == session_id)
             .map(|i| (i + 1) as u32)
