@@ -26,7 +26,7 @@ impl Move {
         Move::Spock,
     ];
 
-    /// Verbs describing how `self` beats `other`, per Sheldon's canon.
+    /// Verbs describing how `self` beats `other`, per the canonical RPSLS set.
     /// Returns `None` if `self` does not beat `other`.
     pub fn beats(self, other: Move) -> Option<&'static str> {
         use Move::*;
@@ -145,7 +145,7 @@ mod tests {
 
     #[test]
     fn all_canonical_wins() {
-        // Sheldon's canon: each move beats exactly 2 others.
+        // Canonical RPSLS: each move beats exactly 2 others.
         let canon = [
             (Scissors, Paper),    (Paper,  Rock),
             (Rock,     Lizard),   (Lizard, Spock),

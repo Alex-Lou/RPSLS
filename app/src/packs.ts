@@ -1,7 +1,7 @@
 /**
  * Three hand-crafted variant packs. Every winner→loser pair has a deliberate
- * narrative verb, just like Sheldon's original RPSLS. No cyclic auto-generation,
- * no nonsense like "Paper covers Fire". If a pair isn't in `verbs`, it's a draw
+ * narrative verb, like the canonical RPSLS. No cyclic auto-generation, no
+ * nonsense like "Paper covers Fire". If a pair isn't in `verbs`, it's a draw
  * (which never happens for a properly authored pack).
  *
  * Elements within a pack are arranged in cyclic order so each beats the next 2
@@ -23,7 +23,7 @@ export interface Pack {
   verbs: Record<string, Record<string, string>>;
 }
 
-/* ────────── Pack 1: RPSLS (canon Sheldon Cooper) ────────── */
+/* ────────── Pack 1: RPSLS (canonical 5-move set) ────────── */
 const RPSLS_PACK: Pack = {
   id: "rpsls",
   elements: [
