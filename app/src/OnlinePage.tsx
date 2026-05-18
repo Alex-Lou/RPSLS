@@ -7,9 +7,11 @@ import { MOVES, type Move } from "./game";
 import {
   OnlineClient,
   normalizeServerUrl,
+  type ClientMessage,
   type ServerMessage,
   type PlayerSlot,
 } from "./online";
+import { LanesMatchView } from "./LanesMatchView";
 import {
   hapticTap,
   hapticLock,
@@ -32,6 +34,7 @@ type Phase =
   | "round"
   | "reveal"
   | "match_end"
+  | "lanes_match"  // Constellation Lanes match in progress (LanesMatchView)
   | "error";
 
 interface MatchState {
@@ -155,8 +158,14 @@ export function OnlinePage() {
   const serverConfig = useStore((s) => s.serverConfig);
   const setServerConfig = useStore((s) => s.setServerConfig);
 
+  // Mode toggle: classic 1v1 (current) vs Constellation Lanes (Phase 1).
+  // Once a user picks a mode in the menu, the rest of the flow follows.
+  const [mode, setMode] = useState<"classic" | "lanes">("classic");
+
   const [phase, setPhase] = useState<Phase>("menu");
   const [bestOf, setBestOf] = useState(3);
+  // For Lanes mode: win_to (3 → bo5 in round-wins).
+  const [lanesWinTo, setLanesWinTo] = useState(2);
   const [lobbyCode, setLobbyCode] = useState("");        // we created it
   const [joinCode, setJoinCode] = useState("");          // input
   const [queuePosition, setQueuePosition] = useState(0);
@@ -333,8 +342,19 @@ export function OnlinePage() {
         setErrMsg(`${msg.code}: ${msg.message}`);
         setPhase("error");
         break;
+      // Lanes messages flip us into the "lanes_match" phase. The
+      // LanesMatchView component owns the rest of the flow (its own
+      // listener subscribes via onMessage prop).
+      case "lanes_match_found":
+        setPhase("lanes_match");
+        break;
       case "chat":
       case "pong":
+      case "lanes_round_start":
+      case "lanes_round_result":
+      case "lanes_match_end":
+        // Handled inside LanesMatchView's own subscription.
+        break;
       default:
         break;
     }
@@ -388,7 +408,11 @@ export function OnlinePage() {
     setPhase("connecting");
     try {
       const c = await ensureClient();
-      c.send({ type: "join_queue", best_of: bestOf });
+      if (mode === "lanes") {
+        c.send({ type: "join_lanes_queue", win_to: lanesWinTo });
+      } else {
+        c.send({ type: "join_queue", best_of: bestOf });
+      }
     } catch (e) {
       handleConnectError(e);
     }
@@ -536,7 +560,14 @@ export function OnlinePage() {
             exit={{ opacity: 0, y: -8 }}
             className="flex flex-col gap-4"
           >
-            <BestOfPicker value={bestOf} onChange={setBestOf} />
+            {/* Mode picker — Classic vs Constellation Lanes */}
+            <ModePicker mode={mode} onChange={setMode} />
+
+            {mode === "classic" ? (
+              <BestOfPicker value={bestOf} onChange={setBestOf} />
+            ) : (
+              <LanesWinToPicker value={lanesWinTo} onChange={setLanesWinTo} />
+            )}
 
             <Card title="🎲 Random match">
               <p className="text-sm text-zinc-400 mb-3">
@@ -696,6 +727,29 @@ export function OnlinePage() {
             opponentName={m.opponent}
             onBack={backToMenu}
           />
+        )}
+
+        {phase === "lanes_match" && (
+          <motion.div
+            key="lanes"
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <LanesMatchView
+              nickname={player.nickname}
+              onSend={(msg: ClientMessage) => clientRef.current?.send(msg)}
+              onMessage={(cb) => {
+                const c = clientRef.current;
+                if (!c) return () => {};
+                return c.on(cb);
+              }}
+              onLeave={() => {
+                clientRef.current?.send({ type: "leave_match" });
+                backToMenu();
+              }}
+            />
+          </motion.div>
         )}
 
         {phase === "error" && (
@@ -978,6 +1032,83 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
     <div className="rounded-2xl bg-black/30 border border-white/10 p-4">
       <h3 className="font-bold mb-2">{title}</h3>
       {children}
+    </div>
+  );
+}
+
+function ModePicker({
+  mode,
+  onChange,
+}: {
+  mode: "classic" | "lanes";
+  onChange: (m: "classic" | "lanes") => void;
+}) {
+  return (
+    <div className="rounded-2xl bg-black/30 border border-white/10 p-3 flex gap-2">
+      <button
+        onClick={() => onChange("classic")}
+        className={
+          "flex-1 py-3 rounded-xl font-semibold transition flex flex-col items-center gap-0.5 " +
+          (mode === "classic"
+            ? "bg-emerald-500/90 text-white shadow-lg shadow-emerald-500/30"
+            : "bg-white/5 hover:bg-white/10 text-zinc-300")
+        }
+      >
+        <span>⚔️ Classic 1v1</span>
+        <span className={"text-[10px] font-normal " + (mode === "classic" ? "text-emerald-100/80" : "text-zinc-500")}>
+          One move per round
+        </span>
+      </button>
+      <button
+        onClick={() => onChange("lanes")}
+        className={
+          "flex-1 py-3 rounded-xl font-semibold transition flex flex-col items-center gap-0.5 " +
+          (mode === "lanes"
+            ? "bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-500 text-white shadow-lg shadow-violet-500/30"
+            : "bg-white/5 hover:bg-white/10 text-zinc-300")
+        }
+      >
+        <span>🌌 Constellation Lanes</span>
+        <span className={"text-[10px] font-normal " + (mode === "lanes" ? "text-violet-100/90" : "text-zinc-500")}>
+          3 picks per round · NEW
+        </span>
+      </button>
+    </div>
+  );
+}
+
+function LanesWinToPicker({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+}) {
+  return (
+    <div className="rounded-2xl bg-black/30 border border-white/10 p-4">
+      <div className="text-xs uppercase tracking-wider text-zinc-500 mb-2">First to … round-wins</div>
+      <div className="flex gap-2">
+        {[1, 2, 3, 4].map((n) => {
+          const active = n === value;
+          return (
+            <button
+              key={n}
+              onClick={() => onChange(n)}
+              className={
+                "flex-1 py-2 rounded-xl font-semibold transition " +
+                (active
+                  ? "bg-violet-500/90 text-white shadow-lg shadow-violet-500/30"
+                  : "bg-white/5 hover:bg-white/10 text-zinc-300")
+              }
+            >
+              {n}
+            </button>
+          );
+        })}
+      </div>
+      <div className="text-[10px] text-zinc-500 mt-2 text-center">
+        Each round = 3 lanes resolved simultaneously
+      </div>
     </div>
   );
 }
