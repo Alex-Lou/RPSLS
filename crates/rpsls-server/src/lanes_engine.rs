@@ -156,10 +156,10 @@ async fn run_lanes_match(
         a.send(msg.clone());
         b.send(msg);
 
-        // Stretched from 3.5s to 5.5s so the combo banner + verdict are
-        // visible long enough to read and feel ("name the combo before
-        // it disappears").
-        tokio::time::sleep(Duration::from_millis(5500)).await;
+        // 7.5s of inter-round breathing room — lets the combo banner,
+        // verdict line and lane-by-lane reveal land fully and gives the
+        // player time to read the tagline (and *get* the joke).
+        tokio::time::sleep(Duration::from_millis(7500)).await;
     }
 
     if battle.status() != BattleStatus::InProgress {
