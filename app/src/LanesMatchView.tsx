@@ -1,0 +1,770 @@
+/**
+ * Constellation Lanes match view — Phase 1.
+ *
+ * Drives the 3-lane match flow once the server has accepted us into a
+ * lanes match. Reads server messages from a callback, sends client
+ * messages via a sender prop, and renders the full pick → reveal →
+ * verdict → match-end cycle.
+ *
+ * Designed to slot into OnlinePage when the user picks the "Lanes" mode,
+ * leaving the classic 1v1 flow completely untouched.
+ */
+
+import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { Hand, MOVE_ICON, MOVE_PALETTE } from "./icons";
+import { MOVES, type Move } from "./game";
+import {
+  hapticLock,
+  hapticMatchStart,
+  hapticMatchWin,
+  hapticMatchLoss,
+  hapticTap,
+  hapticWin,
+  hapticLoss,
+} from "./haptic";
+import type {
+  ClientMessage,
+  LanePlay,
+  LaneResult,
+  PlayerSlot,
+  ServerMessage,
+} from "./online";
+
+/* ──────────── Types ──────────── */
+
+type Phase =
+  | "waiting"        // queue → match_found
+  | "matched"        // match_found → first round_start (splash visible)
+  | "picking"        // round_start → user has filled 3 lanes
+  | "submitted"      // user picks locked, waiting for opponent
+  | "reveal_intro"   // 1.4s suspense "Rock-Paper-Scissors-SHOOT"
+  | "reveal"         // showing the verdict
+  | "match_end";
+
+interface MatchInfo {
+  matchId: string;
+  opponent: string;
+  youAre: PlayerSlot;
+  lanes: number;
+  winTo: number;
+}
+
+interface RoundData {
+  no: number;
+  deadlineMs: number;
+  startedAt: number;
+}
+
+interface RoundResultData {
+  yourPlays: LanePlay[];
+  oppPlays: LanePlay[];
+  laneResults: LaneResult[];
+  yourPoints: number;
+  oppPoints: number;
+  roundWinsYou: number;
+  roundWinsOpp: number;
+}
+
+interface EndData {
+  winner: PlayerSlot | null;
+  roundWinsYou: number;
+  roundWinsOpp: number;
+  forfeit: boolean;
+}
+
+export interface LanesMatchViewProps {
+  /** Player's own nickname for the score header. */
+  nickname: string;
+  /** Send a `ClientMessage` over the live WS. */
+  onSend: (msg: ClientMessage) => void;
+  /** Subscribe to incoming server messages — returns an unsubscribe. */
+  onMessage: (cb: (msg: ServerMessage) => void) => () => void;
+  /** Called when the user wants to leave (forfeit or after match end). */
+  onLeave: () => void;
+}
+
+/* ──────────── Main view ──────────── */
+
+export function LanesMatchView({
+  nickname,
+  onSend,
+  onMessage,
+  onLeave,
+}: LanesMatchViewProps) {
+  const [phase, setPhase] = useState<Phase>("waiting");
+  const [info, setInfo] = useState<MatchInfo | null>(null);
+  const [round, setRound] = useState<RoundData | null>(null);
+  const [picks, setPicks] = useState<(Move | null)[]>([null, null, null]);
+  const [lastResult, setLastResult] = useState<RoundResultData | null>(null);
+  const [end, setEnd] = useState<EndData | null>(null);
+
+  const revealTimer = useRef<number | null>(null);
+  const splashTimer = useRef<number | null>(null);
+  const [showSplash, setShowSplash] = useState(false);
+
+  /* Wire server messages. */
+  useEffect(() => {
+    const unsub = onMessage((msg) => {
+      switch (msg.type) {
+        case "lanes_match_found":
+          setInfo({
+            matchId: msg.match_id,
+            opponent: msg.opponent.nickname,
+            youAre: msg.you_are,
+            lanes: msg.lanes,
+            winTo: msg.win_to,
+          });
+          setPhase("matched");
+          setShowSplash(true);
+          hapticMatchStart();
+          if (splashTimer.current) window.clearTimeout(splashTimer.current);
+          splashTimer.current = window.setTimeout(() => setShowSplash(false), 2500);
+          break;
+
+        case "lanes_round_start":
+          setRound({
+            no: msg.round_no,
+            deadlineMs: msg.deadline_ms,
+            startedAt: Date.now(),
+          });
+          setPicks([null, null, null]);
+          setLastResult(null);
+          setPhase("picking");
+          break;
+
+        case "lanes_round_result": {
+          // Map server message → "your"/"opp" perspective.
+          setInfo((cur) => {
+            if (!cur) return cur;
+            const youAreA = cur.youAre === "a";
+            const yourPlays = youAreA ? msg.a_plays : msg.b_plays;
+            const oppPlays  = youAreA ? msg.b_plays : msg.a_plays;
+            const yourPoints = youAreA ? msg.a_points : msg.b_points;
+            const oppPoints  = youAreA ? msg.b_points : msg.a_points;
+            const roundWinsYou = youAreA ? msg.round_wins_a : msg.round_wins_b;
+            const roundWinsOpp = youAreA ? msg.round_wins_b : msg.round_wins_a;
+            setLastResult({
+              yourPlays, oppPlays,
+              laneResults: msg.lane_results,
+              yourPoints, oppPoints,
+              roundWinsYou, roundWinsOpp,
+            });
+            return cur;
+          });
+          setPhase("reveal_intro");
+          if (revealTimer.current) window.clearTimeout(revealTimer.current);
+          revealTimer.current = window.setTimeout(() => {
+            setPhase("reveal");
+            // Haptic on win/loss/draw based on round outcome.
+            setLastResult((r) => {
+              if (!r) return r;
+              if (r.yourPoints > r.oppPoints) hapticWin();
+              else if (r.yourPoints < r.oppPoints) hapticLoss();
+              else hapticTap();
+              return r;
+            });
+          }, 1400);
+          break;
+        }
+
+        case "lanes_match_end": {
+          setInfo((cur) => {
+            if (!cur) return cur;
+            const youAreA = cur.youAre === "a";
+            const winner = msg.winner;
+            const youWon = winner === cur.youAre;
+            const draw = winner === null;
+            if (youWon) hapticMatchWin();
+            else if (!draw) hapticMatchLoss();
+            else hapticTap();
+            setEnd({
+              winner,
+              roundWinsYou: youAreA ? msg.round_wins_a : msg.round_wins_b,
+              roundWinsOpp: youAreA ? msg.round_wins_b : msg.round_wins_a,
+              forfeit: msg.forfeit,
+            });
+            return cur;
+          });
+          setPhase("match_end");
+          break;
+        }
+
+        case "opponent_left":
+          // Will be followed by lanes_match_end with forfeit:true — no UI here.
+          break;
+
+        default:
+          break;
+      }
+    });
+    return () => {
+      unsub();
+      if (revealTimer.current) window.clearTimeout(revealTimer.current);
+      if (splashTimer.current) window.clearTimeout(splashTimer.current);
+    };
+  }, [onMessage]);
+
+  /* Lock picks when all 3 lanes are filled. */
+  function submitPicks() {
+    if (picks.some((p) => p === null)) return;
+    hapticLock();
+    onSend({
+      type: "play_lanes",
+      plays: picks.map((mv) => ({ mv: mv as Move, mana: 0 })),
+    });
+    setPhase("submitted");
+  }
+
+  function pickFor(laneIdx: number, mv: Move) {
+    if (phase !== "picking") return;
+    setPicks((cur) => {
+      const next = [...cur];
+      next[laneIdx] = mv;
+      return next;
+    });
+  }
+
+  function clearLane(laneIdx: number) {
+    if (phase !== "picking") return;
+    setPicks((cur) => {
+      const next = [...cur];
+      next[laneIdx] = null;
+      return next;
+    });
+  }
+
+  const target = info?.winTo ?? 3;
+  const youWins = lastResult?.roundWinsYou ?? end?.roundWinsYou ?? 0;
+  const oppWins = lastResult?.roundWinsOpp ?? end?.roundWinsOpp ?? 0;
+
+  /* ──────────── Render ──────────── */
+  return (
+    <div className="relative flex flex-col gap-4">
+      {/* Splash overlay */}
+      <AnimatePresence>
+        {showSplash && info && (
+          <MatchFoundSplash
+            you={nickname}
+            opp={info.opponent}
+            lanes={info.lanes}
+            winTo={info.winTo}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Score header */}
+      {info && (
+        <ScoreHeader
+          you={nickname}
+          opp={info.opponent}
+          youWins={youWins}
+          oppWins={oppWins}
+          target={target}
+          round={round?.no ?? 1}
+        />
+      )}
+
+      {/* Stage */}
+      <div className="relative min-h-[300px] sm:min-h-[360px] flex items-center justify-center">
+        {phase === "waiting" && (
+          <div className="text-sm text-zinc-400">Finding an opponent…</div>
+        )}
+        {phase === "matched" && !showSplash && (
+          <div className="text-sm text-zinc-400">Preparing round 1…</div>
+        )}
+        {phase === "picking" && round && (
+          <PickStage
+            picks={picks}
+            onPick={pickFor}
+            onClearLane={clearLane}
+            startedAt={round.startedAt}
+            deadlineMs={round.deadlineMs}
+            onSubmit={submitPicks}
+          />
+        )}
+        {phase === "submitted" && (
+          <LockedStage picks={picks as Move[]} />
+        )}
+        {phase === "reveal_intro" && <RevealCountdown />}
+        {phase === "reveal" && lastResult && (
+          <RevealStage result={lastResult} />
+        )}
+        {phase === "match_end" && end && (
+          <MatchEndScene end={end} onBack={onLeave} />
+        )}
+      </div>
+
+      {/* Forfeit button — shown anytime but match-end. */}
+      {phase !== "match_end" && phase !== "waiting" && (
+        <button
+          onClick={onLeave}
+          className="self-center px-4 py-2 rounded-xl bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-500/40 text-zinc-400 hover:text-rose-200 text-xs transition"
+        >
+          🏳️ Forfeit match
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ──────────── Subcomponents ──────────── */
+
+function ScoreHeader({
+  you, opp, youWins, oppWins, target, round,
+}: {
+  you: string; opp: string;
+  youWins: number; oppWins: number; target: number; round: number;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center justify-between rounded-2xl bg-black/30 border border-white/10 px-4 py-3">
+        <div className="flex flex-col min-w-0 flex-1">
+          <span className="text-[10px] uppercase tracking-wider text-zinc-500">You</span>
+          <span className="font-semibold truncate text-emerald-200">{you}</span>
+        </div>
+        <div className="text-3xl sm:text-4xl font-black tabular-nums px-4">
+          <motion.span
+            key={youWins}
+            initial={{ scale: 1.6 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 0.4 }}
+            className="text-emerald-300 inline-block"
+          >
+            {youWins}
+          </motion.span>
+          <span className="text-zinc-600 mx-2">:</span>
+          <motion.span
+            key={oppWins}
+            initial={{ scale: 1.6 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 0.4 }}
+            className="text-rose-300 inline-block"
+          >
+            {oppWins}
+          </motion.span>
+        </div>
+        <div className="flex flex-col text-right min-w-0 flex-1">
+          <span className="text-[10px] uppercase tracking-wider text-zinc-500">Opponent</span>
+          <span className="font-semibold truncate text-rose-200">{opp || "—"}</span>
+        </div>
+      </div>
+      <div className="text-center text-[11px] uppercase tracking-[0.25em] text-zinc-500">
+        Round {round} · 3 lanes · First to {target} round-wins
+      </div>
+    </div>
+  );
+}
+
+function MatchFoundSplash({
+  you, opp, lanes, winTo,
+}: { you: string; opp: string; lanes: number; winTo: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, scale: 1.05 }}
+      transition={{ duration: 0.3 }}
+      className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md"
+    >
+      <motion.div
+        initial={{ y: -30, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.1 }}
+        className="text-xs tracking-[0.5em] text-violet-300/80 uppercase mb-3"
+      >
+        Constellation · Lanes Match Found
+      </motion.div>
+      <motion.div
+        initial={{ scale: 0.4, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.15, type: "spring", stiffness: 220, damping: 12 }}
+        className="flex items-center gap-6 sm:gap-10"
+      >
+        <NameTag name={you} accent="emerald" align="right" />
+        <motion.div
+          animate={{ rotate: [0, -8, 8, -4, 4, 0], scale: [1, 1.2, 1] }}
+          transition={{ duration: 0.9, delay: 0.4 }}
+          className="text-5xl sm:text-7xl font-black bg-gradient-to-br from-amber-300 to-rose-400 bg-clip-text text-transparent"
+        >
+          VS
+        </motion.div>
+        <NameTag name={opp} accent="rose" align="left" />
+      </motion.div>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.9 }}
+        className="mt-8 text-sm uppercase tracking-[0.3em] text-zinc-400"
+      >
+        {lanes} lanes · First to {winTo} rounds
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function NameTag({
+  name, accent, align,
+}: { name: string; accent: "emerald" | "rose"; align: "left" | "right" }) {
+  const grad = accent === "emerald" ? "from-emerald-300 to-teal-400" : "from-rose-300 to-fuchsia-400";
+  return (
+    <div className={"flex flex-col " + (align === "right" ? "items-end" : "items-start")}>
+      <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">
+        {accent === "emerald" ? "You" : "Opponent"}
+      </div>
+      <div
+        className={
+          "mt-1 text-xl sm:text-3xl font-black truncate max-w-[32vw] sm:max-w-[28vw] bg-gradient-to-r " +
+          grad +
+          " bg-clip-text text-transparent"
+        }
+      >
+        {name || "Anonymous"}
+      </div>
+    </div>
+  );
+}
+
+function PickStage({
+  picks, onPick, onClearLane, startedAt, deadlineMs, onSubmit,
+}: {
+  picks: (Move | null)[];
+  onPick: (lane: number, mv: Move) => void;
+  onClearLane: (lane: number) => void;
+  startedAt: number;
+  deadlineMs: number;
+  onSubmit: () => void;
+}) {
+  const allFilled = picks.every((p) => p !== null);
+  return (
+    <div className="w-full flex flex-col items-center gap-5">
+      {/* Timer */}
+      <TimerBar startedAt={startedAt} durationMs={deadlineMs} />
+
+      {/* 3 lane slots */}
+      <div className="grid grid-cols-3 gap-3 sm:gap-5 w-full max-w-2xl">
+        {picks.map((mv, i) => (
+          <LaneSlot key={i} index={i} pick={mv} onClear={() => onClearLane(i)} />
+        ))}
+      </div>
+
+      <div className="text-[11px] uppercase tracking-[0.3em] text-zinc-500">
+        Tap a move below, then tap a lane to place
+      </div>
+
+      {/* Picker — tap a move, then tap a lane. For MVP simplicity we use
+          a lane-by-lane focus: clicking a move places it in the next empty lane. */}
+      <PickerBar onPickInNextEmpty={(mv) => {
+        const idx = picks.findIndex((p) => p === null);
+        if (idx === -1) return;
+        onPick(idx, mv);
+      }} />
+
+      <button
+        onClick={onSubmit}
+        disabled={!allFilled}
+        className={
+          "mt-2 px-7 py-3 rounded-2xl font-bold text-white transition " +
+          (allFilled
+            ? "bg-gradient-to-r from-violet-500 via-fuchsia-500 to-teal-400 shadow-lg shadow-violet-500/30 hover:scale-[1.02]"
+            : "bg-white/5 text-zinc-500 cursor-not-allowed")
+        }
+      >
+        {allFilled ? "✓ Lock all 3 picks" : `Pick ${3 - picks.filter(Boolean).length} more`}
+      </button>
+    </div>
+  );
+}
+
+function LaneSlot({
+  index, pick, onClear,
+}: { index: number; pick: Move | null; onClear: () => void }) {
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="text-[10px] uppercase tracking-wider text-zinc-500">
+        Lane {index + 1}
+      </div>
+      <button
+        onClick={onClear}
+        disabled={!pick}
+        className={
+          "aspect-square w-full rounded-2xl border-2 transition flex items-center justify-center " +
+          (pick
+            ? "border-emerald-400/40 bg-emerald-500/10 hover:bg-rose-500/10 hover:border-rose-400/50"
+            : "border-dashed border-white/15 bg-black/20")
+        }
+        title={pick ? `Clear ${pick}` : "Empty lane"}
+      >
+        {pick ? (
+          <Hand move={pick} size="md" />
+        ) : (
+          <span className="text-3xl text-zinc-700 font-black">?</span>
+        )}
+      </button>
+    </div>
+  );
+}
+
+function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void }) {
+  return (
+    <div className="grid grid-cols-5 gap-2 sm:gap-3 w-full max-w-md">
+      {MOVES.map((mv, i) => {
+        const Icon = MOVE_ICON[mv];
+        const pal = MOVE_PALETTE[mv];
+        return (
+          <motion.button
+            key={mv}
+            onClick={() => onPickInNextEmpty(mv)}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 * i }}
+            whileHover={{ y: -4, scale: 1.04 }}
+            whileTap={{ scale: 0.92 }}
+            className={
+              "aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 " +
+              "bg-gradient-to-br " + pal.from + " " + pal.to + " ring-2 " + pal.ring + " " + pal.glow +
+              " text-zinc-900 shadow-lg transition"
+            }
+          >
+            <Icon className="w-6 h-6 sm:w-8 sm:h-8" />
+            <span className="text-[9px] uppercase tracking-wider font-bold">{mv}</span>
+          </motion.button>
+        );
+      })}
+    </div>
+  );
+}
+
+function TimerBar({ startedAt, durationMs }: { startedAt: number; durationMs: number }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 80);
+    return () => clearInterval(id);
+  }, []);
+  const elapsed = Math.max(0, now - startedAt);
+  const remaining = Math.max(0, durationMs - elapsed);
+  const progress = Math.max(0, Math.min(1, remaining / durationMs));
+  const urgent = remaining < 3000;
+  const critical = remaining < 1000;
+  const color = critical ? "bg-rose-500" : urgent ? "bg-amber-400" : "bg-violet-400";
+  return (
+    <div className="w-full max-w-md flex items-center gap-3">
+      <span className="text-xs font-mono text-zinc-400 tabular-nums w-8 text-right">
+        {Math.ceil(remaining / 1000)}s
+      </span>
+      <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
+        <motion.div
+          className={"h-full " + color}
+          animate={{ width: `${(progress * 100).toFixed(1)}%` }}
+          transition={{ duration: 0.1, ease: "linear" }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function LockedStage({ picks }: { picks: Move[] }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="flex flex-col items-center gap-4"
+    >
+      <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-300">
+        Picks locked in
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        {picks.map((mv, i) => (
+          <motion.div
+            key={i}
+            animate={{ y: [0, -4, 0] }}
+            transition={{ duration: 1.4, delay: i * 0.2, repeat: Infinity }}
+            className="flex flex-col items-center gap-1"
+          >
+            <Hand move={mv} size="md" />
+            <span className="text-[9px] uppercase tracking-wider text-zinc-500">L{i + 1}</span>
+          </motion.div>
+        ))}
+      </div>
+      <div className="text-sm text-zinc-300 font-medium">Waiting for opponent…</div>
+    </motion.div>
+  );
+}
+
+function RevealCountdown() {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="flex flex-col items-center justify-center gap-3 px-4 text-center"
+    >
+      <div className="text-[10px] uppercase tracking-[0.4em] text-zinc-500">Reveal</div>
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xl sm:text-3xl font-black leading-tight">
+        {["Rock", "Paper", "Scissors"].map((w, i) => (
+          <motion.span
+            key={w}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 + i * 0.18 }}
+            className="bg-gradient-to-br from-zinc-100 to-zinc-400 bg-clip-text text-transparent"
+          >
+            {w}
+          </motion.span>
+        ))}
+      </div>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.7 }}
+        animate={{ opacity: 1, scale: [0.7, 1.3, 1] }}
+        transition={{ delay: 0.78, duration: 0.4 }}
+        className="text-3xl sm:text-5xl font-black bg-gradient-to-br from-amber-300 to-rose-400 bg-clip-text text-transparent"
+      >
+        SHOOT!
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function RevealStage({ result }: { result: RoundResultData }) {
+  const youSwept = result.yourPoints === 3;
+  const swept    = result.oppPoints === 3;
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="flex flex-col items-center gap-3 w-full"
+    >
+      {/* 3-lane reveal grid */}
+      <div className="grid grid-cols-3 gap-3 sm:gap-5 w-full max-w-2xl">
+        {result.laneResults.map((lr, i) => (
+          <LaneRevealCard key={i} lane={i} you={result.yourPlays[i].mv} opp={result.oppPlays[i].mv} lr={lr} />
+        ))}
+      </div>
+
+      {/* Round verdict */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="text-center mt-2 px-2"
+      >
+        {result.yourPoints > result.oppPoints && (
+          <div className="text-emerald-300 text-lg font-bold">
+            ✨ Round won {result.yourPoints}-{result.oppPoints}
+            {youSwept && " · clean sweep!"}
+          </div>
+        )}
+        {result.yourPoints < result.oppPoints && (
+          <div className="text-rose-300 text-lg font-bold">
+            💥 Round lost {result.yourPoints}-{result.oppPoints}
+            {swept && " · they swept all 3"}
+          </div>
+        )}
+        {result.yourPoints === result.oppPoints && (
+          <div className="text-zinc-300 text-lg font-bold">
+            🤝 Round draw {result.yourPoints}-{result.oppPoints}
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function LaneRevealCard({
+  lane, you, opp, lr,
+}: { lane: number; you: Move; opp: Move; lr: LaneResult }) {
+  const ringColor =
+    lr.winner === "a" && lr.a_play.mv === you ? "ring-emerald-400/50" :
+    lr.winner === "b" && lr.b_play.mv === you ? "ring-emerald-400/50" :
+    lr.winner === "draw" ? "ring-zinc-500/30" : "ring-rose-400/40";
+  // Simpler: check by comparing your play vs lane winner.
+  const youWon = (lr.winner === "a" && lr.a_play.mv === you && lr.b_play.mv === opp)
+              || (lr.winner === "b" && lr.b_play.mv === you && lr.a_play.mv === opp);
+  const oppWon = (lr.winner !== "draw") && !youWon;
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: 0.05 * lane }}
+      className={
+        "rounded-2xl bg-black/30 border-2 p-3 flex flex-col items-center gap-2 ring-2 " + ringColor +
+        " " + (youWon ? "border-emerald-400/30" : oppWon ? "border-rose-400/30" : "border-zinc-500/20")
+      }
+    >
+      <span className="text-[9px] uppercase tracking-wider text-zinc-500">Lane {lane + 1}</span>
+      <Hand move={you} size="sm" emphasis={youWon ? "winner" : oppWon ? "loser" : "default"} />
+      <span className="text-[10px] text-zinc-600 font-black">VS</span>
+      <Hand move={opp} size="sm" emphasis={oppWon ? "winner" : youWon ? "loser" : "default"} />
+      <span className={
+        "text-[10px] uppercase tracking-wider font-bold mt-0.5 " +
+        (youWon ? "text-emerald-300" : oppWon ? "text-rose-300" : "text-zinc-500")
+      }>
+        {youWon ? "WIN" : oppWon ? "LOSS" : "DRAW"}
+      </span>
+    </motion.div>
+  );
+}
+
+function MatchEndScene({
+  end, onBack,
+}: { end: EndData; onBack: () => void }) {
+  // Caller passes "winner=you" via end.winner already in absolute terms — we
+  // need to know whether you won. Compute from round wins: if youWins > oppWins
+  // your side won. Backwards compat: use end.winner with caller's youAre context
+  // not directly available here, so we infer from scores.
+  const youWon = end.roundWinsYou > end.roundWinsOpp;
+  const draw = end.roundWinsYou === end.roundWinsOpp;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex flex-col items-center gap-5 py-6"
+    >
+      <motion.div
+        initial={{ scale: 0, rotate: -180 }}
+        animate={{ scale: 1, rotate: 0 }}
+        transition={{ type: "spring", stiffness: 200, damping: 12, delay: 0.1 }}
+        className="text-7xl sm:text-8xl"
+      >
+        {youWon ? "🏆" : draw ? "🤝" : "💀"}
+      </motion.div>
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+        className={
+          "text-4xl sm:text-5xl font-black bg-gradient-to-br bg-clip-text text-transparent " +
+          (youWon
+            ? "from-emerald-300 to-teal-400"
+            : draw
+            ? "from-zinc-200 to-zinc-400"
+            : "from-rose-300 to-fuchsia-400")
+        }
+      >
+        {youWon ? "VICTORY" : draw ? "DRAW" : "DEFEAT"}
+      </motion.div>
+      {end.forfeit && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.8 }}
+          className="text-xs uppercase tracking-[0.3em] text-amber-300"
+        >
+          (by forfeit)
+        </motion.div>
+      )}
+      <div className="text-2xl font-mono">
+        {end.roundWinsYou} — {end.roundWinsOpp}
+      </div>
+      <motion.button
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 1 }}
+        onClick={onBack}
+        className="mt-2 px-6 py-3 rounded-xl bg-violet-500/90 hover:bg-violet-500 font-semibold text-white shadow-lg shadow-violet-500/30 transition"
+      >
+        Back to menu
+      </motion.button>
+    </motion.div>
+  );
+}
+
