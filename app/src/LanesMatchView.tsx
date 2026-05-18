@@ -10,10 +10,11 @@
  * leaving the classic 1v1 flow completely untouched.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Hand, MOVE_ICON, MOVE_PALETTE } from "./icons";
 import { MOVES, type Move } from "./game";
+import { hapticAlert, hapticTap } from "./haptic";
 import type { LanePlay, LaneResult, PlayerSlot } from "./online";
 
 /* ──────────── Types (re-exported for the parent) ──────────── */
@@ -448,28 +449,93 @@ function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void
 
 function TimerBar({ startedAt, durationMs }: { startedAt: number; durationMs: number }) {
   const [now, setNow] = useState(Date.now());
+  // Track previous urgency level so we can fire a haptic on each transition.
+  const prevLevel = useRef<"calm" | "urgent" | "critical">("calm");
+
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 80);
     return () => clearInterval(id);
   }, []);
+
   const elapsed = Math.max(0, now - startedAt);
   const remaining = Math.max(0, durationMs - elapsed);
   const progress = Math.max(0, Math.min(1, remaining / durationMs));
-  const urgent = remaining < 3000;
-  const critical = remaining < 1000;
-  const color = critical ? "bg-rose-500" : urgent ? "bg-amber-400" : "bg-violet-400";
+  const urgent = remaining < 3000 && remaining > 0;
+  const critical = remaining < 1000 && remaining > 0;
+  const expired = remaining === 0;
+  const level: "calm" | "urgent" | "critical" =
+    expired ? "critical" : critical ? "critical" : urgent ? "urgent" : "calm";
+
+  useEffect(() => {
+    if (level !== prevLevel.current) {
+      if (level === "urgent")  hapticTap();
+      if (level === "critical") hapticAlert();
+      prevLevel.current = level;
+    }
+  }, [level]);
+
+  const color = critical || expired ? "bg-rose-500" : urgent ? "bg-amber-400" : "bg-violet-400";
+  const num = Math.ceil(remaining / 1000);
+
   return (
-    <div className="w-full max-w-md flex items-center gap-3">
-      <span className="text-xs font-mono text-zinc-400 tabular-nums w-8 text-right">
-        {Math.ceil(remaining / 1000)}s
-      </span>
-      <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
-        <motion.div
-          className={"h-full " + color}
-          animate={{ width: `${(progress * 100).toFixed(1)}%` }}
-          transition={{ duration: 0.1, ease: "linear" }}
-        />
+    <div className="w-full max-w-md flex flex-col gap-1 items-center">
+      <div className="flex items-center gap-3 w-full">
+        <motion.span
+          key={num}
+          initial={{ scale: critical ? 1.4 : 1 }}
+          animate={{ scale: 1 }}
+          transition={{ duration: 0.25 }}
+          className={
+            "text-sm font-mono tabular-nums w-10 text-right font-bold " +
+            (critical || expired ? "text-rose-300" : urgent ? "text-amber-300" : "text-zinc-300")
+          }
+        >
+          {num}s
+        </motion.span>
+        <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
+          <motion.div
+            className={"h-full " + color}
+            animate={{
+              width: `${(progress * 100).toFixed(1)}%`,
+              opacity: critical ? [0.5, 1, 0.5] : 1,
+            }}
+            transition={{
+              width:   { duration: 0.1, ease: "linear" },
+              opacity: critical ? { duration: 0.4, repeat: Infinity } : { duration: 0.1 },
+            }}
+          />
+        </div>
       </div>
+      {/* Pressure overlay: faint red vignette + screen shake when critical. */}
+      <AnimatePresence>
+        {critical && (
+          <motion.div
+            key="overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 pointer-events-none z-30"
+            style={{
+              boxShadow: "inset 0 0 120px 30px rgba(244,63,94,0.6)",
+            }}
+          />
+        )}
+      </AnimatePresence>
+      {urgent && !critical && (
+        <div className="text-[10px] uppercase tracking-[0.3em] text-amber-300/80 font-bold">
+          Hurry!
+        </div>
+      )}
+      {critical && (
+        <motion.div
+          animate={{ x: [0, -3, 3, -2, 2, 0] }}
+          transition={{ duration: 0.3, repeat: Infinity }}
+          className="text-[10px] uppercase tracking-[0.3em] text-rose-300 font-bold"
+        >
+          ⚠ Pick fast or lose this round!
+        </motion.div>
+      )}
     </div>
   );
 }
