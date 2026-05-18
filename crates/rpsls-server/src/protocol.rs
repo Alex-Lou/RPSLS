@@ -3,6 +3,7 @@
 //! All messages are JSON with a `type` discriminator. Mirrored in TypeScript
 //! at `app/src/online.ts` — keep both in sync.
 
+use rpsls_core::constellation::{LanePlay, LaneResult};
 use rpsls_core::{Move, Outcome};
 use serde::{Deserialize, Serialize};
 
@@ -29,7 +30,15 @@ pub enum ClientMessage {
     /// Play a move in the current match.
     PlayMove { mv: Move },
 
-    /// Quit the current match (forfeit).
+    /// Enter the public matchmaking queue for a Constellation Lanes match.
+    /// `win_to` = number of round-wins needed (e.g. 3 → best-of-5).
+    JoinLanesQueue { win_to: u8 },
+
+    /// Submit the 3 lane plays for the current Lanes round. Order is left
+    /// to right (lane 0, lane 1, lane 2).
+    PlayLanes { plays: Vec<LanePlay> },
+
+    /// Quit the current match (forfeit). Works for both classic and lanes.
     LeaveMatch,
 
     /// Send a quick emoji reaction to the opponent.
@@ -84,6 +93,44 @@ pub enum ServerMessage {
 
     /// Opponent disconnected before the match ended.
     OpponentLeft,
+
+    /* ──────────── Constellation Lanes (Phase 1) ──────────── */
+
+    /// Lanes match has been found and is starting.
+    LanesMatchFound {
+        match_id: String,
+        opponent: OpponentInfo,
+        you_are: PlayerSlot,
+        /// How many lanes per round (3 in Phase 1).
+        lanes: u8,
+        /// Number of round-wins required to win the match (e.g. 3 for bo5).
+        win_to: u8,
+    },
+
+    /// New Lanes round started — client should show the 3-lane picker.
+    LanesRoundStart { round_no: u32, deadline_ms: u32 },
+
+    /// Lanes round resolved — both sides revealed simultaneously.
+    LanesRoundResult {
+        round_no: u32,
+        a_plays: Vec<LanePlay>,
+        b_plays: Vec<LanePlay>,
+        lane_results: Vec<LaneResult>,
+        /// Total points this round (Phase 1: = lanes won this round).
+        a_points: u8,
+        b_points: u8,
+        /// Cumulative round wins so far.
+        round_wins_a: u8,
+        round_wins_b: u8,
+    },
+
+    /// Lanes match has ended.
+    LanesMatchEnd {
+        winner: Option<PlayerSlot>,
+        round_wins_a: u8,
+        round_wins_b: u8,
+        forfeit: bool,
+    },
 
     /// Opponent sent a chat emoji.
     Chat { from: PlayerSlot, emoji: String },
