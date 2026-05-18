@@ -34,8 +34,8 @@ import {
 } from "./haptic";
 
 const LANE_COUNT = 3;
-const PICK_DEADLINE_MS = 12_000;
-const ROUND_PAUSE_MS = 3_500;
+const PICK_DEADLINE_MS = 13_500;          // matches server PICK_DEADLINE
+const ROUND_PAUSE_MS = 5_500;              // matches server inter-round sleep
 const REVEAL_SUSPENSE_MS = 1_400;
 const MATCH_FOUND_SPLASH_MS = 2_500;
 
@@ -204,6 +204,25 @@ export function LocalLanesGame({
     };
   }, []);
 
+  function rematch() {
+    // Reset everything for a fresh local match.
+    setRound(null);
+    setLastResult(null);
+    setEnd(null);
+    setSubmitted(false);
+    moodRef.current = rollAiMood();
+    playerHistoryRef.current = [];
+    battleRef.current = makeLocalBattle();
+    roundNoRef.current = 0;
+    if (deadlineTimerRef.current) {
+      window.clearTimeout(deadlineTimerRef.current);
+      deadlineTimerRef.current = null;
+    }
+    hapticMatchStart();
+    // Give the match-found splash a beat before round 1 like at fresh start.
+    window.setTimeout(() => startNextRound(), MATCH_FOUND_SPLASH_MS);
+  }
+
   return (
     <LanesMatchView
       nickname={profileNickname}
@@ -214,6 +233,7 @@ export function LocalLanesGame({
       submitted={submitted}
       onSubmitPicks={handleSubmit}
       onLeave={onQuit}
+      onRematch={rematch}
     />
   );
 }

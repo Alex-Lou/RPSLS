@@ -549,7 +549,15 @@ export function OnlinePage() {
 
   /* ── Render ── */
   return (
-    <div className="px-4 py-6 max-w-3xl w-full mx-auto flex-1 flex flex-col">
+    <div
+      className="px-4 pb-10 max-w-3xl w-full mx-auto flex-1 flex flex-col"
+      style={{
+        // Leaves room for the floating mobile hamburger (which sits at
+        // top:max(safe-area-top, 32px) with height 11). Otherwise the
+        // score header's left name slides under it.
+        paddingTop: "calc(max(env(safe-area-inset-top), 0px) + 4.5rem)",
+      }}
+    >
       {/* Cinematic match-found splash overlay */}
       <AnimatePresence>
         {showMatchFoundSplash && phase !== "menu" && (
@@ -838,6 +846,17 @@ export function OnlinePage() {
                 setLanesEnd(null);
                 setLanesSubmitted(false);
                 backToMenu();
+              }}
+              onRematch={() => {
+                // Wipe match state and re-queue with the same win_to.
+                const winTo = lanesMatch.winTo;
+                setLanesMatch(null);
+                setLanesRound(null);
+                setLanesLastResult(null);
+                setLanesEnd(null);
+                setLanesSubmitted(false);
+                clientRef.current?.send({ type: "join_lanes_queue", win_to: winTo });
+                setPhase("queued");
               }}
             />
           </motion.div>

@@ -32,7 +32,7 @@ export interface ComboTheme {
 
 const TRIPLE_THEMES: Record<Move, ComboTheme> = {
   rock: {
-    id: "triple-rock",
+    id: "rockslide",
     name: "ROCKSLIDE",
     tagline: "Three boulders, no mercy.",
     tier: "rare",
@@ -41,7 +41,7 @@ const TRIPLE_THEMES: Record<Move, ComboTheme> = {
     bonus: 1,
   },
   paper: {
-    id: "triple-paper",
+    id: "origami",
     name: "ORIGAMI WAVE",
     tagline: "A flock of folded fate.",
     tier: "rare",
@@ -50,7 +50,7 @@ const TRIPLE_THEMES: Record<Move, ComboTheme> = {
     bonus: 1,
   },
   scissors: {
-    id: "triple-scissors",
+    id: "shear",
     name: "SHEAR FRENZY",
     tagline: "Snip · snip · snip.",
     tier: "rare",
@@ -59,7 +59,7 @@ const TRIPLE_THEMES: Record<Move, ComboTheme> = {
     bonus: 1,
   },
   lizard: {
-    id: "triple-lizard",
+    id: "reptile",
     name: "REPTILE OVERLOAD",
     tagline: "Cold blood, venom thrice.",
     tier: "rare",
@@ -68,7 +68,7 @@ const TRIPLE_THEMES: Record<Move, ComboTheme> = {
     bonus: 1,
   },
   spock: {
-    id: "triple-spock",
+    id: "vulcan",
     name: "VULCAN BURST",
     tagline: "Live long and dominate.",
     tier: "rare",
@@ -79,7 +79,7 @@ const TRIPLE_THEMES: Record<Move, ComboTheme> = {
 };
 
 const TRINITY_CLASSIC: ComboTheme = {
-  id: "trinity-classic",
+  id: "trinityClassic",
   name: "CLASSIC TRINITY",
   tagline: "Rock · Paper · Scissors — the originals.",
   tier: "common",
@@ -88,7 +88,7 @@ const TRINITY_CLASSIC: ComboTheme = {
 };
 
 const TRINITY_SHELDON: ComboTheme = {
-  id: "trinity-sheldon",
+  id: "trinitySheldon",
   name: "SHELDON'S CURVE",
   tagline: "Lizard, Spock and one of the trio walked into a bar.",
   tier: "rare",
@@ -116,7 +116,7 @@ const SWEEP: ComboTheme = {
 };
 
 const SWEPT: ComboTheme = {
-  id: "swept",
+  id: "wipeout",
   name: "WIPEOUT",
   tagline: "All three lanes lost. Reset your nerves.",
   tier: "epic",
@@ -125,7 +125,7 @@ const SWEPT: ComboTheme = {
 };
 
 const TIE_3WAY: ComboTheme = {
-  id: "tie-3way",
+  id: "stalemate",
   name: "STALEMATE",
   tagline: "Three lanes, three minds, no winner.",
   tier: "neutral",
