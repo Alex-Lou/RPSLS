@@ -87,10 +87,10 @@ const TRINITY_CLASSIC: ComboTheme = {
   gradient: "from-zinc-100 via-amber-200 to-rose-300",
 };
 
-const TRINITY_SHELDON: ComboTheme = {
-  id: "trinitySheldon",
-  name: "SHELDON'S CURVE",
-  tagline: "Lizard, Spock and one of the trio walked into a bar.",
+const TRINITY_QUANTUM: ComboTheme = {
+  id: "trinityQuantum",
+  name: "QUANTUM PARADOX",
+  tagline: "Probability collapses across three lanes.",
   tier: "rare",
   glyph: "🧠",
   gradient: "from-emerald-300 via-violet-400 to-cyan-300",
@@ -158,10 +158,17 @@ export function detectPlayerCombo(picks: Move[]): ComboTheme | null {
     if (hasClassic) return TRINITY_CLASSIC;
     const hasLizard = set.has("lizard");
     const hasSpock = set.has("spock");
-    if (hasLizard || hasSpock) return TRINITY_SHELDON;
+    if (hasLizard || hasSpock) return TRINITY_QUANTUM;
   }
   // No themed combo (e.g. mixed pair like Rock-Rock-Paper).
   return null;
+}
+
+/** Convenience: same as `detectPlayerCombo` but takes a non-Move sentinel
+ *  list of picks (e.g. with nulls) and returns null until all 3 are set. */
+export function detectPlayerComboIfFull(picks: (Move | null)[]): ComboTheme | null {
+  if (picks.length !== 3 || picks.some((p) => p === null)) return null;
+  return detectPlayerCombo(picks as Move[]);
 }
 
 /**
