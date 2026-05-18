@@ -480,14 +480,27 @@ function LaneSlot({
   const idKey = IDENTITY_KEYS[index];
   const title = t(`${idKey}.title`);
   const hint = t(`${idKey}.hint`);
-  const accentRing =
-    identity.accent === "amber"  ? "ring-amber-400/30"  :
-    identity.accent === "sky"    ? "ring-sky-400/30"    :
-                                    "ring-emerald-400/30";
+
+  // Per-identity accent palette — used on the ring, badge and the
+  // "favoured" halo so the player learns to associate colour ↔ lane.
+  const accent = identity.accent;
+  const ringIdle =
+    accent === "amber"  ? "ring-amber-400/30"  :
+    accent === "sky"    ? "ring-sky-400/30"    :
+                          "ring-emerald-400/30";
+  const ringFav =
+    accent === "amber"  ? "ring-amber-400/80 shadow-[0_0_24px_rgba(251,191,36,0.55)]"  :
+    accent === "sky"    ? "ring-sky-400/80 shadow-[0_0_24px_rgba(56,189,248,0.55)]"    :
+                          "ring-emerald-400/80 shadow-[0_0_24px_rgba(52,211,153,0.55)]";
   const accentText =
-    identity.accent === "amber"  ? "text-amber-300"  :
-    identity.accent === "sky"    ? "text-sky-300"    :
-                                    "text-emerald-300";
+    accent === "amber"  ? "text-amber-300"  :
+    accent === "sky"    ? "text-sky-300"    :
+                          "text-emerald-300";
+  const haloColor =
+    accent === "amber"  ? "rgba(251,191,36,0.5)"  :
+    accent === "sky"    ? "rgba(56,189,248,0.5)"  :
+                          "rgba(52,211,153,0.5)";
+
   return (
     <div className="flex flex-col items-center gap-1">
       <div className={"flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold " + accentText}>
@@ -498,21 +511,45 @@ function LaneSlot({
         onClick={onClear}
         disabled={!pick}
         className={
-          "aspect-square w-full rounded-2xl border-2 transition flex items-center justify-center relative ring-1 " +
-          accentRing + " " +
+          "aspect-square w-full rounded-2xl border-2 transition flex items-center justify-center relative ring-2 " +
+          (favoured ? ringFav : ringIdle) + " " +
           (pick
             ? "border-emerald-400/40 bg-emerald-500/10 hover:bg-rose-500/10 hover:border-rose-400/50"
             : "border-dashed border-white/15 bg-black/20")
         }
         title={pick ? t("lanes.clearLane", { move: pick }) : hint}
       >
+        {/* Soft halo glow when the placed move is on its favoured lane */}
+        {favoured && (
+          <motion.div
+            aria-hidden
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0.45, 0.8, 0.45] }}
+            transition={{ duration: 2.2, repeat: Infinity }}
+            className="absolute inset-0 rounded-2xl pointer-events-none"
+            style={{
+              background: `radial-gradient(circle at 50% 50%, ${haloColor}, transparent 70%)`,
+              filter: "blur(8px)",
+            }}
+          />
+        )}
         {pick ? (
           <>
             <Hand move={pick} size="md" />
             {favoured && (
-              <span className="absolute -top-1 -right-1 text-xs px-1.5 rounded-full bg-amber-400/90 text-zinc-900 font-bold shadow">
-                ✨
-              </span>
+              <motion.span
+                initial={{ scale: 0, rotate: -20 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: "spring", stiffness: 280, damping: 12 }}
+                className={
+                  "absolute -top-2 -right-2 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-zinc-900 shadow-lg flex items-center gap-1 " +
+                  (accent === "amber"  ? "bg-amber-300" :
+                   accent === "sky"    ? "bg-sky-300"   :
+                                          "bg-emerald-300")
+                }
+              >
+                ✨ +1
+              </motion.span>
             )}
           </>
         ) : (
@@ -935,24 +972,14 @@ function LaneRevealCard({
       <div className="relative">
         <Hand move={you} size="sm" emphasis={youWon ? "winner" : oppWon ? "loser" : "default"} />
         {youFavoured && revealed && (
-          <span
-            title={identity.hint}
-            className="absolute -top-1 -right-1 text-[10px] px-1 rounded-full bg-amber-400/90 text-zinc-900 font-bold"
-          >
-            ✨
-          </span>
+          <FavouredBadge winning={youWon} />
         )}
       </div>
       <span className="text-[10px] text-zinc-600 font-black">VS</span>
       <div className="relative">
         <Hand move={opp} size="sm" emphasis={oppWon ? "winner" : youWon ? "loser" : "default"} />
         {oppFavoured && revealed && (
-          <span
-            title={identity.hint}
-            className="absolute -top-1 -right-1 text-[10px] px-1 rounded-full bg-amber-400/90 text-zinc-900 font-bold"
-          >
-            ✨
-          </span>
+          <FavouredBadge winning={oppWon} />
         )}
       </div>
       <span className={
@@ -969,12 +996,10 @@ function MatchEndScene({
   end, onBack, onRematch,
 }: { end: LanesEndData; onBack: () => void; onRematch?: () => void }) {
   const t = useT();
-  // Caller passes "winner=you" via end.winner already in absolute terms — we
-  // need to know whether you won. Compute from round wins: if youWins > oppWins
-  // your side won. Backwards compat: use end.winner with caller's youAre context
-  // not directly available here, so we infer from scores.
   const youWon = end.roundWinsYou > end.roundWinsOpp;
   const draw = end.roundWinsYou === end.roundWinsOpp;
+  // Pick a stable end-of-match quote once per mount.
+  const quoteIdx = useRef(Math.floor(Math.random() * 10)).current;
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -1035,10 +1060,26 @@ function MatchEndScene({
       <div className="text-2xl font-mono">
         {end.roundWinsYou} — {end.roundWinsOpp}
       </div>
+
+      {/* End-of-match quote — public-domain author. */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 1.2, duration: 0.4 }}
+        className="max-w-md mx-auto px-6 mt-1 text-center"
+      >
+        <div className="text-sm italic text-zinc-300 leading-relaxed">
+          « {t(`lanes.endQuote.${quoteIdx}.text`)} »
+        </div>
+        <div className="text-xs text-zinc-500 mt-1 tracking-wide">
+          {t(`lanes.endQuote.${quoteIdx}.author`)}
+        </div>
+      </motion.div>
+
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 1 }}
+        transition={{ delay: 1.5 }}
         className="flex flex-col sm:flex-row gap-2 mt-2 w-full max-w-md px-4"
       >
         {onRematch && (
@@ -1057,6 +1098,36 @@ function MatchEndScene({
         </button>
       </motion.div>
     </motion.div>
+  );
+}
+
+/**
+ * Badge that pops on a lane reveal when the placed move was on its
+ * favoured lane. The "+1" floats upward when it actually won the lane,
+ * making the identity bonus *visible* in the moment.
+ */
+function FavouredBadge({ winning }: { winning: boolean }) {
+  return (
+    <>
+      <motion.span
+        initial={{ scale: 0, rotate: -30 }}
+        animate={{ scale: 1, rotate: 0 }}
+        transition={{ type: "spring", stiffness: 280, damping: 12, delay: 0.1 }}
+        className="absolute -top-2 -right-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400 text-zinc-900 shadow-lg flex items-center gap-1"
+      >
+        ✨
+      </motion.span>
+      {winning && (
+        <motion.span
+          initial={{ opacity: 0, y: 0, scale: 0.5 }}
+          animate={{ opacity: [0, 1, 1, 0], y: -28, scale: [0.5, 1.4, 1.2, 1] }}
+          transition={{ duration: 1.2, delay: 0.3 }}
+          className="absolute -top-1 left-1/2 -translate-x-1/2 text-amber-300 text-base font-black drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]"
+        >
+          +1 ✨
+        </motion.span>
+      )}
+    </>
   );
 }
 
@@ -1140,33 +1211,33 @@ function HelpModal({ target, onClose }: { target: number; onClose: () => void })
               {RPSLS_MOVES_HELP.map(({ id, glyph, color }) => (
                 <div
                   key={id}
-                  className="rounded-xl bg-white/5 border border-white/10 p-2.5 flex items-center gap-3"
+                  className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center gap-3"
                 >
                   <div
                     className={
-                      "shrink-0 w-9 h-9 rounded-lg bg-gradient-to-br " + color +
-                      " flex items-center justify-center text-zinc-900 text-lg shadow"
+                      "shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br " + color +
+                      " flex items-center justify-center text-zinc-900 text-2xl shadow-md"
                     }
                   >
                     {glyph}
                   </div>
-                  <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-200">
-                      {t(`move.${id}.label`)}
+                  <div className="flex-1 min-w-0 flex flex-col gap-1">
+                    <div className="text-base font-black uppercase tracking-wider text-zinc-50">
+                      {t(`online.reveal.${id}`)}
                     </div>
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]">
-                      <span className="text-emerald-300/90">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm leading-tight">
+                      <span className="text-emerald-300 font-semibold">
                         ✓ {t("lanes.help.rps.beats")}
                       </span>
-                      <span className="text-zinc-300">
+                      <span className="text-zinc-200 break-words">
                         {t(`lanes.help.rps.${id}.beats`)}
                       </span>
                     </div>
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]">
-                      <span className="text-rose-300/90">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm leading-tight">
+                      <span className="text-rose-300 font-semibold">
                         ✗ {t("lanes.help.rps.losesTo")}
                       </span>
-                      <span className="text-zinc-400">
+                      <span className="text-zinc-400 break-words">
                         {t(`lanes.help.rps.${id}.losesTo`)}
                       </span>
                     </div>
@@ -1208,19 +1279,21 @@ function HelpModal({ target, onClose }: { target: number; onClose: () => void })
             body={t("lanes.help.combos.body")}
             accent="fuchsia"
           >
-            <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className="mt-3 flex flex-col gap-2">
               {COMBO_LEXICON.map(({ id, glyph }) => (
                 <div
                   key={id}
-                  className="rounded-xl bg-white/5 border border-white/10 p-2 flex flex-col items-center gap-1 text-center"
+                  className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center gap-3"
                 >
-                  <span className="text-xl">{glyph}</span>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-200 leading-tight">
-                    {t(`combo.${id}.name`)}
-                  </span>
-                  <span className="text-[10px] text-zinc-500 leading-tight line-clamp-2">
-                    {t(`combo.${id}.tag`)}
-                  </span>
+                  <span className="text-2xl shrink-0">{glyph}</span>
+                  <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                    <span className="text-sm font-black uppercase tracking-wider text-zinc-50 leading-tight">
+                      {t(`combo.${id}.name`)}
+                    </span>
+                    <span className="text-xs text-zinc-400 leading-snug break-words">
+                      {t(`combo.${id}.tag`)}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1253,17 +1326,17 @@ const RPSLS_MOVES_HELP: { id: "rock" | "paper" | "scissors" | "lizard" | "spock"
 ];
 
 const COMBO_LEXICON: { id: string; glyph: string }[] = [
-  { id: "rockslide",     glyph: "🪨" },
-  { id: "origami",       glyph: "📄" },
-  { id: "shear",         glyph: "✂️" },
-  { id: "reptile",       glyph: "🦎" },
-  { id: "vulcan",        glyph: "🖖" },
+  { id: "rockslide",      glyph: "🪨" },
+  { id: "origami",        glyph: "📄" },
+  { id: "shear",          glyph: "✂️" },
+  { id: "reptile",        glyph: "🦎" },
+  { id: "vulcan",         glyph: "🖖" },
   { id: "trinityClassic", glyph: "🌀" },
-  { id: "trinitySheldon", glyph: "🧠" },
-  { id: "mirror",        glyph: "🪞" },
-  { id: "sweep",         glyph: "👑" },
-  { id: "wipeout",       glyph: "💀" },
-  { id: "stalemate",     glyph: "🤝" },
+  { id: "trinityQuantum", glyph: "🧠" },
+  { id: "mirror",         glyph: "🪞" },
+  { id: "sweep",          glyph: "👑" },
+  { id: "wipeout",        glyph: "💀" },
+  { id: "stalemate",      glyph: "🤝" },
 ];
 
 function Section({
