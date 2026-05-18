@@ -15,6 +15,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Hand, MOVE_ICON, MOVE_PALETTE } from "./icons";
 import { MOVES, type Move } from "./game";
 import { hapticAlert, hapticTap } from "./haptic";
+import { useT } from "./i18n";
 import type { LanePlay, LaneResult, PlayerSlot } from "./online";
 import {
   detectOutcomeCombo,
@@ -23,6 +24,9 @@ import {
   laneFavoursMove,
   type ComboTheme,
 } from "./lanesCombos";
+
+/** Map of lane index → i18n key prefix for the identity. */
+const IDENTITY_KEYS = ["lanes.identity.force", "lanes.identity.wisdom", "lanes.identity.cunning"];
 
 /* ──────────── Types (re-exported for the parent) ──────────── */
 
@@ -100,7 +104,9 @@ export function LanesMatchView({
   submitted,
   onSubmitPicks,
   onLeave,
-}: LanesMatchViewProps) {
+  onRematch,
+}: LanesMatchViewProps & { onRematch?: () => void }) {
+  const t = useT();
   /* The phase is derived from the props — no listener, no race. */
   const phase: Phase = (() => {
     if (end) return "match_end";
@@ -193,7 +199,7 @@ export function LanesMatchView({
       {/* Stage */}
       <div className="relative min-h-[300px] sm:min-h-[360px] flex items-center justify-center">
         {phase === "matched" && !showSplash && (
-          <div className="text-sm text-zinc-400">Preparing round 1…</div>
+          <div className="text-sm text-zinc-400">{t("lanes.preparingFirstRound")}</div>
         )}
         {phase === "picking" && round && (
           <PickStage
@@ -213,7 +219,7 @@ export function LanesMatchView({
           <RevealStage result={lastResult} />
         )}
         {phase === "match_end" && end && (
-          <MatchEndScene end={end} onBack={onLeave} />
+          <MatchEndScene end={end} onBack={onLeave} onRematch={onRematch} />
         )}
       </div>
 
@@ -223,7 +229,7 @@ export function LanesMatchView({
           onClick={onLeave}
           className="self-center px-4 py-2 rounded-xl bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-500/40 text-zinc-400 hover:text-rose-200 text-xs transition"
         >
-          🏳️ Forfeit match
+          {t("lanes.forfeitMatch")}
         </button>
       )}
     </div>
@@ -238,11 +244,12 @@ function ScoreHeader({
   you: string; opp: string;
   youWins: number; oppWins: number; target: number; round: number;
 }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between rounded-2xl bg-black/30 border border-white/10 px-4 py-3">
         <div className="flex flex-col min-w-0 flex-1">
-          <span className="text-[10px] uppercase tracking-wider text-zinc-500">You</span>
+          <span className="text-[10px] uppercase tracking-wider text-zinc-500">{t("lanes.you")}</span>
           <span className="font-semibold truncate text-emerald-200">{you}</span>
         </div>
         {/* Score: each side rendered through a "rolling number" so the value
@@ -254,12 +261,12 @@ function ScoreHeader({
           <RollingNumber value={oppWins} color="rose" />
         </div>
         <div className="flex flex-col text-right min-w-0 flex-1">
-          <span className="text-[10px] uppercase tracking-wider text-zinc-500">Opponent</span>
+          <span className="text-[10px] uppercase tracking-wider text-zinc-500">{t("lanes.opponent")}</span>
           <span className="font-semibold truncate text-rose-200">{opp || "—"}</span>
         </div>
       </div>
       <div className="text-center text-[11px] uppercase tracking-[0.25em] text-zinc-500">
-        Round {round} · 3 lanes · First to {target} round-wins
+        {t("lanes.scoreCaption", { round, target })}
       </div>
     </div>
   );
@@ -295,6 +302,7 @@ function RollingNumber({
 function MatchFoundSplash({
   you, opp, lanes, winTo,
 }: { you: string; opp: string; lanes: number; winTo: number }) {
+  const t = useT();
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -307,9 +315,9 @@ function MatchFoundSplash({
         initial={{ y: -30, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.1 }}
-        className="text-xs tracking-[0.5em] text-violet-300/80 uppercase mb-3"
+        className="text-xs tracking-[0.5em] text-violet-300/80 uppercase mb-3 text-center px-4"
       >
-        Constellation · Lanes Match Found
+        {t("lanes.matchFoundKicker")}
       </motion.div>
       <motion.div
         initial={{ scale: 0.4, opacity: 0 }}
@@ -331,9 +339,9 @@ function MatchFoundSplash({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.9 }}
-        className="mt-8 text-sm uppercase tracking-[0.3em] text-zinc-400"
+        className="mt-8 text-sm uppercase tracking-[0.3em] text-zinc-400 text-center px-4"
       >
-        {lanes} lanes · First to {winTo} rounds
+        {t("lanes.matchFoundSub", { lanes, winTo })}
       </motion.div>
     </motion.div>
   );
@@ -342,11 +350,12 @@ function MatchFoundSplash({
 function NameTag({
   name, accent, align,
 }: { name: string; accent: "emerald" | "rose"; align: "left" | "right" }) {
+  const t = useT();
   const grad = accent === "emerald" ? "from-emerald-300 to-teal-400" : "from-rose-300 to-fuchsia-400";
   return (
     <div className={"flex flex-col " + (align === "right" ? "items-end" : "items-start")}>
       <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">
-        {accent === "emerald" ? "You" : "Opponent"}
+        {accent === "emerald" ? t("lanes.you") : t("lanes.opponent")}
       </div>
       <div
         className={
@@ -372,7 +381,9 @@ function PickStage({
   deadlineMs: number;
   onSubmit: () => void;
 }) {
+  const t = useT();
   const allFilled = picks.every((p) => p !== null);
+  const remaining = 3 - picks.filter(Boolean).length;
   return (
     <div className="w-full flex flex-col items-center gap-5">
       {/* Timer */}
@@ -385,12 +396,10 @@ function PickStage({
         ))}
       </div>
 
-      <div className="text-[11px] uppercase tracking-[0.3em] text-zinc-500">
-        Tap a move below, then tap a lane to place
+      <div className="text-[11px] uppercase tracking-[0.3em] text-zinc-500 text-center px-4">
+        {t("lanes.pickInstruction")}
       </div>
 
-      {/* Picker — tap a move, then tap a lane. For MVP simplicity we use
-          a lane-by-lane focus: clicking a move places it in the next empty lane. */}
       <PickerBar onPickInNextEmpty={onPick} />
 
       <button
@@ -403,7 +412,7 @@ function PickStage({
             : "bg-white/5 text-zinc-500 cursor-not-allowed")
         }
       >
-        {allFilled ? "✓ Lock all 3 picks" : `Pick ${3 - picks.filter(Boolean).length} more`}
+        {allFilled ? t("lanes.lockButton") : t("lanes.pickRemaining", { n: remaining })}
       </button>
     </div>
   );
@@ -412,8 +421,12 @@ function PickStage({
 function LaneSlot({
   index, pick, onClear,
 }: { index: number; pick: Move | null; onClear: () => void }) {
+  const t = useT();
   const identity = LANE_IDENTITIES[index];
   const favoured = pick ? laneFavoursMove(index, pick) : false;
+  const idKey = IDENTITY_KEYS[index];
+  const title = t(`${idKey}.title`);
+  const hint = t(`${idKey}.hint`);
   const accentRing =
     identity.accent === "amber"  ? "ring-amber-400/30"  :
     identity.accent === "sky"    ? "ring-sky-400/30"    :
@@ -424,10 +437,9 @@ function LaneSlot({
                                     "text-emerald-300";
   return (
     <div className="flex flex-col items-center gap-1">
-      {/* Lane identity badge — taught to the player by visibility. */}
       <div className={"flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold " + accentText}>
         <span>{identity.glyph}</span>
-        <span>{identity.title}</span>
+        <span>{title}</span>
       </div>
       <button
         onClick={onClear}
@@ -439,11 +451,7 @@ function LaneSlot({
             ? "border-emerald-400/40 bg-emerald-500/10 hover:bg-rose-500/10 hover:border-rose-400/50"
             : "border-dashed border-white/15 bg-black/20")
         }
-        title={
-          pick
-            ? `Clear ${pick}${favoured ? " · favoured here ✨" : ""}`
-            : identity.hint
-        }
+        title={pick ? t("lanes.clearLane", { move: pick }) : hint}
       >
         {pick ? (
           <>
@@ -459,7 +467,7 @@ function LaneSlot({
         )}
       </button>
       <span className="text-[9px] text-zinc-500 text-center leading-tight hidden sm:block">
-        {identity.hint}
+        {hint}
       </span>
     </div>
   );
@@ -496,6 +504,7 @@ function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void
 }
 
 function TimerBar({ startedAt, durationMs }: { startedAt: number; durationMs: number }) {
+  const tr = useT();
   const [now, setNow] = useState(Date.now());
   // Track previous urgency level so we can fire a haptic on each transition.
   const prevLevel = useRef<"calm" | "urgent" | "critical">("calm");
@@ -572,16 +581,16 @@ function TimerBar({ startedAt, durationMs }: { startedAt: number; durationMs: nu
       </AnimatePresence>
       {urgent && !critical && (
         <div className="text-[10px] uppercase tracking-[0.3em] text-amber-300/80 font-bold">
-          Hurry!
+          {tr("lanes.hurry")}
         </div>
       )}
       {critical && (
         <motion.div
           animate={{ x: [0, -3, 3, -2, 2, 0] }}
           transition={{ duration: 0.3, repeat: Infinity }}
-          className="text-[10px] uppercase tracking-[0.3em] text-rose-300 font-bold"
+          className="text-[10px] uppercase tracking-[0.3em] text-rose-300 font-bold text-center px-4"
         >
-          ⚠ Pick fast or lose this round!
+          {tr("lanes.pickFastOrLose")}
         </motion.div>
       )}
     </div>
@@ -589,6 +598,7 @@ function TimerBar({ startedAt, durationMs }: { startedAt: number; durationMs: nu
 }
 
 function LockedStage({ picks }: { picks: Move[] }) {
+  const t = useT();
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
@@ -596,7 +606,7 @@ function LockedStage({ picks }: { picks: Move[] }) {
       className="flex flex-col items-center gap-4"
     >
       <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-300">
-        Picks locked in
+        {t("lanes.lockedIn")}
       </div>
       <div className="grid grid-cols-3 gap-3">
         {picks.map((mv, i) => (
@@ -611,23 +621,24 @@ function LockedStage({ picks }: { picks: Move[] }) {
           </motion.div>
         ))}
       </div>
-      <div className="text-sm text-zinc-300 font-medium">Waiting for opponent…</div>
+      <div className="text-sm text-zinc-300 font-medium">{t("lanes.waitingOpponent")}</div>
     </motion.div>
   );
 }
 
 function RevealCountdown() {
+  const tCount = useT();
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="flex flex-col items-center justify-center gap-3 px-4 text-center"
     >
-      <div className="text-[10px] uppercase tracking-[0.4em] text-zinc-500">Reveal</div>
+      <div className="text-[10px] uppercase tracking-[0.4em] text-zinc-500">{tCount("lanes.reveal")}</div>
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xl sm:text-3xl font-black leading-tight">
-        {["Rock", "Paper", "Scissors"].map((w, i) => (
+        {[tCount("online.reveal.rock"), tCount("online.reveal.paper"), tCount("online.reveal.scissors")].map((w, i) => (
           <motion.span
-            key={w}
+            key={i}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 + i * 0.18 }}
@@ -643,7 +654,7 @@ function RevealCountdown() {
         transition={{ delay: 0.78, duration: 0.4 }}
         className="text-3xl sm:text-5xl font-black bg-gradient-to-br from-amber-300 to-rose-400 bg-clip-text text-transparent"
       >
-        SHOOT!
+        {tCount("lanes.shoot")}
       </motion.div>
     </motion.div>
   );
@@ -656,6 +667,7 @@ function RevealCountdown() {
  * last, on top of the lanes.
  */
 function RevealStage({ result }: { result: LanesRoundResultData }) {
+  const t = useT();
   const yourPicks = result.yourPlays.map((p) => p.mv);
   const oppPicks  = result.oppPlays.map((p)  => p.mv);
 
@@ -716,17 +728,17 @@ function RevealStage({ result }: { result: LanesRoundResultData }) {
           >
             {result.yourPoints > result.oppPoints && (
               <div className="text-emerald-300 text-lg font-bold">
-                ✨ Round won {result.yourPoints}-{result.oppPoints}
+                {t("lanes.roundWon", { a: result.yourPoints, b: result.oppPoints })}
               </div>
             )}
             {result.yourPoints < result.oppPoints && (
               <div className="text-rose-300 text-lg font-bold">
-                💥 Round lost {result.yourPoints}-{result.oppPoints}
+                {t("lanes.roundLost", { a: result.yourPoints, b: result.oppPoints })}
               </div>
             )}
             {result.yourPoints === result.oppPoints && (
               <div className="text-zinc-300 text-lg font-bold">
-                🤝 Round draw {result.yourPoints}-{result.oppPoints}
+                {t("lanes.roundDraw", { a: result.yourPoints, b: result.oppPoints })}
               </div>
             )}
           </motion.div>
@@ -748,8 +760,13 @@ function RevealStage({ result }: { result: LanesRoundResultData }) {
  * Tier drives the size + treatment — epics shake the layout, commons fade in.
  */
 function ComboBanner({ combo }: { combo: ComboTheme }) {
+  const t = useT();
   const epic = combo.tier === "epic";
   const rare = combo.tier === "rare";
+  // i18n keys follow the convention combo.<id>.{name,tag} — falls back to
+  // the in-code defaults if a locale doesn't translate them yet.
+  const name = t(`combo.${combo.id}.name`);
+  const tag  = t(`combo.${combo.id}.tag`);
   return (
     <motion.div
       key={combo.id}
@@ -776,10 +793,10 @@ function ComboBanner({ combo }: { combo: ComboTheme }) {
           className={
             (epic ? "text-3xl sm:text-5xl" : rare ? "text-2xl sm:text-3xl" : "text-xl sm:text-2xl") +
             " font-black tracking-wider bg-gradient-to-br " + combo.gradient +
-            " bg-clip-text text-transparent drop-shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
+            " bg-clip-text text-transparent drop-shadow-[0_4px_16px_rgba(0,0,0,0.4)] text-center"
           }
         >
-          {combo.name}
+          {name}
         </span>
         <motion.span
           animate={{ rotate: [0, 10, -10, 5, -5, 0] }}
@@ -789,13 +806,13 @@ function ComboBanner({ combo }: { combo: ComboTheme }) {
           {combo.glyph}
         </motion.span>
       </div>
-      <div className={"text-[11px] sm:text-xs uppercase tracking-[0.25em] " +
+      <div className={"text-[11px] sm:text-xs uppercase tracking-[0.25em] text-center px-3 " +
         (epic ? "text-amber-300/90" : rare ? "text-fuchsia-300/80" : "text-zinc-400")}>
-        {combo.tagline}
+        {tag}
       </div>
       {combo.bonus != null && combo.bonus > 0 && (
         <div className="text-[10px] uppercase tracking-wider text-amber-300/70 mt-1">
-          ✨ Style bonus · +{combo.bonus}
+          {t("lanes.styleBonus", { n: combo.bonus })}
         </div>
       )}
     </motion.div>
@@ -805,7 +822,9 @@ function ComboBanner({ combo }: { combo: ComboTheme }) {
 function LaneRevealCard({
   lane, you, opp, lr, revealed,
 }: { lane: number; you: Move; opp: Move; lr: LaneResult; revealed: boolean }) {
+  const t = useT();
   const identity = LANE_IDENTITIES[lane];
+  const idKey = IDENTITY_KEYS[lane];
   const ringColor =
     lr.winner === "a" && lr.a_play.mv === you ? "ring-emerald-400/50" :
     lr.winner === "b" && lr.b_play.mv === you ? "ring-emerald-400/50" :
@@ -830,14 +849,14 @@ function LaneRevealCard({
       style={{ transformPerspective: 800 }}
     >
       <div className="flex items-center gap-1 text-[9px] uppercase tracking-wider">
-        <span className="text-zinc-500">Lane {lane + 1}</span>
+        <span className="text-zinc-500">{t("lanes.lane", { n: lane + 1 })}</span>
         <span className="text-zinc-600">·</span>
         <span className={
           identity.accent === "amber"  ? "text-amber-300/80"   :
           identity.accent === "sky"    ? "text-sky-300/80"     :
                                           "text-emerald-300/80"
         }>
-          {identity.glyph} {identity.title}
+          {identity.glyph} {t(`${idKey}.title`)}
         </span>
       </div>
       <div className="relative">
@@ -867,15 +886,16 @@ function LaneRevealCard({
         "text-[10px] uppercase tracking-wider font-bold mt-0.5 " +
         (youWon ? "text-emerald-300" : oppWon ? "text-rose-300" : "text-zinc-500")
       }>
-        {youWon ? "WIN" : oppWon ? "LOSS" : "DRAW"}
+        {youWon ? t("lanes.win") : oppWon ? t("lanes.loss") : t("lanes.drawShort")}
       </span>
     </motion.div>
   );
 }
 
 function MatchEndScene({
-  end, onBack,
-}: { end: LanesEndData; onBack: () => void }) {
+  end, onBack, onRematch,
+}: { end: LanesEndData; onBack: () => void; onRematch?: () => void }) {
+  const t = useT();
   // Caller passes "winner=you" via end.winner already in absolute terms — we
   // need to know whether you won. Compute from round wins: if youWins > oppWins
   // your side won. Backwards compat: use end.winner with caller's youAre context
@@ -888,18 +908,36 @@ function MatchEndScene({
       animate={{ opacity: 1, y: 0 }}
       className="flex flex-col items-center gap-5 py-6"
     >
+      {/* Trophy/skull/handshake — spring in, then idle-float forever. */}
       <motion.div
         initial={{ scale: 0, rotate: -180 }}
-        animate={{ scale: 1, rotate: 0 }}
-        transition={{ type: "spring", stiffness: 200, damping: 12, delay: 0.1 }}
+        animate={{
+          scale: 1,
+          rotate: 0,
+          y: [0, -8, 0, -4, 0],
+        }}
+        transition={{
+          scale:   { type: "spring", stiffness: 200, damping: 12, delay: 0.1 },
+          rotate:  { type: "spring", stiffness: 200, damping: 12, delay: 0.1 },
+          y:       { duration: 3.2, repeat: Infinity, ease: "easeInOut", delay: 1.0 },
+        }}
         className="text-7xl sm:text-8xl"
       >
         {youWon ? "🏆" : draw ? "🤝" : "💀"}
       </motion.div>
+      {/* VICTORY / DRAW / DEFEAT — gentle ambient zoom after the entrance. */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: [1, 1.04, 1],
+        }}
+        transition={{
+          opacity: { delay: 0.5 },
+          y:       { delay: 0.5 },
+          scale:   { duration: 2.6, repeat: Infinity, ease: "easeInOut", delay: 1.2 },
+        }}
         className={
           "text-4xl sm:text-5xl font-black bg-gradient-to-br bg-clip-text text-transparent " +
           (youWon
@@ -909,7 +947,7 @@ function MatchEndScene({
             : "from-rose-300 to-fuchsia-400")
         }
       >
-        {youWon ? "VICTORY" : draw ? "DRAW" : "DEFEAT"}
+        {youWon ? t("lanes.victory") : draw ? t("lanes.endDraw") : t("lanes.defeat")}
       </motion.div>
       {end.forfeit && (
         <motion.div
@@ -918,21 +956,33 @@ function MatchEndScene({
           transition={{ delay: 0.8 }}
           className="text-xs uppercase tracking-[0.3em] text-amber-300"
         >
-          (by forfeit)
+          {t("lanes.byForfeit")}
         </motion.div>
       )}
       <div className="text-2xl font-mono">
         {end.roundWinsYou} — {end.roundWinsOpp}
       </div>
-      <motion.button
+      <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 1 }}
-        onClick={onBack}
-        className="mt-2 px-6 py-3 rounded-xl bg-violet-500/90 hover:bg-violet-500 font-semibold text-white shadow-lg shadow-violet-500/30 transition"
+        className="flex flex-col sm:flex-row gap-2 mt-2 w-full max-w-md px-4"
       >
-        Back to menu
-      </motion.button>
+        {onRematch && (
+          <button
+            onClick={onRematch}
+            className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 font-bold text-white shadow-lg shadow-emerald-500/30 transition"
+          >
+            {t("lanes.rematch")}
+          </button>
+        )}
+        <button
+          onClick={onBack}
+          className="flex-1 px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 font-semibold text-zinc-200 transition"
+        >
+          {t("lanes.backToMenu")}
+        </button>
+      </motion.div>
     </motion.div>
   );
 }

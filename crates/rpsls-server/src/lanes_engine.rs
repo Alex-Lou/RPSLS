@@ -19,8 +19,10 @@ use uuid::Uuid;
 use crate::protocol::{OpponentInfo, PlayerSlot, ServerMessage};
 use crate::session::Session;
 
-/// Time given to each player to submit their 3 lane plays.
-const PICK_DEADLINE: Duration = Duration::from_secs(12);
+/// Time given to each player to submit their 3 lane plays. Bumped from 12s
+/// to 13.5s on user feedback ("need more thinking room"). The countdown
+/// UI is unchanged — last 3s still trigger the urgency styling.
+const PICK_DEADLINE: Duration = Duration::from_millis(13_500);
 
 /// Commands sent to a running lanes match.
 #[derive(Debug)]
@@ -154,8 +156,10 @@ async fn run_lanes_match(
         a.send(msg.clone());
         b.send(msg);
 
-        // Same generous "savour the verdict" delay as the classic engine.
-        tokio::time::sleep(Duration::from_millis(3500)).await;
+        // Stretched from 3.5s to 5.5s so the combo banner + verdict are
+        // visible long enough to read and feel ("name the combo before
+        // it disappears").
+        tokio::time::sleep(Duration::from_millis(5500)).await;
     }
 
     if battle.status() != BattleStatus::InProgress {
