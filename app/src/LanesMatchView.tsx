@@ -10,39 +10,15 @@
  * leaving the classic 1v1 flow completely untouched.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Hand, MOVE_ICON, MOVE_PALETTE } from "./icons";
 import { MOVES, type Move } from "./game";
-import {
-  hapticLock,
-  hapticMatchStart,
-  hapticMatchWin,
-  hapticMatchLoss,
-  hapticTap,
-  hapticWin,
-  hapticLoss,
-} from "./haptic";
-import type {
-  ClientMessage,
-  LanePlay,
-  LaneResult,
-  PlayerSlot,
-  ServerMessage,
-} from "./online";
+import type { LanePlay, LaneResult, PlayerSlot } from "./online";
 
-/* ──────────── Types ──────────── */
+/* ──────────── Types (re-exported for the parent) ──────────── */
 
-type Phase =
-  | "waiting"        // queue → match_found
-  | "matched"        // match_found → first round_start (splash visible)
-  | "picking"        // round_start → user has filled 3 lanes
-  | "submitted"      // user picks locked, waiting for opponent
-  | "reveal_intro"   // 1.4s suspense "Rock-Paper-Scissors-SHOOT"
-  | "reveal"         // showing the verdict
-  | "match_end";
-
-interface MatchInfo {
+export interface LanesMatchInfo {
   matchId: string;
   opponent: string;
   youAre: PlayerSlot;
@@ -50,13 +26,13 @@ interface MatchInfo {
   winTo: number;
 }
 
-interface RoundData {
+export interface LanesRoundData {
   no: number;
   deadlineMs: number;
   startedAt: number;
 }
 
-interface RoundResultData {
+export interface LanesRoundResultData {
   yourPlays: LanePlay[];
   oppPlays: LanePlay[];
   laneResults: LaneResult[];
@@ -66,21 +42,42 @@ interface RoundResultData {
   roundWinsOpp: number;
 }
 
-interface EndData {
+export interface LanesEndData {
   winner: PlayerSlot | null;
   roundWinsYou: number;
   roundWinsOpp: number;
   forfeit: boolean;
 }
 
+/**
+ * Internal UI phase derived from the props the parent provides. Kept here so
+ * the parent doesn't have to know about reveal countdowns and submit states.
+ */
+type Phase =
+  | "matched"        // splash visible, waiting for first round_start
+  | "picking"        // round_start → user can choose lanes
+  | "submitted"      // user picks locked, waiting for opponent
+  | "reveal_intro"   // 1.4s suspense "Rock-Paper-Scissors-SHOOT"
+  | "reveal"         // showing the verdict
+  | "match_end";
+
 export interface LanesMatchViewProps {
   /** Player's own nickname for the score header. */
   nickname: string;
-  /** Send a `ClientMessage` over the live WS. */
-  onSend: (msg: ClientMessage) => void;
-  /** Subscribe to incoming server messages — returns an unsubscribe. */
-  onMessage: (cb: (msg: ServerMessage) => void) => () => void;
-  /** Called when the user wants to leave (forfeit or after match end). */
+  /** Match metadata (provided as soon as lanes_match_found arrives). */
+  match: LanesMatchInfo;
+  /** Current round details (null between rounds / before the first one). */
+  round: LanesRoundData | null;
+  /** Most recent resolved round (null until at least one round has finished). */
+  lastResult: LanesRoundResultData | null;
+  /** Match-end payload (null until the server says it's over). */
+  end: LanesEndData | null;
+  /** Locked-in marker — the parent stores whether *we* have already submitted
+   *  picks for the current round. */
+  submitted: boolean;
+  /** Called when the user locks their 3 picks. */
+  onSubmitPicks: (picks: [Move, Move, Move]) => void;
+  /** Forfeit / back to menu. */
   onLeave: () => void;
 }
 
@@ -88,153 +85,75 @@ export interface LanesMatchViewProps {
 
 export function LanesMatchView({
   nickname,
-  onSend,
-  onMessage,
+  match,
+  round,
+  lastResult,
+  end,
+  submitted,
+  onSubmitPicks,
   onLeave,
 }: LanesMatchViewProps) {
-  const [phase, setPhase] = useState<Phase>("waiting");
-  const [info, setInfo] = useState<MatchInfo | null>(null);
-  const [round, setRound] = useState<RoundData | null>(null);
+  /* The phase is derived from the props — no listener, no race. */
+  const phase: Phase = (() => {
+    if (end) return "match_end";
+    if (lastResult && !round) return "reveal";       // reveal until next round_start
+    if (round && submitted) return "submitted";
+    if (round) return "picking";
+    return "matched";
+  })();
+
+  /* Local UI state for the picks the user is currently building. */
   const [picks, setPicks] = useState<(Move | null)[]>([null, null, null]);
-  const [lastResult, setLastResult] = useState<RoundResultData | null>(null);
-  const [end, setEnd] = useState<EndData | null>(null);
-
-  const revealTimer = useRef<number | null>(null);
-  const splashTimer = useRef<number | null>(null);
-  const [showSplash, setShowSplash] = useState(false);
-
-  /* Wire server messages. */
+  /* Reset picks whenever a new round starts. */
   useEffect(() => {
-    const unsub = onMessage((msg) => {
-      switch (msg.type) {
-        case "lanes_match_found":
-          setInfo({
-            matchId: msg.match_id,
-            opponent: msg.opponent.nickname,
-            youAre: msg.you_are,
-            lanes: msg.lanes,
-            winTo: msg.win_to,
-          });
-          setPhase("matched");
-          setShowSplash(true);
-          hapticMatchStart();
-          if (splashTimer.current) window.clearTimeout(splashTimer.current);
-          splashTimer.current = window.setTimeout(() => setShowSplash(false), 2500);
-          break;
+    if (round) setPicks([null, null, null]);
+  }, [round?.no]);
 
-        case "lanes_round_start":
-          setRound({
-            no: msg.round_no,
-            deadlineMs: msg.deadline_ms,
-            startedAt: Date.now(),
-          });
-          setPicks([null, null, null]);
-          setLastResult(null);
-          setPhase("picking");
-          break;
+  /* Splash visible for the first 2.5 seconds after mount (we boot in matched). */
+  const [showSplash, setShowSplash] = useState(true);
+  useEffect(() => {
+    const t = window.setTimeout(() => setShowSplash(false), 2500);
+    return () => window.clearTimeout(t);
+  }, [match.matchId]);
 
-        case "lanes_round_result": {
-          // Map server message → "your"/"opp" perspective.
-          setInfo((cur) => {
-            if (!cur) return cur;
-            const youAreA = cur.youAre === "a";
-            const yourPlays = youAreA ? msg.a_plays : msg.b_plays;
-            const oppPlays  = youAreA ? msg.b_plays : msg.a_plays;
-            const yourPoints = youAreA ? msg.a_points : msg.b_points;
-            const oppPoints  = youAreA ? msg.b_points : msg.a_points;
-            const roundWinsYou = youAreA ? msg.round_wins_a : msg.round_wins_b;
-            const roundWinsOpp = youAreA ? msg.round_wins_b : msg.round_wins_a;
-            setLastResult({
-              yourPlays, oppPlays,
-              laneResults: msg.lane_results,
-              yourPoints, oppPoints,
-              roundWinsYou, roundWinsOpp,
-            });
-            return cur;
-          });
-          setPhase("reveal_intro");
-          if (revealTimer.current) window.clearTimeout(revealTimer.current);
-          revealTimer.current = window.setTimeout(() => {
-            setPhase("reveal");
-            // Haptic on win/loss/draw based on round outcome.
-            setLastResult((r) => {
-              if (!r) return r;
-              if (r.yourPoints > r.oppPoints) hapticWin();
-              else if (r.yourPoints < r.oppPoints) hapticLoss();
-              else hapticTap();
-              return r;
-            });
-          }, 1400);
-          break;
-        }
+  /* Render-side reveal countdown — a quick 1.4s suspense when a new
+     lastResult lands. Parent re-feeds lastResult fresh; we just gate
+     the "reveal" content behind a short timer. */
+  const [revealReady, setRevealReady] = useState(false);
+  useEffect(() => {
+    if (!lastResult) {
+      setRevealReady(false);
+      return;
+    }
+    setRevealReady(false);
+    const t = window.setTimeout(() => setRevealReady(true), 1400);
+    return () => window.clearTimeout(t);
+  }, [lastResult]);
 
-        case "lanes_match_end": {
-          setInfo((cur) => {
-            if (!cur) return cur;
-            const youAreA = cur.youAre === "a";
-            const winner = msg.winner;
-            const youWon = winner === cur.youAre;
-            const draw = winner === null;
-            if (youWon) hapticMatchWin();
-            else if (!draw) hapticMatchLoss();
-            else hapticTap();
-            setEnd({
-              winner,
-              roundWinsYou: youAreA ? msg.round_wins_a : msg.round_wins_b,
-              roundWinsOpp: youAreA ? msg.round_wins_b : msg.round_wins_a,
-              forfeit: msg.forfeit,
-            });
-            return cur;
-          });
-          setPhase("match_end");
-          break;
-        }
-
-        case "opponent_left":
-          // Will be followed by lanes_match_end with forfeit:true — no UI here.
-          break;
-
-        default:
-          break;
-      }
-    });
-    return () => {
-      unsub();
-      if (revealTimer.current) window.clearTimeout(revealTimer.current);
-      if (splashTimer.current) window.clearTimeout(splashTimer.current);
-    };
-  }, [onMessage]);
-
-  /* Lock picks when all 3 lanes are filled. */
-  function submitPicks() {
+  function submitNow() {
     if (picks.some((p) => p === null)) return;
-    hapticLock();
-    onSend({
-      type: "play_lanes",
-      plays: picks.map((mv) => ({ mv: mv as Move, mana: 0 })),
-    });
-    setPhase("submitted");
+    onSubmitPicks(picks as [Move, Move, Move]);
   }
-
-  function pickFor(laneIdx: number, mv: Move) {
+  function pickInNextEmpty(mv: Move) {
+    if (phase !== "picking") return;
+    setPicks((cur) => {
+      const i = cur.findIndex((p) => p === null);
+      if (i === -1) return cur;
+      const next = [...cur];
+      next[i] = mv;
+      return next;
+    });
+  }
+  function clearLane(i: number) {
     if (phase !== "picking") return;
     setPicks((cur) => {
       const next = [...cur];
-      next[laneIdx] = mv;
+      next[i] = null;
       return next;
     });
   }
 
-  function clearLane(laneIdx: number) {
-    if (phase !== "picking") return;
-    setPicks((cur) => {
-      const next = [...cur];
-      next[laneIdx] = null;
-      return next;
-    });
-  }
-
-  const target = info?.winTo ?? 3;
+  const target = match.winTo;
   const youWins = lastResult?.roundWinsYou ?? end?.roundWinsYou ?? 0;
   const oppWins = lastResult?.roundWinsOpp ?? end?.roundWinsOpp ?? 0;
 
@@ -243,51 +162,46 @@ export function LanesMatchView({
     <div className="relative flex flex-col gap-4">
       {/* Splash overlay */}
       <AnimatePresence>
-        {showSplash && info && (
+        {showSplash && (
           <MatchFoundSplash
             you={nickname}
-            opp={info.opponent}
-            lanes={info.lanes}
-            winTo={info.winTo}
+            opp={match.opponent}
+            lanes={match.lanes}
+            winTo={match.winTo}
           />
         )}
       </AnimatePresence>
 
       {/* Score header */}
-      {info && (
-        <ScoreHeader
-          you={nickname}
-          opp={info.opponent}
-          youWins={youWins}
-          oppWins={oppWins}
-          target={target}
-          round={round?.no ?? 1}
-        />
-      )}
+      <ScoreHeader
+        you={nickname}
+        opp={match.opponent}
+        youWins={youWins}
+        oppWins={oppWins}
+        target={target}
+        round={round?.no ?? 1}
+      />
 
       {/* Stage */}
       <div className="relative min-h-[300px] sm:min-h-[360px] flex items-center justify-center">
-        {phase === "waiting" && (
-          <div className="text-sm text-zinc-400">Finding an opponent…</div>
-        )}
         {phase === "matched" && !showSplash && (
           <div className="text-sm text-zinc-400">Preparing round 1…</div>
         )}
         {phase === "picking" && round && (
           <PickStage
             picks={picks}
-            onPick={pickFor}
+            onPick={pickInNextEmpty}
             onClearLane={clearLane}
             startedAt={round.startedAt}
             deadlineMs={round.deadlineMs}
-            onSubmit={submitPicks}
+            onSubmit={submitNow}
           />
         )}
         {phase === "submitted" && (
           <LockedStage picks={picks as Move[]} />
         )}
-        {phase === "reveal_intro" && <RevealCountdown />}
-        {phase === "reveal" && lastResult && (
+        {phase === "reveal" && lastResult && !revealReady && <RevealCountdown />}
+        {phase === "reveal" && lastResult && revealReady && (
           <RevealStage result={lastResult} />
         )}
         {phase === "match_end" && end && (
@@ -296,7 +210,7 @@ export function LanesMatchView({
       </div>
 
       {/* Forfeit button — shown anytime but match-end. */}
-      {phase !== "match_end" && phase !== "waiting" && (
+      {phase !== "match_end" && (
         <button
           onClick={onLeave}
           className="self-center px-4 py-2 rounded-xl bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-500/40 text-zinc-400 hover:text-rose-200 text-xs transition"
@@ -429,7 +343,8 @@ function PickStage({
   picks, onPick, onClearLane, startedAt, deadlineMs, onSubmit,
 }: {
   picks: (Move | null)[];
-  onPick: (lane: number, mv: Move) => void;
+  /** Pick `mv` — drops it into the next empty lane. */
+  onPick: (mv: Move) => void;
   onClearLane: (lane: number) => void;
   startedAt: number;
   deadlineMs: number;
@@ -454,11 +369,7 @@ function PickStage({
 
       {/* Picker — tap a move, then tap a lane. For MVP simplicity we use
           a lane-by-lane focus: clicking a move places it in the next empty lane. */}
-      <PickerBar onPickInNextEmpty={(mv) => {
-        const idx = picks.findIndex((p) => p === null);
-        if (idx === -1) return;
-        onPick(idx, mv);
-      }} />
+      <PickerBar onPickInNextEmpty={onPick} />
 
       <button
         onClick={onSubmit}
@@ -624,7 +535,7 @@ function RevealCountdown() {
   );
 }
 
-function RevealStage({ result }: { result: RoundResultData }) {
+function RevealStage({ result }: { result: LanesRoundResultData }) {
   const youSwept = result.yourPoints === 3;
   const swept    = result.oppPoints === 3;
   return (
@@ -706,7 +617,7 @@ function LaneRevealCard({
 
 function MatchEndScene({
   end, onBack,
-}: { end: EndData; onBack: () => void }) {
+}: { end: LanesEndData; onBack: () => void }) {
   // Caller passes "winner=you" via end.winner already in absolute terms — we
   // need to know whether you won. Compute from round wins: if youWins > oppWins
   // your side won. Backwards compat: use end.winner with caller's youAre context

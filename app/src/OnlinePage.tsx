@@ -7,11 +7,16 @@ import { MOVES, type Move } from "./game";
 import {
   OnlineClient,
   normalizeServerUrl,
-  type ClientMessage,
   type ServerMessage,
   type PlayerSlot,
 } from "./online";
-import { LanesMatchView } from "./LanesMatchView";
+import {
+  LanesMatchView,
+  type LanesMatchInfo,
+  type LanesRoundData,
+  type LanesRoundResultData,
+  type LanesEndData,
+} from "./LanesMatchView";
 import {
   hapticTap,
   hapticLock,
@@ -184,6 +189,14 @@ export function OnlinePage() {
   // Connection drop tracking — keeps the UI sane during wifi hiccups.
   const [connDropped, setConnDropped] = useState(false);
 
+  // Constellation Lanes state — all messages land here so LanesMatchView
+  // is a pure view and never races with a late mount.
+  const [lanesMatch, setLanesMatch] = useState<LanesMatchInfo | null>(null);
+  const [lanesRound, setLanesRound] = useState<LanesRoundData | null>(null);
+  const [lanesLastResult, setLanesLastResult] = useState<LanesRoundResultData | null>(null);
+  const [lanesEnd, setLanesEnd] = useState<LanesEndData | null>(null);
+  const [lanesSubmitted, setLanesSubmitted] = useState(false);
+
   const clientRef = useRef<OnlineClient | null>(null);
 
   const activeServerUrl =
@@ -342,19 +355,85 @@ export function OnlinePage() {
         setErrMsg(`${msg.code}: ${msg.message}`);
         setPhase("error");
         break;
-      // Lanes messages flip us into the "lanes_match" phase. The
-      // LanesMatchView component owns the rest of the flow (its own
-      // listener subscribes via onMessage prop).
       case "lanes_match_found":
+        // Fresh match — wipe any stale state from a previous one.
+        setLanesMatch({
+          matchId: msg.match_id,
+          opponent: msg.opponent.nickname,
+          youAre: msg.you_are,
+          lanes: msg.lanes,
+          winTo: msg.win_to,
+        });
+        setLanesRound(null);
+        setLanesLastResult(null);
+        setLanesEnd(null);
+        setLanesSubmitted(false);
         setPhase("lanes_match");
+        hapticMatchStart();
         break;
+
+      case "lanes_round_start":
+        setLanesRound({
+          no: msg.round_no,
+          deadlineMs: msg.deadline_ms,
+          startedAt: Date.now(),
+        });
+        // A new round wipes the just-seen reveal and the locked picks.
+        setLanesLastResult(null);
+        setLanesSubmitted(false);
+        break;
+
+      case "lanes_round_result": {
+        // Translate server (a/b) → local (you/opp) coordinates.
+        setLanesMatch((cur) => {
+          if (!cur) return cur;
+          const youA = cur.youAre === "a";
+          const r: LanesRoundResultData = {
+            yourPlays:    youA ? msg.a_plays : msg.b_plays,
+            oppPlays:     youA ? msg.b_plays : msg.a_plays,
+            laneResults:  msg.lane_results,
+            yourPoints:   youA ? msg.a_points : msg.b_points,
+            oppPoints:    youA ? msg.b_points : msg.a_points,
+            roundWinsYou: youA ? msg.round_wins_a : msg.round_wins_b,
+            roundWinsOpp: youA ? msg.round_wins_b : msg.round_wins_a,
+          };
+          setLanesLastResult(r);
+          // The round is over — clear it so the view shows the reveal.
+          // A new round_start will reset everything cleanly.
+          setLanesRound(null);
+          // Haptic timed to land with the reveal (1.4s into the suspense).
+          window.setTimeout(() => {
+            if (r.yourPoints > r.oppPoints) hapticWin();
+            else if (r.yourPoints < r.oppPoints) hapticLoss();
+            else hapticTap();
+          }, 1400);
+          return cur;
+        });
+        break;
+      }
+
+      case "lanes_match_end": {
+        setLanesMatch((cur) => {
+          if (!cur) return cur;
+          const youA = cur.youAre === "a";
+          const youWon = msg.winner === cur.youAre;
+          const draw = msg.winner === null;
+          if (youWon) hapticMatchWin();
+          else if (!draw) hapticMatchLoss();
+          else hapticTap();
+          setLanesEnd({
+            winner: msg.winner,
+            roundWinsYou: youA ? msg.round_wins_a : msg.round_wins_b,
+            roundWinsOpp: youA ? msg.round_wins_b : msg.round_wins_a,
+            forfeit: msg.forfeit,
+          });
+          return cur;
+        });
+        break;
+      }
+
       case "chat":
       case "pong":
-      case "lanes_round_start":
-      case "lanes_round_result":
-      case "lanes_match_end":
-        // Handled inside LanesMatchView's own subscription.
-        break;
       default:
         break;
     }
@@ -729,7 +808,7 @@ export function OnlinePage() {
           />
         )}
 
-        {phase === "lanes_match" && (
+        {phase === "lanes_match" && lanesMatch && (
           <motion.div
             key="lanes"
             initial={{ opacity: 0, scale: 0.97 }}
@@ -738,14 +817,26 @@ export function OnlinePage() {
           >
             <LanesMatchView
               nickname={player.nickname}
-              onSend={(msg: ClientMessage) => clientRef.current?.send(msg)}
-              onMessage={(cb) => {
-                const c = clientRef.current;
-                if (!c) return () => {};
-                return c.on(cb);
+              match={lanesMatch}
+              round={lanesRound}
+              lastResult={lanesLastResult}
+              end={lanesEnd}
+              submitted={lanesSubmitted}
+              onSubmitPicks={(picks) => {
+                hapticLock();
+                clientRef.current?.send({
+                  type: "play_lanes",
+                  plays: picks.map((mv) => ({ mv, mana: 0 })),
+                });
+                setLanesSubmitted(true);
               }}
               onLeave={() => {
                 clientRef.current?.send({ type: "leave_match" });
+                setLanesMatch(null);
+                setLanesRound(null);
+                setLanesLastResult(null);
+                setLanesEnd(null);
+                setLanesSubmitted(false);
                 backToMenu();
               }}
             />
