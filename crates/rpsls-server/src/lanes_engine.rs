@@ -8,8 +8,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use rpsls_core::constellation::{
-    Battle, BattleConfig, BattleStatus, LanePlay, WinCondition,
+    Battle, BattleConfig, BattleStatus, LaneResult, LaneWinner, LanePlay, RoundOutcome,
+    WinCondition,
 };
+use rpsls_core::{Move, Outcome};
 use tokio::sync::mpsc;
 use tokio::time::timeout;
 use uuid::Uuid;
@@ -25,6 +27,18 @@ const PICK_DEADLINE: Duration = Duration::from_secs(12);
 pub enum LanesCommand {
     Play { slot: PlayerSlot, plays: Vec<LanePlay> },
     Leave { slot: PlayerSlot },
+}
+
+/// How a round resolution ended at the collection layer.
+enum RoundEnd {
+    /// Both players submitted their plays in time.
+    Both,
+    /// One side ran out of time but is still connected — round is a forced
+    /// loss on that side, the match continues. Stored so we can flag it in
+    /// history / UI ("lost by inactivity").
+    Timeout(PlayerSlot),
+    /// One side explicitly left the match — full forfeit, match ends now.
+    Leave(PlayerSlot),
 }
 
 /// Spawn a new lanes match task. Returns the sender to feed it commands.
@@ -82,37 +96,49 @@ async fn run_lanes_match(
         b.send(ServerMessage::LanesRoundStart { round_no, deadline_ms: pick_deadline_ms });
 
         // Collect both players' lane plays.
-        let (a_plays, b_plays, forfeit_slot) =
-            collect_lanes_round(&mut rx, lanes as usize).await;
+        let (a_plays, b_plays, end) = collect_lanes_round(&mut rx, lanes as usize).await;
 
-        // Forfeit handling.
-        if let Some(slot) = forfeit_slot {
-            let other = match slot {
-                PlayerSlot::A => &b,
-                PlayerSlot::B => &a,
-            };
+        // Explicit leave = full match forfeit.
+        if let RoundEnd::Leave(slot) = end {
+            let other = match slot { PlayerSlot::A => &b, PlayerSlot::B => &a };
             other.send(ServerMessage::OpponentLeft);
             let (round_wins_a, round_wins_b) = match slot {
                 PlayerSlot::A => (0u8, win_to),
                 PlayerSlot::B => (win_to, 0u8),
             };
-            broadcast_lanes_end(
-                &a, &b,
-                Some(other_slot(slot)),
-                round_wins_a, round_wins_b,
-                true,
-            );
+            broadcast_lanes_end(&a, &b, Some(other_slot(slot)), round_wins_a, round_wins_b, true);
             break;
         }
 
-        let a_p = a_plays.expect("forfeit handled above");
-        let b_p = b_plays.expect("forfeit handled above");
-        let outcome = match battle.play_round(&a_p, &b_p) {
-            Ok(o) => o,
-            Err(e) => {
-                tracing::warn!(?e, "lanes battle rejected play_round");
-                break;
+        // Timeout = round forced loss for the silent side; match continues.
+        let (a_p, b_p, outcome) = match end {
+            RoundEnd::Timeout(silent) => {
+                let (ap, bp) = build_timeout_plays(lanes as usize, silent, a_plays, b_plays);
+                let o = build_timeout_outcome(&ap, &bp, silent);
+                // Apply to battle state manually (skip play_round).
+                match silent {
+                    PlayerSlot::A => battle.state.round_wins_b += 1,
+                    PlayerSlot::B => battle.state.round_wins_a += 1,
+                }
+                battle.state.total_points_a += o.a_points;
+                battle.state.total_points_b += o.b_points;
+                battle.state.rounds_played += 1;
+                battle.state.history.push(o.clone());
+                (ap, bp, o)
             }
+            RoundEnd::Both => {
+                let ap = a_plays.expect("Both => a present");
+                let bp = b_plays.expect("Both => b present");
+                let o = match battle.play_round(&ap, &bp) {
+                    Ok(o) => o,
+                    Err(e) => {
+                        tracing::warn!(?e, "lanes battle rejected play_round");
+                        break;
+                    }
+                };
+                (ap, bp, o)
+            }
+            RoundEnd::Leave(_) => unreachable!(),
         };
 
         let msg = ServerMessage::LanesRoundResult {
@@ -154,7 +180,7 @@ async fn run_lanes_match(
 async fn collect_lanes_round(
     rx: &mut mpsc::UnboundedReceiver<LanesCommand>,
     expected_lanes: usize,
-) -> (Option<Vec<LanePlay>>, Option<Vec<LanePlay>>, Option<PlayerSlot>) {
+) -> (Option<Vec<LanePlay>>, Option<Vec<LanePlay>>, RoundEnd) {
     let mut a_plays: Option<Vec<LanePlay>> = None;
     let mut b_plays: Option<Vec<LanePlay>> = None;
 
@@ -163,16 +189,17 @@ async fn collect_lanes_round(
         let next = timeout(timeout_dur, rx.recv()).await;
         match next {
             Err(_) => {
-                // Deadline expired — whichever side hasn't played forfeits.
-                let forfeit = if a_plays.is_none() {
+                // Deadline expired. Whichever side is silent loses *this round*
+                // by inactivity — the match goes on.
+                let silent = if a_plays.is_none() {
                     PlayerSlot::A
                 } else {
                     PlayerSlot::B
                 };
-                return (a_plays, b_plays, Some(forfeit));
+                return (a_plays, b_plays, RoundEnd::Timeout(silent));
             }
             Ok(None) => {
-                return (a_plays, b_plays, Some(PlayerSlot::A));
+                return (a_plays, b_plays, RoundEnd::Leave(PlayerSlot::A));
             }
             Ok(Some(cmd)) => match cmd {
                 LanesCommand::Play { slot, plays } => {
@@ -188,11 +215,59 @@ async fn collect_lanes_round(
                         PlayerSlot::B => b_plays = Some(plays),
                     }
                 }
-                LanesCommand::Leave { slot } => return (a_plays, b_plays, Some(slot)),
+                LanesCommand::Leave { slot } => {
+                    return (a_plays, b_plays, RoundEnd::Leave(slot));
+                }
             },
         }
     }
-    (a_plays, b_plays, None)
+    (a_plays, b_plays, RoundEnd::Both)
+}
+
+/// Build placeholder plays for a side that ran out of time. The silent side
+/// gets 3× Rock — meaningless picks since `build_timeout_outcome` overrides
+/// the lane resolution anyway, but the client still sees something coherent.
+fn build_timeout_plays(
+    expected_lanes: usize,
+    silent: PlayerSlot,
+    a: Option<Vec<LanePlay>>,
+    b: Option<Vec<LanePlay>>,
+) -> (Vec<LanePlay>, Vec<LanePlay>) {
+    let filler = vec![LanePlay::simple(Move::Rock); expected_lanes];
+    match silent {
+        PlayerSlot::A => (a.unwrap_or_else(|| filler.clone()), b.unwrap_or(filler)),
+        PlayerSlot::B => (a.unwrap_or_else(|| filler.clone()), b.unwrap_or(filler)),
+    }
+}
+
+/// All lanes are awarded to the side that *didn't* time out, regardless of
+/// the placeholder moves. Lane verbs carry a "timeout" marker so the client
+/// can label the round accordingly.
+fn build_timeout_outcome(
+    a_plays: &[LanePlay],
+    b_plays: &[LanePlay],
+    silent: PlayerSlot,
+) -> RoundOutcome {
+    let mut lanes = Vec::with_capacity(a_plays.len());
+    for (a, b) in a_plays.iter().zip(b_plays.iter()) {
+        let (outcome, winner) = match silent {
+            PlayerSlot::A => (Outcome::BWins { verb: "wins by timeout".into() }, LaneWinner::B),
+            PlayerSlot::B => (Outcome::AWins { verb: "wins by timeout".into() }, LaneWinner::A),
+        };
+        lanes.push(LaneResult {
+            a_play: a.clone(),
+            b_play: b.clone(),
+            outcome,
+            winner,
+            points: 1,
+        });
+    }
+    let lane_count = lanes.len() as u8;
+    let (a_points, b_points, round_winner) = match silent {
+        PlayerSlot::A => (0u8, lane_count, LaneWinner::B),
+        PlayerSlot::B => (lane_count, 0u8, LaneWinner::A),
+    };
+    RoundOutcome { lanes, a_points, b_points, round_winner }
 }
 
 fn other_slot(s: PlayerSlot) -> PlayerSlot {

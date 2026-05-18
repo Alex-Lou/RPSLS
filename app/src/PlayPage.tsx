@@ -30,10 +30,12 @@ import { THEMES } from "./theme";
 import { todayChallenge, type DailyChallenge } from "./daily";
 import { useT } from "./i18n";
 import type { Page } from "./Sidebar";
+import { LocalLanesGame } from "./LocalLanesGame";
 
 type View =
   | { kind: "select" }
-  | { kind: "game"; mode: GameMode; bestOf: number; daily?: DailyChallenge };
+  | { kind: "game"; mode: GameMode; bestOf: number; daily?: DailyChallenge }
+  | { kind: "lanes_cpu"; winTo: number };
 
 export function PlayPage({ onNavigate }: { onNavigate?: (p: Page) => void }) {
   const [view, setView] = useState<View>({ kind: "select" });
@@ -49,6 +51,7 @@ export function PlayPage({ onNavigate }: { onNavigate?: (p: Page) => void }) {
               setView({ kind: "game", mode: daily.mode, bestOf: daily.bestOf, daily })
             }
             onGoOnline={onNavigate ? () => onNavigate("online") : undefined}
+            onGoConstellation={(winTo) => setView({ kind: "lanes_cpu", winTo })}
           />
         )}
         {view.kind === "game" && (
@@ -60,6 +63,21 @@ export function PlayPage({ onNavigate }: { onNavigate?: (p: Page) => void }) {
             onQuit={() => setView({ kind: "select" })}
           />
         )}
+        {view.kind === "lanes_cpu" && (
+          <motion.div
+            key={`lanes-cpu-${view.winTo}-${Date.now()}`}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.25 }}
+            className="flex-1 flex flex-col"
+          >
+            <LocalLanesGame
+              winTo={view.winTo}
+              onQuit={() => setView({ kind: "select" })}
+            />
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );
@@ -67,22 +85,26 @@ export function PlayPage({ onNavigate }: { onNavigate?: (p: Page) => void }) {
 
 /* ─────────── Mode Select ─────────── */
 
-// "online" is a UI-only card on the home grid that navigates to OnlinePage
-// — it's not a GameMode (which represents local CPU/hotseat match records).
-type ModeCardId = GameMode | "online";
+// "online" + "constellation" are UI-only home cards. Constellation routes to
+// a local vs-CPU 3-lanes match; the real GameMode union covers CPU/hotseat
+// recorded matches.
+type ModeCardId = GameMode | "online" | "constellation";
 
-// Order matches user preference: Online slotted right after Casual so it's
-// visible without scrolling.
-const ALL_CARDS: ModeCardId[] = ["training", "casual", "online", "ranked", "hotseat"];
+// Order: Training, Casual, Online (live), Constellation (NEW vs CPU), Ranked, Hot-seat.
+const ALL_CARDS: ModeCardId[] = [
+  "training", "casual", "online", "constellation", "ranked", "hotseat",
+];
 
 function ModeSelect({
   onStart,
   onStartDaily,
   onGoOnline,
+  onGoConstellation,
 }: {
   onStart: (mode: GameMode, bestOf: number) => void;
   onStartDaily: (daily: DailyChallenge) => void;
   onGoOnline?: () => void;
+  onGoConstellation?: (winTo: number) => void;
 }) {
   const [mode, setMode] = useState<GameMode>("casual");
   const [bestOf, setBestOf] = useState(3);
@@ -144,6 +166,42 @@ function ModeSelect({
                   <p className="text-xs text-zinc-300 mt-0.5">{t("mode.online.tag")}</p>
                   <p className="text-[10px] text-violet-300/80 mt-1.5">
                     {t("mode.online.cta")} →
+                  </p>
+                </div>
+              </motion.button>
+            );
+          }
+          if (m === "constellation") {
+            return (
+              <motion.button
+                key="constellation"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05 * i, duration: 0.25 }}
+                whileHover={{ y: -3 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => onGoConstellation?.(2)}
+                disabled={!onGoConstellation}
+                className={
+                  "text-left p-4 rounded-2xl border transition flex items-start gap-3 relative overflow-hidden " +
+                  "border-fuchsia-400/30 bg-gradient-to-br from-fuchsia-500/15 via-violet-500/10 to-amber-500/15 " +
+                  "hover:from-fuchsia-500/25 hover:via-violet-500/20 hover:to-amber-500/25 hover:border-fuchsia-400/60 " +
+                  "shadow-lg shadow-fuchsia-500/10"
+                }
+              >
+                <span className="text-3xl">🌌</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold">Constellation</span>
+                    <span className="text-[10px] uppercase tracking-wider text-fuchsia-200 bg-fuchsia-500/25 px-1.5 rounded-full">
+                      NEW
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-300 mt-0.5">
+                    3 lanes simultaneously vs CPU
+                  </p>
+                  <p className="text-[10px] text-fuchsia-300/80 mt-1.5">
+                    Multi-pick tactics · {/*FIXME i18n later*/}first to 2 round-wins →
                   </p>
                 </div>
               </motion.button>
