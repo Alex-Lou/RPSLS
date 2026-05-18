@@ -552,10 +552,14 @@ export function OnlinePage() {
     <div
       className="px-4 pb-10 max-w-3xl w-full mx-auto flex-1 flex flex-col"
       style={{
-        // Leaves room for the floating mobile hamburger (which sits at
-        // top:max(safe-area-top, 32px) with height 11). Otherwise the
-        // score header's left name slides under it.
-        paddingTop: "calc(max(env(safe-area-inset-top), 0px) + 4.5rem)",
+        // The mobile hamburger is `fixed top: max(safe-area-top, 32px)` with
+        // a 44px height. We need to clear its full footprint *and* leave
+        // breathing room — measured against the actual hamburger bottom,
+        // not just safe-area.
+        //   top              = max(safe-area-top, 32px)
+        //   bottom-of-burger = top + 44px
+        //   target           = bottom + 24px  (visual gap)
+        paddingTop: "calc(max(env(safe-area-inset-top), 32px) + 68px)",
       }}
     >
       {/* Cinematic match-found splash overlay */}

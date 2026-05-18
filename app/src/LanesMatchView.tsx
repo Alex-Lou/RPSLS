@@ -130,6 +130,9 @@ export function LanesMatchView({
     return () => window.clearTimeout(t);
   }, [match.matchId]);
 
+  /* Help modal state — a "?" button in the score row toggles it. */
+  const [helpOpen, setHelpOpen] = useState(false);
+
   /* Render-side reveal countdown — a quick 1.4s suspense when a new
      lastResult lands. Parent re-feeds lastResult fresh; we just gate
      the "reveal" content behind a short timer. */
@@ -183,6 +186,21 @@ export function LanesMatchView({
             lanes={match.lanes}
             winTo={match.winTo}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Help "?" floating button — quick access to the rules/combos lexicon. */}
+      <button
+        onClick={() => setHelpOpen(true)}
+        title={t("lanes.help.button")}
+        className="self-end -mb-1 w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 border border-white/15 text-zinc-300 hover:text-white text-sm font-bold transition flex items-center justify-center"
+      >
+        ?
+      </button>
+
+      <AnimatePresence>
+        {helpOpen && (
+          <HelpModal target={target} onClose={() => setHelpOpen(false)} />
         )}
       </AnimatePresence>
 
@@ -384,6 +402,8 @@ function PickStage({
   const t = useT();
   const allFilled = picks.every((p) => p !== null);
   const remaining = 3 - picks.filter(Boolean).length;
+  // Combo preview — only triggers once all 3 picks are placed, before lock.
+  const preview = allFilled ? detectPlayerCombo(picks as Move[]) : null;
   return (
     <div className="w-full flex flex-col items-center gap-5">
       {/* Timer */}
@@ -401,6 +421,37 @@ function PickStage({
       </div>
 
       <PickerBar onPickInNextEmpty={onPick} />
+
+      {/* Combo preview: shown as soon as the 3 picks form a known combo. */}
+      <AnimatePresence>
+        {preview && (
+          <motion.div
+            key={preview.id}
+            initial={{ opacity: 0, y: 8, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 280, damping: 20 }}
+            className="flex flex-col items-center gap-0.5"
+          >
+            <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">
+              {t("lanes.potentialCombo")}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xl">{preview.glyph}</span>
+              <span
+                className={
+                  "text-base sm:text-lg font-black tracking-wider bg-gradient-to-br " +
+                  preview.gradient +
+                  " bg-clip-text text-transparent"
+                }
+              >
+                {t(`combo.${preview.id}.name`)}
+              </span>
+              <span className="text-xl">{preview.glyph}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <button
         onClick={onSubmit}
@@ -984,6 +1035,147 @@ function MatchEndScene({
         </button>
       </motion.div>
     </motion.div>
+  );
+}
+
+/* ──────────── Help / Lexicon modal ──────────── */
+
+function HelpModal({ target, onClose }: { target: number; onClose: () => void }) {
+  const t = useT();
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+    >
+      <motion.div
+        initial={{ scale: 0.9, y: 12 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 6 }}
+        transition={{ type: "spring", stiffness: 320, damping: 26 }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md max-h-[85vh] overflow-y-auto bg-zinc-950 border border-white/15 rounded-3xl p-6 shadow-2xl"
+      >
+        <div className="flex items-baseline justify-between mb-4">
+          <h2 className="text-xl font-black tracking-tight bg-gradient-to-br from-violet-300 via-fuchsia-300 to-cyan-300 bg-clip-text text-transparent">
+            🌌 {t("lanes.help.title")}
+          </h2>
+        </div>
+
+        <div className="space-y-5 text-sm">
+          <Section
+            title={t("lanes.help.rules.title")}
+            body={t("lanes.help.rules.body", { target })}
+            accent="violet"
+          />
+          <Section
+            title={t("lanes.help.rps.title")}
+            body={t("lanes.help.rps.body")}
+            accent="cyan"
+          />
+          <Section
+            title={t("lanes.help.identity.title")}
+            body={t("lanes.help.identity.body")}
+            accent="amber"
+          >
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {LANE_IDENTITIES.map((id, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl bg-white/5 border border-white/10 p-2 text-center"
+                >
+                  <div className="text-lg">{id.glyph}</div>
+                  <div className={
+                    "text-[10px] uppercase tracking-wider font-bold mt-0.5 " +
+                    (id.accent === "amber"  ? "text-amber-300"  :
+                     id.accent === "sky"    ? "text-sky-300"    :
+                                              "text-emerald-300")
+                  }>
+                    {t(`${IDENTITY_KEYS[i]}.title`)}
+                  </div>
+                  <div className="text-[10px] text-zinc-400 mt-1 leading-tight">
+                    {t(`${IDENTITY_KEYS[i]}.hint`)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Section>
+          <Section
+            title={t("lanes.help.combos.title")}
+            body={t("lanes.help.combos.body")}
+            accent="fuchsia"
+          >
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {COMBO_LEXICON.map(({ id, glyph }) => (
+                <div
+                  key={id}
+                  className="rounded-xl bg-white/5 border border-white/10 p-2 flex items-center gap-2"
+                >
+                  <span className="text-lg">{glyph}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-200">
+                    {t(`combo.${id}.name`)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Section>
+          <Section
+            title={t("lanes.help.timer.title")}
+            body={t("lanes.help.timer.body")}
+            accent="rose"
+          />
+        </div>
+
+        <button
+          onClick={onClose}
+          className="mt-6 w-full px-6 py-3 rounded-2xl font-bold text-white bg-gradient-to-r from-violet-500 via-fuchsia-500 to-teal-400 shadow-lg shadow-violet-500/30 transition hover:scale-[1.02]"
+        >
+          {t("lanes.help.close")}
+        </button>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+const COMBO_LEXICON: { id: string; glyph: string }[] = [
+  { id: "rockslide",     glyph: "🪨" },
+  { id: "origami",       glyph: "📄" },
+  { id: "shear",         glyph: "✂️" },
+  { id: "reptile",       glyph: "🦎" },
+  { id: "vulcan",        glyph: "🖖" },
+  { id: "trinityClassic", glyph: "🌀" },
+  { id: "trinitySheldon", glyph: "🧠" },
+  { id: "mirror",        glyph: "🪞" },
+  { id: "sweep",         glyph: "👑" },
+  { id: "wipeout",       glyph: "💀" },
+  { id: "stalemate",     glyph: "🤝" },
+];
+
+function Section({
+  title, body, accent, children,
+}: {
+  title: string; body: string;
+  accent: "violet" | "cyan" | "amber" | "fuchsia" | "rose";
+  children?: React.ReactNode;
+}) {
+  const colour = {
+    violet:  "text-violet-300",
+    cyan:    "text-cyan-300",
+    amber:   "text-amber-300",
+    fuchsia: "text-fuchsia-300",
+    rose:    "text-rose-300",
+  }[accent];
+  return (
+    <div>
+      <h3 className={"text-xs uppercase tracking-[0.25em] font-bold mb-1.5 " + colour}>
+        {title}
+      </h3>
+      <p className="text-zinc-300 leading-relaxed text-[13px]">{body}</p>
+      {children}
+    </div>
   );
 }
 
