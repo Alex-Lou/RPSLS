@@ -16,6 +16,13 @@ import { Hand, MOVE_ICON, MOVE_PALETTE } from "./icons";
 import { MOVES, type Move } from "./game";
 import { hapticAlert, hapticTap } from "./haptic";
 import type { LanePlay, LaneResult, PlayerSlot } from "./online";
+import {
+  detectOutcomeCombo,
+  detectPlayerCombo,
+  LANE_IDENTITIES,
+  laneFavoursMove,
+  type ComboTheme,
+} from "./lanesCombos";
 
 /* ──────────── Types (re-exported for the parent) ──────────── */
 
@@ -238,26 +245,13 @@ function ScoreHeader({
           <span className="text-[10px] uppercase tracking-wider text-zinc-500">You</span>
           <span className="font-semibold truncate text-emerald-200">{you}</span>
         </div>
-        <div className="text-3xl sm:text-4xl font-black tabular-nums px-4">
-          <motion.span
-            key={youWins}
-            initial={{ scale: 1.6 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: 0.4 }}
-            className="text-emerald-300 inline-block"
-          >
-            {youWins}
-          </motion.span>
-          <span className="text-zinc-600 mx-2">:</span>
-          <motion.span
-            key={oppWins}
-            initial={{ scale: 1.6 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: 0.4 }}
-            className="text-rose-300 inline-block"
-          >
-            {oppWins}
-          </motion.span>
+        {/* Score: each side rendered through a "rolling number" so the value
+            slides in/out instead of stacking. Fixed width prevents the
+            colon/border from shifting when digits change. */}
+        <div className="text-3xl sm:text-4xl font-black tabular-nums px-3 flex items-center gap-1">
+          <RollingNumber value={youWins} color="emerald" />
+          <span className="text-zinc-600 px-1">:</span>
+          <RollingNumber value={oppWins} color="rose" />
         </div>
         <div className="flex flex-col text-right min-w-0 flex-1">
           <span className="text-[10px] uppercase tracking-wider text-zinc-500">Opponent</span>
@@ -268,6 +262,33 @@ function ScoreHeader({
         Round {round} · 3 lanes · First to {target} round-wins
       </div>
     </div>
+  );
+}
+
+function RollingNumber({
+  value, color,
+}: { value: number; color: "emerald" | "rose" }) {
+  const colorCls = color === "emerald" ? "text-emerald-300" : "text-rose-300";
+  return (
+    <span
+      className={
+        "relative inline-block min-w-[1.2em] text-center overflow-hidden " + colorCls
+      }
+      style={{ height: "1.1em", lineHeight: "1.1em" }}
+    >
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.span
+          key={value}
+          initial={{ y: "-100%", opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: "100%", opacity: 0 }}
+          transition={{ type: "spring", stiffness: 380, damping: 30 }}
+          className="absolute inset-0 flex items-center justify-center"
+        >
+          {value}
+        </motion.span>
+      </AnimatePresence>
+    </span>
   );
 }
 
@@ -391,28 +412,55 @@ function PickStage({
 function LaneSlot({
   index, pick, onClear,
 }: { index: number; pick: Move | null; onClear: () => void }) {
+  const identity = LANE_IDENTITIES[index];
+  const favoured = pick ? laneFavoursMove(index, pick) : false;
+  const accentRing =
+    identity.accent === "amber"  ? "ring-amber-400/30"  :
+    identity.accent === "sky"    ? "ring-sky-400/30"    :
+                                    "ring-emerald-400/30";
+  const accentText =
+    identity.accent === "amber"  ? "text-amber-300"  :
+    identity.accent === "sky"    ? "text-sky-300"    :
+                                    "text-emerald-300";
   return (
-    <div className="flex flex-col items-center gap-2">
-      <div className="text-[10px] uppercase tracking-wider text-zinc-500">
-        Lane {index + 1}
+    <div className="flex flex-col items-center gap-1">
+      {/* Lane identity badge — taught to the player by visibility. */}
+      <div className={"flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold " + accentText}>
+        <span>{identity.glyph}</span>
+        <span>{identity.title}</span>
       </div>
       <button
         onClick={onClear}
         disabled={!pick}
         className={
-          "aspect-square w-full rounded-2xl border-2 transition flex items-center justify-center " +
+          "aspect-square w-full rounded-2xl border-2 transition flex items-center justify-center relative ring-1 " +
+          accentRing + " " +
           (pick
             ? "border-emerald-400/40 bg-emerald-500/10 hover:bg-rose-500/10 hover:border-rose-400/50"
             : "border-dashed border-white/15 bg-black/20")
         }
-        title={pick ? `Clear ${pick}` : "Empty lane"}
+        title={
+          pick
+            ? `Clear ${pick}${favoured ? " · favoured here ✨" : ""}`
+            : identity.hint
+        }
       >
         {pick ? (
-          <Hand move={pick} size="md" />
+          <>
+            <Hand move={pick} size="md" />
+            {favoured && (
+              <span className="absolute -top-1 -right-1 text-xs px-1.5 rounded-full bg-amber-400/90 text-zinc-900 font-bold shadow">
+                ✨
+              </span>
+            )}
+          </>
         ) : (
           <span className="text-3xl text-zinc-700 font-black">?</span>
         )}
       </button>
+      <span className="text-[9px] text-zinc-500 text-center leading-tight hidden sm:block">
+        {identity.hint}
+      </span>
     </div>
   );
 }
@@ -601,54 +649,163 @@ function RevealCountdown() {
   );
 }
 
+/**
+ * Reveal is staged tempo-style: lane 1 → 2 → 3 → verdict. Each lane "drops"
+ * with a 0.6s gap so the player gets to feel each one. The outcome combo
+ * banner (sweep / wipeout / mirror / classic trinity / triple) animates in
+ * last, on top of the lanes.
+ */
 function RevealStage({ result }: { result: LanesRoundResultData }) {
-  const youSwept = result.yourPoints === 3;
-  const swept    = result.oppPoints === 3;
+  const yourPicks = result.yourPlays.map((p) => p.mv);
+  const oppPicks  = result.oppPlays.map((p)  => p.mv);
+
+  const yourCombo = detectPlayerCombo(yourPicks);
+  const oppCombo  = detectPlayerCombo(oppPicks);
+  const outcomeCombo = detectOutcomeCombo(
+    result.yourPoints, result.oppPoints, yourPicks, oppPicks,
+  );
+
+  // Pick the most visually-impactful combo to show as the headline banner:
+  // outcome (sweep/wipeout/mirror) > your combo > opponent combo.
+  const headlineCombo =
+    outcomeCombo ??
+    (result.yourPoints >= result.oppPoints ? yourCombo : oppCombo) ??
+    (yourCombo || oppCombo);
+
+  // Sequential lane reveal — flag each lane "ready" on a timer cascade.
+  const [revealedLanes, setRevealedLanes] = useState(0);
+  useEffect(() => {
+    setRevealedLanes(0);
+    const timers = [
+      window.setTimeout(() => setRevealedLanes(1), 200),
+      window.setTimeout(() => setRevealedLanes(2), 800),
+      window.setTimeout(() => setRevealedLanes(3), 1400),
+    ];
+    return () => timers.forEach(window.clearTimeout);
+  }, [result]);
+
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
+      initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       className="flex flex-col items-center gap-3 w-full"
     >
-      {/* 3-lane reveal grid */}
+      {/* 3-lane reveal — each card flips when its index <= revealedLanes. */}
       <div className="grid grid-cols-3 gap-3 sm:gap-5 w-full max-w-2xl">
         {result.laneResults.map((lr, i) => (
-          <LaneRevealCard key={i} lane={i} you={result.yourPlays[i].mv} opp={result.oppPlays[i].mv} lr={lr} />
+          <LaneRevealCard
+            key={i}
+            lane={i}
+            you={result.yourPlays[i].mv}
+            opp={result.oppPlays[i].mv}
+            lr={lr}
+            revealed={i < revealedLanes}
+          />
         ))}
       </div>
 
-      {/* Round verdict */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="text-center mt-2 px-2"
-      >
-        {result.yourPoints > result.oppPoints && (
-          <div className="text-emerald-300 text-lg font-bold">
-            ✨ Round won {result.yourPoints}-{result.oppPoints}
-            {youSwept && " · clean sweep!"}
-          </div>
+      {/* Verdict line — appears once all 3 lanes have dropped. */}
+      <AnimatePresence>
+        {revealedLanes >= 3 && (
+          <motion.div
+            key="verdict"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            className="text-center mt-1 px-2"
+          >
+            {result.yourPoints > result.oppPoints && (
+              <div className="text-emerald-300 text-lg font-bold">
+                ✨ Round won {result.yourPoints}-{result.oppPoints}
+              </div>
+            )}
+            {result.yourPoints < result.oppPoints && (
+              <div className="text-rose-300 text-lg font-bold">
+                💥 Round lost {result.yourPoints}-{result.oppPoints}
+              </div>
+            )}
+            {result.yourPoints === result.oppPoints && (
+              <div className="text-zinc-300 text-lg font-bold">
+                🤝 Round draw {result.yourPoints}-{result.oppPoints}
+              </div>
+            )}
+          </motion.div>
         )}
-        {result.yourPoints < result.oppPoints && (
-          <div className="text-rose-300 text-lg font-bold">
-            💥 Round lost {result.yourPoints}-{result.oppPoints}
-            {swept && " · they swept all 3"}
-          </div>
+      </AnimatePresence>
+
+      {/* Combo banner — drops in after the verdict. */}
+      <AnimatePresence>
+        {revealedLanes >= 3 && headlineCombo && (
+          <ComboBanner combo={headlineCombo} />
         )}
-        {result.yourPoints === result.oppPoints && (
-          <div className="text-zinc-300 text-lg font-bold">
-            🤝 Round draw {result.yourPoints}-{result.oppPoints}
-          </div>
-        )}
-      </motion.div>
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+/**
+ * Big animated banner that names the combo (ROCKSLIDE, FLAWLESS SWEEP…).
+ * Tier drives the size + treatment — epics shake the layout, commons fade in.
+ */
+function ComboBanner({ combo }: { combo: ComboTheme }) {
+  const epic = combo.tier === "epic";
+  const rare = combo.tier === "rare";
+  return (
+    <motion.div
+      key={combo.id}
+      initial={{ opacity: 0, scale: 0.5, y: -10 }}
+      animate={{
+        opacity: 1,
+        scale: epic ? [0.5, 1.25, 1] : 1,
+        y: 0,
+        x: epic ? [0, -6, 6, -3, 3, 0] : 0,
+      }}
+      exit={{ opacity: 0, scale: 0.8, y: -8 }}
+      transition={{ duration: epic ? 0.7 : 0.4, type: "spring", stiffness: 220, damping: 14 }}
+      className="flex flex-col items-center gap-1 mt-2"
+    >
+      <div className="flex items-center gap-2">
+        <motion.span
+          animate={{ rotate: [0, -10, 10, -5, 5, 0] }}
+          transition={{ duration: 0.8, repeat: epic ? Infinity : 1, repeatType: "loop" }}
+          className={"text-3xl sm:text-4xl"}
+        >
+          {combo.glyph}
+        </motion.span>
+        <span
+          className={
+            (epic ? "text-3xl sm:text-5xl" : rare ? "text-2xl sm:text-3xl" : "text-xl sm:text-2xl") +
+            " font-black tracking-wider bg-gradient-to-br " + combo.gradient +
+            " bg-clip-text text-transparent drop-shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
+          }
+        >
+          {combo.name}
+        </span>
+        <motion.span
+          animate={{ rotate: [0, 10, -10, 5, -5, 0] }}
+          transition={{ duration: 0.8, repeat: epic ? Infinity : 1, repeatType: "loop" }}
+          className="text-3xl sm:text-4xl"
+        >
+          {combo.glyph}
+        </motion.span>
+      </div>
+      <div className={"text-[11px] sm:text-xs uppercase tracking-[0.25em] " +
+        (epic ? "text-amber-300/90" : rare ? "text-fuchsia-300/80" : "text-zinc-400")}>
+        {combo.tagline}
+      </div>
+      {combo.bonus != null && combo.bonus > 0 && (
+        <div className="text-[10px] uppercase tracking-wider text-amber-300/70 mt-1">
+          ✨ Style bonus · +{combo.bonus}
+        </div>
+      )}
     </motion.div>
   );
 }
 
 function LaneRevealCard({
-  lane, you, opp, lr,
-}: { lane: number; you: Move; opp: Move; lr: LaneResult }) {
+  lane, you, opp, lr, revealed,
+}: { lane: number; you: Move; opp: Move; lr: LaneResult; revealed: boolean }) {
+  const identity = LANE_IDENTITIES[lane];
   const ringColor =
     lr.winner === "a" && lr.a_play.mv === you ? "ring-emerald-400/50" :
     lr.winner === "b" && lr.b_play.mv === you ? "ring-emerald-400/50" :
@@ -657,20 +814,55 @@ function LaneRevealCard({
   const youWon = (lr.winner === "a" && lr.a_play.mv === you && lr.b_play.mv === opp)
               || (lr.winner === "b" && lr.b_play.mv === you && lr.a_play.mv === opp);
   const oppWon = (lr.winner !== "draw") && !youWon;
+  const youFavoured = laneFavoursMove(lane, you);
+  const oppFavoured = laneFavoursMove(lane, opp);
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ delay: 0.05 * lane }}
+      initial={{ opacity: 0, scale: 0.7, rotateY: 90 }}
+      animate={revealed
+        ? { opacity: 1, scale: 1, rotateY: 0 }
+        : { opacity: 0.35, scale: 0.85, rotateY: 90 }}
+      transition={{ type: "spring", stiffness: 280, damping: 22 }}
       className={
         "rounded-2xl bg-black/30 border-2 p-3 flex flex-col items-center gap-2 ring-2 " + ringColor +
         " " + (youWon ? "border-emerald-400/30" : oppWon ? "border-rose-400/30" : "border-zinc-500/20")
       }
+      style={{ transformPerspective: 800 }}
     >
-      <span className="text-[9px] uppercase tracking-wider text-zinc-500">Lane {lane + 1}</span>
-      <Hand move={you} size="sm" emphasis={youWon ? "winner" : oppWon ? "loser" : "default"} />
+      <div className="flex items-center gap-1 text-[9px] uppercase tracking-wider">
+        <span className="text-zinc-500">Lane {lane + 1}</span>
+        <span className="text-zinc-600">·</span>
+        <span className={
+          identity.accent === "amber"  ? "text-amber-300/80"   :
+          identity.accent === "sky"    ? "text-sky-300/80"     :
+                                          "text-emerald-300/80"
+        }>
+          {identity.glyph} {identity.title}
+        </span>
+      </div>
+      <div className="relative">
+        <Hand move={you} size="sm" emphasis={youWon ? "winner" : oppWon ? "loser" : "default"} />
+        {youFavoured && revealed && (
+          <span
+            title={identity.hint}
+            className="absolute -top-1 -right-1 text-[10px] px-1 rounded-full bg-amber-400/90 text-zinc-900 font-bold"
+          >
+            ✨
+          </span>
+        )}
+      </div>
       <span className="text-[10px] text-zinc-600 font-black">VS</span>
-      <Hand move={opp} size="sm" emphasis={oppWon ? "winner" : youWon ? "loser" : "default"} />
+      <div className="relative">
+        <Hand move={opp} size="sm" emphasis={oppWon ? "winner" : youWon ? "loser" : "default"} />
+        {oppFavoured && revealed && (
+          <span
+            title={identity.hint}
+            className="absolute -top-1 -right-1 text-[10px] px-1 rounded-full bg-amber-400/90 text-zinc-900 font-bold"
+          >
+            ✨
+          </span>
+        )}
+      </div>
       <span className={
         "text-[10px] uppercase tracking-wider font-bold mt-0.5 " +
         (youWon ? "text-emerald-300" : oppWon ? "text-rose-300" : "text-zinc-500")
