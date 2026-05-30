@@ -46,6 +46,12 @@ pub enum ClientMessage {
 
     /// Keep-alive heartbeat.
     Ping,
+
+    /// Ask the opponent for a rematch once a match has ended (classic or lanes).
+    RequestRematch,
+
+    /// Respond to the opponent's rematch offer.
+    RespondRematch { accept: bool },
 }
 
 /* ──────────── Server → Client ──────────── */
@@ -95,7 +101,6 @@ pub enum ServerMessage {
     OpponentLeft,
 
     /* ──────────── Constellation Lanes (Phase 1) ──────────── */
-
     /// Lanes match has been found and is starting.
     LanesMatchFound {
         match_id: String,
@@ -140,6 +145,12 @@ pub enum ServerMessage {
 
     /// Heartbeat reply.
     Pong,
+
+    /// The opponent has asked for a rematch — prompt to accept or decline.
+    RematchOffered,
+
+    /// Your rematch request was declined, or the opponent left — back to lobby.
+    RematchDeclined,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

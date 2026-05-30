@@ -82,11 +82,7 @@ impl LobbyManager {
 
     /// Push a player into the matchmaking queue. If a compatible opponent
     /// is already waiting, return them and pop from the queue.
-    pub async fn join_or_match(
-        &self,
-        player: Arc<Session>,
-        best_of: u8,
-    ) -> Option<Arc<Session>> {
+    pub async fn join_or_match(&self, player: Arc<Session>, best_of: u8) -> Option<Arc<Session>> {
         let mut q = self.queue.lock().await;
         // Find first entry with same best_of and not the same session.
         if let Some(idx) = q
@@ -131,7 +127,10 @@ impl LobbyManager {
             let entry = q.remove(idx);
             return Some(entry.player);
         }
-        q.push(QueueEntry { player, best_of: win_to });
+        q.push(QueueEntry {
+            player,
+            best_of: win_to,
+        });
         None
     }
 

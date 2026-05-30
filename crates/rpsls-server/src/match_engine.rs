@@ -24,6 +24,8 @@ pub enum MatchCommand {
     Move { slot: PlayerSlot, mv: Move },
     Leave { slot: PlayerSlot },
     Chat { slot: PlayerSlot, emoji: String },
+    RequestRematch { slot: PlayerSlot },
+    RespondRematch { slot: PlayerSlot, accept: bool },
 }
 
 pub fn start_match(
@@ -42,92 +44,183 @@ async fn run_match(
     best_of: u8,
     mut rx: mpsc::UnboundedReceiver<MatchCommand>,
 ) {
-    let match_id = Uuid::new_v4().to_string();
     a.set_in_match(true);
     b.set_in_match(true);
 
-    a.send(ServerMessage::MatchFound {
-        match_id: match_id.clone(),
-        opponent: OpponentInfo { nickname: b.nickname() },
-        best_of,
-        you_are: PlayerSlot::A,
-    });
-    b.send(ServerMessage::MatchFound {
-        match_id: match_id.clone(),
-        opponent: OpponentInfo { nickname: a.nickname() },
-        best_of,
-        you_are: PlayerSlot::B,
-    });
-
-    let mut m = Match::new(best_of);
-    let mut round_no = 0u32;
-
+    // Outer loop: one pass per match. A clean (non-forfeit) finish opens a
+    // rematch window; if both players agree we loop and replay against the same
+    // opponent with the same settings, reusing this task so the server's
+    // in_match routing stays valid the whole time.
     loop {
-        if m.status() != MatchStatus::InProgress {
+        let match_id = Uuid::new_v4().to_string();
+
+        a.send(ServerMessage::MatchFound {
+            match_id: match_id.clone(),
+            opponent: OpponentInfo {
+                nickname: b.nickname(),
+            },
+            best_of,
+            you_are: PlayerSlot::A,
+        });
+        b.send(ServerMessage::MatchFound {
+            match_id: match_id.clone(),
+            opponent: OpponentInfo {
+                nickname: a.nickname(),
+            },
+            best_of,
+            you_are: PlayerSlot::B,
+        });
+
+        let mut m = Match::new(best_of);
+        let mut round_no = 0u32;
+        let mut forfeited = false;
+
+        loop {
+            if m.status() != MatchStatus::InProgress {
+                break;
+            }
+            round_no += 1;
+            let deadline_ms = PICK_DEADLINE.as_millis() as u32;
+            a.send(ServerMessage::RoundStart {
+                round_no,
+                deadline_ms,
+            });
+            b.send(ServerMessage::RoundStart {
+                round_no,
+                deadline_ms,
+            });
+
+            let (a_move, b_move, forfeit_slot) = collect_round_moves(&mut rx, &a, &b).await;
+
+            // Forfeit handling: someone left.
+            if let Some(slot) = forfeit_slot {
+                let other = match slot {
+                    PlayerSlot::A => &b,
+                    PlayerSlot::B => &a,
+                };
+                other.send(ServerMessage::OpponentLeft);
+                let (score_a, score_b) = match slot {
+                    PlayerSlot::A => (0, m.target()),
+                    PlayerSlot::B => (m.target(), 0),
+                };
+                broadcast_match_end(&a, &b, Some(other_slot(slot)), score_a, score_b, true);
+                forfeited = true;
+                break;
+            }
+
+            let a_mv = a_move.expect("forfeit handled above");
+            let b_mv = b_move.expect("forfeit handled above");
+            let _ = m.play(a_mv, b_mv);
+            let last = m.rounds.last().expect("just played");
+
+            // Send result to both players.
+            let msg = ServerMessage::RoundResult {
+                round_no,
+                a_move: a_mv,
+                b_move: b_mv,
+                outcome: last.outcome.clone(),
+                score_a: m.score_a,
+                score_b: m.score_b,
+            };
+            a.send(msg.clone());
+            b.send(msg);
+
+            // Pause so clients can play the full reveal sequence (countdown
+            // "Rock-Paper-Scissors-SHOOT!" ≈1.4s + verdict savouring ≈1.5s)
+            // before we kick off the next round.
+            tokio::time::sleep(Duration::from_millis(3500)).await;
+        }
+
+        if !forfeited {
+            let winner = match m.status() {
+                MatchStatus::AWon => Some(PlayerSlot::A),
+                MatchStatus::BWon => Some(PlayerSlot::B),
+                MatchStatus::InProgress => None,
+            };
+            broadcast_match_end(&a, &b, winner, m.score_a, m.score_b, false);
+        }
+
+        // A forfeit means a player already left — no rematch. A clean finish
+        // opens the handshake window.
+        if forfeited {
             break;
         }
-        round_no += 1;
-        let deadline_ms = PICK_DEADLINE.as_millis() as u32;
-        a.send(ServerMessage::RoundStart { round_no, deadline_ms });
-        b.send(ServerMessage::RoundStart { round_no, deadline_ms });
-
-        let (a_move, b_move, forfeit_slot) =
-            collect_round_moves(&mut rx, &a, &b).await;
-
-        // Forfeit handling: someone left.
-        if let Some(slot) = forfeit_slot {
-            let other = match slot {
-                PlayerSlot::A => &b,
-                PlayerSlot::B => &a,
-            };
-            other.send(ServerMessage::OpponentLeft);
-            let (score_a, score_b) = match slot {
-                PlayerSlot::A => (0, m.target()),
-                PlayerSlot::B => (m.target(), 0),
-            };
-            broadcast_match_end(
-                &a, &b,
-                Some(other_slot(slot)),
-                score_a, score_b,
-                true,
-            );
-            break;
+        match rematch_window(&a, &b, &mut rx).await {
+            RematchOutcome::Restart => continue,
+            RematchOutcome::Done => break,
         }
-
-        let a_mv = a_move.expect("forfeit handled above");
-        let b_mv = b_move.expect("forfeit handled above");
-        let _ = m.play(a_mv, b_mv);
-        let last = m.rounds.last().expect("just played");
-
-        // Send result to both players.
-        let msg = ServerMessage::RoundResult {
-            round_no,
-            a_move: a_mv,
-            b_move: b_mv,
-            outcome: last.outcome.clone(),
-            score_a: m.score_a,
-            score_b: m.score_b,
-        };
-        a.send(msg.clone());
-        b.send(msg);
-
-        // Pause so clients can play the full reveal sequence (countdown
-        // "Rock-Paper-Scissors-SHOOT!" ≈1.4s + verdict savouring ≈1.5s)
-        // before we kick off the next round.
-        tokio::time::sleep(Duration::from_millis(3500)).await;
-    }
-
-    if m.status() != MatchStatus::InProgress {
-        let winner = match m.status() {
-            MatchStatus::AWon => Some(PlayerSlot::A),
-            MatchStatus::BWon => Some(PlayerSlot::B),
-            MatchStatus::InProgress => None,
-        };
-        broadcast_match_end(&a, &b, winner, m.score_a, m.score_b, false);
     }
 
     a.set_in_match(false);
     b.set_in_match(false);
+}
+
+/// How the post-match rematch window resolved.
+enum RematchOutcome {
+    /// Both players agreed — replay the match in this same task.
+    Restart,
+    /// Declined, left, or timed out — end the task.
+    Done,
+}
+
+/// Waits for the rematch handshake after a clean finish: one side asks (the
+/// other gets `RematchOffered`), who accepts (replay) or declines (the asker
+/// gets `RematchDeclined`). Gives up after 30s.
+async fn rematch_window(
+    a: &Arc<Session>,
+    b: &Arc<Session>,
+    rx: &mut mpsc::UnboundedReceiver<MatchCommand>,
+) -> RematchOutcome {
+    let window = Duration::from_secs(30);
+    let mut offered_by: Option<PlayerSlot> = None;
+    loop {
+        match timeout(window, rx.recv()).await {
+            Err(_) | Ok(None) => return RematchOutcome::Done,
+            Ok(Some(cmd)) => match cmd {
+                MatchCommand::RequestRematch { slot } => match offered_by {
+                    None => {
+                        offered_by = Some(slot);
+                        session_for(other_slot(slot), a, b).send(ServerMessage::RematchOffered);
+                    }
+                    // The other side had already asked → both want it.
+                    Some(prev) if prev != slot => return RematchOutcome::Restart,
+                    Some(_) => {}
+                },
+                MatchCommand::RespondRematch { slot, accept } => {
+                    // Only the offered side answering a pending offer counts.
+                    let asker = match offered_by {
+                        Some(asker) if asker == other_slot(slot) => asker,
+                        _ => continue,
+                    };
+                    if accept {
+                        return RematchOutcome::Restart;
+                    }
+                    session_for(asker, a, b).send(ServerMessage::RematchDeclined);
+                    return RematchOutcome::Done;
+                }
+                MatchCommand::Leave { slot } => {
+                    if let Some(asker) = offered_by {
+                        if asker != slot {
+                            session_for(asker, a, b).send(ServerMessage::RematchDeclined);
+                        }
+                    }
+                    return RematchOutcome::Done;
+                }
+                MatchCommand::Move { .. } => {}
+                MatchCommand::Chat { slot, emoji } => {
+                    session_for(other_slot(slot), a, b)
+                        .send(ServerMessage::Chat { from: slot, emoji });
+                }
+            },
+        }
+    }
+}
+
+fn session_for<'s>(slot: PlayerSlot, a: &'s Arc<Session>, b: &'s Arc<Session>) -> &'s Arc<Session> {
+    match slot {
+        PlayerSlot::A => a,
+        PlayerSlot::B => b,
+    }
 }
 
 async fn collect_round_moves(
@@ -170,6 +263,8 @@ async fn collect_round_moves(
                     };
                     target.send(ServerMessage::Chat { from: slot, emoji });
                 }
+                // The rematch handshake only matters after a match — ignore mid-round.
+                MatchCommand::RequestRematch { .. } | MatchCommand::RespondRematch { .. } => {}
             },
         }
     }
@@ -191,7 +286,12 @@ fn broadcast_match_end(
     score_b: u8,
     forfeit: bool,
 ) {
-    let msg = ServerMessage::MatchEnd { winner, score_a, score_b, forfeit };
+    let msg = ServerMessage::MatchEnd {
+        winner,
+        score_a,
+        score_b,
+        forfeit,
+    };
     a.send(msg.clone());
     b.send(msg);
 }

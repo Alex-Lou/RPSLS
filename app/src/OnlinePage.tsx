@@ -196,6 +196,12 @@ export function OnlinePage() {
   const [lanesEnd, setLanesEnd] = useState<LanesEndData | null>(null);
   const [lanesSubmitted, setLanesSubmitted] = useState(false);
 
+  // Rematch handshake (post-match): we asked / opponent asked / a brief toast.
+  const [rematchPending, setRematchPending] = useState(false);
+  const [rematchOffered, setRematchOffered] = useState(false);
+  const [rematchToast, setRematchToast] = useState<string | null>(null);
+  const rematchTimer = useRef<number | null>(null);
+
   const clientRef = useRef<OnlineClient | null>(null);
 
   // Latest match snapshots, so the WS message handler can write a one-shot
@@ -282,6 +288,7 @@ export function OnlinePage() {
         if (queueStartAt === null) setQueueStartAt(Date.now());
         break;
       case "match_found":
+        clearRematch();
         setM({
           ...emptyMatch(),
           matchId: msg.match_id,
@@ -298,6 +305,17 @@ export function OnlinePage() {
         splashTimer.current = window.setTimeout(() => {
           setShowMatchFoundSplash(false);
         }, 2500);
+        break;
+      case "rematch_offered":
+        setRematchOffered(true);
+        break;
+      case "rematch_declined":
+        clearRematch();
+        setRematchToast(t("online.rematch.declined"));
+        window.setTimeout(() => {
+          setRematchToast(null);
+          backToMenu();
+        }, 1600);
         break;
       case "round_start":
         setM((cur) => ({
@@ -383,6 +401,7 @@ export function OnlinePage() {
         break;
       case "lanes_match_found":
         // Fresh match — wipe any stale state from a previous one.
+        clearRematch();
         setLanesMatch({
           matchId: msg.match_id,
           opponent: msg.opponent.nickname,
@@ -565,6 +584,45 @@ export function OnlinePage() {
     setJoinCode("");
     setQueuePosition(0);
     setErrMsg(null);
+    clearRematch();
+  }
+
+  /* ── Rematch handshake ── */
+  function clearRematch() {
+    if (rematchTimer.current) {
+      window.clearTimeout(rematchTimer.current);
+      rematchTimer.current = null;
+    }
+    setRematchPending(false);
+    setRematchOffered(false);
+  }
+  function requestRematch() {
+    clientRef.current?.send({ type: "request_rematch" });
+    setRematchOffered(false);
+    setRematchPending(true);
+    if (rematchTimer.current) window.clearTimeout(rematchTimer.current);
+    // The server's rematch window is 30s; give a little slack before giving up.
+    rematchTimer.current = window.setTimeout(() => {
+      setRematchPending(false);
+      setRematchToast(t("online.rematch.noResponse"));
+      window.setTimeout(() => {
+        setRematchToast(null);
+        backToMenu();
+      }, 1600);
+    }, 32000);
+  }
+  function acceptRematch() {
+    clientRef.current?.send({ type: "respond_rematch", accept: true });
+    setRematchOffered(false);
+    setRematchPending(true); // now waiting for the fresh match_found
+  }
+  function declineRematch() {
+    clientRef.current?.send({ type: "respond_rematch", accept: false });
+    backToMenu();
+  }
+  function cancelRematchWait() {
+    clientRef.current?.send({ type: "leave_match" });
+    backToMenu();
   }
 
   /* ── Derived ── */
@@ -819,6 +877,7 @@ export function OnlinePage() {
             oppScore={oppScore}
             opponentName={m.opponent}
             onBack={backToMenu}
+            onRematch={requestRematch}
           />
         )}
 
@@ -854,17 +913,7 @@ export function OnlinePage() {
                 setLanesSubmitted(false);
                 backToMenu();
               }}
-              onRematch={() => {
-                // Wipe match state and re-queue with the same win_to.
-                const winTo = lanesMatch.winTo;
-                setLanesMatch(null);
-                setLanesRound(null);
-                setLanesLastResult(null);
-                setLanesEnd(null);
-                setLanesSubmitted(false);
-                clientRef.current?.send({ type: "join_lanes_queue", win_to: winTo });
-                setPhase("queued");
-              }}
+              onRematch={requestRematch}
             />
           </motion.div>
         )}
@@ -887,6 +936,88 @@ export function OnlinePage() {
             >
               Back to menu
             </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Rematch handshake overlays — rendered once, cover classic + lanes. */}
+      <AnimatePresence>
+        {rematchOffered && (
+          <motion.div
+            key="rematch-offer"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-5 bg-black/80 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 12 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 6 }}
+              transition={{ type: "spring", stiffness: 320, damping: 26 }}
+              className="w-full max-w-sm rounded-3xl bg-zinc-950 border border-white/15 p-6 shadow-2xl text-center flex flex-col gap-4"
+            >
+              <div className="text-4xl">🔁</div>
+              <div className="text-lg font-black text-white">{t("online.rematch.offer")}</div>
+              <div className="flex gap-2">
+                <button
+                  onClick={acceptRematch}
+                  className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 font-bold text-white shadow-lg shadow-emerald-500/30 active:scale-[0.98] transition"
+                >
+                  {t("online.rematch.accept")}
+                </button>
+                <button
+                  onClick={declineRematch}
+                  className="flex-1 px-4 py-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 font-semibold text-zinc-200 active:scale-[0.98] transition"
+                >
+                  {t("online.rematch.decline")}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {rematchPending && !rematchOffered && (
+          <motion.div
+            key="rematch-wait"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-5 bg-black/80 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 12 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95 }}
+              className="w-full max-w-sm rounded-3xl bg-zinc-950 border border-white/15 p-6 shadow-2xl text-center flex flex-col gap-4"
+            >
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+                className="text-4xl mx-auto"
+              >
+                🔁
+              </motion.div>
+              <div className="text-base font-bold text-white">{t("online.rematch.waiting")}</div>
+              <button
+                onClick={cancelRematchWait}
+                className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 font-semibold text-zinc-300 text-sm transition"
+              >
+                {t("online.rematch.cancel")}
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {rematchToast && (
+          <motion.div
+            key="rematch-toast"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed left-1/2 -translate-x-1/2 bottom-24 z-[60] px-4 py-2.5 rounded-xl bg-rose-500/90 text-white text-sm font-semibold shadow-lg"
+          >
+            {rematchToast}
           </motion.div>
         )}
       </AnimatePresence>
@@ -1632,6 +1763,7 @@ function MatchEndScene({
   oppScore,
   opponentName,
   onBack,
+  onRematch,
 }: {
   winner: "a" | "b" | null;
   youAre: "a" | "b";
@@ -1640,6 +1772,7 @@ function MatchEndScene({
   oppScore: number;
   opponentName: string;
   onBack: () => void;
+  onRematch?: () => void;
 }) {
   const youWon = winner === youAre;
   const draw = winner === null;
@@ -1701,15 +1834,27 @@ function MatchEndScene({
           <div className="text-3xl font-black text-rose-300 tabular-nums">{oppScore}</div>
         </div>
       </motion.div>
-      <motion.button
+      <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 1 }}
-        onClick={onBack}
-        className="mt-4 px-7 py-3 rounded-xl bg-violet-500/90 hover:bg-violet-500 font-semibold text-white shadow-lg shadow-violet-500/30 active:scale-[0.98] transition"
+        className="mt-4 flex flex-row gap-2 w-full max-w-md px-2"
       >
-        Back to menu
-      </motion.button>
+        {onRematch && (
+          <button
+            onClick={onRematch}
+            className="flex-1 px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 font-bold text-white shadow-lg shadow-emerald-500/30 active:scale-[0.98] transition"
+          >
+            🔁 Rematch
+          </button>
+        )}
+        <button
+          onClick={onBack}
+          className="flex-1 px-5 py-3 rounded-xl bg-violet-500/90 hover:bg-violet-500 font-semibold text-white shadow-lg shadow-violet-500/30 active:scale-[0.98] transition"
+        >
+          Back to menu
+        </button>
+      </motion.div>
     </motion.div>
   );
 }

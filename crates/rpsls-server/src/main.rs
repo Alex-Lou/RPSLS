@@ -84,10 +84,7 @@ async fn health() -> &'static str {
     "ok"
 }
 
-async fn ws_handler(
-    ws: WebSocketUpgrade,
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+async fn ws_handler(ws: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     ws.on_upgrade(move |sock| handle_socket(sock, state))
 }
 
@@ -163,11 +160,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
     info!(%session_id, "socket closed");
 }
 
-async fn handle_client_message(
-    state: &Arc<AppState>,
-    session: &Arc<Session>,
-    msg: ClientMessage,
-) {
+async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, msg: ClientMessage) {
     match msg {
         ClientMessage::Hello { nickname } => {
             let clean = nickname.trim();
@@ -196,7 +189,9 @@ async fn handle_client_message(
             state
                 .in_match
                 .insert(lobby.host.id.clone(), (match_tx.clone(), PlayerSlot::A));
-            state.in_match.insert(session.id.clone(), (match_tx, PlayerSlot::B));
+            state
+                .in_match
+                .insert(session.id.clone(), (match_tx, PlayerSlot::B));
         }
 
         ClientMessage::JoinQueue { best_of } => {
@@ -205,8 +200,12 @@ async fn handle_client_message(
             }
             if let Some(opp) = state.lobbies.join_or_match(session.clone(), best_of).await {
                 let match_tx = start_match(opp.clone(), session.clone(), best_of);
-                state.in_match.insert(opp.id.clone(), (match_tx.clone(), PlayerSlot::A));
-                state.in_match.insert(session.id.clone(), (match_tx, PlayerSlot::B));
+                state
+                    .in_match
+                    .insert(opp.id.clone(), (match_tx.clone(), PlayerSlot::A));
+                state
+                    .in_match
+                    .insert(session.id.clone(), (match_tx, PlayerSlot::B));
             } else {
                 let pos = state.lobbies.queue_position(&session.id).await;
                 session.send(ServerMessage::Queued { position: pos });
@@ -268,6 +267,26 @@ async fn handle_client_message(
             if let Some(entry) = state.in_match.get(&session.id) {
                 let (tx, slot) = entry.value().clone();
                 let _ = tx.send(MatchCommand::Chat { slot, emoji });
+            }
+        }
+
+        ClientMessage::RequestRematch => {
+            if let Some(entry) = state.in_match.get(&session.id) {
+                let (tx, slot) = entry.value().clone();
+                let _ = tx.send(MatchCommand::RequestRematch { slot });
+            } else if let Some(entry) = state.in_lanes.get(&session.id) {
+                let (tx, slot) = entry.value().clone();
+                let _ = tx.send(LanesCommand::RequestRematch { slot });
+            }
+        }
+
+        ClientMessage::RespondRematch { accept } => {
+            if let Some(entry) = state.in_match.get(&session.id) {
+                let (tx, slot) = entry.value().clone();
+                let _ = tx.send(MatchCommand::RespondRematch { slot, accept });
+            } else if let Some(entry) = state.in_lanes.get(&session.id) {
+                let (tx, slot) = entry.value().clone();
+                let _ = tx.send(LanesCommand::RespondRematch { slot, accept });
             }
         }
 
