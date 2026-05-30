@@ -96,6 +96,29 @@ const ALL_CARDS: ModeCardId[] = [
   "training", "casual", "online", "constellation", "ranked", "hotseat",
 ];
 
+// Hand-drawn icons that replace the emoji on each mode tile. Lives in
+// public/MenuIcons (renamed to kebab-case to dodge URL-encoding traps).
+const MODE_ICONS: Record<ModeCardId, string> = {
+  training:      "/MenuIcons/entrainement.png",
+  casual:        "/MenuIcons/detendu.png",
+  ranked:        "/MenuIcons/classe.png",
+  hotseat:       "/MenuIcons/hot-seat.png",
+  online:        "/MenuIcons/en-ligne.png",
+  constellation: "/MenuIcons/constellation.png",
+};
+
+/** Renders the mode tile icon — a PNG from /MenuIcons, sized to match the
+ *  emoji it replaced (~36px, with breathing margins for the tile). */
+function ModeIcon({ mode }: { mode: ModeCardId }) {
+  return (
+    <img
+      src={MODE_ICONS[mode]}
+      alt=""
+      className="shrink-0 w-12 h-12 object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
+    />
+  );
+}
+
 function ModeSelect({
   onStart,
   onStartDaily,
@@ -156,7 +179,7 @@ function ModeSelect({
                   "shadow-lg shadow-violet-500/10"
                 }
               >
-                <span className="text-3xl">🌐</span>
+                <ModeIcon mode="online" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold">{t("mode.online")}</span>
@@ -190,7 +213,7 @@ function ModeSelect({
                   "shadow-lg shadow-fuchsia-500/10"
                 }
               >
-                <span className="text-3xl">🌌</span>
+                <ModeIcon mode="constellation" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold">Constellation</span>
@@ -220,7 +243,7 @@ function ModeSelect({
               onClick={() => { setMode(m); setPendingMode(m); }}
               className="text-left p-4 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition flex items-start gap-3"
             >
-              <span className="text-3xl">{MODE_META[m].emoji}</span>
+              <ModeIcon mode={m} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold">{t("mode." + m)}</span>
