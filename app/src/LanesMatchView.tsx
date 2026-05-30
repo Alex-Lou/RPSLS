@@ -16,7 +16,7 @@ import { Hand, MOVE_ICON, MOVE_PALETTE } from "./icons";
 import { MOVES, type Move } from "./game";
 import { hapticAlert, hapticTap } from "./haptic";
 import { useT } from "./i18n";
-import { MatchScoreBar } from "./sharedMatchUI";
+import { MatchScoreBar, hapticTick, PickShock } from "./sharedMatchUI";
 import type { LanePlay, LaneResult, PlayerSlot } from "./online";
 import {
   detectOutcomeCombo,
@@ -525,26 +525,34 @@ function LaneSlot({
 }
 
 function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void }) {
+  const [shockMove, setShockMove] = useState<Move | null>(null);
   return (
     <div className="grid grid-cols-5 gap-2 sm:gap-3 w-full max-w-md">
       {MOVES.map((mv, i) => {
         const Icon = MOVE_ICON[mv];
         const pal = MOVE_PALETTE[mv];
+        function handleClick() {
+          hapticTick();
+          setShockMove(mv);
+          setTimeout(() => setShockMove((cur) => (cur === mv ? null : cur)), 450);
+          onPickInNextEmpty(mv);
+        }
         return (
           <motion.button
             key={mv}
-            onClick={() => onPickInNextEmpty(mv)}
+            onClick={handleClick}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 * i }}
             whileHover={{ y: -4, scale: 1.04 }}
-            whileTap={{ scale: 0.92 }}
+            whileTap={{ scale: 0.86 }}
             className={
-              "aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 " +
+              "relative aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 " +
               "bg-gradient-to-br " + pal.from + " " + pal.to + " ring-2 " + pal.ring + " " + pal.glow +
               " text-zinc-900 shadow-lg transition"
             }
           >
+            <PickShock show={shockMove === mv} />
             <Icon className="w-6 h-6 sm:w-8 sm:h-8" />
             <span className="text-[9px] uppercase tracking-wider font-bold">{mv}</span>
           </motion.button>
@@ -930,17 +938,19 @@ function LaneRevealCard({
           {identity.glyph} {t(`${idKey}.title`)}
         </span>
       </div>
-      <div className="relative">
-        <Hand move={you} size="sm" emphasis={youWon ? "winner" : oppWon ? "loser" : "default"} />
-        {youFavoured && revealed && (
-          <FavouredBadge winning={youWon} />
-        )}
-      </div>
-      <span className="text-[10px] text-zinc-600 font-black">VS</span>
+      {/* Opponent on top, player on bottom — fighting-game orientation so
+          "your hand" is always on the same line as your picker bar below. */}
       <div className="relative">
         <Hand move={opp} size="sm" emphasis={oppWon ? "winner" : youWon ? "loser" : "default"} />
         {oppFavoured && revealed && (
           <FavouredBadge winning={oppWon} />
+        )}
+      </div>
+      <span className="text-[10px] text-zinc-600 font-black">VS</span>
+      <div className="relative">
+        <Hand move={you} size="sm" emphasis={youWon ? "winner" : oppWon ? "loser" : "default"} />
+        {youFavoured && revealed && (
+          <FavouredBadge winning={youWon} />
         )}
       </div>
       <span className={

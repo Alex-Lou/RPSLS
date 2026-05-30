@@ -31,7 +31,7 @@ import { todayChallenge, type DailyChallenge } from "./daily";
 import { useT } from "./i18n";
 import type { Page } from "./Sidebar";
 import { LocalLanesGame } from "./LocalLanesGame";
-import { CinematicMatchEnd, AmbientFlavor, MatchScoreBar } from "./sharedMatchUI";
+import { CinematicMatchEnd, AmbientFlavor, MatchScoreBar, FloatingMatchBackButton, hapticTick, PickShock } from "./sharedMatchUI";
 
 type View =
   | { kind: "select" }
@@ -873,6 +873,10 @@ function Header({
 
   return (
     <>
+      {/* Quit button docks next to the burger so the score bar can take the
+          full row width on its own line. */}
+      <FloatingMatchBackButton onClick={handleQuitClick} label={t("match.quit")} />
+
       {/* Unified score bar — identical component used by Constellation. */}
       <MatchScoreBar
         youName={labelA}
@@ -884,8 +888,6 @@ function Header({
         youStreak={streakA}
         oppStreak={streakB}
         caption={caption}
-        onBack={handleQuitClick}
-        backLabel={t("match.quit")}
       />
 
       {/* Quit confirmation modal */}
@@ -1097,26 +1099,14 @@ function PickPanel({
           On desktop, single row of 5. */}
       <div className="grid grid-cols-6 sm:grid-cols-5 gap-2 sm:gap-4 w-full max-w-3xl">
         {MOVES.map((m, i) => (
-          <motion.button
+          <PickHandButton
             key={m}
-            onClick={() => handlePick(m)}
+            move={m}
+            label={t("element." + m)}
+            index={i}
             disabled={locked}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.04 * i, duration: 0.25 }}
-            whileHover={{ y: -6, scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className={
-              "col-span-2 sm:col-span-1 " +
-              (i === 3 ? "col-start-2 sm:col-start-auto " : "") +
-              "group rounded-2xl p-2 sm:p-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 disabled:opacity-50 disabled:cursor-not-allowed transition flex flex-col items-center gap-1.5 sm:gap-2.5"
-            }
-          >
-            <Hand move={m} size="lg" />
-            <span className="text-xs sm:text-sm font-medium text-zinc-300 group-hover:text-white">
-              {t("element." + m)}
-            </span>
-          </motion.button>
+            onPick={handlePick}
+          />
         ))}
       </div>
 
@@ -1126,6 +1116,53 @@ function PickPanel({
         <AmbientFlavor />
       </div>
     </motion.div>
+  );
+}
+
+/* ─────────── PickHandButton — one of the 5 RPSLS hand buttons with VFX ─────────── */
+
+function PickHandButton({
+  move, label, index, disabled, onPick,
+}: {
+  move: Move;
+  label: string;
+  index: number;
+  disabled: boolean;
+  onPick: (m: Move) => void;
+}) {
+  const [shock, setShock] = useState(false);
+
+  function handleClick() {
+    if (disabled) return;
+    hapticTick();
+    setShock(true);
+    // Auto-clear so the same button can be re-armed if the parent doesn't
+    // unmount (rare here, but keeps the component resilient).
+    setTimeout(() => setShock(false), 500);
+    onPick(move);
+  }
+
+  return (
+    <motion.button
+      onClick={handleClick}
+      disabled={disabled}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.04 * index, duration: 0.25 }}
+      whileHover={{ y: -6, scale: 1.05 }}
+      whileTap={{ scale: 0.88 }}
+      className={
+        "relative col-span-2 sm:col-span-1 " +
+        (index === 3 ? "col-start-2 sm:col-start-auto " : "") +
+        "group rounded-2xl p-2 sm:p-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 disabled:opacity-50 disabled:cursor-not-allowed transition flex flex-col items-center gap-1.5 sm:gap-2.5"
+      }
+    >
+      <PickShock show={shock} />
+      <Hand move={move} size="lg" />
+      <span className="text-xs sm:text-sm font-medium text-zinc-300 group-hover:text-white">
+        {label}
+      </span>
+    </motion.button>
   );
 }
 
