@@ -14,6 +14,7 @@ import { AboutPage } from "./AboutPage";
 import { ContactPage } from "./ContactPage";
 import { Welcome } from "./Welcome";
 import { FloatingMatchBackButton } from "./sharedMatchUI";
+import { UserHeader } from "./UserHeader";
 import { useT } from "./i18n";
 import { setHapticSettings } from "./haptic";
 
@@ -73,7 +74,7 @@ export default function App() {
   const afterSplash = () => setStage(onboarded ? "shell" : "welcome");
 
   return (
-    <div className="min-h-screen w-full select-none">
+    <div className="h-full w-full select-none overflow-hidden">
       <AnimatePresence mode="wait">
         {stage === "splash" && (
           <Splash key="splash" onDone={afterSplash} />
@@ -87,7 +88,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.4 }}
-            className="flex min-h-screen"
+            className="flex h-full min-h-0"
           >
             <Sidebar page={page} onNavigate={navigateTo} />
             <MobileShell page={page} onNavigate={navigateTo} />
@@ -100,11 +101,22 @@ export default function App() {
                 label={t("nav.backToPlay")}
               />
             )}
-            <div className="flex-1 flex flex-col min-w-0">
+            <div className="flex-1 flex flex-col min-w-0 min-h-0">
               {/* Mobile: clear the floating hamburger (top:max(safe,32)+44h)
                   with a measured gap, and keep content above the Android
                   nav bar via safe-area-bottom. Desktop (md+) has no burger. */}
-              <main className="flex-1 flex flex-col pt-[calc(max(env(safe-area-inset-top),32px)+44px)] pb-[calc(max(env(safe-area-inset-bottom),0px)+56px)] md:pt-0 md:pb-0">
+              {/* Top pad = just enough to clear the 44px floating burger (the
+                  safe-area itself is already paid once by #root, so we don't
+                  double-count it here). Bottom pad = minimal nav-bar clearance
+                  on top of #root's safe-area. Keeps the match using the full
+                  vertical space instead of floating with big top/bottom voids. */}
+              <main className="flex-1 flex flex-col min-h-0 overflow-x-hidden overflow-y-auto pt-12 pb-4 md:pt-0 md:pb-0">
+                {/* Persistent player header — shown on every menu page, never on
+                    a match surface (Play / Online own internal match states). Its
+                    XP bar is where quest/match XP gains visibly land. */}
+                {page !== "play" && page !== "online" && (
+                  <UserHeader onNavigate={navigateTo} />
+                )}
                 <AnimatePresence mode="wait">
                   {page === "play"    && <PageWrap key="play"><PlayPage onNavigate={navigateTo} homeNonce={homeNonce} /></PageWrap>}
                   {page === "online"  && <PageWrap key="online"><OnlinePage /></PageWrap>}
@@ -131,7 +143,7 @@ function PageWrap({ children }: { children: React.ReactNode }) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.25 }}
-      className="flex-1 flex flex-col"
+      className="flex-1 flex flex-col min-h-0"
     >
       {children}
     </motion.div>
@@ -149,7 +161,7 @@ function Splash({ onDone }: { onDone: () => void }) {
   return (
     <motion.div
       onClick={onDone}
-      className="min-h-screen cursor-pointer flex flex-col items-center justify-center gap-6 sm:gap-10 py-10 px-4 text-center"
+      className="h-full cursor-pointer flex flex-col items-center justify-center gap-6 sm:gap-10 py-10 px-4 text-center"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, scale: 1.05 }}

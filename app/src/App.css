@@ -15,9 +15,11 @@ html, body, #root {
   /* Disable touch tap-zoom on mobile */
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-  /* Lock the horizontal axis at the root — no rogue child should ever
-     spawn a horizontal scrollbar; if it tries, it gets clipped instead. */
-  overflow-x: hidden;
+  /* Lock BOTH axes on the document — the app owns its scroll through a
+     single <main> container, so neither <body> nor #root may ever scroll.
+     This is what guarantees "no scroll during a match": a bounded match
+     view clips / compresses to fit instead of pushing the page taller. */
+  overflow: hidden;
   max-width: 100vw;
 }
 

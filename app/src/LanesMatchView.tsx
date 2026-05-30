@@ -177,7 +177,7 @@ export function LanesMatchView({
 
   /* ──────────── Render ──────────── */
   return (
-    <div className="relative flex flex-col gap-2 sm:gap-3 h-full min-h-0 overflow-hidden">
+    <div className="relative flex flex-col gap-2 sm:gap-3 flex-1 min-h-0 overflow-hidden">
       {/* Splash overlay */}
       <AnimatePresence>
         {showSplash && (
@@ -190,18 +190,16 @@ export function LanesMatchView({
         )}
       </AnimatePresence>
 
-      {/* Help "?" on its own tiny row above the score bar, right-aligned,
-          so the score bar takes the full row width below.
-          Wrapper has shrink-0 so it never grows past 28 px. */}
-      <div className="flex justify-end shrink-0">
-        <button
-          onClick={() => setHelpOpen(true)}
-          title={t("lanes.help.button")}
-          className="w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 border border-white/15 text-zinc-300 hover:text-white text-[11px] font-bold transition flex items-center justify-center"
-        >
-          ?
-        </button>
-      </div>
+      {/* Help "?" — floated into the top-right clearance band instead of taking
+          a flow row, so the score bar sits higher and the board gets the height
+          back (fixes the opponent cards clipping under the timer). */}
+      <button
+        onClick={() => setHelpOpen(true)}
+        title={t("lanes.help.button")}
+        className="absolute -top-9 right-0 z-20 w-7 h-7 rounded-full bg-black/50 backdrop-blur hover:bg-white/10 border border-white/15 text-zinc-300 hover:text-white text-[11px] font-bold transition flex items-center justify-center"
+      >
+        ?
+      </button>
 
       <ScoreHeader
         you={nickname}
@@ -426,7 +424,7 @@ function FaceDownLaneCard({ index, pulsing = false }: { index: number; pulsing?:
     <motion.div
       animate={pulsing ? { opacity: [0.55, 1, 0.55] } : { opacity: 1 }}
       transition={pulsing ? { duration: 1.4, repeat: Infinity, delay: index * 0.18 } : undefined}
-      className="aspect-[3/2] w-full rounded-xl border-2 border-dashed border-white/10 bg-black/30
+      className="aspect-square w-full rounded-xl border-2 border-dashed border-white/10 bg-black/30
                  flex items-center justify-center"
     >
       <span className="text-xl sm:text-2xl text-zinc-700 font-black">?</span>
@@ -453,10 +451,13 @@ function PickStage({
   // Combo preview — only triggers once all 3 picks are placed, before lock.
   const preview = allFilled ? detectPlayerCombo(picks as Move[]) : null;
   return (
-    <div className="w-full flex flex-col items-center gap-2.5">
-      {/* Timer */}
+    <div className="w-full h-full flex flex-col items-center gap-2 sm:gap-3">
+      {/* Timer — pinned top */}
       <TimerBar startedAt={startedAt} durationMs={deadlineMs} />
 
+      {/* Table is the ONLY part allowed to compress, so the picker + LOCK
+          button below it stay reachable on every phone height. */}
+      <div className="flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden">
       <GameTable
         opponentName={opponentName}
         youName={youName}
@@ -479,8 +480,9 @@ function PickStage({
           </div>
         }
       />
+      </div>
 
-      <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 text-center px-4">
+      <div className="shrink-0 text-[10px] uppercase tracking-[0.25em] text-zinc-500 text-center px-4">
         {t("lanes.pickInstruction")}
       </div>
 
@@ -521,7 +523,7 @@ function PickStage({
         onClick={onSubmit}
         disabled={!allFilled}
         className={
-          "mt-2 px-7 py-3 rounded-2xl font-bold text-white transition " +
+          "shrink-0 mt-1 px-7 py-3 rounded-2xl font-bold text-white transition " +
           (allFilled
             ? "bg-gradient-to-r from-violet-500 via-fuchsia-500 to-teal-400 shadow-lg shadow-violet-500/30 hover:scale-[1.02]"
             : "bg-white/5 text-zinc-500 cursor-not-allowed")
@@ -573,7 +575,7 @@ function LaneSlot({
         onClick={onClear}
         disabled={!pick}
         className={
-          "aspect-[3/2] w-full rounded-xl border-2 transition flex items-center justify-center relative ring-2 " +
+          "aspect-square w-full rounded-xl border-2 transition flex items-center justify-center relative ring-2 " +
           (favoured ? ringFav : ringIdle) + " " +
           (pick
             ? "border-emerald-400/40 bg-emerald-500/10 hover:bg-rose-500/10 hover:border-rose-400/50"
@@ -765,8 +767,9 @@ function LockedStage({
     <motion.div
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="w-full flex flex-col items-center gap-4"
+      className="w-full h-full flex flex-col items-center gap-2 sm:gap-4"
     >
+      <div className="flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden">
       <GameTable
         opponentName={opponentName}
         youName={youName}
@@ -796,7 +799,8 @@ function LockedStage({
           </div>
         }
       />
-      <div className="text-sm text-zinc-300 font-medium">{t("lanes.waitingOpponent")}</div>
+      </div>
+      <div className="shrink-0 text-sm text-zinc-300 font-medium">{t("lanes.waitingOpponent")}</div>
     </motion.div>
   );
 }
@@ -897,8 +901,9 @@ function RevealStage({
     <motion.div
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="w-full flex flex-col items-center gap-3"
+      className="w-full h-full flex flex-col items-center gap-2 sm:gap-3"
     >
+      <div className="flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden">
       <GameTable
         opponentName={opponentName}
         youName={youName}
@@ -935,6 +940,7 @@ function RevealStage({
           </div>
         }
       />
+      </div>
 
       {/* Verdict line — appears once all 3 lanes have dropped. */}
       <AnimatePresence>
@@ -1098,7 +1104,7 @@ function SideLaneCard({
         : { opacity: 0.3, scale: 0.85, rotateY: 90 }}
       transition={{ type: "spring", stiffness: 280, damping: 22 }}
       className={
-        "aspect-[3/2] rounded-xl border-2 ring-2 px-1 py-1 flex flex-col items-center justify-center gap-0.5 " +
+        "aspect-square rounded-xl border-2 ring-2 px-1 py-1 flex flex-col items-center justify-center gap-0.5 " +
         ring + " " + border + " " + bg
       }
       style={{ transformPerspective: 800 }}

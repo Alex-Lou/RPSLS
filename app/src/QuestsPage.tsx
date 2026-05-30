@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store";
 import { QUESTS, questState, type QuestDef } from "./quests";
@@ -115,11 +116,12 @@ function QuestRow({
   const t = useT();
   const pct = (s.value / s.target) * 100;
   const dim = s.claimed;
+  const [burst, setBurst] = useState(false);
 
   return (
     <div
       className={
-        "rounded-2xl border p-4 flex items-center gap-4 transition " +
+        "relative rounded-2xl border p-4 flex items-center gap-4 transition " +
         (s.claimed
           ? "bg-white/[0.02] border-white/5 opacity-60"
           : s.complete
@@ -184,7 +186,7 @@ function QuestRow({
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={onClaim}
+            onClick={() => { setBurst(true); onClaim(); }}
             className="px-4 py-2 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-zinc-900 font-bold text-sm shadow-lg shadow-amber-900/40"
           >
             {t("quests.btn.claim")}
@@ -193,6 +195,23 @@ function QuestRow({
           <span className="text-zinc-600 text-xs">{t("quests.status.progress")}</span>
         )}
       </div>
+
+      {/* XP burst on claim — floats up from the action area and survives the
+          button → ✓ flip (it lives on the row, not inside the button). The same
+          gain also lands in the global header's XP bar. */}
+      <AnimatePresence>
+        {burst && (
+          <motion.span
+            initial={{ opacity: 0, y: 0, scale: 0.6 }}
+            animate={{ opacity: [0, 1, 1, 0], y: -36, scale: 1.1 }}
+            transition={{ duration: 1.2, ease: "easeOut" }}
+            onAnimationComplete={() => setBurst(false)}
+            className="absolute right-4 top-2 whitespace-nowrap text-emerald-300 font-black text-sm drop-shadow-[0_2px_6px_rgba(0,0,0,0.7)] pointer-events-none z-10"
+          >
+            +{q.xpReward} XP ✨
+          </motion.span>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

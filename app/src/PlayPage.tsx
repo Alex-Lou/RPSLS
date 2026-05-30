@@ -27,16 +27,17 @@ import {
   REWARDS,
 } from "./types";
 import { THEMES } from "./theme";
-import { todayChallenge, type DailyChallenge } from "./daily";
+import { todayDailyQuests, matchesToday, todayDateKey, type DailyChallenge, type DailyQuestDef } from "./daily";
 import { useT } from "./i18n";
 import type { Page } from "./Sidebar";
+import { UserHeader } from "./UserHeader";
 import { LocalLanesGame } from "./LocalLanesGame";
 import { CinematicMatchEnd, AmbientFlavor, MatchScoreBar, FloatingMatchBackButton, hapticTick, PickShock } from "./sharedMatchUI";
 import { vibrate, hapticWin, hapticLoss, hapticTap } from "./haptic";
 
 type View =
   | { kind: "select" }
-  | { kind: "game"; mode: GameMode; bestOf: number; daily?: DailyChallenge }
+  | { kind: "game"; mode: GameMode; bestOf: number; daily?: DailyChallenge; questCtx?: { title: string; reward: number } }
   | { kind: "lanes_cpu"; winTo: number };
 
 export function PlayPage({
@@ -68,15 +69,15 @@ export function PlayPage({
   }, [view.kind]);
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-3 sm:px-8 pt-0 pb-2 sm:py-4 flex-1 flex flex-col">
+    <div className="w-full max-w-6xl mx-auto px-3 sm:px-8 pt-0 pb-2 sm:py-4 flex-1 flex flex-col min-h-0">
+      {/* Player header on the home / mode-select too (Alex likes it there) —
+          but never once a match is running (view !== "select"). */}
+      {view.kind === "select" && <UserHeader onNavigate={onNavigate ?? (() => {})} />}
       <AnimatePresence mode="wait">
         {view.kind === "select" && (
           <ModeSelect
             key="select"
-            onStart={(mode, bestOf) => setView({ kind: "game", mode, bestOf })}
-            onStartDaily={(daily) =>
-              setView({ kind: "game", mode: daily.mode, bestOf: daily.bestOf, daily })
-            }
+            onStart={(mode, bestOf, questCtx) => setView({ kind: "game", mode, bestOf, questCtx })}
             onGoOnline={onNavigate ? () => onNavigate("online") : undefined}
             onGoConstellation={(winTo) => setView({ kind: "lanes_cpu", winTo })}
           />
@@ -87,6 +88,7 @@ export function PlayPage({
             mode={view.mode}
             bestOf={view.bestOf}
             daily={view.daily}
+            questCtx={view.questCtx}
             onQuit={() => setView({ kind: "select" })}
           />
         )}
@@ -97,7 +99,7 @@ export function PlayPage({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.25 }}
-            className="flex-1 flex flex-col"
+            className="flex-1 flex flex-col min-h-0"
           >
             <LocalLanesGame
               winTo={view.winTo}
@@ -147,23 +149,17 @@ function ModeIcon({ mode }: { mode: ModeCardId }) {
 
 function ModeSelect({
   onStart,
-  onStartDaily,
   onGoOnline,
   onGoConstellation,
 }: {
-  onStart: (mode: GameMode, bestOf: number) => void;
-  onStartDaily: (daily: DailyChallenge) => void;
+  onStart: (mode: GameMode, bestOf: number, questCtx?: { title: string; reward: number }) => void;
   onGoOnline?: () => void;
   onGoConstellation?: (winTo: number) => void;
 }) {
   const [mode, setMode] = useState<GameMode>("casual");
   const [bestOf, setBestOf] = useState(3);
   const [pendingMode, setPendingMode] = useState<GameMode | null>(null);
-  const completedDailies = useStore((s) => s.player.completedDailies);
   const t = useT();
-
-  const daily = todayChallenge();
-  const dailyDone = completedDailies.includes(daily.date);
 
   return (
     <motion.div
@@ -171,7 +167,7 @@ function ModeSelect({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -16 }}
       transition={{ duration: 0.3 }}
-      className="flex flex-col gap-2 sm:gap-5"
+      className="flex flex-col gap-3 sm:gap-5 flex-1 justify-center py-1"
     >
       <div className="text-center">
         <h1 className="text-2xl sm:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-violet-400 via-fuchsia-400 to-teal-300 bg-clip-text text-transparent leading-tight">
@@ -182,10 +178,10 @@ function ModeSelect({
         </p>
       </div>
 
-      <DailyBanner daily={daily} done={dailyDone} onStart={() => onStartDaily(daily)} />
+      <DailyChallengesPanel onStart={onStart} onGoOnline={onGoOnline} onGoConstellation={onGoConstellation} />
 
       {/* Mode tiles — 2 columns even on mobile so the 6 tiles fit one viewport. */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+      <div className="grid grid-cols-2 gap-3">
         {ALL_CARDS.map((m, i) => {
           if (m === "online") {
             return (
@@ -199,7 +195,7 @@ function ModeSelect({
                 onClick={() => onGoOnline?.()}
                 disabled={!onGoOnline}
                 className={
-                  "text-left p-2.5 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1.5 relative overflow-hidden min-h-[110px] " +
+                  "text-left p-2.5 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1.5 relative overflow-hidden min-h-[124px] " +
                   "border-violet-400/30 bg-gradient-to-br from-violet-500/15 via-fuchsia-500/10 to-cyan-500/15 " +
                   "hover:from-violet-500/25 hover:via-fuchsia-500/20 hover:to-cyan-500/25 hover:border-violet-400/60 " +
                   "shadow-lg shadow-violet-500/10"
@@ -230,7 +226,7 @@ function ModeSelect({
                 onClick={() => onGoConstellation?.(2)}
                 disabled={!onGoConstellation}
                 className={
-                  "text-left p-2.5 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1.5 relative overflow-hidden min-h-[110px] " +
+                  "text-left p-2.5 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1.5 relative overflow-hidden min-h-[124px] " +
                   "border-fuchsia-400/30 bg-gradient-to-br from-fuchsia-500/15 via-violet-500/10 to-amber-500/15 " +
                   "hover:from-fuchsia-500/25 hover:via-violet-500/20 hover:to-amber-500/25 hover:border-fuchsia-400/60 " +
                   "shadow-lg shadow-fuchsia-500/10"
@@ -261,7 +257,7 @@ function ModeSelect({
               whileHover={{ y: -3 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => { setMode(m); setPendingMode(m); }}
-              className="text-left p-2.5 sm:p-4 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition flex flex-col items-start gap-1.5 min-h-[110px]"
+              className="text-left p-2.5 sm:p-4 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition flex flex-col items-start gap-1.5 min-h-[124px]"
             >
               <ModeIcon mode={m} />
               <div className="min-w-0 w-full">
@@ -403,45 +399,171 @@ function ModeConfirmModal({
 
 /* ─────────── Daily Banner ─────────── */
 
-function DailyBanner({
-  daily, done, onStart,
-}: { daily: DailyChallenge; done: boolean; onStart: () => void }) {
+/**
+ * Daily challenges (#17) — a button showing today's claim count that opens a
+ * modal listing the 3 daily objectives. Each one shows live progress (read from
+ * today's recorded matches), a "Claim" button once complete (XP lands in the
+ * header bar) and a "Play" button that routes to the right mode / matchmaking.
+ */
+function DailyChallengesPanel({
+  onStart, onGoOnline, onGoConstellation,
+}: {
+  onStart: (mode: GameMode, bestOf: number, questCtx?: { title: string; reward: number }) => void;
+  onGoOnline?: () => void;
+  onGoConstellation?: (winTo: number) => void;
+}) {
   const t = useT();
+  const history = useStore((s) => s.history);
+  const player = useStore((s) => s.player);
+  const claimDailyQuest = useStore((s) => s.claimDailyQuest);
+  const [open, setOpen] = useState(false);
+
+  const quests = useMemo(() => todayDailyQuests(), []);
+  const today = useMemo(() => matchesToday(history), [history]);
+  const todayKey = todayDateKey();
+  const claimedIds =
+    player.dailyClaims && player.dailyClaims.date === todayKey ? player.dailyClaims.ids : [];
+
+  const states = quests.map((q) => {
+    const raw = q.progress(today, player);
+    return {
+      q,
+      value: Math.min(raw, q.target),
+      complete: raw >= q.target,
+      claimed: claimedIds.includes(q.id),
+    };
+  });
+  const claimable = states.filter((s) => s.complete && !s.claimed).length;
+  const claimedCount = states.filter((s) => s.claimed).length;
+
+  function play(q: DailyQuestDef) {
+    setOpen(false);
+    const r = q.route;
+    if (r.kind === "mode") onStart(r.mode, r.bestOf, { title: t(`daily.${q.id}.title`), reward: q.xpReward });
+    else if (r.kind === "constellation") onGoConstellation?.(2);
+    else onGoOnline?.();
+  }
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className={
-        "rounded-xl p-2.5 sm:p-5 border flex flex-row items-center gap-2 sm:gap-5 " +
-        (done
-          ? "bg-emerald-950/30 border-emerald-700/40"
-          : "bg-gradient-to-br from-amber-500/20 via-orange-500/10 to-transparent border-amber-400/50 shadow-md shadow-amber-900/20")
-      }
-    >
-      <div className="text-xl sm:text-3xl shrink-0">{done ? "✅" : "🎯"}</div>
-      <div className="flex-1 min-w-0">
-        <div className="text-[9px] sm:text-[10px] uppercase tracking-widest font-bold text-amber-300 leading-tight">
-          {t("play.daily.title")}
+    <>
+      <motion.button
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        whileTap={{ scale: 0.99 }}
+        onClick={() => setOpen(true)}
+        className="rounded-xl p-2.5 sm:p-4 border flex items-center gap-3 text-left bg-gradient-to-br from-amber-500/20 via-orange-500/10 to-transparent border-amber-400/50 shadow-md shadow-amber-900/20"
+      >
+        <div className="text-xl sm:text-3xl shrink-0">🎯</div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[9px] sm:text-[10px] uppercase tracking-widest font-bold text-amber-300 leading-tight">
+            {t("play.daily.title")}
+          </div>
+          <div className="text-[12px] sm:text-base font-bold leading-tight">
+            {claimedCount}/{quests.length} ✓
+          </div>
         </div>
-        <div className="text-[11px] sm:text-lg font-bold leading-tight truncate">
-          {AI_MOOD_META[daily.mood].emoji} {t("mode." + daily.mode)} · {t("history.bo", { n: daily.bestOf })}
-        </div>
-        <div className="text-[10px] sm:text-xs text-amber-200/80 leading-tight">
-          {done ? t("play.daily.done") : t("play.daily.bonus", { p: Math.round(daily.xpBonus * 100) })}
-        </div>
-      </div>
-      {!done && (
-        <motion.button
-          whileHover={{ y: -2 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={onStart}
-          className="px-3 py-1.5 sm:px-5 sm:py-2.5 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 text-zinc-900 font-bold text-xs sm:text-sm shadow-md shadow-amber-900/40 shrink-0"
-        >
-          {t("play.daily.start")}
-        </motion.button>
-      )}
-    </motion.div>
+        {claimable > 0 ? (
+          <span className="shrink-0 px-2 py-1 rounded-full bg-amber-400 text-zinc-900 text-[10px] sm:text-xs font-black">
+            {t("quests.toClaim", { n: claimable })}
+          </span>
+        ) : (
+          <span className="shrink-0 text-amber-300 text-lg">›</span>
+        )}
+      </motion.button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.92, y: 12 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 6 }}
+              transition={{ type: "spring", stiffness: 320, damping: 26 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md max-h-[85vh] overflow-y-auto bg-zinc-950 border border-white/15 rounded-3xl p-5 shadow-2xl flex flex-col gap-3"
+            >
+              <div className="flex items-baseline justify-between">
+                <h2 className="text-xl font-black tracking-tight bg-gradient-to-br from-amber-300 to-orange-400 bg-clip-text text-transparent">
+                  🎯 {t("play.daily.title")}
+                </h2>
+                <button onClick={() => setOpen(false)} className="text-zinc-400 hover:text-white text-xl leading-none px-1">✕</button>
+              </div>
+
+              {states.map(({ q, value, complete, claimed }) => {
+                const pct = (value / q.target) * 100;
+                return (
+                  <div
+                    key={q.id}
+                    className={
+                      "rounded-2xl border p-3 flex items-center gap-3 " +
+                      (claimed
+                        ? "bg-white/[0.02] border-white/5 opacity-60"
+                        : complete
+                        ? "bg-amber-500/10 border-amber-400/40"
+                        : "bg-white/5 border-white/10")
+                    }
+                  >
+                    <div className="text-2xl shrink-0">{q.emoji}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-sm">{t(`daily.${q.id}.title`)}</span>
+                        <span className="text-[10px] text-emerald-300 bg-emerald-500/15 px-1.5 py-0.5 rounded-full font-bold">
+                          +{q.xpReward} XP
+                        </span>
+                        {q.scope === "online" && (
+                          <span className="text-[9px] text-cyan-300 bg-cyan-500/15 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                            online
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-zinc-400 mt-0.5">{t(`daily.${q.id}.desc`)}</p>
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <span className="text-[11px] text-zinc-400 tabular-nums whitespace-nowrap">
+                          {value}/{q.target}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="shrink-0">
+                      {claimed ? (
+                        <span className="text-emerald-400 text-xl">✓</span>
+                      ) : complete ? (
+                        <motion.button
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => claimDailyQuest(q.id, q.xpReward)}
+                          className="px-3 py-2 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-zinc-900 font-bold text-xs shadow-lg shadow-amber-900/40"
+                        >
+                          {t("quests.btn.claim")}
+                        </motion.button>
+                      ) : (
+                        <button
+                          onClick={() => play(q)}
+                          className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-white font-bold text-xs transition"
+                        >
+                          {t("play.daily.start")}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
@@ -468,11 +590,13 @@ function Game({
   mode,
   bestOf,
   daily,
+  questCtx,
   onQuit,
 }: {
   mode: GameMode;
   bestOf: number;
   daily?: DailyChallenge;
+  questCtx?: { title: string; reward: number };
   onQuit: () => void;
 }) {
   const recordMatch = useStore((s) => s.recordMatch);
@@ -682,8 +806,18 @@ function Game({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -16 }}
       transition={{ duration: 0.3 }}
-      className="flex flex-col gap-2 sm:gap-4 flex-1 min-h-0 overflow-hidden"
+      className="flex flex-col gap-3 sm:gap-4 flex-1 min-h-0 overflow-hidden"
     >
+      {/* Daily-challenge context — shows *why* this match was started (from a
+          challenge) and the reward at stake, so the point is visible in-game. */}
+      {questCtx && (
+        <div className="shrink-0 flex items-center gap-2 rounded-xl px-3 py-1.5 bg-amber-500/15 border border-amber-400/40 text-amber-200 text-xs font-bold">
+          <span>🎯</span>
+          <span className="flex-1 min-w-0 truncate">{questCtx.title}</span>
+          <span className="shrink-0 text-emerald-300">+{questCtx.reward} XP</span>
+        </div>
+      )}
+
       {/* Header OUTSIDE the board — never overlaps */}
       <Header
         mode={mode}
@@ -699,7 +833,7 @@ function Game({
       />
 
       {/* Board: pad as canvas, takes ALL remaining vertical space */}
-      <div className="relative flex-1 min-h-[400px] rounded-2xl sm:rounded-3xl overflow-hidden">
+      <div className="relative flex-1 min-h-0 rounded-2xl sm:rounded-3xl overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
           <BattlePad padId={padId} className="w-full h-full opacity-90" />
           <div
@@ -1046,7 +1180,7 @@ function PickPanel({
         : { duration: 0.25 }
       }
       className={
-        "relative bg-zinc-950/30 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl ring-1 px-3 py-4 sm:p-12 border flex flex-col items-center gap-3 sm:gap-6 w-full transition-colors " +
+        "relative bg-zinc-950/30 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl ring-1 px-3 py-3 sm:p-12 border flex flex-col items-center gap-2 sm:gap-6 w-full transition-colors " +
         (urgent
           ? "ring-rose-500/50 border-rose-500/40"
           : "ring-white/10 border-white/10")
@@ -1143,8 +1277,9 @@ function PickPanel({
       </div>
 
       {/* Atmosphere — same rotating geek one-liners as in Constellation,
-          so every mode breathes with the same vibe. */}
-      <div className="mt-1">
+          so every mode breathes with the same vibe. Hidden on mobile so the
+          panel stays short enough to fit the board without clipping the title. */}
+      <div className="mt-1 hidden sm:block">
         <AmbientFlavor />
       </div>
     </motion.div>

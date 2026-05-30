@@ -161,7 +161,7 @@ export function OnlinePage() {
   const t = useT();
   const player = useStore((s) => s.player);
   const serverConfig = useStore((s) => s.serverConfig);
-  const setServerConfig = useStore((s) => s.setServerConfig);
+  const recordMatch = useStore((s) => s.recordMatch);
 
   // Mode toggle: classic 1v1 (current) vs Constellation Lanes (Phase 1).
   // Once a user picks a mode in the menu, the rest of the flow follows.
@@ -177,7 +177,6 @@ export function OnlinePage() {
   const [queueStartAt, setQueueStartAt] = useState<number | null>(null);
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [m, setM] = useState<MatchState>(emptyMatch());
-  const [serverPickerOpen, setServerPickerOpen] = useState(false);
 
   // Cinematic state — keeps the experience from feeling rushed.
   const [showMatchFoundSplash, setShowMatchFoundSplash] = useState(false);
@@ -199,8 +198,17 @@ export function OnlinePage() {
 
   const clientRef = useRef<OnlineClient | null>(null);
 
-  const activeServerUrl =
-    serverConfig.mode === "cloud" ? serverConfig.cloudUrl : serverConfig.lanUrl;
+  // Latest match snapshots, so the WS message handler can write a one-shot
+  // history entry at match end without trusting its stale closure (and without
+  // recording inside a state updater, which StrictMode double-invokes).
+  const mRef = useRef(m);
+  useEffect(() => { mRef.current = m; }, [m]);
+  const lanesMatchRef = useRef(lanesMatch);
+  useEffect(() => { lanesMatchRef.current = lanesMatch; }, [lanesMatch]);
+
+  // Online is cloud-only now — the public Render instance. No LAN, no manual
+  // URLs: the connection target is always the default cloud server.
+  const activeServerUrl = serverConfig.cloudUrl;
   const { status: connStatus, latencyMs, refresh: refreshStatus } =
     useServerStatus(activeServerUrl);
 
@@ -211,7 +219,7 @@ export function OnlinePage() {
     }
     // Disconnect any previous closed client.
     clientRef.current?.disconnect();
-    const url = serverConfig.mode === "cloud" ? serverConfig.cloudUrl : serverConfig.lanUrl;
+    const url = serverConfig.cloudUrl;
     if (!url.trim()) {
       return Promise.reject(
         new Error(
@@ -333,7 +341,24 @@ export function OnlinePage() {
           });
         }, 1400);
         break;
-      case "match_end":
+      case "match_end": {
+        // Log this online 1v1 to history with the real opponent's nickname.
+        const prev = mRef.current;
+        const outcome = msg.winner == null ? "draw" : msg.winner === prev.youAre ? "win" : "loss";
+        recordMatch({
+          id: `${prev.matchId || "online"}-${Date.now()}`,
+          mode: "online",
+          bestOf: prev.bestOf,
+          opponent: { kind: "human", nickname: prev.opponent || "Anonymous" },
+          scorePlayer:   prev.youAre === "a" ? msg.score_a : msg.score_b,
+          scoreOpponent: prev.youAre === "a" ? msg.score_b : msg.score_a,
+          outcome,
+          rounds: [],
+          xpDelta: 0,
+          lpDelta: 0,
+          timestamp: Date.now(),
+          forfeit: msg.forfeit && outcome === "loss",
+        });
         setM((cur) => {
           const won = msg.winner === cur.youAre;
           if (won) hapticMatchWin();
@@ -348,6 +373,7 @@ export function OnlinePage() {
         });
         setPhase("match_end");
         break;
+      }
       case "opponent_left":
         // Wait for match_end which arrives right after.
         break;
@@ -413,6 +439,29 @@ export function OnlinePage() {
       }
 
       case "lanes_match_end": {
+        // Log this online Constellation duel to history (simplified entry — the
+        // 3-lane rounds don't map to the single-move round log).
+        const lm = lanesMatchRef.current;
+        if (lm) {
+          const youA = lm.youAre === "a";
+          const winsYou = youA ? msg.round_wins_a : msg.round_wins_b;
+          const winsOpp = youA ? msg.round_wins_b : msg.round_wins_a;
+          const outcome = msg.winner == null ? "draw" : msg.winner === lm.youAre ? "win" : "loss";
+          recordMatch({
+            id: `${lm.matchId || "lanes"}-${Date.now()}`,
+            mode: "constellation",
+            bestOf: lm.winTo,
+            opponent: { kind: "human", nickname: lm.opponent || "Anonymous" },
+            scorePlayer: winsYou,
+            scoreOpponent: winsOpp,
+            outcome,
+            rounds: [],
+            xpDelta: 0,
+            lpDelta: 0,
+            timestamp: Date.now(),
+            forfeit: msg.forfeit && outcome === "loss",
+          });
+        }
         setLanesMatch((cur) => {
           if (!cur) return cur;
           const youA = cur.youAre === "a";
@@ -440,20 +489,12 @@ export function OnlinePage() {
   }
 
   /* ── Actions ── */
-  function activeUrl(): string {
-    return serverConfig.mode === "cloud" ? serverConfig.cloudUrl : serverConfig.lanUrl;
-  }
-
   function handleConnectError(e: unknown) {
-    const url = activeUrl();
     const reason = e instanceof Error ? e.message : String(e);
     setErrMsg(
-      `Couldn't reach ${normalizeServerUrl(url) || "(no URL set)"}.\n${reason}\n\n` +
-        `→ Check that the server is running and the address is correct.\n` +
-        `→ On the host PC: \`pnpm server\` (from app/) or run the rpsls-server binary.\n` +
-        `→ From another device on the same Wi-Fi: use the host's local IP, not localhost.`
+      `Couldn't reach the server.\n${reason}\n\n` +
+        `→ The free cloud instance may be asleep — the first try can take up to ~90s to wake it. Give it a moment and retry.`
     );
-    setServerPickerOpen(true);
     setPhase("error");
   }
 
@@ -549,7 +590,7 @@ export function OnlinePage() {
 
   /* ── Render ── */
   return (
-    <div className="px-4 pt-2 pb-10 max-w-3xl w-full mx-auto flex-1 flex flex-col">
+    <div className="px-4 pt-2 pb-10 max-w-3xl w-full mx-auto flex-1 flex flex-col min-h-0">
       {/* Burger clearance is handled once by <main> in App.tsx now. */}
       {/* Cinematic match-found splash overlay */}
       <AnimatePresence>
@@ -568,20 +609,11 @@ export function OnlinePage() {
           <h1 className="text-3xl font-black tracking-tight">🌐 {t("nav.online")}</h1>
           <span className="text-xs text-zinc-500">Beta · {player.nickname}</span>
         </div>
-        {phase === "menu" && (
-          <button
-            onClick={() => setServerPickerOpen((v) => !v)}
-            className="text-xs px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 transition"
-            title="Server settings"
-          >
-            ⚙️ {serverConfig.mode === "cloud" ? "Cloud" : "LAN"}
-          </button>
-        )}
       </div>
 
       {/* Live server status badge */}
       <ServerStatusBadge
-        mode={serverConfig.mode}
+        mode="cloud"
         url={activeServerUrl}
         status={connStatus}
         latencyMs={latencyMs}
@@ -611,25 +643,6 @@ export function OnlinePage() {
         )}
       </AnimatePresence>
 
-      {/* Server picker — collapsible */}
-      <AnimatePresence>
-        {serverPickerOpen && phase === "menu" && (
-          <motion.div
-            key="srv"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
-          >
-            <ServerPicker
-              cfg={serverConfig}
-              onChange={setServerConfig}
-              onClose={() => setServerPickerOpen(false)}
-              onRefreshStatus={refreshStatus}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <AnimatePresence mode="wait">
         {phase === "menu" && (
@@ -815,6 +828,7 @@ export function OnlinePage() {
             initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
+            className="flex-1 flex flex-col min-h-0"
           >
             <LanesMatchView
               nickname={player.nickname}
@@ -952,181 +966,6 @@ function ServerStatusBadge({
   );
 }
 
-/* ──────────── Server picker ──────────── */
-
-function ServerPicker({
-  cfg,
-  onChange,
-  onClose,
-  onRefreshStatus,
-}: {
-  cfg: { mode: "cloud" | "lan"; cloudUrl: string; lanUrl: string };
-  onChange: (p: Partial<{ mode: "cloud" | "lan"; cloudUrl: string; lanUrl: string }>) => void;
-  onClose: () => void;
-  onRefreshStatus?: () => void;
-}) {
-  const [lan, setLan] = useState(cfg.lanUrl);
-  const [cloud, setCloud] = useState(cfg.cloudUrl);
-  const [testStatus, setTestStatus] = useState<"" | "testing" | "ok" | "fail">("");
-  const [testMsg, setTestMsg] = useState<string>("");
-  const previewLan = normalizeServerUrl(lan);
-  const previewCloud = normalizeServerUrl(cloud);
-
-  function testConnection() {
-    setTestStatus("testing");
-    setTestMsg("");
-    const wsUrlRaw = cfg.mode === "lan" ? previewLan : previewCloud;
-    const wsUrl = wsUrlRaw.replace(/\/+$/, "") + "/ws";
-    let ws: WebSocket;
-    try {
-      ws = new WebSocket(wsUrl);
-    } catch (e) {
-      setTestStatus("fail");
-      setTestMsg(`Invalid URL: ${e instanceof Error ? e.message : String(e)}`);
-      return;
-    }
-    const t0 = performance.now();
-    const t = setTimeout(() => {
-      try { ws.close(); } catch { /* ignore */ }
-      setTestStatus("fail");
-      setTestMsg(
-        cfg.mode === "cloud"
-          ? "No response in 90s. The free instance may be down."
-          : "No response in 90s. Is the server running? Same Wi-Fi? Firewall?"
-      );
-    }, 90_000);
-    ws.onopen = () => {
-      clearTimeout(t);
-      const dt = Math.round(performance.now() - t0);
-      try { ws.close(); } catch { /* ignore */ }
-      setTestStatus("ok");
-      setTestMsg(`Server reachable (WebSocket opened in ${dt} ms).`);
-      onRefreshStatus?.();
-    };
-    ws.onerror = () => {
-      clearTimeout(t);
-      setTestStatus("fail");
-      setTestMsg(
-        "Cannot open WebSocket — server unreachable, wrong URL, or firewall."
-      );
-    };
-  }
-
-  return (
-    <div className="rounded-2xl bg-black/40 border border-white/10 p-4 mb-4">
-      <div className="flex gap-2 mb-4">
-        <button
-          onClick={() => onChange({ mode: "lan" })}
-          className={
-            "flex-1 py-2 rounded-xl font-semibold transition " +
-            (cfg.mode === "lan"
-              ? "bg-emerald-500/90 text-white"
-              : "bg-white/5 hover:bg-white/10 text-zinc-300")
-          }
-        >
-          📶 Local network
-        </button>
-        <button
-          onClick={() => onChange({ mode: "cloud" })}
-          className={
-            "flex-1 py-2 rounded-xl font-semibold transition " +
-            (cfg.mode === "cloud"
-              ? "bg-violet-500/90 text-white"
-              : "bg-white/5 hover:bg-white/10 text-zinc-300")
-          }
-        >
-          ☁️ Cloud
-        </button>
-      </div>
-
-      {cfg.mode === "lan" ? (
-        <div className="flex flex-col gap-2">
-          <label className="text-xs uppercase tracking-wider text-zinc-500">
-            Host's address (LAN)
-          </label>
-          <input
-            value={lan}
-            onChange={(e) => setLan(e.target.value)}
-            placeholder="192.168.1.42"
-            className="px-3 py-2 rounded-lg bg-black/40 border border-white/10 font-mono text-sm"
-          />
-          <div className="text-[11px] text-zinc-500 break-all">
-            → {previewLan || "—"}
-          </div>
-          <div className="text-xs text-zinc-400 mt-2 leading-relaxed">
-            <b>Host setup:</b> on the host PC, open a terminal in the project and run:
-            <pre className="mt-1 px-2 py-1 rounded bg-black/50 text-zinc-200 font-mono text-[11px] overflow-x-auto">
-cargo run -p rpsls-server --release
-            </pre>
-            Then find your local IP with <code className="bg-black/40 px-1 rounded">ipconfig</code>{" "}
-            (Windows) or <code className="bg-black/40 px-1 rounded">ip a</code> (Linux/Mac) and
-            share it with the joiner.
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          <label className="text-xs uppercase tracking-wider text-zinc-500">
-            Cloud server URL
-          </label>
-          <input
-            value={cloud}
-            onChange={(e) => setCloud(e.target.value)}
-            placeholder="wss://your-server.example.com"
-            className="px-3 py-2 rounded-lg bg-black/40 border border-white/10 font-mono text-sm"
-          />
-          <div className="text-[11px] text-zinc-500 break-all">
-            → {previewCloud || "—"}
-          </div>
-          <div className="text-xs text-zinc-400 mt-2">
-            Use any public host (Cloudflare Tunnel, Render, your VPS…).
-          </div>
-        </div>
-      )}
-
-      {testStatus !== "" && (
-        <div
-          className={
-            "mt-3 px-3 py-2 rounded-lg text-xs " +
-            (testStatus === "ok"
-              ? "bg-emerald-500/15 text-emerald-200 border border-emerald-500/30"
-              : testStatus === "fail"
-              ? "bg-rose-500/15 text-rose-200 border border-rose-500/30"
-              : "bg-white/5 text-zinc-300 border border-white/10")
-          }
-        >
-          {testStatus === "testing" ? "Testing…" : testMsg}
-        </div>
-      )}
-
-      <div className="flex flex-wrap justify-end gap-2 mt-4">
-        <button
-          onClick={testConnection}
-          disabled={testStatus === "testing"}
-          className="px-4 py-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/40 text-sky-100 text-sm transition disabled:opacity-50"
-        >
-          Test connection
-        </button>
-        <button
-          onClick={onClose}
-          className="px-4 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-sm text-zinc-300 transition"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={() => {
-            onChange({ lanUrl: lan, cloudUrl: cloud });
-            // Defer to next tick so the store update lands before refresh.
-            setTimeout(() => onRefreshStatus?.(), 0);
-            onClose();
-          }}
-          className="px-4 py-1.5 rounded-lg bg-emerald-500/90 hover:bg-emerald-500 text-sm text-white font-semibold transition"
-        >
-          Save
-        </button>
-      </div>
-    </div>
-  );
-}
 
 /* ──────────── Subcomponents ──────────── */
 

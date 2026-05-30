@@ -7,6 +7,11 @@ export type PadId = "chalkboard" | "vintage" | "cosmos" | "neon" | "comics";
 
 export type GameMode = "training" | "casual" | "ranked" | "hotseat";
 
+/** Modes that can appear in match HISTORY — the local GameMode set plus the two
+ *  online surfaces (recorded from OnlinePage). Kept separate from GameMode so the
+ *  local Game / ModeSelect flow stays a clean 4-mode union. */
+export type RecordMode = GameMode | "online" | "constellation";
+
 export type Difficulty = "easy" | "normal" | "hard";
 
 export const DIFFICULTY_META: Record<Difficulty, { label: string; emoji: string; desc: string }> = {
@@ -41,6 +46,8 @@ export interface Player {
   stats: PlayerStats;
   claimedQuests: string[];
   completedDailies: string[]; // 'YYYY-MM-DD' date keys
+  /** Daily-challenge (#17) rewards claimed today; resets when the date rolls over. */
+  dailyClaims?: { date: string; ids: string[] };
   createdAt: number;
   /** Vibration on/off — default true. Read via store.migration on legacy save. */
   hapticEnabled?: boolean;
@@ -68,7 +75,7 @@ export interface MatchRoundLog {
 
 export interface MatchRecord {
   id: string;
-  mode: GameMode;
+  mode: RecordMode;
   bestOf: number;
   opponent: Opponent;
   scorePlayer: number;
@@ -93,9 +100,11 @@ export const REWARDS: Record<
   hotseat:  { xpWin: 0,  xpLoss: 0,  xpDraw: 0,  lpWin: 0,  lpLoss: 0,   lpDraw: 0 },
 };
 
-export const MODE_META: Record<GameMode, { label: string; emoji: string; tagline: string }> = {
-  training: { label: "Training", emoji: "🤖", tagline: "Vs CPU · no XP, no risk" },
-  casual:   { label: "Casual",   emoji: "🎮", tagline: "Vs CPU · earn XP" },
-  ranked:   { label: "Ranked",   emoji: "🏆", tagline: "Vs CPU · LP at stake" },
-  hotseat:  { label: "Hot-seat", emoji: "👥", tagline: "2 players, 1 device" },
+export const MODE_META: Record<RecordMode, { label: string; emoji: string; tagline: string }> = {
+  training:      { label: "Training",      emoji: "🤖", tagline: "Vs CPU · no XP, no risk" },
+  casual:        { label: "Casual",        emoji: "🎮", tagline: "Vs CPU · earn XP" },
+  ranked:        { label: "Ranked",        emoji: "🏆", tagline: "Vs CPU · LP at stake" },
+  hotseat:       { label: "Hot-seat",      emoji: "👥", tagline: "2 players, 1 device" },
+  online:        { label: "Online",        emoji: "🌐", tagline: "Live 1v1 vs a real player" },
+  constellation: { label: "Constellation", emoji: "🌌", tagline: "3-lane online duel" },
 };

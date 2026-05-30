@@ -13,7 +13,7 @@ import {
   type LanesRoundResultData,
   type LanesEndData,
 } from "./LanesMatchView";
-import { rollAiMood, type Move } from "./game";
+import { type AiMood, type Move } from "./game";
 import { useStore } from "./store";
 import {
   battleStatus,
@@ -65,8 +65,10 @@ export function LocalLanesGame({
   const [end, setEnd] = useState<LanesEndData | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
-  // Mood is rolled once per match so CPU behaviour is consistent.
-  const moodRef = useRef(rollAiMood());
+  // Constellation CPU is fair by default: a pure-uniform "random" mood (no
+  // aggressive/logical bias, true 1/5 per move). The challenge is dialed up
+  // only via the explicit difficulty setting (Profil), never by a hidden bias.
+  const moodRef = useRef<AiMood>("random");
   // Player move history fed to the hard AI.
   const playerHistoryRef = useRef<Move[]>([]);
   // Local battle state machine.
@@ -114,8 +116,6 @@ export function LocalLanesGame({
       deadlineTimerRef.current = null;
     }
     const plays: LanePlay[] = picks.map((mv) => ({ mv, mana: 0 }));
-    // Stash for the hard AI.
-    playerHistoryRef.current.push(...picks);
     setSubmitted(true);
     resolveAndAdvance(plays, /*timedOut=*/ false);
   }
@@ -130,6 +130,14 @@ export function LocalLanesGame({
       },
       LANE_COUNT,
     );
+
+    // Record the player's real picks for the AI's PAST-rounds pattern model —
+    // but only AFTER the CPU has committed this round, so it can never peek at
+    // the picks the player just made (that would be cheating). Timeout fillers
+    // (Rock×3) aren't real choices, so they don't pollute the model.
+    if (!timedOut) {
+      playerHistoryRef.current.push(...playerPlays.map((p) => p.mv));
+    }
 
     let outcome;
     if (timedOut) {
@@ -210,7 +218,7 @@ export function LocalLanesGame({
     setLastResult(null);
     setEnd(null);
     setSubmitted(false);
-    moodRef.current = rollAiMood();
+    moodRef.current = "random";
     playerHistoryRef.current = [];
     battleRef.current = makeLocalBattle();
     roundNoRef.current = 0;
