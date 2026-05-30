@@ -44,7 +44,9 @@ export type ClientMessage =
   | { type: "play_lanes"; plays: LanePlay[] }
   | { type: "leave_match" }
   | { type: "chat"; emoji: string }
-  | { type: "ping" };
+  | { type: "ping" }
+  | { type: "request_rematch" }
+  | { type: "respond_rematch"; accept: boolean };
 
 /* Server → Client */
 export type ServerMessage =
@@ -79,6 +81,8 @@ export type ServerMessage =
   | { type: "chat"; from: PlayerSlot; emoji: string }
   | { type: "error"; code: string; message: string }
   | { type: "pong" }
+  | { type: "rematch_offered" }
+  | { type: "rematch_declined" }
   /* Lanes variants */
   | {
       type: "lanes_match_found";
