@@ -177,7 +177,7 @@ export function LanesMatchView({
 
   /* ──────────── Render ──────────── */
   return (
-    <div className="relative flex flex-col gap-2 sm:gap-3">
+    <div className="relative flex flex-col gap-2 sm:gap-3 h-full min-h-0 overflow-hidden">
       {/* Splash overlay */}
       <AnimatePresence>
         {showSplash && (
@@ -190,26 +190,28 @@ export function LanesMatchView({
         )}
       </AnimatePresence>
 
-      {/* Help "?" on its own row, right-aligned, so the score bar below
-          can use the full available width for the two player names + the
-          big score digits without being squeezed. */}
-      <button
-        onClick={() => setHelpOpen(true)}
-        title={t("lanes.help.button")}
-        className="self-end w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 border border-white/15 text-zinc-300 hover:text-white text-xs font-bold transition flex items-center justify-center"
-      >
-        ?
-      </button>
-
-      {/* Score header — full row width now that "?" is on its own line. */}
-      <ScoreHeader
-        you={nickname}
-        opp={match.opponent}
-        youWins={youWins}
-        oppWins={oppWins}
-        target={target}
-        round={round?.no ?? 1}
-      />
+      {/* Score header + inline help "?" — single row to save the vertical
+          space that the dedicated "?" row was eating (caused the layout
+          to spill back under the burger). */}
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <ScoreHeader
+            you={nickname}
+            opp={match.opponent}
+            youWins={youWins}
+            oppWins={oppWins}
+            target={target}
+            round={round?.no ?? 1}
+          />
+        </div>
+        <button
+          onClick={() => setHelpOpen(true)}
+          title={t("lanes.help.button")}
+          className="shrink-0 mt-1 w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 border border-white/15 text-zinc-300 hover:text-white text-xs font-bold transition flex items-center justify-center"
+        >
+          ?
+        </button>
+      </div>
 
       <AnimatePresence>
         {helpOpen && (
@@ -217,9 +219,9 @@ export function LanesMatchView({
         )}
       </AnimatePresence>
 
-      {/* Stage — shorter min-height on mobile so a full match-end fits the
-          viewport without scroll on a typical phone (~712-740px tall). */}
-      <div className="relative min-h-[240px] sm:min-h-[320px] flex items-center justify-center">
+      {/* Stage — claims all remaining vertical space inside the locked
+          overflow-hidden container. No min-height so it shrinks to fit. */}
+      <div className="relative flex-1 min-h-0 flex items-center justify-center overflow-hidden">
         {phase === "matched" && !showSplash && (
           <div className="text-sm text-zinc-400">{t("lanes.preparingFirstRound")}</div>
         )}
