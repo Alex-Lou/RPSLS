@@ -71,7 +71,10 @@ export default function App() {
             <Sidebar page={page} onNavigate={setPage} />
             <MobileShell page={page} onNavigate={setPage} />
             <div className="flex-1 flex flex-col min-w-0">
-              <main className="flex-1 flex flex-col pt-16 md:pt-0">
+              {/* Mobile: clear the floating hamburger (top:max(safe,32)+44h)
+                  with a measured gap, and keep content above the Android
+                  nav bar via safe-area-bottom. Desktop (md+) has no burger. */}
+              <main className="flex-1 flex flex-col pt-[calc(max(env(safe-area-inset-top),32px)+60px)] pb-[env(safe-area-inset-bottom)] md:pt-0 md:pb-0">
                 <AnimatePresence mode="wait">
                   {page === "play"    && <PageWrap key="play"><PlayPage onNavigate={setPage} /></PageWrap>}
                   {page === "online"  && <PageWrap key="online"><OnlinePage /></PageWrap>}
