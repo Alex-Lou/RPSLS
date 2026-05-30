@@ -44,8 +44,9 @@ export function vibrate(pattern: Pattern): void {
 
 /* ── Named events used by the match flow ─────────────────────────────── */
 
-/** Soft tap: move picked / button confirmed. */
-export const hapticTap = () => vibrate(10);
+/** Soft tap: move picked / button confirmed.
+ *  Bumped from 10 ms to 22 ms so it's actually felt through a phone case. */
+export const hapticTap = () => vibrate(22);
 
 /** Lock / important confirmation. */
 export const hapticLock = () => vibrate(20);

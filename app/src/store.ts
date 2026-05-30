@@ -154,7 +154,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "rpsls-app-state",
-      version: 11,
+      version: 12,
       migrate: (persisted: unknown, version: number): AppState => {
         const state = persisted as {
           player?: Partial<Player> & { customVariants?: unknown };
@@ -204,6 +204,11 @@ export const useStore = create<AppState>()(
             state.serverConfig.cloudUrl = DEFAULT_CLOUD_URL;
           }
           state.serverConfig.mode = "cloud";
+        }
+        // v12: haptic settings — opt-in by default, medium intensity.
+        if (version < 12 && state?.player) {
+          if (state.player.hapticEnabled === undefined) state.player.hapticEnabled = true;
+          if (state.player.hapticIntensity === undefined) state.player.hapticIntensity = "med";
         }
         return state as AppState;
       },
