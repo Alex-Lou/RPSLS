@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import type { Move } from "./game";
 import type { MatchRecord, PadId, Player, ThemeId } from "./types";
 import type { Locale } from "./i18n";
+import { todayDateKey } from "./daily";
 
 const emptyByMove = () => ({
   rock:     { picked: 0, won: 0 },
@@ -32,6 +33,7 @@ export function defaultPlayer(): Player {
     stats: { wins: 0, losses: 0, draws: 0, byMove: emptyByMove() },
     claimedQuests: [],
     completedDailies: [],
+    dailyClaims: { date: "", ids: [] },
     createdAt: Date.now(),
     hapticEnabled: true,
     hapticIntensity: "med",
@@ -58,6 +60,7 @@ interface AppState {
   updateProfile: (patch: Partial<Pick<Player, "nickname" | "avatar" | "themeId" | "padId" | "difficulty" | "hapticEnabled" | "hapticIntensity">>) => void;
   recordMatch: (m: MatchRecord) => void;
   claimQuest: (id: string, xpReward: number, lpReward?: number) => void;
+  claimDailyQuest: (id: string, xpReward: number) => void;
   recordDailyComplete: (date: string) => void;
   setOnboarded: (value: boolean) => void;
   setLocale: (locale: Locale) => void;
@@ -139,6 +142,23 @@ export const useStore = create<AppState>()(
           };
         }),
 
+      claimDailyQuest: (id, xpReward) =>
+        set((s) => {
+          const today = todayDateKey();
+          const cur =
+            s.player.dailyClaims && s.player.dailyClaims.date === today
+              ? s.player.dailyClaims
+              : { date: today, ids: [] };
+          if (cur.ids.includes(id)) return s;
+          return {
+            player: {
+              ...s.player,
+              xp: s.player.xp + xpReward,
+              dailyClaims: { date: today, ids: [...cur.ids, id] },
+            },
+          };
+        }),
+
       recordDailyComplete: (date) =>
         set((s) => {
           if (s.player.completedDailies.includes(date)) return s;
@@ -154,7 +174,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "rpsls-app-state",
-      version: 12,
+      version: 13,
       migrate: (persisted: unknown, version: number): AppState => {
         const state = persisted as {
           player?: Partial<Player> & { customVariants?: unknown };
@@ -209,6 +229,10 @@ export const useStore = create<AppState>()(
         if (version < 12 && state?.player) {
           if (state.player.hapticEnabled === undefined) state.player.hapticEnabled = true;
           if (state.player.hapticIntensity === undefined) state.player.hapticIntensity = "med";
+        }
+        // v13: daily-challenge (#17) claims tracker.
+        if (version < 13 && state?.player && !("dailyClaims" in state.player)) {
+          state.player.dailyClaims = { date: "", ids: [] };
         }
         return state as AppState;
       },

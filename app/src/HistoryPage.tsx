@@ -2,20 +2,22 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store";
 import { MODE_META } from "./types";
-import type { MatchRecord, GameMode, Outcome } from "./types";
+import type { MatchRecord, RecordMode, Outcome } from "./types";
 import { MOVE_META, AI_MOOD_META } from "./game";
 
-const FILTERS: Array<{ id: "all" | GameMode; label: string }> = [
-  { id: "all",      label: "All" },
-  { id: "casual",   label: "Casual" },
-  { id: "ranked",   label: "Ranked" },
-  { id: "training", label: "Training" },
-  { id: "hotseat",  label: "Hot-seat" },
+const FILTERS: Array<{ id: "all" | RecordMode; label: string }> = [
+  { id: "all",           label: "All" },
+  { id: "online",        label: "Online" },
+  { id: "constellation", label: "Constellation" },
+  { id: "casual",        label: "Casual" },
+  { id: "ranked",        label: "Ranked" },
+  { id: "training",      label: "Training" },
+  { id: "hotseat",       label: "Hot-seat" },
 ];
 
 export function HistoryPage() {
   const history = useStore((s) => s.history);
-  const [filter, setFilter] = useState<"all" | GameMode>("all");
+  const [filter, setFilter] = useState<"all" | RecordMode>("all");
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const filtered = filter === "all" ? history : history.filter((m) => m.mode === filter);
