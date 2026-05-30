@@ -69,13 +69,13 @@ export function RollingScore({
 /**
  * The unified top-of-match score bar used by every mode (classic
  * Training/Casual/Ranked/Hot-seat AND Constellation Lanes). One component →
- * one look. Optional back button, optional per-side streak badge, caption
- * underneath.
+ * one look. Full-width score card with centered names + score; the back/quit
+ * button is rendered separately by `FloatingMatchBackButton` so it docks next
+ * to the burger and frees the whole row width for the score header.
  */
 export function MatchScoreBar({
   youName, oppName, youScore, oppScore, caption,
   youTag, oppTag, youStreak = 0, oppStreak = 0,
-  onBack, backLabel,
 }: {
   youName: string;
   oppName: string;
@@ -87,47 +87,32 @@ export function MatchScoreBar({
   oppTag?: string;
   youStreak?: number;
   oppStreak?: number;
-  onBack?: () => void;
-  backLabel?: string;
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-2">
-        {onBack && (
-          <button
-            onClick={onBack}
-            aria-label={backLabel}
-            className="shrink-0 w-10 h-10 rounded-xl border border-white/10 hover:border-white/30 bg-zinc-950/40 backdrop-blur-sm transition flex items-center justify-center text-zinc-300 hover:text-white"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
-          </button>
-        )}
-        <div className="flex-1 flex items-center justify-between rounded-2xl bg-black/30 border border-white/10 px-3 sm:px-4 py-2.5 sm:py-3 min-w-0">
-          <div className="flex flex-col min-w-0 flex-1">
-            {youTag && (
-              <span className="text-[10px] uppercase tracking-wider text-zinc-500">{youTag}</span>
-            )}
-            <span className="font-semibold truncate text-emerald-200 flex items-center gap-1.5">
-              <span className="truncate">{youName}</span>
-              <StreakBadge streak={youStreak} />
-            </span>
-          </div>
-          <div className="px-2 sm:px-3 flex items-center gap-1">
-            <RollingScore value={youScore} color="emerald" size="lg" />
-            <span className="text-zinc-600 px-0.5">:</span>
-            <RollingScore value={oppScore} color="rose" size="lg" />
-          </div>
-          <div className="flex flex-col text-right min-w-0 flex-1">
-            {oppTag && (
-              <span className="text-[10px] uppercase tracking-wider text-zinc-500">{oppTag}</span>
-            )}
-            <span className="font-semibold truncate text-rose-200 flex items-center gap-1.5 justify-end">
-              <StreakBadge streak={oppStreak} />
-              <span className="truncate">{oppName}</span>
-            </span>
-          </div>
+      <div className="flex items-center justify-between rounded-2xl bg-black/30 border border-white/10 px-3 sm:px-4 py-2.5 sm:py-3 min-w-0">
+        <div className="flex flex-col min-w-0 flex-1">
+          {youTag && (
+            <span className="text-[10px] uppercase tracking-wider text-zinc-500">{youTag}</span>
+          )}
+          <span className="font-semibold truncate text-emerald-200 flex items-center gap-1.5">
+            <span className="truncate">{youName}</span>
+            <StreakBadge streak={youStreak} />
+          </span>
+        </div>
+        <div className="px-2 sm:px-3 flex items-center gap-1">
+          <RollingScore value={youScore} color="emerald" size="lg" />
+          <span className="text-zinc-600 px-0.5">:</span>
+          <RollingScore value={oppScore} color="rose" size="lg" />
+        </div>
+        <div className="flex flex-col text-right min-w-0 flex-1">
+          {oppTag && (
+            <span className="text-[10px] uppercase tracking-wider text-zinc-500">{oppTag}</span>
+          )}
+          <span className="font-semibold truncate text-rose-200 flex items-center gap-1.5 justify-end">
+            <StreakBadge streak={oppStreak} />
+            <span className="truncate">{oppName}</span>
+          </span>
         </div>
       </div>
       {caption && (
@@ -136,6 +121,40 @@ export function MatchScoreBar({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Floating back/quit button that docks at the top-left of the screen, right
+ * next to the mobile hamburger (or just inside the desktop sidebar gutter).
+ * Pulled out of MatchScoreBar so the score header can stretch full-width on
+ * its own line.
+ */
+export function FloatingMatchBackButton({
+  onClick, label,
+}: {
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="
+        fixed z-30 w-11 h-11 rounded-2xl bg-black/55 backdrop-blur border border-white/15
+        flex items-center justify-center text-zinc-100 active:scale-95 transition shadow-lg
+        hover:bg-black/70
+        top-[max(env(safe-area-inset-top),32px)]
+        left-[calc(max(env(safe-area-inset-left),12px)+44px+8px)]
+        md:top-3
+        md:left-3
+      "
+    >
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M15 18l-6-6 6-6" />
+      </svg>
+    </button>
   );
 }
 
@@ -301,6 +320,51 @@ export function CinematicMatchEnd({
         </button>
       </motion.div>
     </motion.div>
+  );
+}
+
+/* ──────────── Pick VFX (impact on tap) ──────────── */
+
+/**
+ * Trigger a brief 15 ms haptic buzz on devices that support the Vibration API
+ * — adds physicality to taps without sounding alarms. Safe-noop everywhere
+ * else (desktop, iOS Safari pre-16).
+ */
+export function hapticTick() {
+  try {
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate(12);
+    }
+  } catch {
+    // Vibration API can throw inside cross-origin iframes; swallow silently.
+  }
+}
+
+/**
+ * Fires a brief inflate-ring "shock" overlay on the parent button, useful for
+ * marking the exact moment a pick was committed. Wrap one of these inside any
+ * `relative` button next to its <Hand>/<Icon>.
+ */
+export function PickShock({
+  show, color = "rgba(255,255,255,0.85)",
+}: {
+  show: boolean;
+  color?: string;
+}) {
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.span
+          key="shock"
+          initial={{ scale: 0.6, opacity: 0.9 }}
+          animate={{ scale: 1.4, opacity: 0 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.45, ease: "easeOut" }}
+          className="pointer-events-none absolute inset-0 rounded-[inherit]"
+          style={{ boxShadow: `0 0 0 3px ${color}, 0 0 24px 6px ${color}` }}
+        />
+      )}
+    </AnimatePresence>
   );
 }
 
