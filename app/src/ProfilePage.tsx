@@ -8,6 +8,7 @@ import type { Difficulty, PadId, ThemeId } from "./types";
 import { MOVES } from "./game";
 import { BattlePad } from "./BattlePad";
 import { useT } from "./i18n";
+import { hapticTap, hapticMatchStart } from "./haptic";
 
 const AVATAR_PRESETS = [
   "🎮", "👾", "🦊", "🐉", "🦄", "🥷", "🧙", "🤖",
@@ -36,17 +37,45 @@ export function ProfilePage() {
     setEditingNick(false);
   };
 
+  /** Accept any photo: load it, fit it in a 512×512 canvas, JPEG-encode at
+   *  ~0.8 quality, and store the resulting data URL on the player. This
+   *  replaces the previous hard 200 KB reject — big phone-camera shots
+   *  now just get scaled down silently instead of being refused. */
   const onUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    if (f.size > 200 * 1024) {
-      alert("Image must be smaller than 200KB.");
+    // Hard guard against absurd files (~10 MB+) so we don't OOM the WebView.
+    if (f.size > 10 * 1024 * 1024) {
+      alert(t("profile.avatar.tooBig"));
       return;
     }
     const reader = new FileReader();
     reader.onload = () => {
-      const result = reader.result as string;
-      updateProfile({ avatar: result });
+      const dataUrl = reader.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 512;
+        const ratio = Math.min(1, MAX / Math.max(img.width, img.height));
+        const w = Math.round(img.width * ratio);
+        const h = Math.round(img.height * ratio);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          // Canvas unavailable — fall back to the original (could be big).
+          updateProfile({ avatar: dataUrl });
+          return;
+        }
+        ctx.drawImage(img, 0, 0, w, h);
+        // Pick JPEG for photos (small); keep PNG if the source is already
+        // a small lossless image (avatars often are).
+        const isPng = f.type === "image/png" && f.size < 100 * 1024;
+        const resized = canvas.toDataURL(isPng ? "image/png" : "image/jpeg", 0.82);
+        updateProfile({ avatar: resized });
+      };
+      img.onerror = () => alert(t("profile.avatar.invalid"));
+      img.src = dataUrl;
     };
     reader.readAsDataURL(f);
   };
@@ -91,9 +120,12 @@ export function ProfilePage() {
               />
               <button
                 onClick={saveNick}
-                className="px-4 py-2 rounded-xl bg-emerald-500/30 hover:bg-emerald-500/50 text-emerald-200 font-semibold"
+                aria-label="Save"
+                className="shrink-0 w-10 h-10 rounded-xl bg-emerald-500/40 hover:bg-emerald-500/60 text-white font-bold flex items-center justify-center transition"
               >
-                Save
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12l5 5L20 7" />
+                </svg>
               </button>
             </div>
           ) : (
@@ -269,7 +301,12 @@ export function ProfilePage() {
             return (
               <button
                 key={lvl}
-                onClick={() => updateProfile({ hapticIntensity: lvl })}
+                onClick={() => {
+                  updateProfile({ hapticIntensity: lvl });
+                  // Give a sample buzz at the new level so the player
+                  // can actually feel the difference between pills.
+                  setTimeout(() => hapticTap(), 60);
+                }}
                 className={
                   "rounded-xl py-2 text-xs font-semibold border transition " +
                   (active
@@ -282,6 +319,17 @@ export function ProfilePage() {
             );
           })}
         </div>
+        <button
+          onClick={() => hapticMatchStart()}
+          className={
+            "mt-3 w-full py-2 rounded-xl text-xs font-semibold border transition " +
+            ((player.hapticEnabled ?? true)
+              ? "border-violet-400/40 bg-violet-500/15 text-violet-200 hover:bg-violet-500/25"
+              : "opacity-40 pointer-events-none border-white/10 bg-white/5 text-zinc-500")
+          }
+        >
+          {t("profile.haptic.test")}
+        </button>
       </section>
 
       {/* Battle pad picker */}

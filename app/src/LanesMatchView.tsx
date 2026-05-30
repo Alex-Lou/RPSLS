@@ -190,28 +190,26 @@ export function LanesMatchView({
         )}
       </AnimatePresence>
 
-      {/* Score header + inline help "?" — moved into the same row to free a
-          full line of vertical space (was the cause of the screen
-          overflowing into the Android status bar on small phones). */}
-      <div className="flex items-start gap-2">
-        <div className="flex-1 min-w-0">
-          <ScoreHeader
-            you={nickname}
-            opp={match.opponent}
-            youWins={youWins}
-            oppWins={oppWins}
-            target={target}
-            round={round?.no ?? 1}
-          />
-        </div>
-        <button
-          onClick={() => setHelpOpen(true)}
-          title={t("lanes.help.button")}
-          className="shrink-0 mt-1 w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 border border-white/15 text-zinc-300 hover:text-white text-sm font-bold transition flex items-center justify-center"
-        >
-          ?
-        </button>
-      </div>
+      {/* Help "?" on its own row, right-aligned, so the score bar below
+          can use the full available width for the two player names + the
+          big score digits without being squeezed. */}
+      <button
+        onClick={() => setHelpOpen(true)}
+        title={t("lanes.help.button")}
+        className="self-end w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 border border-white/15 text-zinc-300 hover:text-white text-xs font-bold transition flex items-center justify-center"
+      >
+        ?
+      </button>
+
+      {/* Score header — full row width now that "?" is on its own line. */}
+      <ScoreHeader
+        you={nickname}
+        opp={match.opponent}
+        youWins={youWins}
+        oppWins={oppWins}
+        target={target}
+        round={round?.no ?? 1}
+      />
 
       <AnimatePresence>
         {helpOpen && (
@@ -859,11 +857,18 @@ function RevealStage({
     result.yourPoints, result.oppPoints, yourPicks, oppPicks,
   );
 
-  // Pick the most visually-impactful combo to show as the headline banner:
-  // outcome (sweep/wipeout/mirror) > your combo > opponent combo.
+  // Pick the most visually-impactful combo to show as the headline banner.
+  // Priority: outcome combo (sweep / wipeout / mirror) → winning side's
+  // combo → whichever side has any combo. Critically, the *winning* side
+  // gets the spotlight when both sides have one — even when they're the
+  // opponent — so a defeat doesn't drown out their highlight.
+  const youWonRound = result.yourPoints >  result.oppPoints;
+  const oppWonRound = result.oppPoints >  result.yourPoints;
   const headlineCombo =
     outcomeCombo ??
-    (result.yourPoints >= result.oppPoints ? yourCombo : oppCombo) ??
+    (oppWonRound ? oppCombo : null) ??
+    (youWonRound ? yourCombo : null) ??
+    // Draw: just pick whichever side actually has a combo.
     (yourCombo || oppCombo);
 
   // Sequential lane reveal — flag each lane "ready" on a timer cascade.
