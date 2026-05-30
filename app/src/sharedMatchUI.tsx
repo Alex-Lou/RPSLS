@@ -64,6 +64,105 @@ export function RollingScore({
   );
 }
 
+/* ──────────── MatchScoreBar ──────────── */
+
+/**
+ * The unified top-of-match score bar used by every mode (classic
+ * Training/Casual/Ranked/Hot-seat AND Constellation Lanes). One component →
+ * one look. Optional back button, optional per-side streak badge, caption
+ * underneath.
+ */
+export function MatchScoreBar({
+  youName, oppName, youScore, oppScore, caption,
+  youTag, oppTag, youStreak = 0, oppStreak = 0,
+  onBack, backLabel,
+}: {
+  youName: string;
+  oppName: string;
+  youScore: number;
+  oppScore: number;
+  caption?: string;
+  /** Tiny uppercase label above each name (e.g. "You" / "Opponent"). */
+  youTag?: string;
+  oppTag?: string;
+  youStreak?: number;
+  oppStreak?: number;
+  onBack?: () => void;
+  backLabel?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        {onBack && (
+          <button
+            onClick={onBack}
+            aria-label={backLabel}
+            className="shrink-0 w-10 h-10 rounded-xl border border-white/10 hover:border-white/30 bg-zinc-950/40 backdrop-blur-sm transition flex items-center justify-center text-zinc-300 hover:text-white"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+        )}
+        <div className="flex-1 flex items-center justify-between rounded-2xl bg-black/30 border border-white/10 px-3 sm:px-4 py-2.5 sm:py-3 min-w-0">
+          <div className="flex flex-col min-w-0 flex-1">
+            {youTag && (
+              <span className="text-[10px] uppercase tracking-wider text-zinc-500">{youTag}</span>
+            )}
+            <span className="font-semibold truncate text-emerald-200 flex items-center gap-1.5">
+              <span className="truncate">{youName}</span>
+              <StreakBadge streak={youStreak} />
+            </span>
+          </div>
+          <div className="px-2 sm:px-3 flex items-center gap-1">
+            <RollingScore value={youScore} color="emerald" size="lg" />
+            <span className="text-zinc-600 px-0.5">:</span>
+            <RollingScore value={oppScore} color="rose" size="lg" />
+          </div>
+          <div className="flex flex-col text-right min-w-0 flex-1">
+            {oppTag && (
+              <span className="text-[10px] uppercase tracking-wider text-zinc-500">{oppTag}</span>
+            )}
+            <span className="font-semibold truncate text-rose-200 flex items-center gap-1.5 justify-end">
+              <StreakBadge streak={oppStreak} />
+              <span className="truncate">{oppName}</span>
+            </span>
+          </div>
+        </div>
+      </div>
+      {caption && (
+        <div className="text-center text-[11px] uppercase tracking-[0.25em] text-zinc-500">
+          {caption}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StreakBadge({ streak }: { streak: number }) {
+  return (
+    <AnimatePresence>
+      {streak >= 2 && (
+        <motion.span
+          key={streak}
+          initial={{ scale: 0.4, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 500, damping: 18 }}
+          className={
+            "shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full " +
+            (streak >= 3
+              ? "bg-orange-500/30 text-orange-300 ring-1 ring-orange-400/50"
+              : "bg-amber-500/20 text-amber-300 ring-1 ring-amber-400/40")
+          }
+        >
+          🔥 {streak}
+        </motion.span>
+      )}
+    </AnimatePresence>
+  );
+}
+
 /* ──────────── CinematicMatchEnd ──────────── */
 
 export interface CinematicMatchEndProps {
