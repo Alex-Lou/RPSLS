@@ -225,35 +225,36 @@ export function CinematicMatchEnd({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col items-center gap-5 py-6"
+      className="flex flex-col items-center gap-2.5 py-2"
     >
-      {/* Glyph: spring in, then idle-float forever. */}
+      {/* Glyph: spring in, then idle-float forever. Tightened from 7xl/8xl
+          to 6xl so it doesn't dominate the viewport on mobile. */}
       <motion.div
         initial={{ scale: 0, rotate: -180 }}
         animate={{
           scale: 1,
           rotate: 0,
-          y: [0, -8, 0, -4, 0],
+          y: [0, -6, 0, -3, 0],
         }}
         transition={{
           scale:  { type: "spring", stiffness: 200, damping: 12, delay: 0.1 },
           rotate: { type: "spring", stiffness: 200, damping: 12, delay: 0.1 },
           y:      { duration: 3.2, repeat: Infinity, ease: "easeInOut", delay: 1.0 },
         }}
-        className="text-7xl sm:text-8xl"
+        className="text-5xl sm:text-6xl leading-none"
       >
         {glyph}
       </motion.div>
 
       {/* Wordmark: enter then breathe. */}
       <motion.div
-        initial={{ opacity: 0, y: 8 }}
+        initial={{ opacity: 0, y: 6 }}
         animate={{
           opacity: 1,
           y: 0,
-          scale: [1, 1.04, 1],
+          scale: [1, 1.03, 1],
         }}
         transition={{
           opacity: { delay: 0.5 },
@@ -261,7 +262,7 @@ export function CinematicMatchEnd({
           scale:   { duration: 2.6, repeat: Infinity, ease: "easeInOut", delay: 1.2 },
         }}
         className={
-          "text-4xl sm:text-5xl font-black bg-gradient-to-br bg-clip-text text-transparent " +
+          "text-3xl sm:text-4xl font-black bg-gradient-to-br bg-clip-text text-transparent leading-tight " +
           gradient
         }
       >
@@ -273,48 +274,52 @@ export function CinematicMatchEnd({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.8 }}
-          className="text-xs uppercase tracking-[0.3em] text-amber-300"
+          className="text-[10px] uppercase tracking-[0.3em] text-amber-300"
         >
           {t("lanes.byForfeit")}
         </motion.div>
       )}
 
       {scoreLine && (
-        <div className="text-2xl font-mono">{scoreLine}</div>
+        <div className="text-xl font-mono text-zinc-200">{scoreLine}</div>
       )}
 
-      {/* Author quote. */}
+      {/* Author quote — capped to 2 lines so a chatty Sagan quote can't
+          push the rest of the screen under the Android nav. */}
       <motion.div
-        initial={{ opacity: 0, y: 8 }}
+        initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 1.2, duration: 0.4 }}
-        className="max-w-md mx-auto px-6 mt-1 text-center"
+        className="max-w-md mx-auto px-4 text-center"
       >
-        <div className="text-sm italic text-zinc-300 leading-relaxed">
+        <div
+          className="text-[13px] italic text-zinc-300 leading-snug overflow-hidden"
+          style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}
+        >
           « {t(`lanes.endQuote.${quoteIdx}.text`)} »
         </div>
-        <div className="text-xs text-zinc-500 mt-1 tracking-wide">
+        <div className="text-[11px] text-zinc-500 mt-0.5 tracking-wide">
           {t(`lanes.endQuote.${quoteIdx}.author`)}
         </div>
       </motion.div>
 
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 1.5 }}
-        className="flex flex-col sm:flex-row gap-2 mt-2 w-full max-w-md px-4"
+        className="flex flex-row gap-2 w-full max-w-md px-2"
       >
         {onRematch && (
           <button
             onClick={onRematch}
-            className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 font-bold text-white shadow-lg shadow-emerald-500/30 transition"
+            className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 font-bold text-white shadow-lg shadow-emerald-500/30 transition text-sm"
           >
             {rematchLabel ?? t("lanes.rematch")}
           </button>
         )}
         <button
           onClick={onBack}
-          className="flex-1 px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 font-semibold text-zinc-200 transition"
+          className="flex-1 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 font-semibold text-zinc-200 transition text-sm"
         >
           {backLabel ?? t("lanes.backToMenu")}
         </button>

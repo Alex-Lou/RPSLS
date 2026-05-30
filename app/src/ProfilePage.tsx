@@ -56,7 +56,7 @@ export function ProfilePage() {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="w-full max-w-3xl mx-auto px-6 pt-3 pb-6 md:p-6 flex flex-col gap-6"
+      className="w-full max-w-3xl mx-auto px-5 pt-2 pb-6 md:p-6 flex flex-col gap-5"
     >
       <h1 className="text-3xl font-extrabold tracking-tight">Profile</h1>
 

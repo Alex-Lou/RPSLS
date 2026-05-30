@@ -1487,11 +1487,11 @@ function EndPanel({
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.92 }}
+      initial={{ opacity: 0, scale: 0.94 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
       transition={{ type: "spring", stiffness: 220, damping: 18 }}
-      className="bg-zinc-950/30 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 p-5 sm:p-10 border border-white/10 flex flex-col items-center text-center"
+      className="bg-zinc-950/30 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 p-3 sm:p-8 border border-white/10 flex flex-col items-center text-center max-h-[calc(100dvh-180px)] overflow-y-auto"
     >
       {/* Cinematic match-end shared with Constellation Lanes — same trophy
           breath / wordmark pulse / quote / rematch buttons feel everywhere. */}
@@ -1504,35 +1504,39 @@ function EndPanel({
         backLabel={t("match.back")}
       />
 
-      {/* Local extras specific to single-player: winner title, streak,
-          mood and XP/LP reward chips. Rendered *under* the cinematic end
-          scene, more compact. */}
-      <div className="text-zinc-400 text-xs space-y-0.5 mt-4">
-        <p className="text-zinc-300 font-semibold">
+      {/* Local single-player extras — compacted to one wrap line so the
+          card stays in one viewport without scroll on typical phones. */}
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-[11px] text-zinc-500">
+        <span className="text-zinc-300 font-semibold">
           {t("match.win.title", { name: winnerLabel })}
-        </p>
-        <p>{t("match.win.final", { a: match.scoreA, b: match.scoreB, bo: match.bestOf })}</p>
+        </span>
+        <span className="opacity-50">·</span>
+        <span>{t("match.win.final", { a: match.scoreA, b: match.scoreB, bo: match.bestOf })}</span>
         {bestStreak >= 2 && (
-          <p>{t("match.win.streak", { n: bestStreak, name: bestStreakHolder })}</p>
+          <>
+            <span className="opacity-50">·</span>
+            <span>🔥 {bestStreak} ({bestStreakHolder})</span>
+          </>
         )}
         {mood && (
-          <p className="text-zinc-500">
-            {t("match.win.moodLabel")}: {AI_MOOD_META[mood].emoji} {t("mood." + mood)}
-          </p>
+          <>
+            <span className="opacity-50">·</span>
+            <span>{AI_MOOD_META[mood].emoji} {t("mood." + mood)}</span>
+          </>
         )}
       </div>
 
       {(xpDelta !== 0 || lpDelta !== 0) && (
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1.7 }}
-          className="flex flex-col items-center gap-2 mt-3"
+          className="flex flex-col items-center gap-1 mt-2"
         >
-          <div className="flex gap-2 text-sm">
+          <div className="flex gap-2 text-xs">
             {xpDelta !== 0 && (
               <span className={
-                "px-3 py-1 rounded-full font-semibold " +
+                "px-2.5 py-0.5 rounded-full font-semibold " +
                 (xpDelta > 0 ? "bg-emerald-500/20 text-emerald-300" : "bg-zinc-500/20 text-zinc-400")
               }>
                 {xpDelta > 0 ? "+" : ""}{xpDelta} XP
@@ -1540,7 +1544,7 @@ function EndPanel({
             )}
             {lpDelta !== 0 && (
               <span className={
-                "px-3 py-1 rounded-full font-semibold " +
+                "px-2.5 py-0.5 rounded-full font-semibold " +
                 (lpDelta > 0 ? "bg-rose-500/20 text-rose-300" : "bg-rose-500/30 text-rose-200")
               }>
                 {lpDelta > 0 ? "+" : ""}{lpDelta} LP
@@ -1548,7 +1552,7 @@ function EndPanel({
             )}
           </div>
           {xpBonus > 0 && (
-            <p className="text-[11px] text-amber-300 font-medium">
+            <p className="text-[10px] text-amber-300 font-medium px-2 leading-tight">
               {isDaily && playerWon && t("match.bonus.daily", { p: Math.round(dailyBonus * 100) }) + " "}
               {streakMult > 1 && (isDaily ? "· " : "") + t("match.bonus.streak", { x: streakMult.toFixed(1) }) + " "}
               · {t("match.bonus.breakdown", { a: baseXp, b: xpBonus })}
