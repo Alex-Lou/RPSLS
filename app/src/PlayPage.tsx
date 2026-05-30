@@ -656,7 +656,7 @@ function Game({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -16 }}
       transition={{ duration: 0.3 }}
-      className="flex flex-col gap-2 sm:gap-4 flex-1"
+      className="flex flex-col gap-2 sm:gap-4 flex-1 min-h-0 overflow-hidden"
     >
       {/* Header OUTSIDE the board — never overlaps */}
       <Header
@@ -1497,7 +1497,7 @@ function EndPanel({
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
       transition={{ type: "spring", stiffness: 220, damping: 18 }}
-      className="bg-zinc-950/30 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 p-3 sm:p-8 border border-white/10 flex flex-col items-center text-center max-h-[calc(100dvh-180px)] overflow-y-auto"
+      className="bg-zinc-950/30 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 p-3 sm:p-8 border border-white/10 flex flex-col items-center text-center"
     >
       {/* Cinematic match-end shared with Constellation Lanes — same trophy
           breath / wordmark pulse / quote / rematch buttons feel everywhere. */}
