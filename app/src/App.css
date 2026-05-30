@@ -45,9 +45,24 @@ body {
 }
 
 /* Hide scrollbars everywhere — keep the scroll behavior, ditch the bar.
+   Some Android WebView builds ignore the universal selector for nested
+   scroll containers, so we declare the rule on three levels (universal,
+   html/body, and direct overflow utilities) and use !important to override
+   any Tailwind-injected scrollbar style.
    - WebKit/Chromium (Tauri Android WebView + WebView2): ::-webkit-scrollbar
    - Firefox: scrollbar-width: none
-   - IE/Edge Legacy: -ms-overflow-style: none
-   Apply on the universal selector so every overflow container is silent. */
-*::-webkit-scrollbar { display: none; width: 0; height: 0; }
-* { scrollbar-width: none; -ms-overflow-style: none; }
+   - IE/Edge Legacy: -ms-overflow-style: none */
+html, body, * {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+*::-webkit-scrollbar,
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-corner,
+*::-webkit-resizer {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}

@@ -16,7 +16,7 @@ import { Hand, MOVE_ICON, MOVE_PALETTE } from "./icons";
 import { MOVES, type Move } from "./game";
 import { hapticAlert, hapticTap } from "./haptic";
 import { useT } from "./i18n";
-import { MatchScoreBar, hapticTick, PickShock } from "./sharedMatchUI";
+import { MatchScoreBar, hapticTick, PickShock, CinematicMatchEnd } from "./sharedMatchUI";
 import type { LanePlay, LaneResult, PlayerSlot } from "./online";
 import {
   detectOutcomeCombo,
@@ -177,7 +177,7 @@ export function LanesMatchView({
 
   /* ──────────── Render ──────────── */
   return (
-    <div className="relative flex flex-col gap-4">
+    <div className="relative flex flex-col gap-2 sm:gap-3">
       {/* Splash overlay */}
       <AnimatePresence>
         {showSplash && (
@@ -190,14 +190,28 @@ export function LanesMatchView({
         )}
       </AnimatePresence>
 
-      {/* Help "?" floating button — quick access to the rules/combos lexicon. */}
-      <button
-        onClick={() => setHelpOpen(true)}
-        title={t("lanes.help.button")}
-        className="self-end -mb-1 w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 border border-white/15 text-zinc-300 hover:text-white text-sm font-bold transition flex items-center justify-center"
-      >
-        ?
-      </button>
+      {/* Score header + inline help "?" — moved into the same row to free a
+          full line of vertical space (was the cause of the screen
+          overflowing into the Android status bar on small phones). */}
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <ScoreHeader
+            you={nickname}
+            opp={match.opponent}
+            youWins={youWins}
+            oppWins={oppWins}
+            target={target}
+            round={round?.no ?? 1}
+          />
+        </div>
+        <button
+          onClick={() => setHelpOpen(true)}
+          title={t("lanes.help.button")}
+          className="shrink-0 mt-1 w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 border border-white/15 text-zinc-300 hover:text-white text-sm font-bold transition flex items-center justify-center"
+        >
+          ?
+        </button>
+      </div>
 
       <AnimatePresence>
         {helpOpen && (
@@ -205,18 +219,9 @@ export function LanesMatchView({
         )}
       </AnimatePresence>
 
-      {/* Score header */}
-      <ScoreHeader
-        you={nickname}
-        opp={match.opponent}
-        youWins={youWins}
-        oppWins={oppWins}
-        target={target}
-        round={round?.no ?? 1}
-      />
-
-      {/* Stage */}
-      <div className="relative min-h-[300px] sm:min-h-[360px] flex items-center justify-center">
+      {/* Stage — shorter min-height on mobile so a full match-end fits the
+          viewport without scroll on a typical phone (~712-740px tall). */}
+      <div className="relative min-h-[240px] sm:min-h-[320px] flex items-center justify-center">
         {phase === "matched" && !showSplash && (
           <div className="text-sm text-zinc-400">{t("lanes.preparingFirstRound")}</div>
         )}
@@ -378,18 +383,18 @@ function GameTable({
 }) {
   return (
     <div
-      className="w-full max-w-2xl rounded-3xl p-3 sm:p-5 flex flex-col gap-3 sm:gap-4
+      className="w-full max-w-2xl rounded-2xl p-2 sm:p-4 flex flex-col gap-2 sm:gap-3
                  border border-emerald-900/40
                  bg-gradient-to-b from-emerald-950/40 via-zinc-950/60 to-emerald-950/40
-                 shadow-[inset_0_0_40px_rgba(0,0,0,0.55)]"
+                 shadow-[inset_0_0_36px_rgba(0,0,0,0.55)]"
     >
       {/* Opponent header */}
-      <div className="flex items-center justify-between px-1">
-        <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-rose-300/90">
+      <div className="flex items-center justify-between px-0.5">
+        <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-rose-300/90 truncate">
           ✦ {opponentName}
         </span>
         {oppStatus && (
-          <span className="text-[10px] uppercase tracking-wider text-zinc-500">{oppStatus}</span>
+          <span className="text-[10px] uppercase tracking-wider text-zinc-500 shrink-0 ml-2">{oppStatus}</span>
         )}
       </div>
 
@@ -403,12 +408,12 @@ function GameTable({
       {youRow}
 
       {/* You footer */}
-      <div className="flex items-center justify-between px-1">
-        <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-emerald-300/90">
+      <div className="flex items-center justify-between px-0.5">
+        <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-emerald-300/90 truncate">
           ✦ {youName}
         </span>
         {youStatus && (
-          <span className="text-[10px] uppercase tracking-wider text-zinc-500">{youStatus}</span>
+          <span className="text-[10px] uppercase tracking-wider text-zinc-500 shrink-0 ml-2">{youStatus}</span>
         )}
       </div>
     </div>
@@ -1123,109 +1128,19 @@ function SideLaneCard({
 function MatchEndScene({
   end, onBack, onRematch,
 }: { end: LanesEndData; onBack: () => void; onRematch?: () => void }) {
-  const t = useT();
   const youWon = end.roundWinsYou > end.roundWinsOpp;
   const draw = end.roundWinsYou === end.roundWinsOpp;
-  // Pick a stable end-of-match quote once per mount.
-  const quoteIdx = useRef(Math.floor(Math.random() * 10)).current;
+  const outcome: "win" | "loss" | "draw" = draw ? "draw" : youWon ? "win" : "loss";
+  // Delegate to the shared compact match-end so Constellation and the
+  // classic modes have identical sizing and never overflow the viewport.
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col items-center gap-5 py-6"
-    >
-      {/* Trophy/skull/handshake — spring in, then idle-float forever. */}
-      <motion.div
-        initial={{ scale: 0, rotate: -180 }}
-        animate={{
-          scale: 1,
-          rotate: 0,
-          y: [0, -8, 0, -4, 0],
-        }}
-        transition={{
-          scale:   { type: "spring", stiffness: 200, damping: 12, delay: 0.1 },
-          rotate:  { type: "spring", stiffness: 200, damping: 12, delay: 0.1 },
-          y:       { duration: 3.2, repeat: Infinity, ease: "easeInOut", delay: 1.0 },
-        }}
-        className="text-7xl sm:text-8xl"
-      >
-        {youWon ? "🏆" : draw ? "🤝" : "💀"}
-      </motion.div>
-      {/* VICTORY / DRAW / DEFEAT — gentle ambient zoom after the entrance. */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{
-          opacity: 1,
-          y: 0,
-          scale: [1, 1.04, 1],
-        }}
-        transition={{
-          opacity: { delay: 0.5 },
-          y:       { delay: 0.5 },
-          scale:   { duration: 2.6, repeat: Infinity, ease: "easeInOut", delay: 1.2 },
-        }}
-        className={
-          "text-4xl sm:text-5xl font-black bg-gradient-to-br bg-clip-text text-transparent " +
-          (youWon
-            ? "from-emerald-300 to-teal-400"
-            : draw
-            ? "from-zinc-200 to-zinc-400"
-            : "from-rose-300 to-fuchsia-400")
-        }
-      >
-        {youWon ? t("lanes.victory") : draw ? t("lanes.endDraw") : t("lanes.defeat")}
-      </motion.div>
-      {end.forfeit && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
-          className="text-xs uppercase tracking-[0.3em] text-amber-300"
-        >
-          {t("lanes.byForfeit")}
-        </motion.div>
-      )}
-      <div className="text-2xl font-mono">
-        {end.roundWinsYou} — {end.roundWinsOpp}
-      </div>
-
-      {/* End-of-match quote — public-domain author. */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 1.2, duration: 0.4 }}
-        className="max-w-md mx-auto px-6 mt-1 text-center"
-      >
-        <div className="text-sm italic text-zinc-300 leading-relaxed">
-          « {t(`lanes.endQuote.${quoteIdx}.text`)} »
-        </div>
-        <div className="text-xs text-zinc-500 mt-1 tracking-wide">
-          {t(`lanes.endQuote.${quoteIdx}.author`)}
-        </div>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 1.5 }}
-        className="flex flex-col sm:flex-row gap-2 mt-2 w-full max-w-md px-4"
-      >
-        {onRematch && (
-          <button
-            onClick={onRematch}
-            className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 font-bold text-white shadow-lg shadow-emerald-500/30 transition"
-          >
-            {t("lanes.rematch")}
-          </button>
-        )}
-        <button
-          onClick={onBack}
-          className="flex-1 px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 font-semibold text-zinc-200 transition"
-        >
-          {t("lanes.backToMenu")}
-        </button>
-      </motion.div>
-    </motion.div>
+    <CinematicMatchEnd
+      outcome={outcome}
+      forfeit={end.forfeit}
+      scoreLine={`${end.roundWinsYou} — ${end.roundWinsOpp}`}
+      onRematch={onRematch}
+      onBack={onBack}
+    />
   );
 }
 
