@@ -8,16 +8,35 @@
  */
 
 type Pattern = number | number[];
+export type HapticIntensity = "low" | "med" | "high";
 
 function canVibrate(): boolean {
   return typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
 }
 
-/** Fire a vibration pattern. Silently no-ops if the device doesn't support it. */
+/* ── Module-level settings, synced from the Zustand store by App.tsx ─────── */
+let _enabled = true;
+let _intensity: HapticIntensity = "med";
+
+/** Called by App.tsx in a useEffect whenever the player toggles haptics. */
+export function setHapticSettings(s: { enabled: boolean; intensity: HapticIntensity }) {
+  _enabled = s.enabled;
+  _intensity = s.intensity;
+}
+
+/** Multiplier applied to every ms value of a pattern based on intensity. */
+function scale(pattern: Pattern): Pattern {
+  const mult = _intensity === "low" ? 0.5 : _intensity === "high" ? 1.4 : 1.0;
+  if (typeof pattern === "number") return Math.max(1, Math.round(pattern * mult));
+  return pattern.map((v) => Math.max(1, Math.round(v * mult)));
+}
+
+/** Fire a vibration pattern. Silently no-ops if the device doesn't support it
+ *  or if the player has haptics disabled in settings. */
 export function vibrate(pattern: Pattern): void {
-  if (!canVibrate()) return;
+  if (!_enabled || !canVibrate()) return;
   try {
-    navigator.vibrate(pattern);
+    navigator.vibrate(scale(pattern));
   } catch {
     /* ignore — some browsers throw if the page is in the background. */
   }

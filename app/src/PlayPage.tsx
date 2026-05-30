@@ -42,7 +42,7 @@ export function PlayPage({ onNavigate }: { onNavigate?: (p: Page) => void }) {
   const [view, setView] = useState<View>({ kind: "select" });
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-3 sm:px-8 py-2 sm:py-4 flex-1 flex flex-col">
+    <div className="w-full max-w-6xl mx-auto px-3 sm:px-8 pt-0 pb-2 sm:py-4 flex-1 flex flex-col">
       <AnimatePresence mode="wait">
         {view.kind === "select" && (
           <ModeSelect
@@ -145,21 +145,21 @@ function ModeSelect({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -16 }}
       transition={{ duration: 0.3 }}
-      className="flex flex-col gap-6"
+      className="flex flex-col gap-2 sm:gap-5"
     >
       <div className="text-center">
-        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-violet-400 via-fuchsia-400 to-teal-300 bg-clip-text text-transparent">
+        <h1 className="text-2xl sm:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-violet-400 via-fuchsia-400 to-teal-300 bg-clip-text text-transparent leading-tight">
           {t("play.title")}
         </h1>
-        <p className="mt-2 text-zinc-400 text-sm">
+        <p className="mt-0.5 sm:mt-2 text-zinc-400 text-[11px] sm:text-sm leading-tight">
           {t("splash.tagline")}
         </p>
       </div>
 
       <DailyBanner daily={daily} done={dailyDone} onStart={() => onStartDaily(daily)} />
 
-      {/* Mode tiles — tap to open confirmation modal (Online navigates instead) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {/* Mode tiles — 2 columns even on mobile so the 6 tiles fit one viewport. */}
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
         {ALL_CARDS.map((m, i) => {
           if (m === "online") {
             return (
@@ -173,24 +173,21 @@ function ModeSelect({
                 onClick={() => onGoOnline?.()}
                 disabled={!onGoOnline}
                 className={
-                  "text-left p-4 rounded-2xl border transition flex items-start gap-3 relative overflow-hidden " +
+                  "text-left p-2.5 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1.5 relative overflow-hidden min-h-[110px] " +
                   "border-violet-400/30 bg-gradient-to-br from-violet-500/15 via-fuchsia-500/10 to-cyan-500/15 " +
                   "hover:from-violet-500/25 hover:via-fuchsia-500/20 hover:to-cyan-500/25 hover:border-violet-400/60 " +
                   "shadow-lg shadow-violet-500/10"
                 }
               >
                 <ModeIcon mode="online" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold">{t("mode.online")}</span>
-                    <span className="text-[10px] uppercase tracking-wider text-violet-200 bg-violet-500/25 px-1.5 rounded-full">
+                <div className="min-w-0 w-full">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold text-sm sm:text-base">{t("mode.online")}</span>
+                    <span className="text-[9px] uppercase tracking-wider text-violet-200 bg-violet-500/25 px-1 rounded-full">
                       LIVE
                     </span>
                   </div>
-                  <p className="text-xs text-zinc-300 mt-0.5">{t("mode.online.tag")}</p>
-                  <p className="text-[10px] text-violet-300/80 mt-1.5">
-                    {t("mode.online.cta")} →
-                  </p>
+                  <p className="text-[10px] sm:text-xs text-zinc-400 mt-0.5 line-clamp-2">{t("mode.online.tag")}</p>
                 </div>
               </motion.button>
             );
@@ -207,25 +204,22 @@ function ModeSelect({
                 onClick={() => onGoConstellation?.(2)}
                 disabled={!onGoConstellation}
                 className={
-                  "text-left p-4 rounded-2xl border transition flex items-start gap-3 relative overflow-hidden " +
+                  "text-left p-2.5 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1.5 relative overflow-hidden min-h-[110px] " +
                   "border-fuchsia-400/30 bg-gradient-to-br from-fuchsia-500/15 via-violet-500/10 to-amber-500/15 " +
                   "hover:from-fuchsia-500/25 hover:via-violet-500/20 hover:to-amber-500/25 hover:border-fuchsia-400/60 " +
                   "shadow-lg shadow-fuchsia-500/10"
                 }
               >
                 <ModeIcon mode="constellation" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold">Constellation</span>
-                    <span className="text-[10px] uppercase tracking-wider text-fuchsia-200 bg-fuchsia-500/25 px-1.5 rounded-full">
+                <div className="min-w-0 w-full">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold text-sm sm:text-base">Constellation</span>
+                    <span className="text-[9px] uppercase tracking-wider text-fuchsia-200 bg-fuchsia-500/25 px-1 rounded-full">
                       NEW
                     </span>
                   </div>
-                  <p className="text-xs text-zinc-300 mt-0.5">
-                    3 lanes simultaneously vs CPU
-                  </p>
-                  <p className="text-[10px] text-fuchsia-300/80 mt-1.5">
-                    Multi-pick tactics · {/*FIXME i18n later*/}first to 2 round-wins →
+                  <p className="text-[10px] sm:text-xs text-zinc-400 mt-0.5 line-clamp-2">
+                    3 lanes en parallèle vs IA
                   </p>
                 </div>
               </motion.button>
@@ -241,31 +235,24 @@ function ModeSelect({
               whileHover={{ y: -3 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => { setMode(m); setPendingMode(m); }}
-              className="text-left p-4 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition flex items-start gap-3"
+              className="text-left p-2.5 sm:p-4 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition flex flex-col items-start gap-1.5 min-h-[110px]"
             >
               <ModeIcon mode={m} />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold">{t("mode." + m)}</span>
+              <div className="min-w-0 w-full">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="font-semibold text-sm sm:text-base">{t("mode." + m)}</span>
                   {rewards.lpWin > 0 && (
-                    <span className="text-[10px] uppercase tracking-wider text-rose-300 bg-rose-500/15 px-1.5 rounded-full">
+                    <span className="text-[9px] uppercase tracking-wider text-rose-300 bg-rose-500/15 px-1 rounded-full">
                       LP
                     </span>
                   )}
                   {rewards.xpWin > 0 && (
-                    <span className="text-[10px] uppercase tracking-wider text-emerald-300 bg-emerald-500/15 px-1.5 rounded-full">
+                    <span className="text-[9px] uppercase tracking-wider text-emerald-300 bg-emerald-500/15 px-1 rounded-full">
                       XP
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-zinc-400 mt-0.5">{t("mode." + m + ".tag")}</p>
-                {rewards.xpWin > 0 && (
-                  <p className="text-[10px] text-zinc-500 mt-1.5">
-                    {t("play.win.xp", { n: rewards.xpWin })}
-                    {rewards.lpWin > 0 && ` · ${t("play.win.lp", { n: rewards.lpWin })}`}
-                    {rewards.lpLoss < 0 && ` · ${t("play.loss.lp", { n: rewards.lpLoss })}`}
-                  </p>
-                )}
+                <p className="text-[10px] sm:text-xs text-zinc-400 mt-0.5 line-clamp-2">{t("mode." + m + ".tag")}</p>
               </div>
             </motion.button>
           );
@@ -400,25 +387,21 @@ function DailyBanner({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
       className={
-        "rounded-2xl p-4 sm:p-5 border-2 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-5 " +
+        "rounded-xl p-2.5 sm:p-5 border flex flex-row items-center gap-2 sm:gap-5 " +
         (done
           ? "bg-emerald-950/30 border-emerald-700/40"
-          : "bg-gradient-to-br from-amber-500/20 via-orange-500/10 to-transparent border-amber-400/50 shadow-lg shadow-amber-900/20")
+          : "bg-gradient-to-br from-amber-500/20 via-orange-500/10 to-transparent border-amber-400/50 shadow-md shadow-amber-900/20")
       }
     >
-      <div className="text-3xl shrink-0">{done ? "✅" : "🎯"}</div>
+      <div className="text-xl sm:text-3xl shrink-0">{done ? "✅" : "🎯"}</div>
       <div className="flex-1 min-w-0">
-        <div className="text-[10px] uppercase tracking-widest font-bold text-amber-300">
+        <div className="text-[9px] sm:text-[10px] uppercase tracking-widest font-bold text-amber-300 leading-tight">
           {t("play.daily.title")}
         </div>
-        <div className="text-base sm:text-lg font-bold mt-0.5">
-          {MODE_META[daily.mode].emoji} {t("mode." + daily.mode)}
-          {" · "}
-          {AI_MOOD_META[daily.mood].emoji} {t("mood." + daily.mood)}
-          {" · "}
-          {t("history.bo", { n: daily.bestOf })}
+        <div className="text-[11px] sm:text-lg font-bold leading-tight truncate">
+          {AI_MOOD_META[daily.mood].emoji} {t("mode." + daily.mode)} · {t("history.bo", { n: daily.bestOf })}
         </div>
-        <div className="text-xs text-amber-200/80 mt-0.5">
+        <div className="text-[10px] sm:text-xs text-amber-200/80 leading-tight">
           {done ? t("play.daily.done") : t("play.daily.bonus", { p: Math.round(daily.xpBonus * 100) })}
         </div>
       </div>
@@ -427,7 +410,7 @@ function DailyBanner({
           whileHover={{ y: -2 }}
           whileTap={{ scale: 0.97 }}
           onClick={onStart}
-          className="px-5 py-2.5 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-zinc-900 font-bold text-sm shadow-lg shadow-amber-900/40 shrink-0"
+          className="px-3 py-1.5 sm:px-5 sm:py-2.5 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 text-zinc-900 font-bold text-xs sm:text-sm shadow-md shadow-amber-900/40 shrink-0"
         >
           {t("play.daily.start")}
         </motion.button>

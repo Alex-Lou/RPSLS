@@ -420,16 +420,17 @@ function GameTable({
   );
 }
 
-/** Tiny "?" face-down card for an opponent lane we can't see yet. */
+/** Tiny "?" face-down card for an opponent lane we can't see yet.
+ *  Rectangular (3/2) instead of square so the row stays short on mobile. */
 function FaceDownLaneCard({ index, pulsing = false }: { index: number; pulsing?: boolean }) {
   return (
     <motion.div
       animate={pulsing ? { opacity: [0.55, 1, 0.55] } : { opacity: 1 }}
       transition={pulsing ? { duration: 1.4, repeat: Infinity, delay: index * 0.18 } : undefined}
-      className="aspect-square w-full rounded-2xl border-2 border-dashed border-white/10 bg-black/30
+      className="aspect-[3/2] w-full rounded-xl border-2 border-dashed border-white/10 bg-black/30
                  flex items-center justify-center"
     >
-      <span className="text-2xl sm:text-3xl text-zinc-700 font-black">?</span>
+      <span className="text-xl sm:text-2xl text-zinc-700 font-black">?</span>
     </motion.div>
   );
 }
@@ -453,7 +454,7 @@ function PickStage({
   // Combo preview — only triggers once all 3 picks are placed, before lock.
   const preview = allFilled ? detectPlayerCombo(picks as Move[]) : null;
   return (
-    <div className="w-full flex flex-col items-center gap-5">
+    <div className="w-full flex flex-col items-center gap-2.5">
       {/* Timer */}
       <TimerBar startedAt={startedAt} durationMs={deadlineMs} />
 
@@ -465,14 +466,14 @@ function PickStage({
           allFilled ? t("lanes.tableYouReady") : t("lanes.pickRemaining", { n: remaining })
         }
         oppRow={
-          <div className="grid grid-cols-3 gap-3 sm:gap-5">
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
             {[0, 1, 2].map((i) => (
               <FaceDownLaneCard key={i} index={i} pulsing />
             ))}
           </div>
         }
         youRow={
-          <div className="grid grid-cols-3 gap-3 sm:gap-5">
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
             {picks.map((mv, i) => (
               <LaneSlot key={i} index={i} pick={mv} onClear={() => onClearLane(i)} />
             ))}
@@ -480,11 +481,9 @@ function PickStage({
         }
       />
 
-      <div className="text-[11px] uppercase tracking-[0.3em] text-zinc-500 text-center px-4">
+      <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 text-center px-4">
         {t("lanes.pickInstruction")}
       </div>
-
-      <AmbientFlavor />
 
       <PickerBar onPickInNextEmpty={onPick} />
 
@@ -575,7 +574,7 @@ function LaneSlot({
         onClick={onClear}
         disabled={!pick}
         className={
-          "aspect-square w-full rounded-2xl border-2 transition flex items-center justify-center relative ring-2 " +
+          "aspect-[3/2] w-full rounded-xl border-2 transition flex items-center justify-center relative ring-2 " +
           (favoured ? ringFav : ringIdle) + " " +
           (pick
             ? "border-emerald-400/40 bg-emerald-500/10 hover:bg-rose-500/10 hover:border-rose-400/50"
@@ -590,7 +589,7 @@ function LaneSlot({
             initial={{ opacity: 0 }}
             animate={{ opacity: [0.45, 0.8, 0.45] }}
             transition={{ duration: 2.2, repeat: Infinity }}
-            className="absolute inset-0 rounded-2xl pointer-events-none"
+            className="absolute inset-0 rounded-xl pointer-events-none"
             style={{
               background: `radial-gradient(circle at 50% 50%, ${haloColor}, transparent 70%)`,
               filter: "blur(8px)",
@@ -599,14 +598,14 @@ function LaneSlot({
         )}
         {pick ? (
           <>
-            <Hand move={pick} size="md" />
+            <Hand move={pick} size="sm" />
             {favoured && (
               <motion.span
                 initial={{ scale: 0, rotate: -20 }}
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{ type: "spring", stiffness: 280, damping: 12 }}
                 className={
-                  "absolute -top-2 -right-2 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-zinc-900 shadow-lg flex items-center gap-1 " +
+                  "absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider text-zinc-900 shadow-lg flex items-center gap-1 " +
                   (accent === "amber"  ? "bg-amber-300" :
                    accent === "sky"    ? "bg-sky-300"   :
                                           "bg-emerald-300")
@@ -617,7 +616,7 @@ function LaneSlot({
             )}
           </>
         ) : (
-          <span className="text-3xl text-zinc-700 font-black">?</span>
+          <span className="text-2xl text-zinc-700 font-black">?</span>
         )}
       </button>
       <span className="text-[9px] text-zinc-500 text-center leading-tight hidden sm:block">
@@ -630,7 +629,7 @@ function LaneSlot({
 function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void }) {
   const [shockMove, setShockMove] = useState<Move | null>(null);
   return (
-    <div className="grid grid-cols-5 gap-2 sm:gap-3 w-full max-w-md">
+    <div className="grid grid-cols-5 gap-1.5 sm:gap-3 w-full max-w-md">
       {MOVES.map((mv, i) => {
         const Icon = MOVE_ICON[mv];
         const pal = MOVE_PALETTE[mv];
@@ -650,14 +649,14 @@ function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void
             whileHover={{ y: -4, scale: 1.04 }}
             whileTap={{ scale: 0.86 }}
             className={
-              "relative aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 " +
+              "relative aspect-[4/5] rounded-xl flex flex-col items-center justify-center gap-0.5 py-1 " +
               "bg-gradient-to-br " + pal.from + " " + pal.to + " ring-2 " + pal.ring + " " + pal.glow +
-              " text-zinc-900 shadow-lg transition"
+              " text-zinc-900 shadow-md transition"
             }
           >
             <PickShock show={shockMove === mv} />
-            <Icon className="w-6 h-6 sm:w-8 sm:h-8" />
-            <span className="text-[9px] uppercase tracking-wider font-bold">{mv}</span>
+            <Icon className="w-5 h-5 sm:w-7 sm:h-7" />
+            <span className="text-[8px] uppercase tracking-wider font-bold leading-none">{mv}</span>
           </motion.button>
         );
       })}
@@ -1093,26 +1092,26 @@ function SideLaneCard({
         : { opacity: 0.3, scale: 0.85, rotateY: 90 }}
       transition={{ type: "spring", stiffness: 280, damping: 22 }}
       className={
-        "rounded-2xl border-2 ring-2 p-2 sm:p-3 flex flex-col items-center gap-1 sm:gap-1.5 " +
+        "aspect-[3/2] rounded-xl border-2 ring-2 px-1 py-1 flex flex-col items-center justify-center gap-0.5 " +
         ring + " " + border + " " + bg
       }
       style={{ transformPerspective: 800 }}
     >
       <div className={
-        "flex items-center gap-1 text-[9px] uppercase tracking-wider " +
+        "flex items-center gap-0.5 text-[8px] uppercase tracking-wider leading-none " +
         (identity.accent === "amber"  ? "text-amber-300/80"   :
          identity.accent === "sky"    ? "text-sky-300/80"     :
                                         "text-emerald-300/80")
       }>
         <span>{identity.glyph}</span>
-        <span>{t(`${idKey}.title`)}</span>
+        <span className="truncate">{t(`${idKey}.title`)}</span>
       </div>
       <div className="relative">
         <Hand move={move} size="sm" emphasis={isWin ? "winner" : isLoss ? "loser" : "default"} />
         {favoured && revealed && <FavouredBadge winning={isWin} />}
       </div>
       <span className={
-        "text-[10px] uppercase tracking-wider font-bold " +
+        "text-[9px] uppercase tracking-wider font-bold leading-none " +
         (isWin ? "text-emerald-300" : isLoss ? "text-rose-300" : "text-zinc-500")
       }>
         {isWin
@@ -1174,41 +1173,10 @@ function FavouredBadge({ winning }: { winning: boolean }) {
   );
 }
 
-/* ──────────── Ambient flavor (subtle geek quote) ──────────── */
-
-/**
- * Random tiny one-liner drawn from the `lanes.flavor.*` i18n bucket and
- * rotated every ~3.5s. Intentionally subtle — it's atmosphere, not signal.
- * 10 quotes cycle through pseudo-randomly per mount.
- */
-const FLAVOR_COUNT = 10;
-function AmbientFlavor() {
-  const t = useT();
-  const [idx, setIdx] = useState(() => Math.floor(Math.random() * FLAVOR_COUNT));
-  useEffect(() => {
-    const id = setInterval(
-      () => setIdx((cur) => (cur + 1 + Math.floor(Math.random() * (FLAVOR_COUNT - 1))) % FLAVOR_COUNT),
-      3500,
-    );
-    return () => clearInterval(id);
-  }, []);
-  return (
-    <div className="min-h-[1.4em] flex items-center justify-center px-4 text-center">
-      <AnimatePresence mode="wait">
-        <motion.span
-          key={idx}
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 0.55, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.4 }}
-          className="text-[10px] italic text-zinc-500 font-light tracking-wide"
-        >
-          {t(`lanes.flavor.${idx}`)}
-        </motion.span>
-      </AnimatePresence>
-    </div>
-  );
-}
+/* AmbientFlavor was used by PickStage to rotate a tiny geek one-liner under
+   the picker bar. Removed during the Constellation layout pass to save
+   ~28 px of vertical space on small phones; same component lives in
+   sharedMatchUI.tsx if a future surface wants to bring it back. */
 
 /* ──────────── Help / Lexicon modal ──────────── */
 

@@ -15,6 +15,7 @@ import { ContactPage } from "./ContactPage";
 import { Welcome } from "./Welcome";
 import { FloatingMatchBackButton } from "./sharedMatchUI";
 import { useT } from "./i18n";
+import { setHapticSettings } from "./haptic";
 
 type Stage = "splash" | "welcome" | "shell";
 
@@ -22,9 +23,17 @@ export default function App() {
   const themeId = useStore((s) => s.player.themeId);
   const onboarded = useStore((s) => s.onboarded);
   const locale = useStore((s) => s.locale);
+  const hapticEnabled  = useStore((s) => s.player.hapticEnabled ?? true);
+  const hapticIntensity = useStore((s) => s.player.hapticIntensity ?? "med");
   const [stage, setStage] = useState<Stage>("splash");
   const [page, setPage] = useState<Page>("play");
   const t = useT();
+
+  // Sync the player's vibration preferences down to the haptic module so
+  // every vibrate() call honors them (module-level state, read sync).
+  useEffect(() => {
+    setHapticSettings({ enabled: hapticEnabled, intensity: hapticIntensity });
+  }, [hapticEnabled, hapticIntensity]);
 
   // Apply theme on mount and whenever it changes
   useEffect(() => {
