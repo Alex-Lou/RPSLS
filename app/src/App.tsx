@@ -13,6 +13,8 @@ import { PacksPage } from "./PacksPage";
 import { AboutPage } from "./AboutPage";
 import { ContactPage } from "./ContactPage";
 import { Welcome } from "./Welcome";
+import { FloatingMatchBackButton } from "./sharedMatchUI";
+import { useT } from "./i18n";
 
 type Stage = "splash" | "welcome" | "shell";
 
@@ -22,6 +24,7 @@ export default function App() {
   const locale = useStore((s) => s.locale);
   const [stage, setStage] = useState<Stage>("splash");
   const [page, setPage] = useState<Page>("play");
+  const t = useT();
 
   // Apply theme on mount and whenever it changes
   useEffect(() => {
@@ -70,6 +73,15 @@ export default function App() {
           >
             <Sidebar page={page} onNavigate={setPage} />
             <MobileShell page={page} onNavigate={setPage} />
+            {/* Global "back to Play" arrow, parked right next to the burger
+                on every non-Play page. Avoids the Android system back button
+                (which closes the app) being the only escape route. */}
+            {page !== "play" && (
+              <FloatingMatchBackButton
+                onClick={() => setPage("play")}
+                label={t("nav.backToPlay")}
+              />
+            )}
             <div className="flex-1 flex flex-col min-w-0">
               {/* Mobile: clear the floating hamburger (top:max(safe,32)+44h)
                   with a measured gap, and keep content above the Android
