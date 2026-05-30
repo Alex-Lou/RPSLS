@@ -228,14 +228,24 @@ export function LanesMatchView({
             startedAt={round.startedAt}
             deadlineMs={round.deadlineMs}
             onSubmit={submitNow}
+            opponentName={match.opponent}
+            youName={nickname}
           />
         )}
         {phase === "submitted" && (
-          <LockedStage picks={picks as Move[]} />
+          <LockedStage
+            picks={picks as Move[]}
+            opponentName={match.opponent}
+            youName={nickname}
+          />
         )}
         {phase === "reveal" && lastResult && !revealReady && <RevealCountdown />}
         {phase === "reveal" && lastResult && revealReady && (
-          <RevealStage result={lastResult} />
+          <RevealStage
+            result={lastResult}
+            opponentName={match.opponent}
+            youName={nickname}
+          />
         )}
         {phase === "match_end" && end && (
           <MatchEndScene end={end} onBack={onLeave} onRematch={onRematch} />
@@ -349,8 +359,78 @@ function NameTag({
   );
 }
 
+/**
+ * GameTable — felt-mat container that frames the two rows of lanes
+ * (Opponent on top, You on bottom) so the player can never confuse which
+ * side belongs to whom. Used by PickStage, LockedStage and RevealStage.
+ */
+function GameTable({
+  opponentName, youName,
+  oppRow, youRow,
+  oppStatus, youStatus,
+}: {
+  opponentName: string;
+  youName: string;
+  oppRow: React.ReactNode;
+  youRow: React.ReactNode;
+  oppStatus?: React.ReactNode;
+  youStatus?: React.ReactNode;
+}) {
+  return (
+    <div
+      className="w-full max-w-2xl rounded-3xl p-3 sm:p-5 flex flex-col gap-3 sm:gap-4
+                 border border-emerald-900/40
+                 bg-gradient-to-b from-emerald-950/40 via-zinc-950/60 to-emerald-950/40
+                 shadow-[inset_0_0_40px_rgba(0,0,0,0.55)]"
+    >
+      {/* Opponent header */}
+      <div className="flex items-center justify-between px-1">
+        <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-rose-300/90">
+          ✦ {opponentName}
+        </span>
+        {oppStatus && (
+          <span className="text-[10px] uppercase tracking-wider text-zinc-500">{oppStatus}</span>
+        )}
+      </div>
+
+      {/* Opponent row */}
+      {oppRow}
+
+      {/* Felt divider */}
+      <div className="h-px bg-gradient-to-r from-transparent via-emerald-400/30 to-transparent" />
+
+      {/* You row */}
+      {youRow}
+
+      {/* You footer */}
+      <div className="flex items-center justify-between px-1">
+        <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-emerald-300/90">
+          ✦ {youName}
+        </span>
+        {youStatus && (
+          <span className="text-[10px] uppercase tracking-wider text-zinc-500">{youStatus}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Tiny "?" face-down card for an opponent lane we can't see yet. */
+function FaceDownLaneCard({ index, pulsing = false }: { index: number; pulsing?: boolean }) {
+  return (
+    <motion.div
+      animate={pulsing ? { opacity: [0.55, 1, 0.55] } : { opacity: 1 }}
+      transition={pulsing ? { duration: 1.4, repeat: Infinity, delay: index * 0.18 } : undefined}
+      className="aspect-square w-full rounded-2xl border-2 border-dashed border-white/10 bg-black/30
+                 flex items-center justify-center"
+    >
+      <span className="text-2xl sm:text-3xl text-zinc-700 font-black">?</span>
+    </motion.div>
+  );
+}
+
 function PickStage({
-  picks, onPick, onClearLane, startedAt, deadlineMs, onSubmit,
+  picks, onPick, onClearLane, startedAt, deadlineMs, onSubmit, opponentName, youName,
 }: {
   picks: (Move | null)[];
   /** Pick `mv` — drops it into the next empty lane. */
@@ -359,6 +439,8 @@ function PickStage({
   startedAt: number;
   deadlineMs: number;
   onSubmit: () => void;
+  opponentName: string;
+  youName: string;
 }) {
   const t = useT();
   const allFilled = picks.every((p) => p !== null);
@@ -370,12 +452,28 @@ function PickStage({
       {/* Timer */}
       <TimerBar startedAt={startedAt} durationMs={deadlineMs} />
 
-      {/* 3 lane slots */}
-      <div className="grid grid-cols-3 gap-3 sm:gap-5 w-full max-w-2xl">
-        {picks.map((mv, i) => (
-          <LaneSlot key={i} index={i} pick={mv} onClear={() => onClearLane(i)} />
-        ))}
-      </div>
+      <GameTable
+        opponentName={opponentName}
+        youName={youName}
+        oppStatus={t("lanes.tableOppThinking")}
+        youStatus={
+          allFilled ? t("lanes.tableYouReady") : t("lanes.pickRemaining", { n: remaining })
+        }
+        oppRow={
+          <div className="grid grid-cols-3 gap-3 sm:gap-5">
+            {[0, 1, 2].map((i) => (
+              <FaceDownLaneCard key={i} index={i} pulsing />
+            ))}
+          </div>
+        }
+        youRow={
+          <div className="grid grid-cols-3 gap-3 sm:gap-5">
+            {picks.map((mv, i) => (
+              <LaneSlot key={i} index={i} pick={mv} onClear={() => onClearLane(i)} />
+            ))}
+          </div>
+        }
+      />
 
       <div className="text-[11px] uppercase tracking-[0.3em] text-zinc-500 text-center px-4">
         {t("lanes.pickInstruction")}
@@ -656,30 +754,45 @@ function TimerBar({ startedAt, durationMs }: { startedAt: number; durationMs: nu
   );
 }
 
-function LockedStage({ picks }: { picks: Move[] }) {
+function LockedStage({
+  picks, opponentName, youName,
+}: { picks: Move[]; opponentName: string; youName: string }) {
   const t = useT();
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
+      initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="flex flex-col items-center gap-4"
+      className="w-full flex flex-col items-center gap-4"
     >
-      <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-300">
-        {t("lanes.lockedIn")}
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        {picks.map((mv, i) => (
-          <motion.div
-            key={i}
-            animate={{ y: [0, -4, 0] }}
-            transition={{ duration: 1.4, delay: i * 0.2, repeat: Infinity }}
-            className="flex flex-col items-center gap-1"
-          >
-            <Hand move={mv} size="md" />
-            <span className="text-[9px] uppercase tracking-wider text-zinc-500">L{i + 1}</span>
-          </motion.div>
-        ))}
-      </div>
+      <GameTable
+        opponentName={opponentName}
+        youName={youName}
+        oppStatus={t("lanes.tableOppThinking")}
+        youStatus={t("lanes.lockedIn")}
+        oppRow={
+          <div className="grid grid-cols-3 gap-3 sm:gap-5">
+            {[0, 1, 2].map((i) => (
+              <FaceDownLaneCard key={i} index={i} pulsing />
+            ))}
+          </div>
+        }
+        youRow={
+          <div className="grid grid-cols-3 gap-3 sm:gap-5">
+            {picks.map((mv, i) => (
+              <motion.div
+                key={i}
+                animate={{ y: [0, -3, 0] }}
+                transition={{ duration: 1.4, delay: i * 0.18, repeat: Infinity }}
+                className="aspect-square w-full rounded-2xl border-2 border-emerald-400/40 bg-emerald-500/10
+                           flex flex-col items-center justify-center gap-1 ring-2 ring-emerald-400/30"
+              >
+                <Hand move={mv} size="md" />
+                <span className="text-[9px] uppercase tracking-wider text-emerald-300/80">L{i + 1}</span>
+              </motion.div>
+            ))}
+          </div>
+        }
+      />
       <div className="text-sm text-zinc-300 font-medium">{t("lanes.waitingOpponent")}</div>
     </motion.div>
   );
@@ -725,7 +838,13 @@ function RevealCountdown() {
  * banner (sweep / wipeout / mirror / classic trinity / triple) animates in
  * last, on top of the lanes.
  */
-function RevealStage({ result }: { result: LanesRoundResultData }) {
+function RevealStage({
+  result, opponentName, youName,
+}: {
+  result: LanesRoundResultData;
+  opponentName: string;
+  youName: string;
+}) {
   const t = useT();
   const yourPicks = result.yourPlays.map((p) => p.mv);
   const oppPicks  = result.oppPlays.map((p)  => p.mv);
@@ -755,25 +874,57 @@ function RevealStage({ result }: { result: LanesRoundResultData }) {
     return () => timers.forEach(window.clearTimeout);
   }, [result]);
 
+  // Per-lane verdicts from the player's perspective.
+  const laneVerdicts: ("win" | "loss" | "draw")[] = result.laneResults.map((lr, i) => {
+    const you = result.yourPlays[i].mv;
+    if (lr.winner === "draw") return "draw";
+    const youWon = (lr.winner === "a" && lr.a_play.mv === you)
+                || (lr.winner === "b" && lr.b_play.mv === you);
+    return youWon ? "win" : "loss";
+  });
+
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
+      initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="flex flex-col items-center gap-3 w-full"
+      className="w-full flex flex-col items-center gap-3"
     >
-      {/* 3-lane reveal — each card flips when its index <= revealedLanes. */}
-      <div className="grid grid-cols-3 gap-3 sm:gap-5 w-full max-w-2xl">
-        {result.laneResults.map((lr, i) => (
-          <LaneRevealCard
-            key={i}
-            lane={i}
-            you={result.yourPlays[i].mv}
-            opp={result.oppPlays[i].mv}
-            lr={lr}
-            revealed={i < revealedLanes}
-          />
-        ))}
-      </div>
+      <GameTable
+        opponentName={opponentName}
+        youName={youName}
+        oppRow={
+          <div className="grid grid-cols-3 gap-3 sm:gap-5">
+            {result.laneResults.map((_, i) => (
+              <SideLaneCard
+                key={i}
+                lane={i}
+                move={result.oppPlays[i].mv}
+                verdictForSide={
+                  laneVerdicts[i] === "draw" ? "draw"
+                  : laneVerdicts[i] === "win" ? "loss" /* opp lost = lost from opp side */
+                  : "win"
+                }
+                revealed={i < revealedLanes}
+                side="opp"
+              />
+            ))}
+          </div>
+        }
+        youRow={
+          <div className="grid grid-cols-3 gap-3 sm:gap-5">
+            {result.laneResults.map((_, i) => (
+              <SideLaneCard
+                key={i}
+                lane={i}
+                move={result.yourPlays[i].mv}
+                verdictForSide={laneVerdicts[i]}
+                revealed={i < revealedLanes}
+                side="you"
+              />
+            ))}
+          </div>
+        }
+      />
 
       {/* Verdict line — appears once all 3 lanes have dropped. */}
       <AnimatePresence>
@@ -898,66 +1049,72 @@ function ComboBanner({ combo }: { combo: ComboTheme }) {
   );
 }
 
-function LaneRevealCard({
-  lane, you, opp, lr, revealed,
-}: { lane: number; you: Move; opp: Move; lr: LaneResult; revealed: boolean }) {
+/** Single-side lane card: one Hand + lane identity + per-lane verdict from
+ *  the perspective of that side. Used twice per lane (once opp, once you). */
+function SideLaneCard({
+  lane, move, verdictForSide, revealed, side,
+}: {
+  lane: number;
+  move: Move;
+  verdictForSide: "win" | "loss" | "draw";
+  revealed: boolean;
+  side: "opp" | "you";
+}) {
   const t = useT();
   const identity = LANE_IDENTITIES[lane];
   const idKey = IDENTITY_KEYS[lane];
-  const ringColor =
-    lr.winner === "a" && lr.a_play.mv === you ? "ring-emerald-400/50" :
-    lr.winner === "b" && lr.b_play.mv === you ? "ring-emerald-400/50" :
-    lr.winner === "draw" ? "ring-zinc-500/30" : "ring-rose-400/40";
-  // Simpler: check by comparing your play vs lane winner.
-  const youWon = (lr.winner === "a" && lr.a_play.mv === you && lr.b_play.mv === opp)
-              || (lr.winner === "b" && lr.b_play.mv === you && lr.a_play.mv === opp);
-  const oppWon = (lr.winner !== "draw") && !youWon;
-  const youFavoured = laneFavoursMove(lane, you);
-  const oppFavoured = laneFavoursMove(lane, opp);
+  const favoured = laneFavoursMove(lane, move);
+  const isWin  = verdictForSide === "win";
+  const isLoss = verdictForSide === "loss";
+
+  const ring =
+    isWin  ? "ring-emerald-400/60" :
+    isLoss ? "ring-rose-400/50"    :
+             "ring-zinc-500/30";
+  const border =
+    isWin  ? "border-emerald-400/40" :
+    isLoss ? "border-rose-400/30"    :
+             "border-zinc-500/20";
+  const bg =
+    isWin  ? "bg-emerald-500/10" :
+    isLoss ? "bg-rose-500/10"    :
+             "bg-black/30";
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.7, rotateY: 90 }}
       animate={revealed
         ? { opacity: 1, scale: 1, rotateY: 0 }
-        : { opacity: 0.35, scale: 0.85, rotateY: 90 }}
+        : { opacity: 0.3, scale: 0.85, rotateY: 90 }}
       transition={{ type: "spring", stiffness: 280, damping: 22 }}
       className={
-        "rounded-2xl bg-black/30 border-2 p-3 flex flex-col items-center gap-2 ring-2 " + ringColor +
-        " " + (youWon ? "border-emerald-400/30" : oppWon ? "border-rose-400/30" : "border-zinc-500/20")
+        "rounded-2xl border-2 ring-2 p-2 sm:p-3 flex flex-col items-center gap-1 sm:gap-1.5 " +
+        ring + " " + border + " " + bg
       }
       style={{ transformPerspective: 800 }}
     >
-      <div className="flex items-center gap-1 text-[9px] uppercase tracking-wider">
-        <span className="text-zinc-500">{t("lanes.lane", { n: lane + 1 })}</span>
-        <span className="text-zinc-600">·</span>
-        <span className={
-          identity.accent === "amber"  ? "text-amber-300/80"   :
-          identity.accent === "sky"    ? "text-sky-300/80"     :
-                                          "text-emerald-300/80"
-        }>
-          {identity.glyph} {t(`${idKey}.title`)}
-        </span>
+      <div className={
+        "flex items-center gap-1 text-[9px] uppercase tracking-wider " +
+        (identity.accent === "amber"  ? "text-amber-300/80"   :
+         identity.accent === "sky"    ? "text-sky-300/80"     :
+                                        "text-emerald-300/80")
+      }>
+        <span>{identity.glyph}</span>
+        <span>{t(`${idKey}.title`)}</span>
       </div>
-      {/* Opponent on top, player on bottom — fighting-game orientation so
-          "your hand" is always on the same line as your picker bar below. */}
       <div className="relative">
-        <Hand move={opp} size="sm" emphasis={oppWon ? "winner" : youWon ? "loser" : "default"} />
-        {oppFavoured && revealed && (
-          <FavouredBadge winning={oppWon} />
-        )}
-      </div>
-      <span className="text-[10px] text-zinc-600 font-black">VS</span>
-      <div className="relative">
-        <Hand move={you} size="sm" emphasis={youWon ? "winner" : oppWon ? "loser" : "default"} />
-        {youFavoured && revealed && (
-          <FavouredBadge winning={youWon} />
-        )}
+        <Hand move={move} size="sm" emphasis={isWin ? "winner" : isLoss ? "loser" : "default"} />
+        {favoured && revealed && <FavouredBadge winning={isWin} />}
       </div>
       <span className={
-        "text-[10px] uppercase tracking-wider font-bold mt-0.5 " +
-        (youWon ? "text-emerald-300" : oppWon ? "text-rose-300" : "text-zinc-500")
+        "text-[10px] uppercase tracking-wider font-bold " +
+        (isWin ? "text-emerald-300" : isLoss ? "text-rose-300" : "text-zinc-500")
       }>
-        {youWon ? t("lanes.win") : oppWon ? t("lanes.loss") : t("lanes.drawShort")}
+        {isWin
+          ? (side === "you" ? t("lanes.win") : t("lanes.loss"))
+          : isLoss
+          ? (side === "you" ? t("lanes.loss") : t("lanes.win"))
+          : t("lanes.drawShort")}
       </span>
     </motion.div>
   );

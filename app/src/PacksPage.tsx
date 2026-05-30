@@ -21,7 +21,7 @@ export function PacksPage() {
   const theme = THEMES[themeId];
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-6 pt-3 pb-6 md:p-6">
+    <div className="w-full max-w-5xl mx-auto px-5 pt-2 pb-6 md:p-6">
       <AnimatePresence mode="wait">
         {view.kind === "list" ? (
           <motion.div
