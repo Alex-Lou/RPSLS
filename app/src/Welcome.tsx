@@ -34,7 +34,7 @@ export function Welcome({ onDone }: { onDone: () => void }) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.4 }}
-      className="min-h-screen w-full flex items-center justify-center p-4"
+      className="h-full w-full flex items-center justify-center p-4"
     >
       <motion.div
         initial={{ opacity: 0, scale: 0.92, y: 20 }}
