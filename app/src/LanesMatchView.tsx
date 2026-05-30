@@ -16,6 +16,7 @@ import { Hand, MOVE_ICON, MOVE_PALETTE } from "./icons";
 import { MOVES, type Move } from "./game";
 import { hapticAlert, hapticTap } from "./haptic";
 import { useT } from "./i18n";
+import { MatchScoreBar } from "./sharedMatchUI";
 import type { LanePlay, LaneResult, PlayerSlot } from "./online";
 import {
   detectOutcomeCombo,
@@ -263,57 +264,17 @@ function ScoreHeader({
   youWins: number; oppWins: number; target: number; round: number;
 }) {
   const t = useT();
+  // Same shared component the classic modes use — guaranteed uniformity.
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between rounded-2xl bg-black/30 border border-white/10 px-4 py-3">
-        <div className="flex flex-col min-w-0 flex-1">
-          <span className="text-[10px] uppercase tracking-wider text-zinc-500">{t("lanes.you")}</span>
-          <span className="font-semibold truncate text-emerald-200">{you}</span>
-        </div>
-        {/* Score: each side rendered through a "rolling number" so the value
-            slides in/out instead of stacking. Fixed width prevents the
-            colon/border from shifting when digits change. */}
-        <div className="text-3xl sm:text-4xl font-black tabular-nums px-3 flex items-center gap-1">
-          <RollingNumber value={youWins} color="emerald" />
-          <span className="text-zinc-600 px-1">:</span>
-          <RollingNumber value={oppWins} color="rose" />
-        </div>
-        <div className="flex flex-col text-right min-w-0 flex-1">
-          <span className="text-[10px] uppercase tracking-wider text-zinc-500">{t("lanes.opponent")}</span>
-          <span className="font-semibold truncate text-rose-200">{opp || "—"}</span>
-        </div>
-      </div>
-      <div className="text-center text-[11px] uppercase tracking-[0.25em] text-zinc-500">
-        {t("lanes.scoreCaption", { round, target })}
-      </div>
-    </div>
-  );
-}
-
-function RollingNumber({
-  value, color,
-}: { value: number; color: "emerald" | "rose" }) {
-  const colorCls = color === "emerald" ? "text-emerald-300" : "text-rose-300";
-  return (
-    <span
-      className={
-        "relative inline-block min-w-[1.2em] text-center overflow-hidden " + colorCls
-      }
-      style={{ height: "1.1em", lineHeight: "1.1em" }}
-    >
-      <AnimatePresence mode="popLayout" initial={false}>
-        <motion.span
-          key={value}
-          initial={{ y: "-100%", opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: "100%", opacity: 0 }}
-          transition={{ type: "spring", stiffness: 380, damping: 30 }}
-          className="absolute inset-0 flex items-center justify-center"
-        >
-          {value}
-        </motion.span>
-      </AnimatePresence>
-    </span>
+    <MatchScoreBar
+      youName={you}
+      oppName={opp || "—"}
+      youScore={youWins}
+      oppScore={oppWins}
+      youTag={t("lanes.you")}
+      oppTag={t("lanes.opponent")}
+      caption={t("lanes.scoreCaption", { round, target })}
+    />
   );
 }
 

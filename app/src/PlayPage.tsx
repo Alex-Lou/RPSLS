@@ -31,7 +31,7 @@ import { todayChallenge, type DailyChallenge } from "./daily";
 import { useT } from "./i18n";
 import type { Page } from "./Sidebar";
 import { LocalLanesGame } from "./LocalLanesGame";
-import { CinematicMatchEnd, AmbientFlavor } from "./sharedMatchUI";
+import { CinematicMatchEnd, AmbientFlavor, MatchScoreBar } from "./sharedMatchUI";
 
 type View =
   | { kind: "select" }
@@ -867,27 +867,26 @@ function Header({
     else onQuit();
   };
 
+  // Same caption shape as the Constellation ScoreHeader, classic wording.
+  const round = scoreA + scoreB + 1;
+  const caption = t("match.scoreCaption", { round, target });
+
   return (
     <>
-      <div className="flex items-center justify-center gap-3 relative">
-        {/* Compact back-arrow button — absolute positioned so the score stays centered */}
-        <button
-          onClick={handleQuitClick}
-          aria-label={t("match.quit")}
-          className="absolute left-0 w-10 h-10 rounded-xl border border-white/10 hover:border-white/30 bg-zinc-950/40 backdrop-blur-sm transition flex items-center justify-center text-zinc-300 hover:text-white"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-        </button>
-
-        {/* Centered score badge */}
-        <div className="flex items-center gap-4 sm:gap-7 bg-zinc-950/55 backdrop-blur-md border border-white/15 rounded-xl sm:rounded-2xl px-4 sm:px-7 py-1.5 sm:py-2 shadow-xl">
-          <ScoreSide name={labelA} score={scoreA} target={target} streak={streakA} />
-          <span className="text-zinc-500 text-xs font-bold tracking-[0.3em]">{t("match.vs")}</span>
-          <ScoreSide name={labelB} score={scoreB} target={target} streak={streakB} align="right" />
-        </div>
-      </div>
+      {/* Unified score bar — identical component used by Constellation. */}
+      <MatchScoreBar
+        youName={labelA}
+        oppName={labelB}
+        youScore={scoreA}
+        oppScore={scoreB}
+        youTag={t("lanes.you")}
+        oppTag={t("lanes.opponent")}
+        youStreak={streakA}
+        oppStreak={streakB}
+        caption={caption}
+        onBack={handleQuitClick}
+        backLabel={t("match.quit")}
+      />
 
       {/* Quit confirmation modal */}
       <AnimatePresence>
@@ -954,55 +953,6 @@ function QuitConfirmModal({
         </div>
       </motion.div>
     </motion.div>
-  );
-}
-
-function ScoreSide({
-  name, score, target, streak, align = "left",
-}: {
-  name: string; score: number; target: number; streak: number;
-  align?: "left" | "right";
-}) {
-  return (
-    <div className={"flex flex-col " + (align === "right" ? "items-end" : "items-start")}>
-      <div className="flex items-center gap-1.5">
-        <span className="text-sm font-semibold uppercase tracking-wider text-zinc-200">{name}</span>
-        <AnimatePresence>
-          {streak >= 2 && (
-            <motion.span
-              key={streak}
-              initial={{ scale: 0.4, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 500, damping: 18 }}
-              className={
-                "text-[10px] font-bold px-1.5 py-0.5 rounded-full " +
-                (streak >= 3
-                  ? "bg-orange-500/30 text-orange-300 ring-1 ring-orange-400/50"
-                  : "bg-amber-500/20 text-amber-300 ring-1 ring-amber-400/40")
-              }
-            >
-              🔥 {streak}
-            </motion.span>
-          )}
-        </AnimatePresence>
-      </div>
-      <div className="flex gap-1.5 mt-1.5">
-        {Array.from({ length: target }).map((_, i) => (
-          <motion.span
-            key={i}
-            initial={false}
-            animate={{
-              scale: i < score ? [1, 1.5, 1] : 1,
-              backgroundColor: i < score ? "#a78bfa" : "rgba(255,255,255,0.12)",
-            }}
-            transition={{ duration: 0.4 }}
-            className="w-3 h-3 rounded-full"
-            style={i < score ? { boxShadow: "0 0 8px #a78bfa80" } : undefined}
-          />
-        ))}
-      </div>
-    </div>
   );
 }
 
