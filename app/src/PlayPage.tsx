@@ -31,6 +31,7 @@ import { todayChallenge, type DailyChallenge } from "./daily";
 import { useT } from "./i18n";
 import type { Page } from "./Sidebar";
 import { LocalLanesGame } from "./LocalLanesGame";
+import { CinematicMatchEnd, AmbientFlavor } from "./sharedMatchUI";
 
 type View =
   | { kind: "select" }
@@ -1168,6 +1169,12 @@ function PickPanel({
           </motion.button>
         ))}
       </div>
+
+      {/* Atmosphere — same rotating geek one-liners as in Constellation,
+          so every mode breathes with the same vibe. */}
+      <div className="mt-1">
+        <AmbientFlavor />
+      </div>
     </motion.div>
   );
 }
@@ -1483,27 +1490,36 @@ function EndPanel({
   const xpDelta = Math.round(baseXp * xpMultiplier);
   const xpBonus = xpDelta - baseXp;
 
+  // Map status to outcome from the player's perspective (player is always A).
+  const outcome: "win" | "loss" | "draw" =
+    s === "a_won" ? "win" : s === "b_won" ? "loss" : "draw";
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.92 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
       transition={{ type: "spring", stiffness: 220, damping: 18 }}
-      className="bg-zinc-950/30 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 p-5 sm:p-10 border border-white/10 flex flex-col items-center gap-5 text-center"
+      className="bg-zinc-950/30 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 p-5 sm:p-10 border border-white/10 flex flex-col items-center text-center"
     >
-      <motion.span
-        initial={{ scale: 0, rotate: -45 }}
-        animate={{ scale: 1, rotate: 0 }}
-        transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
-        className="text-6xl"
-      >
-        🏆
-      </motion.span>
-      <h2 className="text-3xl font-extrabold bg-gradient-to-r from-violet-300 to-teal-300 bg-clip-text text-transparent">
-        {t("match.win.title", { name: winnerLabel })}
-      </h2>
+      {/* Cinematic match-end shared with Constellation Lanes — same trophy
+          breath / wordmark pulse / quote / rematch buttons feel everywhere. */}
+      <CinematicMatchEnd
+        outcome={outcome}
+        scoreLine={`${match.scoreA} — ${match.scoreB}`}
+        onRematch={onAgain}
+        onBack={onQuit}
+        rematchLabel={t("match.playAgain")}
+        backLabel={t("match.back")}
+      />
 
-      <div className="text-zinc-400 text-sm space-y-0.5">
+      {/* Local extras specific to single-player: winner title, streak,
+          mood and XP/LP reward chips. Rendered *under* the cinematic end
+          scene, more compact. */}
+      <div className="text-zinc-400 text-xs space-y-0.5 mt-4">
+        <p className="text-zinc-300 font-semibold">
+          {t("match.win.title", { name: winnerLabel })}
+        </p>
         <p>{t("match.win.final", { a: match.scoreA, b: match.scoreB, bo: match.bestOf })}</p>
         {bestStreak >= 2 && (
           <p>{t("match.win.streak", { n: bestStreak, name: bestStreakHolder })}</p>
@@ -1519,8 +1535,8 @@ function EndPanel({
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="flex flex-col items-center gap-2"
+          transition={{ delay: 1.7 }}
+          className="flex flex-col items-center gap-2 mt-3"
         >
           <div className="flex gap-2 text-sm">
             {xpDelta !== 0 && (
@@ -1549,25 +1565,6 @@ function EndPanel({
           )}
         </motion.div>
       )}
-
-      <div className="flex gap-3">
-        <motion.button
-          whileHover={{ y: -2 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={onAgain}
-          className="px-5 py-3 rounded-2xl font-semibold bg-gradient-to-br from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400"
-        >
-          {t("match.playAgain")}
-        </motion.button>
-        <motion.button
-          whileHover={{ y: -2 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={onQuit}
-          className="px-5 py-3 rounded-2xl font-semibold bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30"
-        >
-          {t("match.back")}
-        </motion.button>
-      </div>
     </motion.div>
   );
 }
