@@ -15,7 +15,7 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { id: "play",    labelKey: "nav.play",    icon: "🎯" },
+  { id: "play",    labelKey: "nav.home",    icon: "🏠" },
   { id: "online",  labelKey: "nav.online",  icon: "🌐" },
   { id: "quests",  labelKey: "nav.quests",  icon: "🏅" },
   { id: "packs",   labelKey: "nav.packs",   icon: "🎴" },

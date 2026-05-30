@@ -190,27 +190,26 @@ export function LanesMatchView({
         )}
       </AnimatePresence>
 
-      {/* Score header + inline help "?" — single row to save the vertical
-          space that the dedicated "?" row was eating (caused the layout
-          to spill back under the burger). */}
-      <div className="flex items-start gap-2">
-        <div className="flex-1 min-w-0">
-          <ScoreHeader
-            you={nickname}
-            opp={match.opponent}
-            youWins={youWins}
-            oppWins={oppWins}
-            target={target}
-            round={round?.no ?? 1}
-          />
-        </div>
+      {/* Score header — full row width. Help "?" floats above as an
+          absolute overlay so it never steals horizontal space from the
+          two names + score, and doesn't add a row that would push the
+          layout into the burger zone. */}
+      <div className="relative">
         <button
           onClick={() => setHelpOpen(true)}
           title={t("lanes.help.button")}
-          className="shrink-0 mt-1 w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 border border-white/15 text-zinc-300 hover:text-white text-xs font-bold transition flex items-center justify-center"
+          className="absolute -top-7 right-0 z-10 w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 border border-white/15 text-zinc-300 hover:text-white text-[11px] font-bold transition flex items-center justify-center"
         >
           ?
         </button>
+        <ScoreHeader
+          you={nickname}
+          opp={match.opponent}
+          youWins={youWins}
+          oppWins={oppWins}
+          target={target}
+          round={round?.no ?? 1}
+        />
       </div>
 
       <AnimatePresence>
