@@ -236,6 +236,54 @@ export function ProfilePage() {
         </div>
       </section>
 
+      {/* Haptics — vibration on tap + result */}
+      <section className="bg-white/5 border border-white/10 rounded-3xl p-4 sm:p-5">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-1">
+          {t("profile.haptic.title")}
+        </h2>
+        <p className="text-xs text-zinc-500 mb-3">
+          {t("profile.haptic.subtitle")}
+        </p>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <span className="text-sm text-zinc-300">{t("profile.haptic.enable")}</span>
+          <button
+            onClick={() => updateProfile({ hapticEnabled: !(player.hapticEnabled ?? true) })}
+            className={
+              "w-12 h-7 rounded-full transition relative " +
+              ((player.hapticEnabled ?? true)
+                ? "bg-emerald-500/70"
+                : "bg-zinc-700")
+            }
+          >
+            <span
+              className={
+                "absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-all " +
+                ((player.hapticEnabled ?? true) ? "left-[22px]" : "left-0.5")
+              }
+            />
+          </button>
+        </div>
+        <div className={"grid grid-cols-3 gap-2 " + ((player.hapticEnabled ?? true) ? "" : "opacity-40 pointer-events-none")}>
+          {(["low", "med", "high"] as const).map((lvl) => {
+            const active = (player.hapticIntensity ?? "med") === lvl;
+            return (
+              <button
+                key={lvl}
+                onClick={() => updateProfile({ hapticIntensity: lvl })}
+                className={
+                  "rounded-xl py-2 text-xs font-semibold border transition " +
+                  (active
+                    ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
+                    : "border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10")
+                }
+              >
+                {t(`profile.haptic.${lvl}`)}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       {/* Battle pad picker */}
       <section className="bg-white/5 border border-white/10 rounded-3xl p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-3">Battle pad</h2>

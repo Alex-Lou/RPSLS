@@ -42,6 +42,10 @@ export interface Player {
   claimedQuests: string[];
   completedDailies: string[]; // 'YYYY-MM-DD' date keys
   createdAt: number;
+  /** Vibration on/off — default true. Read via store.migration on legacy save. */
+  hapticEnabled?: boolean;
+  /** Vibration intensity multiplier — default "med". */
+  hapticIntensity?: "low" | "med" | "high";
 }
 
 export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: string }> = {

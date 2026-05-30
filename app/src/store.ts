@@ -33,6 +33,8 @@ export function defaultPlayer(): Player {
     claimedQuests: [],
     completedDailies: [],
     createdAt: Date.now(),
+    hapticEnabled: true,
+    hapticIntensity: "med",
   };
 }
 
@@ -53,7 +55,7 @@ interface AppState {
   locale: Locale;
   serverConfig: ServerConfig;
 
-  updateProfile: (patch: Partial<Pick<Player, "nickname" | "avatar" | "themeId" | "padId" | "difficulty">>) => void;
+  updateProfile: (patch: Partial<Pick<Player, "nickname" | "avatar" | "themeId" | "padId" | "difficulty" | "hapticEnabled" | "hapticIntensity">>) => void;
   recordMatch: (m: MatchRecord) => void;
   claimQuest: (id: string, xpReward: number, lpReward?: number) => void;
   recordDailyComplete: (date: string) => void;

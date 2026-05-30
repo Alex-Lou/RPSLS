@@ -592,6 +592,33 @@ function CosmosPad(props: React.SVGProps<SVGSVGElement>) {
         <circle r="6" fill="#ffffff" fillOpacity="0.55" />
       </g>
 
+      {/* ── Animated atom centerpiece (matches the landing page #demo) ──
+           3 orbits at 0°/60°/-60°, one electron each, animateMotion paths.
+           No nucleus glyph — just a soft halo coming from the pulsar above. */}
+      <g transform={`translate(${W/2} ${H/2 + 10})`}>
+        <g transform="rotate(0)">
+          <ellipse cx="0" cy="0" rx="180" ry="55" fill="none" stroke="#a78bfa" strokeOpacity="0.55" strokeWidth="2" />
+          <circle r="9" fill="#a78bfa">
+            <animateMotion dur="4.2s" repeatCount="indefinite"
+              path="M -180,0 a 180,55 0 1,0 360,0 a 180,55 0 1,0 -360,0" />
+          </circle>
+        </g>
+        <g transform="rotate(60)">
+          <ellipse cx="0" cy="0" rx="180" ry="55" fill="none" stroke="#5eead4" strokeOpacity="0.55" strokeWidth="2" />
+          <circle r="9" fill="#5eead4">
+            <animateMotion dur="5.5s" repeatCount="indefinite"
+              path="M -180,0 a 180,55 0 1,1 360,0 a 180,55 0 1,1 -360,0" />
+          </circle>
+        </g>
+        <g transform="rotate(-60)">
+          <ellipse cx="0" cy="0" rx="180" ry="55" fill="none" stroke="#f0abfc" strokeOpacity="0.55" strokeWidth="2" />
+          <circle r="9" fill="#f0abfc">
+            <animateMotion dur="6.8s" repeatCount="indefinite"
+              path="M -180,0 a 180,55 0 1,0 360,0 a 180,55 0 1,0 -360,0" />
+          </circle>
+        </g>
+      </g>
+
       {/* Title — top center */}
       <g transform={`translate(${W/2} 120)`} textAnchor="middle">
         <line x1="-220" y1="-2" x2="-100" y2="-2" stroke="#88e2ff" strokeOpacity="0.25" />

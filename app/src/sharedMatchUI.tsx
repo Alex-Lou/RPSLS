@@ -331,19 +331,11 @@ export function CinematicMatchEnd({
 /* ──────────── Pick VFX (impact on tap) ──────────── */
 
 /**
- * Trigger a brief 15 ms haptic buzz on devices that support the Vibration API
- * — adds physicality to taps without sounding alarms. Safe-noop everywhere
- * else (desktop, iOS Safari pre-16).
+ * Trigger a brief haptic buzz on a player tap. Delegates to the central
+ * haptic.ts helper so it inherits the user's enable/intensity settings
+ * — kept as a re-export under its old name for code-call-site stability.
  */
-export function hapticTick() {
-  try {
-    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-      navigator.vibrate(12);
-    }
-  } catch {
-    // Vibration API can throw inside cross-origin iframes; swallow silently.
-  }
-}
+export { hapticTap as hapticTick } from "./haptic";
 
 /**
  * Fires a brief inflate-ring "shock" overlay on the parent button, useful for
