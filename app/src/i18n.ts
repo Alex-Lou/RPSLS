@@ -43,9 +43,10 @@ type Dict = Record<string, string>;
 const en: Dict = {
   // ── Nav / shell ──
   "nav.play": "Play",
+  "nav.home": "Home",
   "nav.online": "Online",
   "nav.quests": "Quests",
-  "nav.backToPlay": "Back to Play",
+  "nav.backToPlay": "Back to home",
   "nav.packs": "Variants",
   "nav.profile": "Profile",
   "nav.history": "History",
@@ -655,9 +656,10 @@ const en: Dict = {
 const fr: Dict = {
   // ── Nav / shell ──
   "nav.play": "Jouer",
+  "nav.home": "Accueil",
   "nav.online": "En ligne",
   "nav.quests": "Quêtes",
-  "nav.backToPlay": "Retour à Jouer",
+  "nav.backToPlay": "Retour à l'accueil",
   "nav.packs": "Variantes",
   "nav.profile": "Profil",
   "nav.history": "Historique",

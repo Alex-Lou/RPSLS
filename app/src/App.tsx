@@ -27,7 +27,16 @@ export default function App() {
   const hapticIntensity = useStore((s) => s.player.hapticIntensity ?? "med");
   const [stage, setStage] = useState<Stage>("splash");
   const [page, setPage] = useState<Page>("play");
+  // Nonce bumped every time the user explicitly clicks "Home" so PlayPage
+  // can reset its internal view (kick out of a Game / LanesMatch back to
+  // the mode-select home).
+  const [homeNonce, setHomeNonce] = useState(0);
   const t = useT();
+
+  function navigateTo(next: Page) {
+    if (next === "play") setHomeNonce((n) => n + 1);
+    setPage(next);
+  }
 
   // Sync the player's vibration preferences down to the haptic module so
   // every vibrate() call honors them (module-level state, read sync).
@@ -80,14 +89,14 @@ export default function App() {
             transition={{ duration: 0.4 }}
             className="flex min-h-screen"
           >
-            <Sidebar page={page} onNavigate={setPage} />
-            <MobileShell page={page} onNavigate={setPage} />
+            <Sidebar page={page} onNavigate={navigateTo} />
+            <MobileShell page={page} onNavigate={navigateTo} />
             {/* Global "back to Play" arrow, parked right next to the burger
                 on every non-Play page. Avoids the Android system back button
                 (which closes the app) being the only escape route. */}
             {page !== "play" && (
               <FloatingMatchBackButton
-                onClick={() => setPage("play")}
+                onClick={() => navigateTo("play")}
                 label={t("nav.backToPlay")}
               />
             )}
@@ -97,7 +106,7 @@ export default function App() {
                   nav bar via safe-area-bottom. Desktop (md+) has no burger. */}
               <main className="flex-1 flex flex-col pt-[calc(max(env(safe-area-inset-top),32px)+44px)] pb-[calc(max(env(safe-area-inset-bottom),0px)+56px)] md:pt-0 md:pb-0">
                 <AnimatePresence mode="wait">
-                  {page === "play"    && <PageWrap key="play"><PlayPage onNavigate={setPage} /></PageWrap>}
+                  {page === "play"    && <PageWrap key="play"><PlayPage onNavigate={navigateTo} homeNonce={homeNonce} /></PageWrap>}
                   {page === "online"  && <PageWrap key="online"><OnlinePage /></PageWrap>}
                   {page === "quests"  && <PageWrap key="quests"><QuestsPage /></PageWrap>}
                   {page === "packs"   && <PageWrap key="packs"><PacksPage /></PageWrap>}

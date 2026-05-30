@@ -32,14 +32,40 @@ import { useT } from "./i18n";
 import type { Page } from "./Sidebar";
 import { LocalLanesGame } from "./LocalLanesGame";
 import { CinematicMatchEnd, AmbientFlavor, MatchScoreBar, FloatingMatchBackButton, hapticTick, PickShock } from "./sharedMatchUI";
+import { vibrate, hapticWin, hapticLoss, hapticTap } from "./haptic";
 
 type View =
   | { kind: "select" }
   | { kind: "game"; mode: GameMode; bestOf: number; daily?: DailyChallenge }
   | { kind: "lanes_cpu"; winTo: number };
 
-export function PlayPage({ onNavigate }: { onNavigate?: (p: Page) => void }) {
+export function PlayPage({
+  onNavigate, homeNonce,
+}: {
+  onNavigate?: (p: Page) => void;
+  /** Bumps every time the user explicitly clicks "Home" — resets the
+   *  internal view back to mode-select even if a Game or Lanes match
+   *  was running. Skipped on initial mount. */
+  homeNonce?: number;
+}) {
   const [view, setView] = useState<View>({ kind: "select" });
+
+  // Reset to mode-select on explicit Home clicks (not on first mount).
+  useEffect(() => {
+    if (homeNonce && homeNonce > 0) setView({ kind: "select" });
+  }, [homeNonce]);
+
+  // Android system back button: when we're in a sub-view (Game or
+  // LanesMatch) push a history entry on entry and pop back to select
+  // when the user hits the back button — instead of letting Android
+  // minimize the app.
+  useEffect(() => {
+    if (view.kind === "select") return;
+    history.pushState({ rpslsView: view.kind }, "");
+    const onPop = () => setView({ kind: "select" });
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [view.kind]);
 
   return (
     <div className="w-full max-w-6xl mx-auto px-3 sm:px-8 pt-0 pb-2 sm:py-4 flex-1 flex flex-col">
@@ -1219,7 +1245,11 @@ function Countdown({
   const [beat, setBeat] = useState(0);
 
   useEffect(() => {
+    // Tiny buzz on every beat (Rock, Paper, Scissors, Lizard, Spock…) so
+    // the player physically feels the rhythm. The final beat is the
+    // SHOOT moment — give it a slightly stronger pulse.
     if (beat < COUNTDOWN_IDS.length) {
+      vibrate(beat === COUNTDOWN_IDS.length - 1 ? 28 : 12);
       const t = setTimeout(() => setBeat(beat + 1), BEAT_MS);
       return () => clearTimeout(t);
     } else {
@@ -1294,6 +1324,19 @@ function RevealPanel({
   const aWon = outcome.kind === "a_wins";
   const bWon = outcome.kind === "b_wins";
   const draw = outcome.kind === "draw";
+
+  // Buzz once when the result lands. The reveal animation timing is ~0.6 s
+  // after mount so we delay the haptic to land with the verb appearing.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      if (aWon) hapticWin();
+      else if (bWon) hapticLoss();
+      else hapticTap();
+    }, 600);
+    return () => clearTimeout(id);
+    // Effect must re-run if a different round is shown — keyed on outcome.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [round]);
 
   // Translate the canonical RPSLS verb returned by the core engine
   const verb =
