@@ -6,6 +6,7 @@ import { levelFromXp } from "./leveling";
 import { DIFFICULTY_META, PAD_META } from "./types";
 import type { BackgroundId, Difficulty, PadId, ThemeId } from "./types";
 import { BACKGROUNDS, BACKGROUNDS_BY_ID, PAD_DEFAULT_BG } from "./themes";
+import { DiceRoll, type DiceFace } from "./DiceRoll";
 import { MOVES } from "./game";
 import { BattlePad } from "./BattlePad";
 import { useT } from "./i18n";
@@ -26,6 +27,10 @@ export function ProfilePage() {
   const [nickDraft, setNickDraft] = useState(player.nickname);
   const [confirmReset, setConfirmReset] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Dice roll preview — re-keys the DiceRoll component to restart its
+  // animation. Hidden under a button so it doesn't run on every Profile open.
+  const [diceFace, setDiceFace] = useState<DiceFace | null>(null);
+  const [diceKey, setDiceKey] = useState(0);
 
   const info = levelFromXp(player.xp);
   const theme = THEMES[player.themeId];
@@ -331,6 +336,30 @@ export function ProfilePage() {
         >
           {t("profile.haptic.test")}
         </button>
+      </section>
+
+      {/* Dice roll preview — manual trigger so Alex can validate the
+          animation before we wire it into online match starts. */}
+      <section className="bg-white/5 border border-white/10 rounded-3xl p-5 flex items-center gap-4">
+        <div className="flex-1 min-w-0">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-1">Dice roll preview</h2>
+          <p className="text-xs text-zinc-500">
+            Test the rolling die that will pick whose theme paints the table in online matches.
+          </p>
+          <button
+            onClick={() => {
+              const face = (Math.floor(Math.random() * 6) + 1) as DiceFace;
+              setDiceFace(face);
+              setDiceKey((k) => k + 1);
+            }}
+            className="mt-3 px-4 py-2 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-sm font-semibold shadow-lg shadow-violet-500/30 active:scale-[0.97] transition"
+          >
+            {diceFace ? `Roll again — landed on ${diceFace}` : "Roll the dice"}
+          </button>
+        </div>
+        {diceFace !== null && (
+          <DiceRoll key={diceKey} targetFace={diceFace} size={120} />
+        )}
       </section>
 
       {/* Background picker — full-screen image behind every page. Picking one
