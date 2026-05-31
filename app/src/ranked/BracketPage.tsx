@@ -15,6 +15,7 @@ import {
 } from "./TournamentBracket";
 import { BracketTree } from "./BracketUI";
 import { FloatingMatchBackButton } from "../sharedMatchUI";
+import { LoadingTip } from "../flavor/LoadingTip";
 
 function isPlayerEliminated(t: TournamentState): boolean {
   const rounds: MatchSlot[][] = [t.quarters as MatchSlot[], t.semis as MatchSlot[], [t.final]];
@@ -193,8 +194,11 @@ export function BracketPage({
 
       {/* No match right now — waiting for CPU (only if still in the tournament) */}
       {!playerMatch && !eliminated && tournament.phase === "running" && (
-        <div className="text-center text-[11px] text-zinc-500 py-2">
-          Les matchs CPU se jouent... Patiente.
+        <div className="flex flex-col items-center gap-2 py-2 max-w-sm mx-auto px-4">
+          <div className="text-center text-[11px] text-zinc-500">
+            Les matchs CPU se jouent... Patiente.
+          </div>
+          <LoadingTip rotateMs={4000} className="justify-center text-center" />
         </div>
       )}
     </motion.div>

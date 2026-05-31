@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store";
 import { applyTheme } from "./theme";
 import { BACKGROUNDS_BY_ID, resolveFontFamily } from "./themes";
+import { LoadingTip } from "./flavor/LoadingTip";
 import { RTL_LOCALES } from "./i18n";
 import { Sidebar, MobileShell, type Page } from "./Sidebar";
 import { PlayPage } from "./PlayPage";
@@ -236,6 +237,15 @@ function Splash({ onDone }: { onDone: () => void }) {
       >
         Rock · Paper · Scissors · Lizard · Spock
       </motion.p>
+
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.4, duration: 0.4 }}
+        className="max-w-xs px-4"
+      >
+        <LoadingTip rotateMs={0} className="justify-center text-center" />
+      </motion.div>
 
       <motion.p
         initial={{ opacity: 0 }}

@@ -19,6 +19,7 @@ import {
   useAndroidBackPrompt,
   type MatchBackHandle,
 } from "../sharedMatchUI";
+import { LoadingTip } from "../flavor/LoadingTip";
 import { RankedPickPhase } from "./RankedPickPhase";
 import { RankedRevealPhase } from "./RankedRevealPhase";
 import type {
@@ -164,7 +165,10 @@ export function RankedMatchView({
 
       <div className="relative flex-1 min-h-0 flex items-center justify-center overflow-hidden">
         {phase === "matched" && !showSplash && (
-          <div className="text-sm text-zinc-400">{t("lanes.preparingFirstRound")}</div>
+          <div className="flex flex-col items-center gap-3 max-w-sm px-4">
+            <div className="text-sm text-zinc-400">{t("lanes.preparingFirstRound")}</div>
+            <LoadingTip category="strategy" rotateMs={4000} className="justify-center text-center" />
+          </div>
         )}
 
         {phase === "picking" && round && (
@@ -291,6 +295,14 @@ function MatchFoundSplash({ you, opp }: { you: string; opp: string }) {
         className="mt-8 text-sm uppercase tracking-[0.3em] text-zinc-400 text-center px-4"
       >
         Best of 5 · Mana & Cartes
+      </motion.div>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.4, duration: 0.4 }}
+        className="mt-6 max-w-sm px-4"
+      >
+        <LoadingTip category="strategy" rotateMs={0} className="justify-center text-center" />
       </motion.div>
     </motion.div>
   );
