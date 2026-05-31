@@ -67,10 +67,11 @@ export function CardHand({
   return (
     <div
       className="flex items-end justify-center relative"
-      // paddingTop reserves space for selected/played cards lifting above the
-      // fan; paddingBottom reserves space for the outward droop of the outer
-      // cards so they don't bleed into whatever sibling sits underneath.
-      style={{ paddingTop: geo.lift + 12, paddingBottom: geo.lift + 4 }}
+      // CardHand is now at the bottom of the screen (player's side). Outer
+      // cards rise UPWARD from the centre (yLift is applied as a negative y
+      // in CardThumb), so paddingTop reserves room for that rise plus the
+      // selected/played lift. paddingBottom stays tiny — bottoms are anchored.
+      style={{ paddingTop: geo.lift + 26, paddingBottom: 2 }}
     >
       {hand.map((id, i) => {
         const card = CARDS[id];
@@ -115,7 +116,7 @@ function CardThumb({
   playable: boolean;
   /** Resting rotation (deg) for this slot in the fan. */
   angle: number;
-  /** Resting downward lift (px) — outer cards sit lower than the centre. */
+  /** Resting upward lift (px) — outer cards sit higher than the centre. */
   yLift: number;
   /** Horizontal overlap with the previous card (negative margin in px). */
   overlap: number;
@@ -145,12 +146,13 @@ function CardThumb({
       initial={{ opacity: 0, y: 16, rotate: angle }}
       animate={{
         opacity: playable ? 1 : 0.35,
-        // Raised cards lift well above the fan and snap upright.
-        y: raised ? -22 : yLift,
+        // Cards live at the bottom of the screen: outer cards rise UPWARD
+        // from the centre (y goes negative). Raised cards lift further still.
+        y: raised ? -(yLift + 22) : -yLift,
         rotate: raised ? 0 : angle,
       }}
       transition={{ delay: index * 0.04, type: "spring", stiffness: 280, damping: 22 }}
-      whileHover={playable ? { y: -10, rotate: 0, scale: 1.06 } : undefined}
+      whileHover={playable ? { y: -(yLift + 10), rotate: 0, scale: 1.06 } : undefined}
       whileTap={playable ? { scale: 0.92 } : undefined}
       style={{
         marginLeft: overlap,

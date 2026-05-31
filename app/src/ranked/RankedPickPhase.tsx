@@ -126,22 +126,6 @@ export function RankedPickPhase({
     <div className="w-full h-full flex flex-col items-center gap-1.5 sm:gap-3 pb-2 sm:pb-3">
       <TimerBar startedAt={startedAt} durationMs={deadlineMs} />
 
-      {/* Mana + Cards strip — top zone, always visible */}
-      <div className="w-full max-w-md flex items-center gap-2 px-1">
-        <ManaBar mana={mana} spent={reservedMana} />
-        <div className="flex-1 min-w-0">
-          <CardHand
-            hand={hand}
-            mana={mana}
-            selected={selectedCard}
-            playedId={cardPlayed?.id ?? null}
-            onSelect={handleSelectCard}
-            disabled={false}
-            augurCooldown={augurCooldown}
-          />
-        </div>
-      </div>
-
       {/* Targeting hint */}
       <AnimatePresence>
         {targetingHint && (
@@ -179,6 +163,23 @@ export function RankedPickPhase({
           onOppLaneClick={handleOppLaneTap}
           augurTargeting={isAugurTargeting || isOracleTargeting}
         />
+      </div>
+
+      {/* Mana + your fanned hand — bottom-of-board zone, near the move
+          picker so cards and moves are reachable by the same thumb. */}
+      <div className="w-full max-w-md flex items-center gap-2 px-1">
+        <ManaBar mana={mana} spent={reservedMana} />
+        <div className="flex-1 min-w-0">
+          <CardHand
+            hand={hand}
+            mana={mana}
+            selected={selectedCard}
+            playedId={cardPlayed?.id ?? null}
+            onSelect={handleSelectCard}
+            disabled={false}
+            augurCooldown={augurCooldown}
+          />
+        </div>
       </div>
 
       {/* Moves + Lock — bottom zone */}

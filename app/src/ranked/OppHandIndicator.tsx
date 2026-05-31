@@ -35,16 +35,21 @@ export function OppHandIndicator({
 
   return (
     <div
-      className="flex items-end justify-center relative"
-      // Mirror CardHand: paddingTop for the lift, paddingBottom for the
-      // droop of the outer cards so they don't crash into the row below.
-      style={{ paddingTop: geo.lift + 2, paddingBottom: geo.lift + 2, minHeight: 22 + geo.lift }}
+      className="flex items-start justify-center relative"
+      // Opponent fan sits at the TOP of the board so cards are anchored to
+      // the top of the container and droop downward. paddingBottom must hold
+      // the droop entirely or it spills onto the OpponentRow underneath.
+      style={{
+        paddingTop: 2,
+        paddingBottom: geo.lift + 6,
+        minHeight: 30 + geo.lift,
+      }}
     >
       <AnimatePresence>
         {Array.from({ length: slots }, (_, i) => {
           const offset = i - mid;
-          // Mirror the player's fan upside-down — opponent's cards "hang"
-          // from the top of the opp row rather than rising from the bottom.
+          // Mirror the player's fan — opponent's cards "hang" from the top,
+          // outer cards droop downward and rotate outward.
           const angle = -offset * geo.spread;
           const yLift = Math.abs(offset) * geo.lift;
           return (
