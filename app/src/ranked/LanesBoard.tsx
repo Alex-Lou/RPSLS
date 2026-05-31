@@ -13,6 +13,8 @@ import { CardSlot } from "./CardSlot";
 import { OppHandIndicator } from "./OppHandIndicator";
 import type { LaneTarget, PlayedCard } from "./rankedTypes";
 import { useT } from "../i18n";
+import { useStore } from "../store";
+import { BattlePad } from "../BattlePad";
 
 const IDENTITY_KEYS = [
   "lanes.identity.force",
@@ -43,13 +45,23 @@ export function LanesBoard({
   myCard, oppCard, mode, laneResults, oppHandSize,
   onLaneClick, onOppLaneClick, augurTargeting = false,
 }: LanesBoardProps) {
+  const padId = useStore((s) => s.player.padId);
   return (
     <div
-      className="w-full max-w-2xl rounded-2xl p-3 sm:p-4 flex flex-col gap-3 sm:gap-4
+      className="relative w-full max-w-2xl rounded-2xl overflow-hidden
                  border border-emerald-900/40
-                 bg-gradient-to-b from-emerald-950/40 via-zinc-950/60 to-emerald-950/40
                  shadow-[inset_0_0_36px_rgba(0,0,0,0.55)]"
     >
+      {/* Battle-pad backdrop — same pad the user picked in Profile, dimmed
+          enough that the pieces on top stay readable. */}
+      <div className="absolute inset-0 pointer-events-none">
+        <BattlePad padId={padId} className="w-full h-full opacity-55" />
+      </div>
+      {/* Readability overlay keeps the original emerald/zinc tint over the
+          pad so lane outlines and pick icons keep their contrast. */}
+      <div className="absolute inset-0 bg-gradient-to-b from-emerald-950/55 via-zinc-950/65 to-emerald-950/55 pointer-events-none" />
+
+      <div className="relative p-3 sm:p-4 flex flex-col gap-3 sm:gap-4">
       <div className="flex items-center justify-between gap-2 px-0.5">
         <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-rose-300/90 truncate">
           ✦ {opponentName}
@@ -77,6 +89,7 @@ export function LanesBoard({
       />
       <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-emerald-300/90 truncate px-0.5">
         ✦ {youName}
+      </div>
       </div>
     </div>
   );
