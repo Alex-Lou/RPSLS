@@ -38,7 +38,7 @@ import { makeTournament, resolvePlayerMatch, type TournamentState } from "./rank
 import { BracketPage } from "./ranked/BracketPage";
 import { DeckManager } from "./ranked/DeckManager";
 import { levelFromXp } from "./leveling";
-import { CinematicMatchEnd, AmbientFlavor, MatchScoreBar, FloatingMatchBackButton, hapticTick, PickShock } from "./sharedMatchUI";
+import { CinematicMatchEnd, AmbientFlavor, MatchScoreBar, FloatingMatchBackButton, hapticTick, PickShock, useAndroidBackPrompt } from "./sharedMatchUI";
 import { vibrate, hapticWin, hapticLoss, hapticTap } from "./haptic";
 
 type View =
@@ -1133,6 +1133,10 @@ function Header({
     if (isMidMatch) setConfirmQuit(true);
     else onQuit();
   };
+
+  // Android system back routes to the same confirm flow so a stray
+  // back-press mid-match can't silently abandon the game.
+  useAndroidBackPrompt(handleQuitClick);
 
   // Same caption shape as the Constellation ScoreHeader, classic wording.
   const round = scoreA + scoreB + 1;

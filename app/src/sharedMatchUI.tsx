@@ -12,9 +12,40 @@
  *   - AmbientFlavor: ~10 rotating geek one-liners. Atmosphere, not signal.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useT } from "./i18n";
+
+/**
+ * Hook: while a match is mounted, intercept the Android system back button
+ * (and the WebView's history-back) so it routes to `onBack` instead of
+ * exiting the match silently. We push a sentinel history entry on mount and
+ * re-push it on every popstate so successive back-presses keep firing the
+ * handler until the caller actually unmounts the view.
+ *
+ * `onBack` is wrapped in a ref internally so passing a fresh closure every
+ * render doesn't re-register the listener.
+ */
+export function useAndroidBackPrompt(onBack: () => void) {
+  const cbRef = useRef(onBack);
+  useEffect(() => { cbRef.current = onBack; }, [onBack]);
+  useEffect(() => {
+    history.pushState({ rpslsMatch: true }, "");
+    const handler = () => {
+      // Re-arm the back so the user has to confirm again.
+      history.pushState({ rpslsMatch: true }, "");
+      cbRef.current();
+    };
+    window.addEventListener("popstate", handler);
+    return () => window.removeEventListener("popstate", handler);
+  }, []);
+}
+
+/** Imperative handle exposed by FloatingMatchBackButton so the parent can
+ *  trigger the same confirm flow from elsewhere (Android back gesture). */
+export interface MatchBackHandle {
+  triggerConfirm: () => void;
+}
 
 /* ──────────── RollingScore ──────────── */
 
@@ -130,28 +161,34 @@ export function MatchScoreBar({
  * Pulled out of MatchScoreBar so the score header can stretch full-width on
  * its own line.
  */
-export function FloatingMatchBackButton({
-  onClick, label, confirm,
-}: {
-  onClick: () => void;
-  label: string;
-  /** When set, clicking the button opens a confirmation modal first. Used
-   *  for matches where leaving counts as a forfeit (Ranked, Constellation
-   *  Ranked, online). Omit for views where back is harmless. */
-  confirm?: {
-    title: string;
-    body: string;
-    confirmLabel?: string;
-    cancelLabel?: string;
-    /** "danger" colors the confirm CTA red to flag a punitive action. */
-    severity?: "default" | "danger";
-  };
-}) {
+export const FloatingMatchBackButton = forwardRef<
+  MatchBackHandle,
+  {
+    onClick: () => void;
+    label: string;
+    /** When set, clicking the button (or the parent calling triggerConfirm
+     *  via the imperative handle) opens a confirmation modal first. */
+    confirm?: {
+      title: string;
+      body: string;
+      confirmLabel?: string;
+      cancelLabel?: string;
+      /** "danger" colors the confirm CTA red to flag a punitive action. */
+      severity?: "default" | "danger";
+    };
+  }
+>(function FloatingMatchBackButtonImpl({ onClick, label, confirm }, ref) {
   const [open, setOpen] = useState(false);
   const handleClick = () => {
     if (confirm) setOpen(true);
     else onClick();
   };
+  useImperativeHandle(ref, () => ({
+    triggerConfirm: () => {
+      if (confirm) setOpen(true);
+      else onClick();
+    },
+  }), [confirm, onClick]);
   return (
     <>
       <button
@@ -216,7 +253,7 @@ export function FloatingMatchBackButton({
       </AnimatePresence>
     </>
   );
-}
+});
 
 function StreakBadge({ streak }: { streak: number }) {
   return (

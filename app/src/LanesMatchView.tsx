@@ -16,7 +16,7 @@ import { Hand, MOVE_ICON, MOVE_PALETTE } from "./icons";
 import { MOVES, type Move } from "./game";
 import { hapticAlert, hapticTap } from "./haptic";
 import { useT } from "./i18n";
-import { MatchScoreBar, hapticTick, PickShock, CinematicMatchEnd } from "./sharedMatchUI";
+import { MatchScoreBar, hapticTick, PickShock, CinematicMatchEnd, useAndroidBackPrompt } from "./sharedMatchUI";
 import type { LanePlay, LaneResult, PlayerSlot } from "./online";
 import {
   detectOutcomeCombo,
@@ -133,8 +133,11 @@ export function LanesMatchView({
 
   /* Help modal state — a "?" button in the score row toggles it. */
   const [helpOpen, setHelpOpen] = useState(false);
-  /* Forfeit confirmation modal. */
+  /* Forfeit confirmation modal — shown both by the in-flow "Forfait" button
+   *  and by Android system back so a stray back-press can't silently lose
+   *  the match. */
   const [quitConfirmOpen, setQuitConfirmOpen] = useState(false);
+  useAndroidBackPrompt(() => setQuitConfirmOpen(true));
 
   /* Render-side reveal countdown — a quick 1.4s suspense when a new
      lastResult lands. Parent re-feeds lastResult fresh; we just gate

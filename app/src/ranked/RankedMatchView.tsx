@@ -7,7 +7,7 @@
  * `RankedPickPhase` and `RankedRevealPhase`.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import type { Move } from "../game";
 import type { LaneResult, PlayerSlot } from "../online";
@@ -16,6 +16,8 @@ import {
   MatchScoreBar,
   CinematicMatchEnd,
   FloatingMatchBackButton,
+  useAndroidBackPrompt,
+  type MatchBackHandle,
 } from "../sharedMatchUI";
 import { RankedPickPhase } from "./RankedPickPhase";
 import { RankedRevealPhase } from "./RankedRevealPhase";
@@ -138,17 +140,7 @@ export function RankedMatchView({
   return (
     <div className="relative flex flex-col gap-2 sm:gap-3 flex-1 min-h-0 overflow-hidden">
       {onLeave && (
-        <FloatingMatchBackButton
-          onClick={onLeave}
-          label={t("lanes.forfeitMatch")}
-          confirm={{
-            title: "Quitter le match ?",
-            body: "Tu vas perdre la manche en cours. Ce sera compté comme défaite et appliquera la pénalité de LP si applicable.",
-            confirmLabel: "Forfait",
-            cancelLabel: "Continuer",
-            severity: "danger",
-          }}
-        />
+        <RankedBackGuard onLeave={onLeave} label={t("lanes.forfeitMatch")} />
       )}
 
       <AnimatePresence>
@@ -235,6 +227,28 @@ export function RankedMatchView({
 }
 
 /* ──────────── Sub-pieces ──────────── */
+
+/** Wraps FloatingMatchBackButton so the Android system back button (which
+ *  would otherwise blow past every confirm) routes to the same modal as the
+ *  visible back arrow. */
+function RankedBackGuard({ onLeave, label }: { onLeave: () => void; label: string }) {
+  const handleRef = useRef<MatchBackHandle | null>(null);
+  useAndroidBackPrompt(() => handleRef.current?.triggerConfirm());
+  return (
+    <FloatingMatchBackButton
+      ref={handleRef}
+      onClick={onLeave}
+      label={label}
+      confirm={{
+        title: "Quitter le match ?",
+        body: "Tu vas perdre la manche en cours. Ce sera compté comme défaite et appliquera la pénalité de LP si applicable.",
+        confirmLabel: "Forfait",
+        cancelLabel: "Continuer",
+        severity: "danger",
+      }}
+    />
+  );
+}
 
 function MatchFoundSplash({ you, opp }: { you: string; opp: string }) {
   const t = useT();
