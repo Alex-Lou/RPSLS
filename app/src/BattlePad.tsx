@@ -9,10 +9,14 @@ export function BattlePad({
   padId,
   className,
   style,
+  compact = false,
 }: {
   padId: PadId;
   className?: string;
   style?: CSSProperties;
+  /** When true, pads suppress big animated centerpieces (e.g. the Cosmos
+   *  atom orbits) so they read as quiet backdrops behind game content. */
+  compact?: boolean;
 }) {
   const common = {
     className,
@@ -29,7 +33,7 @@ export function BattlePad({
   switch (padId) {
     case "chalkboard": return <ChalkboardPad {...common} />;
     case "vintage":    return <VintagePad {...common} />;
-    case "cosmos":     return <CosmosPad {...common} />;
+    case "cosmos":     return <CosmosPad {...common} compact={compact} />;
     case "neon":       return <NeonPad {...common} />;
     case "comics":     return <ComicsPad {...common} />;
     default:           return <ChalkboardPad {...common} />;
@@ -459,7 +463,7 @@ function ComicsPad(props: React.SVGProps<SVGSVGElement>) {
    one tiny pulsar central, decoration only at perimeter.
 */
 
-function CosmosPad(props: React.SVGProps<SVGSVGElement>) {
+function CosmosPad({ compact = false, ...props }: React.SVGProps<SVGSVGElement> & { compact?: boolean }) {
   const stars = (() => {
     const pts: Array<{ x: number; y: number; r: number; o: number }> = [];
     let seed = 42;
@@ -613,30 +617,33 @@ function CosmosPad(props: React.SVGProps<SVGSVGElement>) {
 
       {/* ── Animated atom centerpiece (matches the landing page #demo) ──
            3 orbits at 0°/60°/-60°, one electron each, animateMotion paths.
-           No nucleus glyph — just a soft halo coming from the pulsar above. */}
-      <g transform={`translate(${W/2} ${H/2 + 10})`}>
-        <g transform="rotate(0)">
-          <ellipse cx="0" cy="0" rx="180" ry="55" fill="none" stroke="#a78bfa" strokeOpacity="0.55" strokeWidth="2" />
-          <circle r="9" fill="#a78bfa">
-            <animateMotion dur="4.2s" repeatCount="indefinite"
-              path="M -180,0 a 180,55 0 1,0 360,0 a 180,55 0 1,0 -360,0" />
-          </circle>
+           Suppressed when the pad is rendered as a backdrop (compact) so the
+           orbiting electrons don't drift across the lane content. */}
+      {!compact && (
+        <g transform={`translate(${W/2} ${H/2 + 10})`}>
+          <g transform="rotate(0)">
+            <ellipse cx="0" cy="0" rx="180" ry="55" fill="none" stroke="#a78bfa" strokeOpacity="0.55" strokeWidth="2" />
+            <circle r="9" fill="#a78bfa">
+              <animateMotion dur="4.2s" repeatCount="indefinite"
+                path="M -180,0 a 180,55 0 1,0 360,0 a 180,55 0 1,0 -360,0" />
+            </circle>
+          </g>
+          <g transform="rotate(60)">
+            <ellipse cx="0" cy="0" rx="180" ry="55" fill="none" stroke="#5eead4" strokeOpacity="0.55" strokeWidth="2" />
+            <circle r="9" fill="#5eead4">
+              <animateMotion dur="5.5s" repeatCount="indefinite"
+                path="M -180,0 a 180,55 0 1,1 360,0 a 180,55 0 1,1 -360,0" />
+            </circle>
+          </g>
+          <g transform="rotate(-60)">
+            <ellipse cx="0" cy="0" rx="180" ry="55" fill="none" stroke="#f0abfc" strokeOpacity="0.55" strokeWidth="2" />
+            <circle r="9" fill="#f0abfc">
+              <animateMotion dur="6.8s" repeatCount="indefinite"
+                path="M -180,0 a 180,55 0 1,0 360,0 a 180,55 0 1,0 -360,0" />
+            </circle>
+          </g>
         </g>
-        <g transform="rotate(60)">
-          <ellipse cx="0" cy="0" rx="180" ry="55" fill="none" stroke="#5eead4" strokeOpacity="0.55" strokeWidth="2" />
-          <circle r="9" fill="#5eead4">
-            <animateMotion dur="5.5s" repeatCount="indefinite"
-              path="M -180,0 a 180,55 0 1,1 360,0 a 180,55 0 1,1 -360,0" />
-          </circle>
-        </g>
-        <g transform="rotate(-60)">
-          <ellipse cx="0" cy="0" rx="180" ry="55" fill="none" stroke="#f0abfc" strokeOpacity="0.55" strokeWidth="2" />
-          <circle r="9" fill="#f0abfc">
-            <animateMotion dur="6.8s" repeatCount="indefinite"
-              path="M -180,0 a 180,55 0 1,0 360,0 a 180,55 0 1,0 -360,0" />
-          </circle>
-        </g>
-      </g>
+      )}
 
       {/* Title — top center */}
       <g transform={`translate(${W/2} 120)`} textAnchor="middle">

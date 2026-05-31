@@ -55,7 +55,7 @@ export function LanesBoard({
       {/* Battle-pad backdrop — the user-chosen pad IS the visible surface the
           lanes sit on. Fully opaque so the chosen theme actually shows. */}
       <div className="absolute inset-0 pointer-events-none">
-        <BattlePad padId={padId} className="w-full h-full" />
+        <BattlePad padId={padId} className="w-full h-full" compact />
       </div>
       {/* Radial vignette: very dark in the centre (where the lanes sit) so
           busy pad decorations — Cosmos atom orbit, Quantum particle traces,
