@@ -358,7 +358,7 @@ export function ProfilePage() {
           </button>
         </div>
         {diceFace !== null && (
-          <DiceRoll key={diceKey} targetFace={diceFace} size={120} />
+          <DiceRoll key={diceKey} targetFace={diceFace} size={84} />
         )}
       </section>
 
