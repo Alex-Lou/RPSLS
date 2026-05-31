@@ -39,6 +39,7 @@ export function defaultPlayer(): Player {
     hapticIntensity: "med",
     cardCollection: ["aegis", "precision", "anchor", "second-wind", "surge", "augur"],
     rankedDeck: ["aegis", "precision", "surge", "augur", "anchor", "second-wind"],
+    backgroundId: "default",
   };
 }
 
@@ -59,7 +60,7 @@ interface AppState {
   locale: Locale;
   serverConfig: ServerConfig;
 
-  updateProfile: (patch: Partial<Pick<Player, "nickname" | "avatar" | "themeId" | "padId" | "difficulty" | "hapticEnabled" | "hapticIntensity">>) => void;
+  updateProfile: (patch: Partial<Pick<Player, "nickname" | "avatar" | "themeId" | "padId" | "difficulty" | "hapticEnabled" | "hapticIntensity" | "backgroundId">>) => void;
   recordMatch: (m: MatchRecord) => void;
   claimQuest: (id: string, xpReward: number, lpReward?: number) => void;
   claimDailyQuest: (id: string, xpReward: number) => void;
@@ -219,7 +220,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "rpsls-app-state",
-      version: 13,
+      version: 14,
       migrate: (persisted: unknown, version: number): AppState => {
         const state = persisted as {
           player?: Partial<Player> & { customVariants?: unknown };
@@ -278,6 +279,10 @@ export const useStore = create<AppState>()(
         // v13: daily-challenge (#17) claims tracker.
         if (version < 13 && state?.player && !("dailyClaims" in state.player)) {
           state.player.dailyClaims = { date: "", ids: [] };
+        }
+        // v14: cosmetic background — default to the original gradient.
+        if (version < 14 && state?.player && !("backgroundId" in state.player)) {
+          state.player.backgroundId = "default";
         }
         return state as AppState;
       },

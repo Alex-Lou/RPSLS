@@ -24,10 +24,19 @@ html, body, #root {
 }
 
 body {
-  background:
+  /* Layer order (top → bottom):
+     1. Optional user-chosen background image (var). Defaults to `none` so
+        the radial gradients show through; when set, sized to "cover" first.
+     2. + 3. The original radial-gradient theme glow.
+     4. The flat theme background colour. */
+  background-color: var(--theme-bg);
+  background-image:
+    var(--app-bg-image, none),
     radial-gradient(1200px 600px at 20% -10%, color-mix(in oklab, var(--theme-primary) 25%, transparent), transparent 60%),
-    radial-gradient(900px 500px at 110% 110%, color-mix(in oklab, var(--theme-secondary) 18%, transparent), transparent 60%),
-    var(--theme-bg);
+    radial-gradient(900px 500px at 110% 110%, color-mix(in oklab, var(--theme-secondary) 18%, transparent), transparent 60%);
+  background-size: cover, auto, auto;
+  background-position: center, center, center;
+  background-repeat: no-repeat;
   background-attachment: fixed;
 }
 

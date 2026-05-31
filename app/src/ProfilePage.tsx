@@ -4,7 +4,8 @@ import { useStore } from "./store";
 import { THEMES } from "./theme";
 import { levelFromXp } from "./leveling";
 import { DIFFICULTY_META, PAD_META } from "./types";
-import type { Difficulty, PadId, ThemeId } from "./types";
+import type { BackgroundId, Difficulty, PadId, ThemeId } from "./types";
+import { BACKGROUNDS, BACKGROUNDS_BY_ID, PAD_DEFAULT_BG } from "./themes";
 import { MOVES } from "./game";
 import { BattlePad } from "./BattlePad";
 import { useT } from "./i18n";
@@ -332,20 +333,79 @@ export function ProfilePage() {
         </button>
       </section>
 
+      {/* Background picker — full-screen image behind every page. Picking one
+          also applies the paired pad (user can override below). */}
+      <section className="bg-white/5 border border-white/10 rounded-3xl p-5">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-3">Background</h2>
+        <p className="text-xs text-zinc-500 mb-3">
+          The wallpaper painted behind every page. Picking a themed background also switches the battle pad to match — change the pad below if you'd rather mix.
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {BACKGROUNDS.map((bg) => {
+            const active = (player.backgroundId ?? "default") === bg.id;
+            return (
+              <button
+                key={bg.id}
+                onClick={() => {
+                  const patch: Partial<{ backgroundId: BackgroundId; padId: PadId }> = { backgroundId: bg.id };
+                  if (bg.defaultPadId) patch.padId = bg.defaultPadId;
+                  updateProfile(patch);
+                }}
+                className={
+                  "group rounded-2xl border overflow-hidden transition text-left " +
+                  (active
+                    ? "border-white/40 ring-2 ring-white/20"
+                    : "border-white/10 hover:border-white/30")
+                }
+              >
+                <div
+                  className="aspect-[3/2] w-full relative bg-zinc-950"
+                  style={
+                    bg.src
+                      ? { backgroundImage: `url("${bg.src}")`, backgroundSize: "cover", backgroundPosition: "center" }
+                      : {
+                          backgroundImage:
+                            "radial-gradient(120% 80% at 20% 0%, rgba(124,92,255,0.45), transparent 60%), radial-gradient(120% 80% at 100% 100%, rgba(45,212,191,0.35), transparent 60%)",
+                        }
+                  }
+                >
+                  {active && (
+                    <div className="absolute top-2 right-2 bg-emerald-500/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      ACTIVE
+                    </div>
+                  )}
+                </div>
+                <div className="p-2.5 bg-white/5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">{bg.emoji}</span>
+                    <span className="text-xs font-semibold truncate">{bg.label}</span>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       {/* Battle pad picker */}
       <section className="bg-white/5 border border-white/10 rounded-3xl p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-3">Battle pad</h2>
         <p className="text-xs text-zinc-500 mb-3">
-          The mat shown behind matches. Inspired by lab boards, vintage salons and deep space.
+          The mat your matches are played on. Picking one also swaps in the paired background — change the background above if you'd rather mix.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {(Object.keys(PAD_META) as PadId[]).map((id) => {
             const meta = PAD_META[id];
             const active = player.padId === id;
+            const pairedBg = PAD_DEFAULT_BG[id];
             return (
               <button
                 key={id}
-                onClick={() => updateProfile({ padId: id })}
+                onClick={() => {
+                  const patch: Partial<{ padId: PadId; backgroundId: BackgroundId }> = { padId: id };
+                  if (pairedBg) patch.backgroundId = pairedBg;
+                  updateProfile(patch);
+                }}
                 className={
                   "group rounded-2xl border overflow-hidden transition text-left " +
                   (active
@@ -358,6 +418,11 @@ export function ProfilePage() {
                   {active && (
                     <div className="absolute top-2 right-2 bg-emerald-500/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                       ACTIVE
+                    </div>
+                  )}
+                  {pairedBg && BACKGROUNDS_BY_ID[pairedBg]?.src && (
+                    <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded">
+                      pairs with {BACKGROUNDS_BY_ID[pairedBg].label}
                     </div>
                   )}
                 </div>

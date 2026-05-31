@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type { PadId } from "./types";
+import { PAD_IMAGES } from "./themes";
 
 const W = 1500;
 const H = 1000;
@@ -21,13 +22,31 @@ export function BattlePad({
     xmlns: "http://www.w3.org/2000/svg",
   };
 
+  // Image-based pads delegate to a shared <image>-renderer.
+  const imgSrc = PAD_IMAGES[padId];
+  if (imgSrc) return <ImagePad src={imgSrc} {...common} />;
+
   switch (padId) {
     case "chalkboard": return <ChalkboardPad {...common} />;
     case "vintage":    return <VintagePad {...common} />;
     case "cosmos":     return <CosmosPad {...common} />;
     case "neon":       return <NeonPad {...common} />;
     case "comics":     return <ComicsPad {...common} />;
+    default:           return <ChalkboardPad {...common} />;
   }
+}
+
+/* ════════════════════ ImagePad ════════════════════
+   Generic <image>-based playmat. Used for every PNG-driven pad in
+   PAD_IMAGES so new image pads cost zero JSX once the file lands.
+*/
+
+function ImagePad({ src, ...rest }: { src: string } & React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...rest}>
+      <image href={src} width={W} height={H} preserveAspectRatio="xMidYMid slice" />
+    </svg>
+  );
 }
 
 /* ════════════════════ Chalkboard ════════════════════

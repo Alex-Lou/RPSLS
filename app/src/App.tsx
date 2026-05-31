@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store";
 import { applyTheme } from "./theme";
+import { BACKGROUNDS_BY_ID } from "./themes";
 import { RTL_LOCALES } from "./i18n";
 import { Sidebar, MobileShell, type Page } from "./Sidebar";
 import { PlayPage } from "./PlayPage";
@@ -23,6 +24,7 @@ type Stage = "splash" | "welcome" | "shell";
 
 export default function App() {
   const themeId = useStore((s) => s.player.themeId);
+  const backgroundId = useStore((s) => s.player.backgroundId ?? "default");
   const onboarded = useStore((s) => s.onboarded);
   const locale = useStore((s) => s.locale);
   const hapticEnabled  = useStore((s) => s.player.hapticEnabled ?? true);
@@ -50,6 +52,19 @@ export default function App() {
   useEffect(() => {
     applyTheme(themeId);
   }, [themeId]);
+
+  // Apply the chosen cosmetic background image to <body> via a CSS variable.
+  // The variable is consumed by body { background-image: var(--app-bg-image) }
+  // in App.css; "default" clears the var so the original gradient remains.
+  useEffect(() => {
+    const def = BACKGROUNDS_BY_ID[backgroundId];
+    const root = document.documentElement;
+    if (def?.src) {
+      root.style.setProperty("--app-bg-image", `url("${def.src}")`);
+    } else {
+      root.style.removeProperty("--app-bg-image");
+    }
+  }, [backgroundId]);
 
   // Mirror the locale onto <html> so Tailwind / browser can pick up text
   // direction and language-aware features (forms, hyphenation, screen reader).

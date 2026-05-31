@@ -3,7 +3,14 @@ import type { AiMood } from "./game";
 
 export type ThemeId = "violet" | "neon" | "pastel" | "sunset" | "forest";
 
-export type PadId = "chalkboard" | "vintage" | "cosmos" | "neon" | "comics";
+export type PadId =
+  | "chalkboard" | "vintage" | "cosmos" | "neon" | "comics"      // original SVG playmats
+  | "ancient" | "astrolab" | "casino" | "cyberpunk" | "quantum" | "steampunk";  // image playmats
+
+export type BackgroundId =
+  | "default"
+  | "ancient" | "astrolab" | "casino" | "cyberpunk"
+  | "galaxy" | "quantum" | "steampunk";
 
 export type GameMode = "training" | "casual" | "ranked" | "hotseat";
 
@@ -57,14 +64,23 @@ export interface Player {
   cardCollection?: string[];
   /** Ranked deck — ordered list of 6 card IDs (3 main + 3 reserve). */
   rankedDeck?: string[];
+  /** Cosmetic background image painted behind every page. Defaults to the
+   *  original radial-gradient. */
+  backgroundId?: BackgroundId;
 }
 
 export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: string }> = {
-  chalkboard: { label: "Blackboard",   emoji: "🧪", tagline: "Hand-drawn chalk, formulas, lab vibes." },
-  vintage:    { label: "Vintage Hall", emoji: "🎲", tagline: "Felt mat, gold trim, retro lounge." },
-  cosmos:     { label: "Cosmos",       emoji: "🌌", tagline: "Dark sky, orbits, particle trails." },
-  neon:       { label: "Neon Arcade",  emoji: "🕹️", tagline: "Synthwave grid, neon lines, 80s arcade." },
-  comics:     { label: "Comics",       emoji: "💥", tagline: "Halftone dots, BAM-POW, pop-art comic page." },
+  chalkboard: { label: "Blackboard",     emoji: "🧪", tagline: "Hand-drawn chalk, formulas, lab vibes." },
+  vintage:    { label: "Vintage Hall",   emoji: "🎲", tagline: "Felt mat, gold trim, retro lounge." },
+  cosmos:     { label: "Cosmos",         emoji: "🌌", tagline: "Dark sky, orbits, particle trails." },
+  neon:       { label: "Neon Arcade",    emoji: "🕹️", tagline: "Synthwave grid, neon lines, 80s arcade." },
+  comics:     { label: "Comics",         emoji: "💥", tagline: "Halftone dots, BAM-POW, pop-art comic page." },
+  ancient:    { label: "Ancient Codex",  emoji: "📜", tagline: "Worn parchment, gold leaf, arcane runes." },
+  astrolab:   { label: "Astrolab",       emoji: "🔭", tagline: "Brass instruments, parchment, star charts." },
+  casino:     { label: "Casino Royale",  emoji: "🎰", tagline: "Emerald felt + Art Deco gold trim." },
+  cyberpunk:  { label: "Cyberpunk",      emoji: "🌆", tagline: "Neon hex grid, holographic HUD." },
+  quantum:    { label: "Quantum Lab",    emoji: "⚛️", tagline: "Particle traces, physics equations." },
+  steampunk:  { label: "Steampunk",      emoji: "⚙️", tagline: "Brass gears, leather, amber filaments." },
 };
 
 export type Opponent =
