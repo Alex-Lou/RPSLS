@@ -1,0 +1,261 @@
+/**
+ * LanesBoard — the 3-lane board for ranked matches.
+ * Supports onOppLaneClick for Augur targeting on the opponent row.
+ */
+
+import { useEffect, useState } from "react";
+import { motion } from "motion/react";
+import { Hand } from "../icons";
+import type { Move } from "../game";
+import type { LaneResult } from "../online";
+import { LANE_IDENTITIES, laneFavoursMove } from "../lanesCombos";
+import { CardSlot } from "./CardSlot";
+import type { LaneTarget, PlayedCard } from "./rankedTypes";
+import { useT } from "../i18n";
+
+const IDENTITY_KEYS = [
+  "lanes.identity.force",
+  "lanes.identity.wisdom",
+  "lanes.identity.cunning",
+];
+
+export interface LanesBoardProps {
+  youName: string;
+  opponentName: string;
+  picks: [Move | null, Move | null, Move | null];
+  oppPicks: [Move, Move, Move] | null;
+  augurRevealed: { lane: LaneTarget; move: Move } | null;
+  myCard: PlayedCard | null;
+  oppCard: PlayedCard | null;
+  mode: "picking" | "locked" | "reveal";
+  laneResults?: LaneResult[];
+  onLaneClick?: (lane: LaneTarget) => void;
+  onOppLaneClick?: (lane: LaneTarget) => void;
+  augurTargeting?: boolean;
+}
+
+export function LanesBoard({
+  youName, opponentName,
+  picks, oppPicks, augurRevealed,
+  myCard, oppCard, mode, laneResults,
+  onLaneClick, onOppLaneClick, augurTargeting = false,
+}: LanesBoardProps) {
+  return (
+    <div
+      className="w-full max-w-2xl rounded-2xl p-3 sm:p-4 flex flex-col gap-3 sm:gap-4
+                 border border-emerald-900/40
+                 bg-gradient-to-b from-emerald-950/40 via-zinc-950/60 to-emerald-950/40
+                 shadow-[inset_0_0_36px_rgba(0,0,0,0.55)]"
+    >
+      <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-rose-300/90 truncate px-0.5">
+        ✦ {opponentName}
+      </div>
+      <OpponentRow
+        oppPicks={oppPicks}
+        oppCard={oppCard}
+        augurRevealed={augurRevealed}
+        mode={mode}
+        laneResults={laneResults}
+        onOppLaneClick={onOppLaneClick}
+        augurTargeting={augurTargeting}
+      />
+
+      <div className="h-px bg-gradient-to-r from-transparent via-emerald-400/30 to-transparent" />
+
+      <PlayerRow
+        picks={picks}
+        myCard={myCard}
+        mode={mode}
+        laneResults={laneResults}
+        onLaneClick={onLaneClick}
+      />
+      <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-emerald-300/90 truncate px-0.5">
+        ✦ {youName}
+      </div>
+    </div>
+  );
+}
+
+function OpponentRow({
+  oppPicks, oppCard, augurRevealed, mode, laneResults,
+  onOppLaneClick, augurTargeting,
+}: {
+  oppPicks: [Move, Move, Move] | null;
+  oppCard: PlayedCard | null;
+  augurRevealed: { lane: LaneTarget; move: Move } | null;
+  mode: "picking" | "locked" | "reveal";
+  laneResults?: LaneResult[];
+  onOppLaneClick?: (lane: LaneTarget) => void;
+  augurTargeting: boolean;
+}) {
+  const [revealedLanes, setRevealedLanes] = useState(mode === "reveal" ? 0 : 3);
+  useEffect(() => {
+    if (mode !== "reveal") { setRevealedLanes(3); return; }
+    setRevealedLanes(0);
+    const timers = [
+      window.setTimeout(() => setRevealedLanes(1), 200),
+      window.setTimeout(() => setRevealedLanes(2), 800),
+      window.setTimeout(() => setRevealedLanes(3), 1400),
+    ];
+    return () => timers.forEach(window.clearTimeout);
+  }, [mode]);
+
+  return (
+    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+      {[0, 1, 2].map((i) => {
+        const lane = i as LaneTarget;
+        const isAugurLane = augurRevealed?.lane === lane;
+        const augurMove = isAugurLane ? augurRevealed.move : null;
+        const oppMove = mode === "reveal" && oppPicks ? oppPicks[i] : augurMove;
+        const lr = laneResults?.[i];
+        const verdict: "win" | "loss" | "draw" | null =
+          lr ? (lr.winner === "b" ? "win" : lr.winner === "a" ? "loss" : "draw") : null;
+        const revealed = mode !== "reveal" || i < revealedLanes;
+        const showCard = mode === "reveal" && oppCard && "lane" in oppCard && oppCard.lane === lane;
+
+        return (
+          <div key={i} className="relative">
+            {oppMove ? (
+              <FaceUpOppCard move={oppMove} verdict={verdict} revealed={revealed} preReveal={mode !== "reveal"} />
+            ) : (
+              <FaceDownCard
+                index={i}
+                pulsing={!augurTargeting}
+                clickable={augurTargeting}
+                onClick={() => onOppLaneClick?.(lane)}
+              />
+            )}
+            {showCard && oppCard && <CardSlot id={oppCard.id} position="tr" />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function PlayerRow({
+  picks, myCard, mode, laneResults, onLaneClick,
+}: {
+  picks: [Move | null, Move | null, Move | null];
+  myCard: PlayedCard | null;
+  mode: "picking" | "locked" | "reveal";
+  laneResults?: LaneResult[];
+  onLaneClick?: (lane: LaneTarget) => void;
+}) {
+  return (
+    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+      {picks.map((mv, i) => {
+        const lane = i as LaneTarget;
+        const lr = laneResults?.[i];
+        const verdict: "win" | "loss" | "draw" | null =
+          lr ? (lr.winner === "a" ? "win" : lr.winner === "b" ? "loss" : "draw") : null;
+        const favoured = mv ? laneFavoursMove(lane, mv) : false;
+        const cardHere = myCard && "lane" in myCard && myCard.lane === lane ? myCard : null;
+        return (
+          <LaneSlot
+            key={i}
+            index={i}
+            pick={mv}
+            favoured={favoured}
+            verdict={verdict}
+            cardHere={cardHere}
+            onClick={() => onLaneClick?.(lane)}
+            disabled={mode !== "picking"}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function FaceDownCard({ index, pulsing, clickable = false, onClick }: {
+  index: number; pulsing: boolean; clickable?: boolean; onClick?: () => void;
+}) {
+  const cls =
+    "aspect-square w-full rounded-xl border-2 flex items-center justify-center " +
+    (clickable
+      ? "border-violet-400/60 bg-violet-500/20 cursor-pointer hover:bg-violet-500/30 ring-2 ring-violet-400/40"
+      : "border-dashed border-white/10 bg-black/30");
+  const inner = (
+    <motion.div
+      animate={pulsing ? { opacity: [0.55, 1, 0.55] } : { opacity: 1 }}
+      transition={pulsing ? { duration: 1.4, repeat: Infinity, delay: index * 0.18 } : undefined}
+      className={cls}
+    >
+      <span className={"text-xl sm:text-2xl font-black " + (clickable ? "text-violet-300" : "text-zinc-700")}>
+        {clickable ? "👁️" : "?"}
+      </span>
+    </motion.div>
+  );
+  if (clickable) return <button onClick={onClick} className="w-full">{inner}</button>;
+  return inner;
+}
+
+function FaceUpOppCard({ move, verdict, revealed, preReveal }: {
+  move: Move; verdict: "win" | "loss" | "draw" | null; revealed: boolean; preReveal: boolean;
+}) {
+  const ring =
+    verdict === "win"  ? "ring-emerald-400/60" :
+    verdict === "loss" ? "ring-rose-400/50"    :
+    verdict === "draw" ? "ring-zinc-500/30"    :
+    "ring-violet-400/70";
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.7, rotateY: 90 }}
+      animate={revealed ? { opacity: 1, scale: 1, rotateY: 0 } : { opacity: 0.3, scale: 0.85, rotateY: 90 }}
+      transition={{ type: "spring", stiffness: 280, damping: 22 }}
+      className={"aspect-square w-full rounded-xl ring-2 flex items-center justify-center " + ring + " " + (preReveal ? "bg-violet-500/15" : "bg-black/30")}
+      style={{ transformPerspective: 800 }}
+    >
+      <Hand move={move} size="sm" emphasis={verdict === "win" ? "winner" : verdict === "loss" ? "loser" : "default"} />
+    </motion.div>
+  );
+}
+
+function LaneSlot({ index, pick, favoured, verdict, cardHere, onClick, disabled }: {
+  index: number; pick: Move | null; favoured: boolean;
+  verdict: "win" | "loss" | "draw" | null; cardHere: PlayedCard | null;
+  onClick: () => void; disabled: boolean;
+}) {
+  const t = useT();
+  const identity = LANE_IDENTITIES[index];
+  const idKey = IDENTITY_KEYS[index];
+  const title = t(`${idKey}.title`);
+  const accent = identity.accent;
+  const ringIdle = accent === "amber" ? "ring-amber-400/30" : accent === "sky" ? "ring-sky-400/30" : "ring-emerald-400/30";
+  const ringFav = accent === "amber" ? "ring-amber-400/80" : accent === "sky" ? "ring-sky-400/80" : "ring-emerald-400/80";
+  const accentText = accent === "amber" ? "text-amber-300" : accent === "sky" ? "text-sky-300" : "text-emerald-300";
+  const verdictRing =
+    verdict === "win" ? "ring-emerald-400/70" : verdict === "loss" ? "ring-rose-400/60" : verdict === "draw" ? "ring-zinc-500/40" : null;
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className={"flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold " + accentText}>
+        <span>{identity.glyph}</span>
+        <span>{title}</span>
+      </div>
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        className={
+          "aspect-square w-full rounded-xl border-2 transition flex items-center justify-center relative ring-2 " +
+          (verdictRing ?? (favoured ? ringFav : ringIdle)) + " " +
+          (pick ? "border-emerald-400/40 bg-emerald-500/10" : "border-dashed border-white/15 bg-black/20")
+        }
+      >
+        {pick ? (
+          <Hand move={pick} size="sm" emphasis={verdict === "win" ? "winner" : verdict === "loss" ? "loser" : "default"} />
+        ) : (
+          <span className="text-2xl text-zinc-700 font-black">?</span>
+        )}
+        {cardHere && <CardSlot id={cardHere.id} position="br" />}
+        {favoured && pick && !verdictRing && (
+          <span className={
+            "absolute -top-1.5 -right-1.5 px-1 py-0.5 rounded-full text-[8px] font-black text-zinc-900 shadow " +
+            (accent === "amber" ? "bg-amber-300" : accent === "sky" ? "bg-sky-300" : "bg-emerald-300")
+          }>✨</span>
+        )}
+      </button>
+    </div>
+  );
+}
