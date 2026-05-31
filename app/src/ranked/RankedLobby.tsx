@@ -10,6 +10,7 @@ import { levelFromXp } from "../leveling";
 import { ALL_CARD_IDS, CARDS, RARITY_COLOR } from "./cards";
 import { CardImage } from "./CardImage";
 import { useT } from "../i18n";
+import { InfoBubble } from "../flavor/InfoBubble";
 // Tournament state now lives in PlayPage
 
 export function RankedLobby({ onViewBracket, onManageDeck }: { onViewBracket: () => void; onManageDeck: () => void }) {
@@ -69,7 +70,20 @@ export function RankedLobby({ onViewBracket, onManageDeck }: { onViewBracket: ()
         </div>
         <div>
           <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-1">
-            <span className="uppercase tracking-wider font-semibold">LP</span>
+            <div className="flex items-center gap-1.5">
+              <span className="uppercase tracking-wider font-semibold">LP</span>
+              <InfoBubble
+                size="sm"
+                title="LP — League Points"
+                body={
+                  <>
+                    Points de rang. Tu en gagnes quand tu gagnes des matchs Classés / Constellation Classés et tu en perds quand tu perds.
+                    Les paliers : <b>Bronze</b> (0+), <b>Silver</b> (1100+), <b>Gold</b> (1300+), <b>Platinum</b> (1500+), <b>Diamond</b> (1750+).
+                    Chaque palier débloque une carte ou un cosmétique.
+                  </>
+                }
+              />
+            </div>
             <span className="tabular-nums">{player.rankLp} {tier.ceil !== Infinity && `/ ${tier.ceil}`}</span>
           </div>
           <div className="h-2 rounded-full bg-white/10 overflow-hidden">

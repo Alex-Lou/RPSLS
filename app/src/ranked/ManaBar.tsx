@@ -4,6 +4,7 @@
  */
 
 import { motion } from "motion/react";
+import { InfoBubble } from "../flavor/InfoBubble";
 
 export function ManaBar({
   mana, max = 4, spent = 0,
@@ -27,9 +28,23 @@ export function ManaBar({
       </motion.span>
       {/* Label + pips */}
       <div className="flex flex-col gap-0.5">
-        <span className="text-[8px] sm:text-[9px] uppercase tracking-wider font-bold text-violet-400/80 leading-none">
-          Mana
-        </span>
+        <div className="flex items-center gap-1">
+          <span className="text-[8px] sm:text-[9px] uppercase tracking-wider font-bold text-violet-400/80 leading-none">
+            Mana
+          </span>
+          <InfoBubble
+            size="sm"
+            variant="minimal"
+            title="Mana"
+            body={
+              <>
+                Le mana sert à jouer des cartes. Il vaut <b>1</b> au round 1 et <b>monte de 1 chaque round</b> jusqu'à <b>4</b>.
+                Communes coûtent 1, rares 2, épiques 3, légendaire 4.
+                Le mana ne s'accumule pas — celui non utilisé est perdu en fin de round.
+              </>
+            }
+          />
+        </div>
         <div className="flex items-center gap-1">
           {Array.from({ length: max }, (_, i) => {
             const filled = i < mana;
