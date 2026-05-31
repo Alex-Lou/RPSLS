@@ -11,18 +11,19 @@ export type Page = "play" | "online" | "quests" | "packs" | "profile" | "history
 interface NavItem {
   id: Page;
   labelKey: string;
-  icon: string;
+  /** Path to the PNG badge icon under /public/Burger Icons/. */
+  iconSrc: string;
 }
 
 const NAV: NavItem[] = [
-  { id: "play",    labelKey: "nav.home",    icon: "🏠" },
-  { id: "online",  labelKey: "nav.online",  icon: "🌐" },
-  { id: "quests",  labelKey: "nav.quests",  icon: "🏅" },
-  { id: "packs",   labelKey: "nav.packs",   icon: "🎴" },
-  { id: "profile", labelKey: "nav.profile", icon: "👤" },
-  { id: "history", labelKey: "nav.history", icon: "🗂️" },
-  { id: "about",   labelKey: "nav.about",   icon: "ℹ️" },
-  { id: "contact", labelKey: "nav.contact", icon: "✉️" },
+  { id: "play",    labelKey: "nav.home",    iconSrc: "/Burger Icons/nav_accueil.png"    },
+  { id: "online",  labelKey: "nav.online",  iconSrc: "/Burger Icons/nav_en_ligne.png"   },
+  { id: "quests",  labelKey: "nav.quests",  iconSrc: "/Burger Icons/nav_quetes.png"     },
+  { id: "packs",   labelKey: "nav.packs",   iconSrc: "/Burger Icons/nav_variantes.png"  },
+  { id: "profile", labelKey: "nav.profile", iconSrc: "/Burger Icons/nav_profil.png"     },
+  { id: "history", labelKey: "nav.history", iconSrc: "/Burger Icons/nav_historique.png" },
+  { id: "about",   labelKey: "nav.about",   iconSrc: "/Burger Icons/nav_a_propos.png"   },
+  { id: "contact", labelKey: "nav.contact", iconSrc: "/Burger Icons/nav_contact.png"    },
 ];
 
 /* ─────────── Body shared between desktop sidebar and mobile drawer ─────────── */
@@ -115,7 +116,12 @@ function SidebarBody({
                 }
                 style={{ background: theme.primary }}
               />
-              <span className="text-base">{item.icon}</span>
+              <img
+                src={item.iconSrc}
+                alt=""
+                draggable={false}
+                className="w-7 h-7 shrink-0 select-none"
+              />
               <span>{t(item.labelKey)}</span>
             </button>
           );
