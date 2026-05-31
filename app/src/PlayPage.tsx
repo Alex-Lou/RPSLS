@@ -343,6 +343,9 @@ function ModeSelect({
             );
           }
           const rewards = REWARDS[m];
+          // Hot-seat is the 7th tile and would sit alone on its row in a 2-col
+          // grid — span it across both columns so the layout stays tight.
+          const wide = m === "hotseat";
           return (
             <motion.button
               key={m}
@@ -352,7 +355,10 @@ function ModeSelect({
               whileHover={{ y: -3 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => { setMode(m); setPendingMode(m); }}
-              className="text-left p-2.5 sm:p-4 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition flex flex-col items-start gap-1.5 min-h-[124px]"
+              className={
+                "text-left p-2.5 sm:p-4 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition flex flex-col items-start gap-1.5 min-h-[124px]" +
+                (wide ? " col-span-2" : "")
+              }
             >
               <ModeIcon mode={m} />
               <div className="min-w-0 w-full">
