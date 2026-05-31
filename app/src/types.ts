@@ -5,12 +5,12 @@ export type ThemeId = "violet" | "neon" | "pastel" | "sunset" | "forest";
 
 export type PadId =
   | "chalkboard" | "vintage" | "cosmos" | "neon" | "comics"      // original SVG playmats
-  | "ancient" | "astrolab" | "casino" | "cyberpunk" | "quantum" | "steampunk";  // image playmats
+  | "ancient" | "astrolab" | "casino" | "cyberpunk" | "holy" | "quantum" | "steampunk";  // image playmats
 
 export type BackgroundId =
   | "default"
   | "ancient" | "astrolab" | "casino" | "cyberpunk"
-  | "galaxy" | "quantum" | "steampunk";
+  | "galaxy" | "holy" | "quantum" | "steampunk";
 
 export type GameMode = "training" | "casual" | "ranked" | "hotseat";
 
@@ -79,6 +79,7 @@ export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: st
   astrolab:   { label: "Astrolab",       emoji: "🔭", tagline: "Brass instruments, parchment, star charts." },
   casino:     { label: "Casino Royale",  emoji: "🎰", tagline: "Emerald felt + Art Deco gold trim." },
   cyberpunk:  { label: "Cyberpunk",      emoji: "🌆", tagline: "Neon hex grid, holographic HUD." },
+  holy:       { label: "Holy Game",      emoji: "✝️", tagline: "Cathedral light, gilded relics, sacred geometry." },
   quantum:    { label: "Quantum Lab",    emoji: "⚛️", tagline: "Particle traces, physics equations." },
   steampunk:  { label: "Steampunk",      emoji: "⚙️", tagline: "Brass gears, leather, amber filaments." },
 };

@@ -46,48 +46,67 @@ export interface BackgroundDef {
    *  defines the baseline — every other theme overrides what it cares about
    *  and inherits the rest. */
   skin: ThemeSkin;
+  /** Path to the small "miniature" badge icon used next to the theme label
+   *  in the picker (instead of the generic emoji). null = fall back to emoji. */
+  miniature: string | null;
 }
+
+const MINI = "/Backgrounds/Miniatures Icons Theme";
 
 export const BACKGROUNDS: BackgroundDef[] = [
   {
     id: "default",   label: "Original",       emoji: "🌌",
     src: null,                                          defaultPadId: null,
     skin: { fontHeadline: "inter",        fontBody: "inter",        fontMono: "jetbrains"  },
+    miniature: null,
   },
   {
     id: "ancient",   label: "Ancient",        emoji: "📜",
     src: "/Backgrounds/Ancient Playmat Backgruond.png", defaultPadId: "ancient",
     skin: { fontHeadline: "cinzel",       fontBody: "cormorant",    fontMono: "imFell"     },
+    miniature: `${MINI}/ancient.png`,
   },
   {
     id: "astrolab",  label: "Astrolab",       emoji: "🔭",
     src: "/Backgrounds/AstroLab Bckground.png",         defaultPadId: "astrolab",
     skin: { fontHeadline: "cinzel",       fontBody: "ebGaramond",   fontMono: "jetbrains"  },
+    miniature: null,
   },
   {
     id: "casino",    label: "Casino Royale",  emoji: "🎰",
     src: "/Backgrounds/CasinoRoyale Background.png",    defaultPadId: "casino",
     skin: { fontHeadline: "playfair",     fontBody: "cormorant",    fontMono: "bebas"      },
+    miniature: `${MINI}/casino.png`,
   },
   {
     id: "cyberpunk", label: "Cyberpunk",      emoji: "🌆",
     src: "/Backgrounds/CyberPunk Background.png",       defaultPadId: "cyberpunk",
     skin: { fontHeadline: "orbitron",     fontBody: "rajdhani",     fontMono: "shareTech"  },
+    miniature: `${MINI}/cyberpunk.png`,
   },
   {
     id: "galaxy",    label: "Galaxy",         emoji: "✨",
     src: "/Backgrounds/Galaxy Background.png",          defaultPadId: "cosmos",
     skin: { fontHeadline: "audiowide",    fontBody: "exo2",         fontMono: "spaceMono"  },
+    miniature: null,
+  },
+  {
+    id: "holy",      label: "Holy Game",      emoji: "✝️",
+    src: "/Backgrounds/Holy Game Background.png",       defaultPadId: "holy",
+    skin: { fontHeadline: "cinzel",       fontBody: "cormorant",    fontMono: "imFell"     },
+    miniature: `${MINI}/holy.png`,
   },
   {
     id: "quantum",   label: "Quantum Lab",    emoji: "⚛️",
     src: "/Backgrounds/Quantum Lab Background.png",     defaultPadId: "quantum",
     skin: { fontHeadline: "spaceGrotesk", fontBody: "ibmPlex",      fontMono: "fira"       },
+    miniature: `${MINI}/quantum.png`,
   },
   {
     id: "steampunk", label: "Steampunk",      emoji: "⚙️",
     src: "/Backgrounds/SteamPunk Workshop Background.png", defaultPadId: "steampunk",
     skin: { fontHeadline: "medieval",     fontBody: "imFell",       fontMono: "bevan"      },
+    miniature: `${MINI}/steampunk.png`,
   },
 ];
 
@@ -107,6 +126,7 @@ export const PAD_IMAGES: Partial<Record<PadId, string>> = {
   astrolab:  "/Pads/Astrolab.png",
   casino:    "/Pads/Casino Royale.png",
   cyberpunk: "/Pads/CyberPunk Pad.png",
+  holy:      "/Pads/Holy Game.png",
   quantum:   "/Pads/Quantum.png",
   steampunk: "/Pads/Steampunk.png",
 };

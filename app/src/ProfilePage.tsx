@@ -406,7 +406,16 @@ export function ProfilePage() {
                 </div>
                 <div className="p-2.5 bg-white/5">
                   <div className="flex items-center gap-2">
-                    <span className="text-base">{bg.emoji}</span>
+                    {bg.miniature ? (
+                      <img
+                        src={bg.miniature}
+                        alt=""
+                        draggable={false}
+                        className="w-6 h-6 shrink-0 object-contain select-none"
+                      />
+                    ) : (
+                      <span className="text-base">{bg.emoji}</span>
+                    )}
                     <span className="text-xs font-semibold truncate">{bg.label}</span>
                   </div>
                 </div>
