@@ -219,7 +219,11 @@ export function RankedMatchView({
               end.roundWinsYou < end.roundWinsOpp ? "loss" : "draw"
             }
             forfeit={end.forfeit}
+            forfeitByYou={end.forfeit && end.winner === "b"}
             scoreLine={`${end.roundWinsYou} — ${end.roundWinsOpp}`}
+            youScore={end.roundWinsYou}
+            oppScore={end.roundWinsOpp}
+            bestOf={match.winTo * 2 - 1}
             onRematch={onNext ? undefined : onRematch}
             onBack={onNext ? onNext : onLeave!}
             backLabel={onNext ? "Suivant →" : undefined}

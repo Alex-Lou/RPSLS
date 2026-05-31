@@ -1787,6 +1787,9 @@ function EndPanel({
       <CinematicMatchEnd
         outcome={outcome}
         scoreLine={`${match.scoreA} — ${match.scoreB}`}
+        youScore={match.scoreA}
+        oppScore={match.scoreB}
+        bestOf={match.bestOf}
         onRematch={onAgain}
         onBack={onQuit}
         rematchLabel={t("match.playAgain")}

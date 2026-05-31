@@ -1192,7 +1192,11 @@ function MatchEndScene({
     <CinematicMatchEnd
       outcome={outcome}
       forfeit={end.forfeit}
+      forfeitByYou={end.forfeit && outcome === "loss"}
       scoreLine={`${end.roundWinsYou} — ${end.roundWinsOpp}`}
+      youScore={end.roundWinsYou}
+      oppScore={end.roundWinsOpp}
+      bestOf={Math.max(end.roundWinsYou, end.roundWinsOpp) * 2 - 1}
       onRematch={onRematch}
       onBack={onBack}
     />

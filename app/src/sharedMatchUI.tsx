@@ -15,6 +15,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useT } from "./i18n";
+import { classifyEnd, pickEndSubtitleKey } from "./flavor/endphrases";
 
 /**
  * Hook: while a match is mounted, intercept the Android system back button
@@ -288,6 +289,14 @@ export interface CinematicMatchEndProps {
   forfeit?: boolean;
   /** Score line (already formatted, e.g. "3 — 1"). */
   scoreLine?: string;
+  /** Final player score (used to pick a contextual subtitle phrase). */
+  youScore?: number;
+  /** Final opponent score (used to pick a contextual subtitle phrase). */
+  oppScore?: number;
+  /** Match length (used to detect sweep — 3 of bestOf 5 = sweep at 3-0). */
+  bestOf?: number;
+  /** True when the player was the one forfeiting (vs opponent forfeit). */
+  forfeitByYou?: boolean;
   /** Rematch action (omit → no button). */
   onRematch?: () => void;
   /** Back / quit action (always shown). */
@@ -301,14 +310,26 @@ export interface CinematicMatchEndProps {
 const QUOTE_COUNT = 10;
 
 export function CinematicMatchEnd({
-  outcome, forfeit, scoreLine, onRematch, onBack,
-  rematchLabel, backLabel,
+  outcome, forfeit, scoreLine, youScore, oppScore, bestOf, forfeitByYou,
+  onRematch, onBack, rematchLabel, backLabel,
 }: CinematicMatchEndProps) {
   const t = useT();
   const youWon = outcome === "win";
   const draw = outcome === "draw";
   // Stable random pick per mount.
   const quoteIdx = useRef(Math.floor(Math.random() * QUOTE_COUNT)).current;
+  // Classify the situation once at mount so the subtitle stays stable.
+  const subtitleKey = useRef<string | null>(null).current;
+  const finalSubtitleKey = (() => {
+    if (subtitleKey) return subtitleKey;
+    if (youScore == null || oppScore == null || bestOf == null) return null;
+    const sit = classifyEnd({
+      youScore, oppScore, bestOf,
+      forfeit: !!forfeit,
+      forfeitByYou: !!forfeitByYou,
+    });
+    return pickEndSubtitleKey(sit);
+  })();
 
   const glyph = youWon ? "🏆" : draw ? "🤝" : "💀";
   const wordmark =
@@ -376,6 +397,25 @@ export function CinematicMatchEnd({
           {t("lanes.byForfeit")}
         </motion.div>
       )}
+
+      {/* Situation-aware one-liner under the wordmark — varies per match
+          (sweep, comeback, close call, dominated, tight loss, etc.). */}
+      {finalSubtitleKey && (() => {
+        const phrase = t(finalSubtitleKey);
+        // Fall back silently if the variant key isn't translated for this
+        // locale — the key itself is returned by t() in that case.
+        if (phrase.startsWith("endphrase.")) return null;
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.95, duration: 0.4 }}
+            className="max-w-xs sm:max-w-sm px-4 text-center text-sm text-zinc-300 leading-snug"
+          >
+            {phrase}
+          </motion.div>
+        );
+      })()}
 
       {scoreLine && (
         <div className="text-xl font-mono text-zinc-200">{scoreLine}</div>
