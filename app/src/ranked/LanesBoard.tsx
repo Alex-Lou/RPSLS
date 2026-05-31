@@ -178,7 +178,7 @@ function FaceDownCard({ index, pulsing, clickable = false, onClick }: {
   index: number; pulsing: boolean; clickable?: boolean; onClick?: () => void;
 }) {
   const cls =
-    "aspect-square w-full rounded-xl border-2 flex items-center justify-center " +
+    "aspect-[5/4] w-full rounded-xl border-2 flex items-center justify-center " +
     (clickable
       ? "border-violet-400/60 bg-violet-500/20 cursor-pointer hover:bg-violet-500/30 ring-2 ring-violet-400/40"
       : "border-dashed border-white/10 bg-black/30");
@@ -188,7 +188,7 @@ function FaceDownCard({ index, pulsing, clickable = false, onClick }: {
       transition={pulsing ? { duration: 1.4, repeat: Infinity, delay: index * 0.18 } : undefined}
       className={cls}
     >
-      <span className={"text-xl sm:text-2xl font-black " + (clickable ? "text-violet-300" : "text-zinc-700")}>
+      <span className={"text-3xl sm:text-4xl font-black " + (clickable ? "text-violet-300" : "text-zinc-700")}>
         {clickable ? "👁️" : "?"}
       </span>
     </motion.div>
@@ -210,10 +210,10 @@ function FaceUpOppCard({ move, verdict, revealed, preReveal }: {
       initial={{ opacity: 0, scale: 0.7, rotateY: 90 }}
       animate={revealed ? { opacity: 1, scale: 1, rotateY: 0 } : { opacity: 0.3, scale: 0.85, rotateY: 90 }}
       transition={{ type: "spring", stiffness: 280, damping: 22 }}
-      className={"aspect-square w-full rounded-xl ring-2 flex items-center justify-center " + ring + " " + (preReveal ? "bg-violet-500/15" : "bg-black/30")}
+      className={"aspect-[5/4] w-full rounded-xl ring-2 flex items-center justify-center " + ring + " " + (preReveal ? "bg-violet-500/15" : "bg-black/30")}
       style={{ transformPerspective: 800 }}
     >
-      <Hand move={move} size="sm" emphasis={verdict === "win" ? "winner" : verdict === "loss" ? "loser" : "default"} />
+      <Hand move={move} size="md" emphasis={verdict === "win" ? "winner" : verdict === "loss" ? "loser" : "default"} />
     </motion.div>
   );
 }
@@ -244,15 +244,15 @@ function LaneSlot({ index, pick, favoured, verdict, cardHere, onClick, disabled 
         onClick={onClick}
         disabled={disabled}
         className={
-          "aspect-square w-full rounded-xl border-2 transition flex items-center justify-center relative ring-2 " +
+          "aspect-[5/4] w-full rounded-xl border-2 transition flex items-center justify-center relative ring-2 " +
           (verdictRing ?? (favoured ? ringFav : ringIdle)) + " " +
           (pick ? "border-emerald-400/40 bg-emerald-500/10" : "border-dashed border-white/15 bg-black/20")
         }
       >
         {pick ? (
-          <Hand move={pick} size="sm" emphasis={verdict === "win" ? "winner" : verdict === "loss" ? "loser" : "default"} />
+          <Hand move={pick} size="md" emphasis={verdict === "win" ? "winner" : verdict === "loss" ? "loser" : "default"} />
         ) : (
-          <span className="text-2xl text-zinc-700 font-black">?</span>
+          <span className="text-3xl sm:text-4xl text-zinc-700 font-black">?</span>
         )}
         {cardHere && <CardSlot id={cardHere.id} position="br" />}
         {favoured && pick && !verdictRing && (
