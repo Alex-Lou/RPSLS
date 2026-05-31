@@ -1,14 +1,16 @@
 /**
- * CardImage — single source of truth for ranked-card art rendering.
+ * CardImage — thin composer that resolves a CardId to its rendered art.
  *
- * The card PNGs ship with a decorative frame; we crop it by combining
- * `object-cover` with a slight upscale (scale-[1.35]). The caller must
- * provide a sized wrapper with `relative overflow-hidden`.
+ * The actual rendering primitives (and the crop scale) live in cardArt.tsx;
+ * this file just does the CardId → RankedCard lookup and binds the i18n alt
+ * text, so callers that already have a RankedCard object can skip straight
+ * to <CardArt> / <CardArtFallback>.
  *
- * Falls back to a gradient + glyph when the card has no art.
+ * The caller must provide a sized wrapper with `relative overflow-hidden`.
  */
 
-import { CARDS, RARITY_BG } from "./cards";
+import { CARDS } from "./cards";
+import { CardArt, CardArtFallback } from "./cardArt";
 import type { CardId } from "./rankedTypes";
 import { useT } from "../i18n";
 
@@ -22,24 +24,7 @@ export function CardImage({
 }) {
   const t = useT();
   const card = CARDS[id];
-  if (card.art) {
-    return (
-      <img
-        src={card.art}
-        alt={t(card.nameKey)}
-        className="absolute inset-0 w-full h-full object-cover scale-[1.35]"
-        draggable={false}
-      />
-    );
-  }
-  return (
-    <div
-      className={
-        "absolute inset-0 flex items-center justify-center bg-gradient-to-br " +
-        RARITY_BG[card.rarity]
-      }
-    >
-      <span className={glyphSize + " drop-shadow-md"}>{card.glyph}</span>
-    </div>
-  );
+  return card.art
+    ? <CardArt card={card} alt={t(card.nameKey)} />
+    : <CardArtFallback card={card} glyphSize={glyphSize} />;
 }
