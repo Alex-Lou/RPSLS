@@ -1,5 +1,5 @@
 /**
- * CardHand — hand of up to 3 cards. Shows illustrated art or emoji fallback.
+ * CardHand — hand of up to 4 cards (3 + the bonus from Heist).
  * Compact strip at the bottom that doesn't interfere with the board.
  */
 
@@ -24,11 +24,14 @@ const GLOW_BY_RARITY: Record<string, string> = {
 };
 
 export function CardHand({
-  hand, mana, selected, onSelect, disabled = false, augurCooldown = 0,
+  hand, mana, selected, playedId = null, onSelect, disabled = false, augurCooldown = 0,
 }: {
   hand: CardId[];
   mana: number;
   selected: CardId | null;
+  /** Id of the card currently committed for the round (cardPlayed.id). Used
+   *  to mark self-target plays visually since they don't get a lane badge. */
+  playedId?: CardId | null;
   onSelect: (id: CardId | null) => void;
   disabled?: boolean;
   augurCooldown?: number;
@@ -41,11 +44,15 @@ export function CardHand({
       </div>
     );
   }
+  // Only light up the FIRST hand index matching playedId so duplicate cards
+  // don't both flash.
+  const playedIdx = playedId !== null ? hand.indexOf(playedId) : -1;
   return (
     <div className="flex items-end justify-end gap-1.5">
       {hand.map((id, i) => {
         const card = CARDS[id];
         const isSelected = selected === id;
+        const isPlayed = i === playedIdx;
         const onCooldown = (id === "augur" || id === "oracle") && augurCooldown > 0;
         const playable = !disabled && card.cost <= mana && !onCooldown;
         return (
@@ -53,6 +60,7 @@ export function CardHand({
             key={`${id}-${i}`}
             id={id}
             selected={isSelected}
+            played={isPlayed}
             playable={playable}
             index={i}
             onClick={() => {
@@ -67,25 +75,34 @@ export function CardHand({
 }
 
 function CardThumb({
-  id, selected, playable, index, onClick,
+  id, selected, played, playable, index, onClick,
 }: {
   id: CardId;
   selected: boolean;
+  played: boolean;
   playable: boolean;
   index: number;
   onClick: () => void;
 }) {
   const t = useT();
   const card = CARDS[id];
-  const ring = selected ? "ring-white" : RING_BY_RARITY[card.rarity];
-  const glow = selected ? "shadow-xl shadow-white/30" : GLOW_BY_RARITY[card.rarity];
+  const ring = played
+    ? "ring-emerald-400"
+    : selected
+    ? "ring-white"
+    : RING_BY_RARITY[card.rarity];
+  const glow = played
+    ? "shadow-xl shadow-emerald-400/40"
+    : selected
+    ? "shadow-xl shadow-white/30"
+    : GLOW_BY_RARITY[card.rarity];
 
   return (
     <motion.button
       onClick={onClick}
       disabled={!playable}
       initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: playable ? 1 : 0.35, y: selected ? -14 : 0 }}
+      animate={{ opacity: playable ? 1 : 0.35, y: played || selected ? -14 : 0 }}
       transition={{ delay: index * 0.04, type: "spring", stiffness: 280, damping: 22 }}
       whileHover={playable ? { y: -6, scale: 1.06 } : undefined}
       whileTap={playable ? { scale: 0.92 } : undefined}
@@ -102,6 +119,13 @@ function CardThumb({
           <div key={k} className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white/90 ring-1 ring-black/30" />
         ))}
       </div>
+      {/* Played checkmark — the only visible feedback for self-target cards
+          (second-wind, vortex, supernova) which never get a lane badge. */}
+      {played && (
+        <div className="absolute top-1 right-1 z-20 w-4 h-4 rounded-full bg-emerald-400 flex items-center justify-center shadow">
+          <span className="text-[9px] text-zinc-900 font-black leading-none">✓</span>
+        </div>
+      )}
       {/* Name at bottom */}
       <div className="absolute bottom-0 left-0 right-0 bg-black/70 backdrop-blur-sm py-0.5 z-10">
         <div className="text-[6px] sm:text-[7px] font-bold uppercase tracking-wider text-center text-white/90 truncate px-0.5">

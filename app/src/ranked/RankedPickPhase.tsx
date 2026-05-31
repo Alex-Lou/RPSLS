@@ -133,6 +133,7 @@ export function RankedPickPhase({
             hand={hand}
             mana={mana}
             selected={selectedCard}
+            playedId={cardPlayed?.id ?? null}
             onSelect={handleSelectCard}
             disabled={false}
             augurCooldown={augurCooldown}
