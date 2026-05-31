@@ -155,6 +155,7 @@ export function RankedLobby({ onViewBracket, onManageDeck }: { onViewBracket: ()
             <CardRule id="curse" />
 
             <div className="text-[10px] uppercase tracking-wider font-bold text-violet-400 mt-1">🟣 Épiques (3 mana)</div>
+            <CardRule id="heist" />
             <CardRule id="tide" />
             <CardRule id="oracle" />
             <CardRule id="vortex" />
@@ -168,7 +169,7 @@ export function RankedLobby({ onViewBracket, onManageDeck }: { onViewBracket: ()
         </div>
       )}
 
-      {/* Cards overview — all 12 */}
+      {/* Cards overview — all 13 */}
       <div className="bg-white/5 border border-white/10 rounded-3xl p-4 sm:p-5">
         <h2 className="text-xs uppercase tracking-[0.25em] font-bold text-zinc-400 mb-3">
           Toutes les cartes
