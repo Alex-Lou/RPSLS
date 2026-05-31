@@ -372,8 +372,8 @@ export function OnlinePage() {
           scoreOpponent: prev.youAre === "a" ? msg.score_b : msg.score_a,
           outcome,
           rounds: [],
-          xpDelta: 0,
-          lpDelta: 0,
+          xpDelta: outcome === "win" ? 60 : outcome === "draw" ? 25 : 15,
+          lpDelta: outcome === "win" ? 20 : outcome === "draw" ? 0 : -15,
           timestamp: Date.now(),
           forfeit: msg.forfeit && outcome === "loss",
         });
@@ -475,8 +475,8 @@ export function OnlinePage() {
             scoreOpponent: winsOpp,
             outcome,
             rounds: [],
-            xpDelta: 0,
-            lpDelta: 0,
+            xpDelta: outcome === "win" ? 60 : outcome === "draw" ? 25 : 15,
+            lpDelta: outcome === "win" ? 20 : outcome === "draw" ? 0 : -15,
             timestamp: Date.now(),
             forfeit: msg.forfeit && outcome === "loss",
           });
