@@ -4,6 +4,7 @@ import { useStore } from "./store";
 import { levelFromXp } from "./leveling";
 import { rankFromLp } from "./rank";
 import { THEMES } from "./theme";
+import { avatarImgStyle } from "./avatar";
 import { useT } from "./i18n";
 import type { Page } from "./Sidebar";
 
@@ -54,7 +55,12 @@ export function UserHeader({ onNavigate }: { onNavigate: (p: Page) => void }) {
           style={{ background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})` }}
         >
           {/^(data:|\/|https?:)/.test(player.avatar) ? (
-            <img src={player.avatar} alt="" className="w-full h-full object-cover" />
+            <img
+              src={player.avatar}
+              alt=""
+              className="w-full h-full object-cover"
+              style={avatarImgStyle(player.avatar)}
+            />
           ) : (
             <span>{player.avatar}</span>
           )}

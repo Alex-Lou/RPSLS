@@ -6,6 +6,7 @@ import { levelFromXp } from "./leveling";
 import { DIFFICULTY_META, PAD_META } from "./types";
 import type { BackgroundId, Difficulty, PadId, ThemeId } from "./types";
 import { BACKGROUNDS, BACKGROUNDS_BY_ID, PAD_DEFAULT_BG } from "./themes";
+import { isAvatarImage, avatarImgStyle } from "./avatar";
 import { MOVES } from "./game";
 import { BattlePad } from "./BattlePad";
 import { useT } from "./i18n";
@@ -33,13 +34,6 @@ const AVATAR_PRESETS: string[] = [
   "/Profile miniatures/chibi_crown.png",
 ];
 
-/** True when a stored avatar value should be rendered as an <img> rather than
- *  a text node. Covers uploaded photos (data: URLs), the new PNG presets
- *  (paths starting with "/") and any future http(s) URLs. Emojis fall
- *  through to text rendering. */
-function isAvatarImage(v: string): boolean {
-  return v.startsWith("data:") || v.startsWith("/") || v.startsWith("http");
-}
 
 export function ProfilePage() {
   const player = useStore((s) => s.player);
@@ -124,7 +118,12 @@ export function ProfilePage() {
           }}
         >
           {isAvatarImage(player.avatar) ? (
-            <img src={player.avatar} alt="" className="w-full h-full rounded-3xl object-cover" />
+            <img
+              src={player.avatar}
+              alt=""
+              className="w-full h-full rounded-3xl object-cover"
+              style={avatarImgStyle(player.avatar)}
+            />
           ) : (
             <span>{player.avatar}</span>
           )}
@@ -217,7 +216,8 @@ export function ProfilePage() {
                   <img
                     src={a}
                     alt=""
-                    className="w-full h-full object-cover scale-[1.25]"
+                    className="w-full h-full object-cover"
+                    style={avatarImgStyle(a)}
                     draggable={false}
                   />
                 ) : (

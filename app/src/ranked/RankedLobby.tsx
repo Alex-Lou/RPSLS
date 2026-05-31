@@ -11,6 +11,7 @@ import { ALL_CARD_IDS, CARDS, RARITY_COLOR } from "./cards";
 import { CardImage } from "./CardImage";
 import { useT } from "../i18n";
 import { InfoBubble } from "../flavor/InfoBubble";
+import { avatarImgStyle } from "../avatar";
 // Tournament state now lives in PlayPage
 
 export function RankedLobby({ onViewBracket, onManageDeck }: { onViewBracket: () => void; onManageDeck: () => void }) {
@@ -50,7 +51,12 @@ export function RankedLobby({ onViewBracket, onManageDeck }: { onViewBracket: ()
         <div className="flex items-center gap-3">
           <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-violet-500/30 to-fuchsia-500/30 border border-white/15 flex items-center justify-center text-3xl overflow-hidden">
             {/^(data:|\/|https?:)/.test(player.avatar) ? (
-              <img src={player.avatar} alt="" className="w-full h-full object-cover" />
+              <img
+                src={player.avatar}
+                alt=""
+                className="w-full h-full object-cover"
+                style={avatarImgStyle(player.avatar)}
+              />
             ) : (
               player.avatar
             )}

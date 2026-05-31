@@ -5,6 +5,7 @@ import { levelFromXp } from "./leveling";
 import { THEMES } from "./theme";
 import { useT } from "./i18n";
 import { LanguagePicker } from "./LanguagePicker";
+import { avatarImgStyle } from "./avatar";
 
 export type Page = "play" | "online" | "quests" | "packs" | "profile" | "history" | "about" | "contact";
 
@@ -61,7 +62,12 @@ function SidebarBody({
           }}
         >
           {/^(data:|\/|https?:)/.test(player.avatar) ? (
-            <img src={player.avatar} alt="" className="w-full h-full object-cover" />
+            <img
+              src={player.avatar}
+              alt=""
+              className="w-full h-full object-cover"
+              style={avatarImgStyle(player.avatar)}
+            />
           ) : (
             <span>{player.avatar}</span>
           )}
