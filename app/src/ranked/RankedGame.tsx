@@ -49,6 +49,21 @@ const REVEAL_SUSPENSE_MS = 1_400;
 const MATCH_FOUND_SPLASH_MS = 2_500;
 const MAX_MANA = 4;
 
+/** CPU's notional hand pool — the cards the AI may consider each round. The
+ *  CPU doesn't track a real deck/hand, but we filter one-shots out across the
+ *  match so it can't replay an epic/legendary it already played. */
+const BASE_CPU_HAND_POOL: CardId[] = [
+  "aegis", "surge", "augur", "curse", "precision", "echo",
+  "heist", "tide", "vortex",
+];
+
+/** Pool the player draws from when a successful Heist nets them a card. Heist
+ *  itself is excluded (you can't steal someone's one-shot they've already
+ *  burned). */
+const STEALABLE_FROM_CPU: CardId[] = [
+  "aegis", "surge", "augur", "curse", "precision", "echo", "tide", "vortex",
+];
+
 function makeBattle(savedDeck?: string[]): RankedBattleState {
   const cleaned = (savedDeck ?? []).filter(
     (id): id is CardId => Object.prototype.hasOwnProperty.call(CARDS, id),
@@ -116,6 +131,12 @@ export function RankedGame({
   const MAX_TIMEOUTS = 3;
   /** Augur cooldown: rounds remaining before Augur can be played again. */
   const [augurCooldown, setAugurCooldown] = useState(0);
+  /** Set true when the CPU successfully Heists the player; consumed at next
+   *  startNextRound to give the victim one free draw (bypassing the hand cap
+   *  if they were a roundwinner this turn and would otherwise hit it). */
+  const compensationDrawNextRef = useRef(false);
+  /** CPU one-shots burned this match — filtered out of BASE_CPU_HAND_POOL. */
+  const cpuOneShotsRef = useRef<CardId[]>([]);
 
   /* ──────────── Lifecycle ──────────── */
   useEffect(() => {
@@ -141,17 +162,25 @@ export function RankedGame({
     setAugurCooldown((c) => Math.max(0, c - 1));
 
     const shouldDraw = nextNo === 1 || wonLastRoundRef.current;
-    const drawCount = nextNo === 1 ? STARTING_HAND : shouldDraw ? 1 : 0;
-    const drawn = drawN(battle.deck, battle.hand, battle.discard, drawCount, HAND_CAP);
+    const compensationDraw = compensationDrawNextRef.current;
+    compensationDrawNextRef.current = false;
+    const baseDrawCount = nextNo === 1 ? STARTING_HAND : shouldDraw ? 1 : 0;
+    const drawCount = baseDrawCount + (compensationDraw ? 1 : 0);
+    // Bump the cap by 1 for this draw cycle when compensating so the free card
+    // is honored even if the victim happened to also win the previous round.
+    const drawCap = compensationDraw ? HAND_CAP + 1 : HAND_CAP;
+    const drawn = drawN(battle.deck, battle.hand, battle.discard, drawCount, drawCap);
 
     // CPU decision now, stored in ref so Augur can read without races.
+    const usedOneShots = new Set(cpuOneShotsRef.current);
+    const cpuHand = BASE_CPU_HAND_POOL.filter((id) => !usedOneShots.has(id));
     const cpuDecision = cpuRankedDecision(
       {
         mood: moodRef.current,
         difficulty,
         playerHistory: playerHistoryRef.current,
         mana: newMana,
-        hand: ["aegis", "surge", "augur", "curse", "precision", "echo", "tide", "vortex"],
+        hand: cpuHand,
       },
       LANE_COUNT,
     );
@@ -319,6 +348,24 @@ export function RankedGame({
 
     wonLastRoundRef.current = finalWinner === "a";
 
+    // Heist resolution — trigger only when the heister's targeted lane was
+    // actually won by them.
+    const myHeistLane = myCard?.id === "heist" ? (myCard as { lane: LaneTarget }).lane : null;
+    const oppHeistLane = oppCard?.id === "heist" ? (oppCard as { lane: LaneTarget }).lane : null;
+    const myHeistSuccess = myHeistLane !== null && fx.outcome.lanes[myHeistLane]?.winner === "a";
+    const oppHeistSuccess = oppHeistLane !== null && fx.outcome.lanes[oppHeistLane]?.winner === "b";
+
+    // Track CPU one-shots burned this match (the CPU has a notional, infinite
+    // pool but we still want epic/legendary to be one-and-done).
+    if (oppCard) {
+      const oppRarity = CARDS[oppCard.id].rarity;
+      if (oppRarity === "epic" || oppRarity === "legendary") {
+        cpuOneShotsRef.current = [...cpuOneShotsRef.current, oppCard.id];
+      }
+    }
+    // CPU successfully Heisted us → grant the victim (us) a free draw next round.
+    if (oppHeistSuccess) compensationDrawNextRef.current = true;
+
     // Battle state update: discard played card, spend mana, lose 1 card if loss.
     const spentMana = myCard ? CARDS[myCard.id].cost : 0;
     setBattle((b) => {
@@ -332,6 +379,18 @@ export function RankedGame({
         } else {
           discardAfter = [...discardAfter, myCard.id];
         }
+      }
+      // Player Heist landed → steal a random card from the CPU's notional hand.
+      if (myHeistSuccess) {
+        const stolen = STEALABLE_FROM_CPU[
+          Math.floor(Math.random() * STEALABLE_FROM_CPU.length)
+        ];
+        handAfter = [...handAfter, stolen];
+      }
+      // CPU Heist landed → yank a random card out of our hand.
+      if (oppHeistSuccess && handAfter.length > 0) {
+        const idx = Math.floor(Math.random() * handAfter.length);
+        handAfter = [...handAfter.slice(0, idx), ...handAfter.slice(idx + 1)];
       }
       // Lose round → discard 1 random card from hand
       if (finalWinner === "b" && handAfter.length > 0) {
@@ -427,6 +486,8 @@ export function RankedGame({
     moodRef.current = "random";
     roundNoRef.current = 0;
     wonLastRoundRef.current = false;
+    compensationDrawNextRef.current = false;
+    cpuOneShotsRef.current = [];
     if (deadlineTimerRef.current) {
       window.clearTimeout(deadlineTimerRef.current);
       deadlineTimerRef.current = null;

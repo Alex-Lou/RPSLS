@@ -48,6 +48,15 @@ function chooseCpuCard(ctx: RankedCpuContext, picks: LanePlay[]): PlayedCard | n
     if (id === "tide" && Math.random() < 0.3) {
       return { id: "tide", lane: 0 as LaneTarget };
     }
+    if (id === "heist" && Math.random() < 0.25) {
+      // Aim Heist at the lane we expect to win — fallback to a random one.
+      for (let i = 0; i < picks.length; i++) {
+        if (laneFavoursMove(i, picks[i].mv)) {
+          return { id: "heist", lane: i as LaneTarget };
+        }
+      }
+      return { id: "heist", lane: Math.floor(Math.random() * picks.length) as LaneTarget };
+    }
   }
 
   return null;

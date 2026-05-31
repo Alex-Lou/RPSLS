@@ -64,15 +64,15 @@ export const CARDS: Record<CardId, RankedCard> = {
     targetHintKey: "ranked.cards.curse.targetHint",
     art: "/Cards Bonus/curse.png",
   },
+
+  /* 🟣 EPICS — 3 mana */
   heist: {
-    id: "heist", cost: 2, rarity: "rare",
+    id: "heist", cost: 3, rarity: "epic",
     target: "lane", palette: "orange", glyph: "🏴‍☠️",
     nameKey: "ranked.cards.heist.name", descKey: "ranked.cards.heist.desc",
     targetHintKey: "ranked.cards.heist.targetHint",
     art: "/Cards Bonus/heist.png",
   },
-
-  /* 🟣 EPICS — 3 mana */
   tide: {
     id: "tide", cost: 3, rarity: "epic",
     target: "self", palette: "cyan", glyph: "🌊",

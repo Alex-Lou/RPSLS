@@ -10,8 +10,8 @@ import type { LanePlay } from "../online";
 
 export type CardId =
   | "aegis" | "precision" | "anchor" | "second-wind"   // commons (1 mana)
-  | "surge" | "augur" | "echo" | "curse" | "heist"      // rares (2 mana)
-  | "tide" | "oracle" | "vortex"                        // epics (3 mana)
+  | "surge" | "augur" | "echo" | "curse"                // rares (2 mana)
+  | "heist" | "tide" | "oracle" | "vortex"              // epics (3 mana)
   | "supernova";                                        // legendary (4 mana)
 
 export type CardRarity = "common" | "rare" | "epic" | "legendary";
