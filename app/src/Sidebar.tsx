@@ -60,7 +60,7 @@ function SidebarBody({
             background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`,
           }}
         >
-          {player.avatar.startsWith("data:") ? (
+          {/^(data:|\/|https?:)/.test(player.avatar) ? (
             <img src={player.avatar} alt="" className="w-full h-full object-cover" />
           ) : (
             <span>{player.avatar}</span>

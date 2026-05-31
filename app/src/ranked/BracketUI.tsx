@@ -123,7 +123,7 @@ function SlotRow({ player, isPrimary, lost, won }: {
 }
 
 function GhostChip({ player, lost }: { player: BracketPlayer; lost: boolean }) {
-  const isPhoto = player.avatar.startsWith("data:");
+  const isPhoto = /^(data:|\/|https?:)/.test(player.avatar);
   return (
     <div className={
       "w-24 sm:w-28 h-7 rounded-md flex items-center gap-1.5 overflow-hidden px-1.5 " +
@@ -143,7 +143,7 @@ function GhostChip({ player, lost }: { player: BracketPlayer; lost: boolean }) {
 function PlayerChip({ player, size, dimmed = false, won = false }: {
   player: BracketPlayer; size: "sm" | "lg"; dimmed?: boolean; won?: boolean;
 }) {
-  const isPhoto = player.avatar.startsWith("data:");
+  const isPhoto = /^(data:|\/|https?:)/.test(player.avatar);
   const lg = size === "lg";
   const color = dimmed
     ? "opacity-25 grayscale line-through"

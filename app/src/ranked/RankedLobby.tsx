@@ -48,7 +48,7 @@ export function RankedLobby({ onViewBracket, onManageDeck }: { onViewBracket: ()
       <div className="bg-white/5 border border-white/10 rounded-3xl p-4 sm:p-5 flex flex-col gap-3">
         <div className="flex items-center gap-3">
           <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-violet-500/30 to-fuchsia-500/30 border border-white/15 flex items-center justify-center text-3xl overflow-hidden">
-            {player.avatar.startsWith("data:") ? (
+            {/^(data:|\/|https?:)/.test(player.avatar) ? (
               <img src={player.avatar} alt="" className="w-full h-full object-cover" />
             ) : (
               player.avatar

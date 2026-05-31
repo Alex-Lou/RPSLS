@@ -49,8 +49,18 @@ const MYSTERY_SIZE = {
   xl: { box: "w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48",        font: "text-6xl sm:text-7xl md:text-8xl" },
 };
 
+/** Themed PNG silhouette for each move. Drops onto the per-move palette
+ *  gradient inside Hand so the gesture is the user's eye-anchor and the
+ *  colour identity comes from the gradient behind it. */
+export const MOVE_PNG: Record<Move, string> = {
+  rock:     "/Moves/rock.png",
+  paper:    "/Moves/paper.png",
+  scissors: "/Moves/scissors.png",
+  lizard:   "/Moves/lizard.png",
+  spock:    "/Moves/spock.png",
+};
+
 export function Hand({ move, size = "md", emphasis = "default", className = "" }: HandProps) {
-  const Icon = MOVE_ICON[move];
   const pal = MOVE_PALETTE[move];
   const s = SIZE[size];
 
@@ -69,7 +79,12 @@ export function Hand({ move, size = "md", emphasis = "default", className = "" }
 
   return (
     <div className={`${base} ${emp} ${className}`}>
-      <Icon className={s.icon} />
+      <img
+        src={MOVE_PNG[move]}
+        alt={move}
+        draggable={false}
+        className={`${s.icon} object-contain select-none`}
+      />
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useStore } from "./store";
 import { useT } from "./i18n";
-import { Hand, MOVE_ICON, MOVE_PALETTE } from "./icons";
+import { Hand, MOVE_PNG, MOVE_PALETTE } from "./icons";
 import { MOVES, type Move } from "./game";
 import {
   OnlineClient,
@@ -1488,7 +1488,6 @@ function PickStage({
       </div>
       <div className="grid grid-cols-5 gap-2 sm:gap-3 w-full">
         {MOVES.map((mv, i) => {
-          const Icon = MOVE_ICON[mv];
           const pal = MOVE_PALETTE[mv];
           return (
             <motion.button
@@ -1506,7 +1505,12 @@ function PickStage({
               }
               title={mv}
             >
-              <Icon className="w-7 h-7 sm:w-9 sm:h-9" />
+              <img
+                src={MOVE_PNG[mv]}
+                alt={mv}
+                draggable={false}
+                className="w-8 h-8 sm:w-10 sm:h-10 object-contain select-none"
+              />
               <span className="text-[10px] uppercase tracking-wider font-bold">{mv}</span>
             </motion.button>
           );

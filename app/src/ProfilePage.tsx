@@ -11,10 +11,35 @@ import { BattlePad } from "./BattlePad";
 import { useT } from "./i18n";
 import { hapticTap, hapticMatchStart } from "./haptic";
 
-const AVATAR_PRESETS = [
-  "🎮", "👾", "🦊", "🐉", "🦄", "🥷", "🧙", "🤖",
-  "🦁", "🐺", "🐯", "🦅", "👻", "💀", "⚔️", "🎯",
+/** 16 themed PNG avatars under /public/Profile miniatures/.
+ *  Mix of 8 dark-fantasy badge sigils and 8 cute kawaii chibis (one per
+ *  RPSLS move + 3 gaming staples). Custom uploads still work alongside. */
+const AVATAR_PRESETS: string[] = [
+  "/Profile miniatures/badge_crown.png",
+  "/Profile miniatures/badge_eye.png",
+  "/Profile miniatures/badge_shield.png",
+  "/Profile miniatures/badge_lightning.png",
+  "/Profile miniatures/badge_phoenix.png",
+  "/Profile miniatures/badge_galaxy.png",
+  "/Profile miniatures/badge_skull.png",
+  "/Profile miniatures/badge_wave.png",
+  "/Profile miniatures/chibi_rock.png",
+  "/Profile miniatures/chibi_paper.png",
+  "/Profile miniatures/chibi_scissors.png",
+  "/Profile miniatures/chibi_lizard.png",
+  "/Profile miniatures/chibi_spock.png",
+  "/Profile miniatures/chibi_gamepad.png",
+  "/Profile miniatures/chibi_d20.png",
+  "/Profile miniatures/chibi_crown.png",
 ];
+
+/** True when a stored avatar value should be rendered as an <img> rather than
+ *  a text node. Covers uploaded photos (data: URLs), the new PNG presets
+ *  (paths starting with "/") and any future http(s) URLs. Emojis fall
+ *  through to text rendering. */
+function isAvatarImage(v: string): boolean {
+  return v.startsWith("data:") || v.startsWith("/") || v.startsWith("http");
+}
 
 export function ProfilePage() {
   const player = useStore((s) => s.player);
@@ -98,7 +123,7 @@ export function ProfilePage() {
             background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`,
           }}
         >
-          {player.avatar.startsWith("data:") ? (
+          {isAvatarImage(player.avatar) ? (
             <img src={player.avatar} alt="" className="w-full h-full rounded-3xl object-cover" />
           ) : (
             <span>{player.avatar}</span>
@@ -174,13 +199,17 @@ export function ProfilePage() {
               key={a}
               onClick={() => updateProfile({ avatar: a })}
               className={
-                "w-12 h-12 rounded-2xl flex items-center justify-center text-2xl transition border " +
+                "w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center transition border " +
                 (player.avatar === a
-                  ? "border-white/40 bg-white/10"
+                  ? "border-white/40 ring-2 ring-white/20 bg-white/10"
                   : "border-white/10 bg-white/5 hover:bg-white/10")
               }
             >
-              {a}
+              {isAvatarImage(a) ? (
+                <img src={a} alt="" className="w-full h-full object-cover" draggable={false} />
+              ) : (
+                <span className="text-2xl">{a}</span>
+              )}
             </button>
           ))}
           <button

@@ -53,7 +53,7 @@ export function UserHeader({ onNavigate }: { onNavigate: (p: Page) => void }) {
           className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl shrink-0 ring-1 ring-white/20 shadow-lg overflow-hidden"
           style={{ background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})` }}
         >
-          {player.avatar.startsWith("data:") ? (
+          {/^(data:|\/|https?:)/.test(player.avatar) ? (
             <img src={player.avatar} alt="" className="w-full h-full object-cover" />
           ) : (
             <span>{player.avatar}</span>
