@@ -58,7 +58,7 @@ export const BACKGROUNDS: BackgroundDef[] = [
     id: "default",   label: "Original",       emoji: "🌌",
     src: null,                                          defaultPadId: null,
     skin: { fontHeadline: "inter",        fontBody: "inter",        fontMono: "jetbrains"  },
-    miniature: null,
+    miniature: `${MINI}/default.png`,
   },
   {
     id: "ancient",   label: "Ancient",        emoji: "📜",
@@ -70,7 +70,7 @@ export const BACKGROUNDS: BackgroundDef[] = [
     id: "astrolab",  label: "Astrolab",       emoji: "🔭",
     src: "/Backgrounds/AstroLab Bckground.png",         defaultPadId: "astrolab",
     skin: { fontHeadline: "cinzel",       fontBody: "ebGaramond",   fontMono: "jetbrains"  },
-    miniature: null,
+    miniature: `${MINI}/astrolab.png`,
   },
   {
     id: "casino",    label: "Casino Royale",  emoji: "🎰",
@@ -88,7 +88,7 @@ export const BACKGROUNDS: BackgroundDef[] = [
     id: "galaxy",    label: "Galaxy",         emoji: "✨",
     src: "/Backgrounds/Galaxy Background.png",          defaultPadId: "cosmos",
     skin: { fontHeadline: "audiowide",    fontBody: "exo2",         fontMono: "spaceMono"  },
-    miniature: null,
+    miniature: `${MINI}/galaxy.png`,
   },
   {
     id: "holy",      label: "Holy Game",      emoji: "✝️",
