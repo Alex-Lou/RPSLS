@@ -52,14 +52,13 @@ export function LanesBoard({
                  border border-emerald-900/40
                  shadow-[inset_0_0_36px_rgba(0,0,0,0.55)]"
     >
-      {/* Battle-pad backdrop — same pad the user picked in Profile, dimmed
-          enough that the pieces on top stay readable. */}
+      {/* Battle-pad backdrop — the user-chosen pad IS the visible surface the
+          lanes sit on. Fully opaque so the chosen theme actually shows. */}
       <div className="absolute inset-0 pointer-events-none">
-        <BattlePad padId={padId} className="w-full h-full opacity-55" />
+        <BattlePad padId={padId} className="w-full h-full" />
       </div>
-      {/* Readability overlay keeps the original emerald/zinc tint over the
-          pad so lane outlines and pick icons keep their contrast. */}
-      <div className="absolute inset-0 bg-gradient-to-b from-emerald-950/55 via-zinc-950/65 to-emerald-950/55 pointer-events-none" />
+      {/* Very light tint to unify across pad themes without hiding the art. */}
+      <div className="absolute inset-0 bg-black/15 pointer-events-none" />
 
       <div className="relative p-3 sm:p-4 flex flex-col gap-3 sm:gap-4">
       <div className="flex items-center justify-between gap-2 px-0.5">
