@@ -36,8 +36,9 @@ export function OppHandIndicator({
   return (
     <div
       className="flex items-end justify-center relative"
-      // Mirror CardHand: lift the container so the fan fits above the row.
-      style={{ paddingTop: geo.lift + 2, minHeight: 22 + geo.lift }}
+      // Mirror CardHand: paddingTop for the lift, paddingBottom for the
+      // droop of the outer cards so they don't crash into the row below.
+      style={{ paddingTop: geo.lift + 2, paddingBottom: geo.lift + 2, minHeight: 22 + geo.lift }}
     >
       <AnimatePresence>
         {Array.from({ length: slots }, (_, i) => {

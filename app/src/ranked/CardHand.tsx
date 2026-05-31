@@ -67,7 +67,10 @@ export function CardHand({
   return (
     <div
       className="flex items-end justify-center relative"
-      style={{ paddingTop: geo.lift + 12 }}
+      // paddingTop reserves space for selected/played cards lifting above the
+      // fan; paddingBottom reserves space for the outward droop of the outer
+      // cards so they don't bleed into whatever sibling sits underneath.
+      style={{ paddingTop: geo.lift + 12, paddingBottom: geo.lift + 4 }}
     >
       {hand.map((id, i) => {
         const card = CARDS[id];
