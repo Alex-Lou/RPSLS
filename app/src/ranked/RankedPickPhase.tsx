@@ -123,7 +123,7 @@ export function RankedPickPhase({
   })();
 
   return (
-    <div className="w-full h-full flex flex-col items-center gap-1.5 sm:gap-3">
+    <div className="w-full h-full flex flex-col items-center gap-1.5 sm:gap-3 pb-2 sm:pb-3">
       <TimerBar startedAt={startedAt} durationMs={deadlineMs} />
 
       {/* Mana + Cards strip — top zone, always visible */}
@@ -188,7 +188,7 @@ export function RankedPickPhase({
         onClick={handleLock}
         disabled={!allFilled}
         className={
-          "shrink-0 px-7 py-2 rounded-2xl font-bold text-white text-sm transition " +
+          "shrink-0 mt-1 sm:mt-2 px-7 py-2.5 rounded-2xl font-bold text-white text-sm transition " +
           (allFilled
             ? "bg-gradient-to-r from-violet-500 via-fuchsia-500 to-teal-400 shadow-lg shadow-violet-500/30 hover:scale-[1.02]"
             : "bg-white/5 text-zinc-500 cursor-not-allowed")
