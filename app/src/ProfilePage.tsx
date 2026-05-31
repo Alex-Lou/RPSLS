@@ -201,19 +201,25 @@ export function ProfilePage() {
                 key={a}
                 onClick={() => updateProfile({ avatar: a })}
                 className={
-                  "w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center transition " +
-                  // PNG stickers carry their own silhouette, so no bg/border
-                  // for them — any tint would peek through the transparent
-                  // pixels. Emoji slots keep the subtle frame for affordance.
+                  "w-14 h-14 overflow-hidden flex items-center justify-center transition " +
+                  // PNG stickers are circle-cropped and scaled past their
+                  // baked-in white "sticker outline" so only the artwork
+                  // shows. Emoji slots keep the squared frame for affordance.
                   (img
-                    ? (player.avatar === a ? "ring-2 ring-white/40 bg-transparent" : "bg-transparent hover:ring-1 hover:ring-white/15")
-                    : "border " + (player.avatar === a
+                    ? "rounded-full bg-transparent " +
+                      (player.avatar === a ? "ring-2 ring-white/40" : "hover:ring-1 hover:ring-white/15")
+                    : "rounded-2xl border " + (player.avatar === a
                         ? "border-white/40 ring-2 ring-white/20 bg-white/10"
                         : "border-white/10 bg-white/5 hover:bg-white/10"))
                 }
               >
                 {img ? (
-                  <img src={a} alt="" className="w-full h-full object-contain" draggable={false} />
+                  <img
+                    src={a}
+                    alt=""
+                    className="w-full h-full object-cover scale-[1.25]"
+                    draggable={false}
+                  />
                 ) : (
                   <span className="text-2xl">{a}</span>
                 )}

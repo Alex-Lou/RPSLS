@@ -86,8 +86,10 @@ export function Hand({ move, size = "md", emphasis = "default", className = "" }
 
 /** Renders a move silhouette via CSS mask so the baked-in dark backdrop in
  *  the source PNG disappears and only the bright silhouette shows, filled
- *  with `color` (defaults to white). Drop on any colored surface — the
- *  surface stays visible everywhere the mask is transparent. */
+ *  with `color` (defaults to white). Uses mask-mode: luminance so the PNG's
+ *  brightness drives the mask — bright pixels visible, dark bg invisible
+ *  (the source PNGs are NOT alpha-transparent). A small drop-shadow gives
+ *  the silhouette a faint white halo for that "lit from below" feel. */
 export function MoveGlyph({
   move,
   className = "",
@@ -111,6 +113,9 @@ export function MoveGlyph({
         WebkitMaskRepeat: "no-repeat",
         maskRepeat: "no-repeat",
         backgroundColor: color,
+        filter: "drop-shadow(0 0 4px rgba(255,255,255,0.45)) drop-shadow(0 0 1px rgba(0,0,0,0.6))",
+        // TS lib types haven't caught up with mask-mode yet, hence the cast.
+        ...({ WebkitMaskMode: "luminance", maskMode: "luminance" } as React.CSSProperties),
       }}
     />
   );
