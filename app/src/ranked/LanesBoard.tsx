@@ -57,8 +57,17 @@ export function LanesBoard({
       <div className="absolute inset-0 pointer-events-none">
         <BattlePad padId={padId} className="w-full h-full" />
       </div>
-      {/* Very light tint to unify across pad themes without hiding the art. */}
-      <div className="absolute inset-0 bg-black/15 pointer-events-none" />
+      {/* Radial vignette: very dark in the centre (where the lanes sit) so
+          busy pad decorations — Cosmos atom orbit, Quantum particle traces,
+          Casino medallion etc. — don't compete with the move icons; thinner
+          at the edges so the pad's perimeter motifs still read. */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(closest-side, rgba(0,0,0,0.7), rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.18) 100%)",
+        }}
+      />
 
       <div className="relative p-3 sm:p-4 flex flex-col gap-3 sm:gap-4">
       <div className="flex items-center justify-between gap-2 px-0.5">

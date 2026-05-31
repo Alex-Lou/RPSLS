@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { MOVES, type Move } from "../game";
-import { MOVE_PNG, MOVE_PALETTE } from "../icons";
+import { MoveGlyph, MOVE_PALETTE } from "../icons";
 import { hapticAlert, hapticTap } from "../haptic";
 import { hapticTick, PickShock } from "../sharedMatchUI";
 import { useT } from "../i18n";
@@ -228,12 +228,7 @@ function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void
             }
           >
             <PickShock show={shockMove === mv} />
-            <img
-              src={MOVE_PNG[mv]}
-              alt={mv}
-              draggable={false}
-              className="w-6 h-6 sm:w-8 sm:h-8 object-contain select-none"
-            />
+            <MoveGlyph move={mv} className="w-6 h-6 sm:w-8 sm:h-8" />
             <span className="text-[8px] uppercase tracking-wider font-bold leading-none">{mv}</span>
           </motion.button>
         );

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useStore } from "./store";
 import { useT } from "./i18n";
-import { Hand, MOVE_PNG, MOVE_PALETTE } from "./icons";
+import { Hand, MoveGlyph, MOVE_PALETTE } from "./icons";
 import { MOVES, type Move } from "./game";
 import {
   OnlineClient,
@@ -1505,12 +1505,7 @@ function PickStage({
               }
               title={mv}
             >
-              <img
-                src={MOVE_PNG[mv]}
-                alt={mv}
-                draggable={false}
-                className="w-8 h-8 sm:w-10 sm:h-10 object-contain select-none"
-              />
+              <MoveGlyph move={mv} className="w-8 h-8 sm:w-10 sm:h-10" />
               <span className="text-[10px] uppercase tracking-wider font-bold">{mv}</span>
             </motion.button>
           );

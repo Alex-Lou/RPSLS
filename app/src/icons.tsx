@@ -79,13 +79,40 @@ export function Hand({ move, size = "md", emphasis = "default", className = "" }
 
   return (
     <div className={`${base} ${emp} ${className}`}>
-      <img
-        src={MOVE_PNG[move]}
-        alt={move}
-        draggable={false}
-        className={`${s.icon} object-contain select-none`}
-      />
+      <MoveGlyph move={move} className={s.icon} />
     </div>
+  );
+}
+
+/** Renders a move silhouette via CSS mask so the baked-in dark backdrop in
+ *  the source PNG disappears and only the bright silhouette shows, filled
+ *  with `color` (defaults to white). Drop on any colored surface — the
+ *  surface stays visible everywhere the mask is transparent. */
+export function MoveGlyph({
+  move,
+  className = "",
+  color = "white",
+}: {
+  move: Move;
+  className?: string;
+  color?: string;
+}) {
+  const url = `url("${MOVE_PNG[move]}")`;
+  return (
+    <div
+      className={className + " select-none pointer-events-none"}
+      style={{
+        WebkitMaskImage: url,
+        maskImage: url,
+        WebkitMaskSize: "contain",
+        maskSize: "contain",
+        WebkitMaskPosition: "center",
+        maskPosition: "center",
+        WebkitMaskRepeat: "no-repeat",
+        maskRepeat: "no-repeat",
+        backgroundColor: color,
+      }}
+    />
   );
 }
 
