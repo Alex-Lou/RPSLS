@@ -69,7 +69,7 @@ export const CARDS: Record<CardId, RankedCard> = {
     target: "lane", palette: "orange", glyph: "🏴‍☠️",
     nameKey: "ranked.cards.heist.name", descKey: "ranked.cards.heist.desc",
     targetHintKey: "ranked.cards.heist.targetHint",
-    art: null,
+    art: "/Cards Bonus/heist.png",
   },
 
   /* 🟣 EPICS — 3 mana */
