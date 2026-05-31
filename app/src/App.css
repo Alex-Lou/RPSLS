@@ -10,7 +10,9 @@ html, body, #root {
   height: 100%;
   margin: 0;
   color: #e5e7eb;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  /* Body font is driven by the current theme's skin (set on :root from
+     App.tsx). Falls back to Inter when no theme has applied yet. */
+  font-family: var(--font-body, Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial);
   -webkit-font-smoothing: antialiased;
   /* Disable touch tap-zoom on mobile */
   touch-action: manipulation;
@@ -21,6 +23,15 @@ html, body, #root {
      view clips / compresses to fit instead of pushing the page taller. */
   overflow: hidden;
   max-width: 100vw;
+}
+
+/* Theme-driven font hooks — opt-in via these classes wherever the headline
+   or monospace family should override the body font. */
+.font-headline {
+  font-family: var(--font-headline, var(--font-body, Inter, sans-serif));
+}
+.font-mono {
+  font-family: var(--font-mono, "JetBrains Mono", Consolas, monospace);
 }
 
 body {

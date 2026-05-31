@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store";
 import { applyTheme } from "./theme";
-import { BACKGROUNDS_BY_ID } from "./themes";
+import { BACKGROUNDS_BY_ID, resolveFontFamily } from "./themes";
 import { RTL_LOCALES } from "./i18n";
 import { Sidebar, MobileShell, type Page } from "./Sidebar";
 import { PlayPage } from "./PlayPage";
@@ -53,9 +53,10 @@ export default function App() {
     applyTheme(themeId);
   }, [themeId]);
 
-  // Apply the chosen cosmetic background image to <body> via a CSS variable.
-  // The variable is consumed by body { background-image: var(--app-bg-image) }
-  // in App.css; "default" clears the var so the original gradient remains.
+  // Apply the chosen cosmetic background image AND skin (fonts, later
+  // colours) to <body> via CSS variables. body { font-family: var(...) }
+  // and body { background-image: var(...) } in App.css consume them;
+  // "default" clears the bg image so the original gradient remains.
   useEffect(() => {
     const def = BACKGROUNDS_BY_ID[backgroundId];
     const root = document.documentElement;
@@ -63,6 +64,11 @@ export default function App() {
       root.style.setProperty("--app-bg-image", `url("${def.src}")`);
     } else {
       root.style.removeProperty("--app-bg-image");
+    }
+    if (def?.skin) {
+      root.style.setProperty("--font-headline", resolveFontFamily(def.skin.fontHeadline));
+      root.style.setProperty("--font-body",     resolveFontFamily(def.skin.fontBody));
+      root.style.setProperty("--font-mono",     resolveFontFamily(def.skin.fontMono));
     }
   }, [backgroundId]);
 

@@ -8,6 +8,63 @@ importers:
 
   .:
     dependencies:
+      '@fontsource/audiowide':
+        specifier: ^5.2.7
+        version: 5.2.7
+      '@fontsource/bebas-neue':
+        specifier: ^5.2.7
+        version: 5.2.7
+      '@fontsource/bevan':
+        specifier: ^5.2.7
+        version: 5.2.7
+      '@fontsource/cinzel':
+        specifier: ^5.2.8
+        version: 5.2.8
+      '@fontsource/cormorant-garamond':
+        specifier: ^5.2.11
+        version: 5.2.11
+      '@fontsource/eb-garamond':
+        specifier: ^5.2.7
+        version: 5.2.7
+      '@fontsource/exo-2':
+        specifier: ^5.2.8
+        version: 5.2.8
+      '@fontsource/fira-code':
+        specifier: ^5.2.7
+        version: 5.2.7
+      '@fontsource/ibm-plex-sans':
+        specifier: ^5.2.8
+        version: 5.2.8
+      '@fontsource/im-fell-english':
+        specifier: ^5.2.6
+        version: 5.2.6
+      '@fontsource/inter':
+        specifier: ^5.2.8
+        version: 5.2.8
+      '@fontsource/jetbrains-mono':
+        specifier: ^5.2.8
+        version: 5.2.8
+      '@fontsource/medievalsharp':
+        specifier: ^5.2.8
+        version: 5.2.8
+      '@fontsource/orbitron':
+        specifier: ^5.2.8
+        version: 5.2.8
+      '@fontsource/playfair-display':
+        specifier: ^5.2.8
+        version: 5.2.8
+      '@fontsource/rajdhani':
+        specifier: ^5.2.7
+        version: 5.2.7
+      '@fontsource/share-tech-mono':
+        specifier: ^5.2.7
+        version: 5.2.7
+      '@fontsource/space-grotesk':
+        specifier: ^5.2.10
+        version: 5.2.10
+      '@fontsource/space-mono':
+        specifier: ^5.2.9
+        version: 5.2.9
       '@tauri-apps/api':
         specifier: ^2
         version: 2.11.0
@@ -54,6 +111,9 @@ importers:
       vite:
         specifier: ^7.0.4
         version: 7.3.3(jiti@2.7.0)(lightningcss@1.32.0)
+      ws:
+        specifier: ^8.20.1
+        version: 8.21.0
 
 packages:
 
@@ -295,6 +355,63 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@fontsource/audiowide@5.2.7':
+    resolution: {integrity: sha512-ude+jAqXaEkV4vfKAYyfub694LSy/OKkYyUHumYrEP3ZgSSP6TomITFLUC8x6Fhc2salL7nuju3xT6aWOHECPg==}
+
+  '@fontsource/bebas-neue@5.2.7':
+    resolution: {integrity: sha512-DsmBrmq55d9BCU0mt4DT4RZDdH8vhWRKEUOfbuNB1EEjMuwbtFvM8N+3gIlkYSFbsb10P8Q19BV5OdpMu2h0fA==}
+
+  '@fontsource/bevan@5.2.7':
+    resolution: {integrity: sha512-fJYcvVGlKE6lQZSn76pqTQJ0uIT4XVlWG55g8C7PfdC2W4MfN4Y5AcNMlzYI0hJNAJmvNvw4BkqyfS6/2uaz9Q==}
+
+  '@fontsource/cinzel@5.2.8':
+    resolution: {integrity: sha512-B9WeF/jPlOJOrcXfX96cy4KfM+s1QcU2C9W2hE3azBOBzPvzFkNpBovT5JmhAeicE/s4HZWKF9LF5hmEcqlbsw==}
+
+  '@fontsource/cormorant-garamond@5.2.11':
+    resolution: {integrity: sha512-5JjpN023lhA5soijgVT0BdRGzmlijm402ppjccMd6h+vRE0mX2lJnE+41UPfnlidrkV9/rCo1mf58WZlHnB0CA==}
+
+  '@fontsource/eb-garamond@5.2.7':
+    resolution: {integrity: sha512-V42tTlHDbnDo0+lENnXKWMx63Llq6Gfl2l7ozkoeRQN60S0jm6hEgCLlOT/5YyKAN9QZ0e2ofpy0rGKlz9jBrw==}
+
+  '@fontsource/exo-2@5.2.8':
+    resolution: {integrity: sha512-cOZuiqW+gKg2SJAjymCicup0A8qto4M/lpyGahal3twMeLCRma8x/okFCdLYlTvYeQesF7d3WLKi+N04iPb40A==}
+
+  '@fontsource/fira-code@5.2.7':
+    resolution: {integrity: sha512-tnB9NNund9TwIym8/7DMJe573nlPEQb+fKUV5GL8TBYXjIhDvL0D7mgmNVNQUPhXp+R7RylQeiBdkA4EbOHPGQ==}
+
+  '@fontsource/ibm-plex-sans@5.2.8':
+    resolution: {integrity: sha512-eztSXjDhPhcpxNIiGTgMebdLP9qS4rWkysuE1V7c+DjOR0qiezaiDaTwQE7bTnG5HxAY/8M43XKDvs3cYq6ZYQ==}
+
+  '@fontsource/im-fell-english@5.2.6':
+    resolution: {integrity: sha512-mVEuyEgLDyaChb0GvQRs5Pyg7SmB0RcPZqR8ub2OnskeiViIieBESRrS4Uovn1hxJ/Dh6xNRaLlmMtPeO8lWRQ==}
+
+  '@fontsource/inter@5.2.8':
+    resolution: {integrity: sha512-P6r5WnJoKiNVV+zvW2xM13gNdFhAEpQ9dQJHt3naLvfg+LkF2ldgSLiF4T41lf1SQCM9QmkqPTn4TH568IRagg==}
+
+  '@fontsource/jetbrains-mono@5.2.8':
+    resolution: {integrity: sha512-6w8/SG4kqvIMu7xd7wt6x3idn1Qux3p9N62s6G3rfldOUYHpWcc2FKrqf+Vo44jRvqWj2oAtTHrZXEP23oSKwQ==}
+
+  '@fontsource/medievalsharp@5.2.8':
+    resolution: {integrity: sha512-KD4nShnTLAdnjsQspINuk3EJ5O2WdmFKe5H7L4EqVIOmcoxsjGKWgLfEPWsxUJ8GRinM1dkin8e4xsWZvj2r9A==}
+
+  '@fontsource/orbitron@5.2.8':
+    resolution: {integrity: sha512-ruzrDl5vnqNykk5DZWY0Ezj4aeFZSbCnwJTc/98ojNJHSsHhlhT2r7rwQrA5sptmF8JtB8TQTAvlfRvcV28RPw==}
+
+  '@fontsource/playfair-display@5.2.8':
+    resolution: {integrity: sha512-fUEhib70SszNhQVsGbUMSsWJhr7Je0rdeuZdtGpDNu0GKF1xJM8QhpI/y0pckU25GcChXm9TLOmeZupkvvZo2g==}
+
+  '@fontsource/rajdhani@5.2.7':
+    resolution: {integrity: sha512-7Gy10U688fCdeFfYKebUF2TZotdgH/ghKyMsseXPmB60lpaUHC8aoCSJl5/OpZ+KHKSU2TqBfKfteVkcIXxTAQ==}
+
+  '@fontsource/share-tech-mono@5.2.7':
+    resolution: {integrity: sha512-1JBJ6CU9u5av8aFEUOGOJkq60/IEVVOZDCmiU8X3i0skk0Pp69GngDwlBUHaTZa4G6pbF1UDrC+Fm7XSckW6TQ==}
+
+  '@fontsource/space-grotesk@5.2.10':
+    resolution: {integrity: sha512-XNXEbT74OIITPqw2H6HXwPDp85fy43uxfBwFR5PU+9sLnjuLj12KlhVM9nZVN6q6dlKjkuN8JisW/OBxwxgUew==}
+
+  '@fontsource/space-mono@5.2.9':
+    resolution: {integrity: sha512-b61faFOHEISQ/pD25G+cfGY9o/WW6lRv6hBQQfpWvEJ4y1V+S4gmth95EVyBE2VL3qDYHeVQ8nBzrplzdXTDDg==}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -953,6 +1070,18 @@ packages:
       yaml:
         optional: true
 
+  ws@8.21.0:
+    resolution: {integrity: sha512-Vsp28b7DRcimFQvrqu2Wek3z1iYxDCWqHYB8Qsnk/S4RfaCQzPGPyBNuVjJV3cd6UiKtUtp6sNM77gWvzcCH+g==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
   yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
 
@@ -1165,6 +1294,44 @@ snapshots:
 
   '@esbuild/win32-x64@0.27.7':
     optional: true
+
+  '@fontsource/audiowide@5.2.7': {}
+
+  '@fontsource/bebas-neue@5.2.7': {}
+
+  '@fontsource/bevan@5.2.7': {}
+
+  '@fontsource/cinzel@5.2.8': {}
+
+  '@fontsource/cormorant-garamond@5.2.11': {}
+
+  '@fontsource/eb-garamond@5.2.7': {}
+
+  '@fontsource/exo-2@5.2.8': {}
+
+  '@fontsource/fira-code@5.2.7': {}
+
+  '@fontsource/ibm-plex-sans@5.2.8': {}
+
+  '@fontsource/im-fell-english@5.2.6': {}
+
+  '@fontsource/inter@5.2.8': {}
+
+  '@fontsource/jetbrains-mono@5.2.8': {}
+
+  '@fontsource/medievalsharp@5.2.8': {}
+
+  '@fontsource/orbitron@5.2.8': {}
+
+  '@fontsource/playfair-display@5.2.8': {}
+
+  '@fontsource/rajdhani@5.2.7': {}
+
+  '@fontsource/share-tech-mono@5.2.7': {}
+
+  '@fontsource/space-grotesk@5.2.10': {}
+
+  '@fontsource/space-mono@5.2.9': {}
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
@@ -1682,6 +1849,8 @@ snapshots:
       fsevents: 2.3.3
       jiti: 2.7.0
       lightningcss: 1.32.0
+
+  ws@8.21.0: {}
 
   yallist@3.1.1: {}
 

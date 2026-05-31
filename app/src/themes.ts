@@ -21,6 +21,16 @@
  */
 
 import type { BackgroundId, PadId } from "./types";
+import { FONT_STACK, type FontStackKey } from "./fonts";
+
+export interface ThemeSkin {
+  /** Display family for big titles, headlines, banners. */
+  fontHeadline: FontStackKey;
+  /** Default UI text — labels, hints, body copy. */
+  fontBody: FontStackKey;
+  /** Numbers, timers, code-like info. */
+  fontMono: FontStackKey;
+}
 
 export interface BackgroundDef {
   id: BackgroundId;
@@ -32,18 +42,60 @@ export interface BackgroundDef {
   /** Pad that visually goes with this background. Selecting the background
    *  applies this pad too unless the user has manually overridden it. */
   defaultPadId: PadId | null;
+  /** Per-theme typography (and later: colours, shapes). The "default" entry
+   *  defines the baseline — every other theme overrides what it cares about
+   *  and inherits the rest. */
+  skin: ThemeSkin;
 }
 
 export const BACKGROUNDS: BackgroundDef[] = [
-  { id: "default",   label: "Original",       emoji: "🌌", src: null,                                            defaultPadId: null         },
-  { id: "ancient",   label: "Ancient",        emoji: "📜", src: "/Backgrounds/Ancient Playmat Backgruond.png",   defaultPadId: "ancient"    },
-  { id: "astrolab",  label: "Astrolab",       emoji: "🔭", src: "/Backgrounds/AstroLab Bckground.png",           defaultPadId: "astrolab"   },
-  { id: "casino",    label: "Casino Royale",  emoji: "🎰", src: "/Backgrounds/CasinoRoyale Background.png",      defaultPadId: "casino"     },
-  { id: "cyberpunk", label: "Cyberpunk",      emoji: "🌆", src: "/Backgrounds/CyberPunk Background.png",         defaultPadId: "cyberpunk"  },
-  { id: "galaxy",    label: "Galaxy",         emoji: "✨", src: "/Backgrounds/Galaxy Background.png",            defaultPadId: "cosmos"     },
-  { id: "quantum",   label: "Quantum Lab",    emoji: "⚛️", src: "/Backgrounds/Quantum Lab Background.png",       defaultPadId: "quantum"    },
-  { id: "steampunk", label: "Steampunk",      emoji: "⚙️", src: "/Backgrounds/SteamPunk Workshop Background.png", defaultPadId: "steampunk" },
+  {
+    id: "default",   label: "Original",       emoji: "🌌",
+    src: null,                                          defaultPadId: null,
+    skin: { fontHeadline: "inter",        fontBody: "inter",        fontMono: "jetbrains"  },
+  },
+  {
+    id: "ancient",   label: "Ancient",        emoji: "📜",
+    src: "/Backgrounds/Ancient Playmat Backgruond.png", defaultPadId: "ancient",
+    skin: { fontHeadline: "cinzel",       fontBody: "cormorant",    fontMono: "imFell"     },
+  },
+  {
+    id: "astrolab",  label: "Astrolab",       emoji: "🔭",
+    src: "/Backgrounds/AstroLab Bckground.png",         defaultPadId: "astrolab",
+    skin: { fontHeadline: "cinzel",       fontBody: "ebGaramond",   fontMono: "jetbrains"  },
+  },
+  {
+    id: "casino",    label: "Casino Royale",  emoji: "🎰",
+    src: "/Backgrounds/CasinoRoyale Background.png",    defaultPadId: "casino",
+    skin: { fontHeadline: "playfair",     fontBody: "cormorant",    fontMono: "bebas"      },
+  },
+  {
+    id: "cyberpunk", label: "Cyberpunk",      emoji: "🌆",
+    src: "/Backgrounds/CyberPunk Background.png",       defaultPadId: "cyberpunk",
+    skin: { fontHeadline: "orbitron",     fontBody: "rajdhani",     fontMono: "shareTech"  },
+  },
+  {
+    id: "galaxy",    label: "Galaxy",         emoji: "✨",
+    src: "/Backgrounds/Galaxy Background.png",          defaultPadId: "cosmos",
+    skin: { fontHeadline: "audiowide",    fontBody: "exo2",         fontMono: "spaceMono"  },
+  },
+  {
+    id: "quantum",   label: "Quantum Lab",    emoji: "⚛️",
+    src: "/Backgrounds/Quantum Lab Background.png",     defaultPadId: "quantum",
+    skin: { fontHeadline: "spaceGrotesk", fontBody: "ibmPlex",      fontMono: "fira"       },
+  },
+  {
+    id: "steampunk", label: "Steampunk",      emoji: "⚙️",
+    src: "/Backgrounds/SteamPunk Workshop Background.png", defaultPadId: "steampunk",
+    skin: { fontHeadline: "medieval",     fontBody: "imFell",       fontMono: "bevan"      },
+  },
 ];
+
+/** Resolve a skin entry to the actual CSS font-family string, with the
+ *  font fallback chain already baked in. */
+export function resolveFontFamily(key: FontStackKey): string {
+  return FONT_STACK[key];
+}
 
 export const BACKGROUNDS_BY_ID: Record<BackgroundId, BackgroundDef> = Object.fromEntries(
   BACKGROUNDS.map((b) => [b.id, b]),
