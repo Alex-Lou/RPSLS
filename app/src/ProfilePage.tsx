@@ -194,24 +194,32 @@ export function ProfilePage() {
       <section className="bg-white/5 border border-white/10 rounded-3xl p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-3">Avatar</h2>
         <div className="flex flex-wrap gap-2">
-          {AVATAR_PRESETS.map((a) => (
-            <button
-              key={a}
-              onClick={() => updateProfile({ avatar: a })}
-              className={
-                "w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center transition border " +
-                (player.avatar === a
-                  ? "border-white/40 ring-2 ring-white/20 bg-white/10"
-                  : "border-white/10 bg-white/5 hover:bg-white/10")
-              }
-            >
-              {isAvatarImage(a) ? (
-                <img src={a} alt="" className="w-full h-full object-cover" draggable={false} />
-              ) : (
-                <span className="text-2xl">{a}</span>
-              )}
-            </button>
-          ))}
+          {AVATAR_PRESETS.map((a) => {
+            const img = isAvatarImage(a);
+            return (
+              <button
+                key={a}
+                onClick={() => updateProfile({ avatar: a })}
+                className={
+                  "w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center transition " +
+                  // PNG stickers carry their own silhouette, so no bg/border
+                  // for them — any tint would peek through the transparent
+                  // pixels. Emoji slots keep the subtle frame for affordance.
+                  (img
+                    ? (player.avatar === a ? "ring-2 ring-white/40 bg-transparent" : "bg-transparent hover:ring-1 hover:ring-white/15")
+                    : "border " + (player.avatar === a
+                        ? "border-white/40 ring-2 ring-white/20 bg-white/10"
+                        : "border-white/10 bg-white/5 hover:bg-white/10"))
+                }
+              >
+                {img ? (
+                  <img src={a} alt="" className="w-full h-full object-contain" draggable={false} />
+                ) : (
+                  <span className="text-2xl">{a}</span>
+                )}
+              </button>
+            );
+          })}
           <button
             onClick={() => fileRef.current?.click()}
             className="w-12 h-12 rounded-2xl flex flex-col items-center justify-center text-[10px] border border-dashed border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/40 transition"
@@ -404,14 +412,14 @@ export function ProfilePage() {
                     </div>
                   )}
                 </div>
-                <div className="p-2.5 bg-white/5">
+                <div className="p-2.5 bg-black/40">
                   <div className="flex items-center gap-2">
                     {bg.miniature ? (
                       <img
                         src={bg.miniature}
                         alt=""
                         draggable={false}
-                        className="w-6 h-6 shrink-0 object-contain select-none"
+                        className="w-7 h-7 shrink-0 object-contain select-none"
                       />
                     ) : (
                       <span className="text-base">{bg.emoji}</span>
