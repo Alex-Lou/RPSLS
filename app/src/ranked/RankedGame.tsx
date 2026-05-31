@@ -74,6 +74,7 @@ function makeBattle(savedDeck?: string[]): RankedBattleState {
     hand: [],
     discard: [],
     usedOneShotCards: [],
+    oppHandSize: STARTING_HAND,
     roundWinsA: 0,
     roundWinsB: 0,
     roundsPlayed: 0,
@@ -401,11 +402,21 @@ export function RankedGame({
       }
       const winsA = b.roundWinsA + (finalWinner === "a" ? 1 : 0);
       const winsB = b.roundWinsB + (finalWinner === "b" ? 1 : 0);
+      // Mirror the player's draw/discard rules onto the notional opp hand so
+      // the indicator above OpponentRow tracks meaningfully across rounds.
+      let oppHandAfter = b.oppHandSize;
+      if (oppCard) oppHandAfter -= 1; // they played a card this round
+      if (myHeistSuccess) oppHandAfter -= 1; // we stole from them
+      if (oppHeistSuccess) oppHandAfter += 1; // they stole from us
+      if (finalWinner === "b") oppHandAfter += 1; // they win → draw 1
+      else if (finalWinner === "a") oppHandAfter -= 1; // they lose → discard 1
+      oppHandAfter = Math.max(0, Math.min(4, oppHandAfter));
       return {
         ...b,
         hand: handAfter,
         discard: discardAfter,
         usedOneShotCards: usedOneShotAfter,
+        oppHandSize: oppHandAfter,
         roundWinsA: winsA,
         roundWinsB: winsB,
         roundsPlayed: b.roundsPlayed + 1,
@@ -508,6 +519,7 @@ export function RankedGame({
       augurRevealed={augurRevealed}
       mana={mana}
       hand={battle.hand}
+      oppHandSize={battle.oppHandSize}
       roundWinsYou={battle.roundWinsA}
       roundWinsOpp={battle.roundWinsB}
       augurCooldown={augurCooldown}

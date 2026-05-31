@@ -34,12 +34,13 @@ export interface RankedRevealPhaseProps {
   roundWinner: "a" | "b" | "draw";
   yourTotal: number;
   oppTotal: number;
+  oppHandSize: number;
 }
 
 export function RankedRevealPhase({
   youName, opponentName,
   yourPicks, oppPicks, myCard, oppCard, augurRevealed,
-  laneResults, bonuses, roundWinner, yourTotal, oppTotal,
+  laneResults, bonuses, roundWinner, yourTotal, oppTotal, oppHandSize,
 }: RankedRevealPhaseProps) {
   const t = useT();
 
@@ -84,6 +85,7 @@ export function RankedRevealPhase({
           oppCard={oppCard}
           mode="reveal"
           laneResults={laneResults}
+          oppHandSize={oppHandSize}
         />
       </div>
 

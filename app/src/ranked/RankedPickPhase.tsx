@@ -26,6 +26,7 @@ export interface RankedPickPhaseProps {
   cardPlayed: PlayedCard | null;
   mana: number;
   hand: CardId[];
+  oppHandSize: number;
   augurCooldown: number;
   startedAt: number;
   deadlineMs: number;
@@ -39,7 +40,7 @@ export interface RankedPickPhaseProps {
 
 export function RankedPickPhase({
   youName, opponentName,
-  picks, augurRevealed, cardPlayed, mana, hand, augurCooldown,
+  picks, augurRevealed, cardPlayed, mana, hand, oppHandSize, augurCooldown,
   startedAt, deadlineMs,
   onPickMove, onPlayCard, onCancelCard, onClearLane, onLock,
   revealAugurFor,
@@ -173,6 +174,7 @@ export function RankedPickPhase({
           myCard={cardPlayed}
           oppCard={null}
           mode="picking"
+          oppHandSize={oppHandSize}
           onLaneClick={handleMyLaneTap}
           onOppLaneClick={handleOppLaneTap}
           augurTargeting={isAugurTargeting || isOracleTargeting}

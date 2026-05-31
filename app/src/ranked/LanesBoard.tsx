@@ -10,6 +10,7 @@ import type { Move } from "../game";
 import type { LaneResult } from "../online";
 import { LANE_IDENTITIES, laneFavoursMove } from "../lanesCombos";
 import { CardSlot } from "./CardSlot";
+import { OppHandIndicator } from "./OppHandIndicator";
 import type { LaneTarget, PlayedCard } from "./rankedTypes";
 import { useT } from "../i18n";
 
@@ -29,6 +30,8 @@ export interface LanesBoardProps {
   oppCard: PlayedCard | null;
   mode: "picking" | "locked" | "reveal";
   laneResults?: LaneResult[];
+  /** Visible opponent hand count (face-down minicards above the opp row). */
+  oppHandSize?: number;
   onLaneClick?: (lane: LaneTarget) => void;
   onOppLaneClick?: (lane: LaneTarget) => void;
   augurTargeting?: boolean;
@@ -37,7 +40,7 @@ export interface LanesBoardProps {
 export function LanesBoard({
   youName, opponentName,
   picks, oppPicks, augurRevealed,
-  myCard, oppCard, mode, laneResults,
+  myCard, oppCard, mode, laneResults, oppHandSize,
   onLaneClick, onOppLaneClick, augurTargeting = false,
 }: LanesBoardProps) {
   return (
@@ -47,8 +50,11 @@ export function LanesBoard({
                  bg-gradient-to-b from-emerald-950/40 via-zinc-950/60 to-emerald-950/40
                  shadow-[inset_0_0_36px_rgba(0,0,0,0.55)]"
     >
-      <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-rose-300/90 truncate px-0.5">
-        ✦ {opponentName}
+      <div className="flex items-center justify-between gap-2 px-0.5">
+        <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-rose-300/90 truncate">
+          ✦ {opponentName}
+        </div>
+        {oppHandSize !== undefined && <OppHandIndicator size={oppHandSize} />}
       </div>
       <OpponentRow
         oppPicks={oppPicks}

@@ -61,6 +61,11 @@ export interface RankedBattleState {
   hand: CardId[];
   discard: CardId[];
   usedOneShotCards: CardId[];
+  /** Notional opponent hand size shown to the player as 3 face-down minicards
+   *  above the OpponentRow. The real CPU draws from BASE_CPU_HAND_POOL minus
+   *  burned one-shots — this is purely a visual counter that decreases when
+   *  player Heist lands and mirrors player draw rules per round outcome. */
+  oppHandSize: number;
   roundWinsA: number;
   roundWinsB: number;
   roundsPlayed: number;

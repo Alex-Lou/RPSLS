@@ -76,6 +76,7 @@ export interface RankedMatchViewProps {
   augurRevealed: { lane: LaneTarget; move: Move } | null;
   mana: number;
   hand: CardId[];
+  oppHandSize: number;
   // Actions
   onPickMove: (mv: Move) => void;
   onClearLane: (lane: LaneTarget) => void;
@@ -99,7 +100,7 @@ type Phase = "matched" | "picking" | "reveal-intro" | "reveal" | "match-end";
 export function RankedMatchView({
   nickname, match,
   round, lastResult, end,
-  picks, cardPlayed, augurRevealed, mana, hand,
+  picks, cardPlayed, augurRevealed, mana, hand, oppHandSize,
   roundWinsYou, roundWinsOpp, augurCooldown,
   onPickMove, onClearLane, onPlayCard, onCancelCard, onLock,
   revealAugurFor, onLeave, onRematch, onNext,
@@ -171,6 +172,7 @@ export function RankedMatchView({
             cardPlayed={cardPlayed}
             mana={mana}
             hand={hand}
+            oppHandSize={oppHandSize}
             augurCooldown={augurCooldown}
             startedAt={round.startedAt}
             deadlineMs={round.deadlineMs}
@@ -198,6 +200,7 @@ export function RankedMatchView({
             roundWinner={lastResult.roundWinner}
             yourTotal={lastResult.yourTotal}
             oppTotal={lastResult.oppTotal}
+            oppHandSize={oppHandSize}
           />
         )}
 
