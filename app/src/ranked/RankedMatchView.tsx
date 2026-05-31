@@ -137,7 +137,19 @@ export function RankedMatchView({
 
   return (
     <div className="relative flex flex-col gap-2 sm:gap-3 flex-1 min-h-0 overflow-hidden">
-      {onLeave && <FloatingMatchBackButton onClick={onLeave} label={t("lanes.forfeitMatch")} />}
+      {onLeave && (
+        <FloatingMatchBackButton
+          onClick={onLeave}
+          label={t("lanes.forfeitMatch")}
+          confirm={{
+            title: "Quitter le match ?",
+            body: "Tu vas perdre la manche en cours. Ce sera compté comme défaite et appliquera la pénalité de LP si applicable.",
+            confirmLabel: "Forfait",
+            cancelLabel: "Continuer",
+            severity: "danger",
+          }}
+        />
+      )}
 
       <AnimatePresence>
         {showSplash && (

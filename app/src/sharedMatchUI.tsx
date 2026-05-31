@@ -131,30 +131,90 @@ export function MatchScoreBar({
  * its own line.
  */
 export function FloatingMatchBackButton({
-  onClick, label,
+  onClick, label, confirm,
 }: {
   onClick: () => void;
   label: string;
+  /** When set, clicking the button opens a confirmation modal first. Used
+   *  for matches where leaving counts as a forfeit (Ranked, Constellation
+   *  Ranked, online). Omit for views where back is harmless. */
+  confirm?: {
+    title: string;
+    body: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    /** "danger" colors the confirm CTA red to flag a punitive action. */
+    severity?: "default" | "danger";
+  };
 }) {
+  const [open, setOpen] = useState(false);
+  const handleClick = () => {
+    if (confirm) setOpen(true);
+    else onClick();
+  };
   return (
-    <button
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className="
-        fixed z-30 w-11 h-11 rounded-2xl bg-black/55 backdrop-blur border border-white/15
-        flex items-center justify-center text-zinc-100 active:scale-95 transition shadow-lg
-        hover:bg-black/70
-        top-[max(env(safe-area-inset-top),32px)]
-        left-[calc(max(env(safe-area-inset-left),12px)+44px+8px)]
-        md:top-3
-        md:left-3
-      "
-    >
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M15 18l-6-6 6-6" />
-      </svg>
-    </button>
+    <>
+      <button
+        onClick={handleClick}
+        aria-label={label}
+        title={label}
+        className="
+          fixed z-30 w-11 h-11 rounded-2xl bg-black/55 backdrop-blur border border-white/15
+          flex items-center justify-center text-zinc-100 active:scale-95 transition shadow-lg
+          hover:bg-black/70
+          top-[max(env(safe-area-inset-top),32px)]
+          left-[calc(max(env(safe-area-inset-left),12px)+44px+8px)]
+          md:top-3
+          md:left-3
+        "
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M15 18l-6-6 6-6" />
+        </svg>
+      </button>
+      <AnimatePresence>
+        {open && confirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+            onClick={() => setOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 280, damping: 22 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm bg-zinc-950/95 border border-white/10 rounded-3xl p-5 sm:p-6 shadow-2xl"
+            >
+              <h3 className="text-base sm:text-lg font-bold text-white mb-1.5">{confirm.title}</h3>
+              <p className="text-sm text-zinc-400 leading-relaxed mb-5">{confirm.body}</p>
+              <div className="flex gap-2.5">
+                <button
+                  onClick={() => setOpen(false)}
+                  className="flex-1 py-2.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 font-semibold text-sm text-zinc-200 transition active:scale-[0.97]"
+                >
+                  {confirm.cancelLabel ?? "Annuler"}
+                </button>
+                <button
+                  onClick={() => { setOpen(false); onClick(); }}
+                  className={
+                    "flex-1 py-2.5 rounded-2xl font-bold text-sm text-white shadow-lg transition active:scale-[0.97] " +
+                    (confirm.severity === "danger"
+                      ? "bg-gradient-to-r from-rose-500 to-red-600 shadow-rose-500/30"
+                      : "bg-gradient-to-r from-violet-500 to-fuchsia-500 shadow-violet-500/30")
+                  }
+                >
+                  {confirm.confirmLabel ?? "Quitter"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
