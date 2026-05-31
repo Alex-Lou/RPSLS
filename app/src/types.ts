@@ -53,6 +53,10 @@ export interface Player {
   hapticEnabled?: boolean;
   /** Vibration intensity multiplier — default "med". */
   hapticIntensity?: "low" | "med" | "high";
+  /** Ranked card collection — IDs of cards the player has unlocked. */
+  cardCollection?: string[];
+  /** Ranked deck — ordered list of 6 card IDs (3 main + 3 reserve). */
+  rankedDeck?: string[];
 }
 
 export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: string }> = {

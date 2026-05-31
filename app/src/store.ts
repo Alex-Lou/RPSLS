@@ -37,6 +37,8 @@ export function defaultPlayer(): Player {
     createdAt: Date.now(),
     hapticEnabled: true,
     hapticIntensity: "med",
+    cardCollection: ["aegis", "precision", "anchor", "second-wind", "surge", "augur"],
+    rankedDeck: ["aegis", "precision", "surge", "augur", "anchor", "second-wind"],
   };
 }
 
@@ -66,6 +68,9 @@ interface AppState {
   setLocale: (locale: Locale) => void;
   setServerConfig: (patch: Partial<ServerConfig>) => void;
   resetProfile: () => void;
+  /** Ranked card collection */
+  unlockCard: (id: string) => void;
+  setRankedDeck: (deck: string[]) => void;
 }
 
 function detectLocale(): Locale {
@@ -92,6 +97,36 @@ export function defaultServerConfig(): ServerConfig {
 }
 
 const HISTORY_LIMIT = 100;
+
+/**
+ * Ranked unlocks — checked after every recordMatch, idempotent.
+ * Tier thresholds mirror rank.ts (Silver 1100 / Gold 1300 / Platinum 1500).
+ * Constellation wins/sweeps are counted from match history.
+ */
+function applyRankedUnlocks(
+  collection: string[],
+  rankLp: number,
+  history: MatchRecord[],
+): string[] {
+  const set = new Set(collection);
+  const constellWins = history.filter(
+    (h) => h.mode === "constellation" && h.outcome === "win",
+  ).length;
+  const constellSweeps = history.filter(
+    (h) =>
+      h.mode === "constellation" &&
+      h.outcome === "win" &&
+      h.scorePlayer === h.bestOf &&
+      h.scoreOpponent === 0,
+  ).length;
+  if (constellWins >= 5) set.add("echo");
+  if (constellWins >= 10) set.add("curse");
+  if (constellSweeps >= 3) set.add("vortex");
+  if (rankLp >= 1100) set.add("heist");
+  if (rankLp >= 1300) set.add("oracle");
+  if (rankLp >= 1500) set.add("supernova");
+  return set.size === collection.length ? collection : Array.from(set);
+}
 
 export const useStore = create<AppState>()(
   persist(
@@ -123,9 +158,11 @@ export const useStore = create<AppState>()(
             p.stats.byMove[k].picked++;
             if (r.result === "win") p.stats.byMove[k].won++;
           }
+          const newHistory = [m, ...s.history].slice(0, HISTORY_LIMIT);
+          p.cardCollection = applyRankedUnlocks(p.cardCollection ?? [], p.rankLp, newHistory);
           return {
             player: p,
-            history: [m, ...s.history].slice(0, HISTORY_LIMIT),
+            history: newHistory,
           };
         }),
 
@@ -171,6 +208,14 @@ export const useStore = create<AppState>()(
         }),
 
       resetProfile: () => set({ player: defaultPlayer(), history: [], onboarded: false }),
+      unlockCard: (id) => set((s) => {
+        const col = s.player.cardCollection ?? [];
+        if (col.includes(id)) return s;
+        return { player: { ...s.player, cardCollection: [...col, id] } };
+      }),
+      setRankedDeck: (deck) => set((s) => ({
+        player: { ...s.player, rankedDeck: deck },
+      })),
     }),
     {
       name: "rpsls-app-state",

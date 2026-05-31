@@ -32,13 +32,23 @@ import { useT } from "./i18n";
 import type { Page } from "./Sidebar";
 import { UserHeader } from "./UserHeader";
 import { LocalLanesGame } from "./LocalLanesGame";
+import { RankedGame } from "./ranked/RankedGame";
+import { RankedLobby } from "./ranked/RankedLobby";
+import { makeTournament, resolvePlayerMatch, type TournamentState } from "./ranked/TournamentBracket";
+import { BracketPage } from "./ranked/BracketPage";
+import { DeckManager } from "./ranked/DeckManager";
+import { levelFromXp } from "./leveling";
 import { CinematicMatchEnd, AmbientFlavor, MatchScoreBar, FloatingMatchBackButton, hapticTick, PickShock } from "./sharedMatchUI";
 import { vibrate, hapticWin, hapticLoss, hapticTap } from "./haptic";
 
 type View =
   | { kind: "select" }
   | { kind: "game"; mode: GameMode; bestOf: number; daily?: DailyChallenge; questCtx?: { title: string; reward: number } }
-  | { kind: "lanes_cpu"; winTo: number };
+  | { kind: "lanes_cpu"; winTo: number }
+  | { kind: "ranked_lobby" }
+  | { kind: "ranked_deck" }
+  | { kind: "ranked_bracket" }
+  | { kind: "ranked_match"; oppName: string; oppAvatar: string };
 
 export function PlayPage({
   onNavigate, homeNonce,
@@ -50,6 +60,11 @@ export function PlayPage({
   homeNonce?: number;
 }) {
   const [view, setView] = useState<View>({ kind: "select" });
+  const [tournament, setTournament] = useState<TournamentState>(() => {
+    const p = useStore.getState().player;
+    const l = levelFromXp(p.xp);
+    return makeTournament(p.nickname, p.avatar, l.level);
+  });
 
   // Reset to mode-select on explicit Home clicks (not on first mount).
   useEffect(() => {
@@ -80,6 +95,7 @@ export function PlayPage({
             onStart={(mode, bestOf, questCtx) => setView({ kind: "game", mode, bestOf, questCtx })}
             onGoOnline={onNavigate ? () => onNavigate("online") : undefined}
             onGoConstellation={(winTo) => setView({ kind: "lanes_cpu", winTo })}
+            onGoRanked={() => setView({ kind: "ranked_lobby" })}
           />
         )}
         {view.kind === "game" && (
@@ -107,6 +123,48 @@ export function PlayPage({
             />
           </motion.div>
         )}
+        {view.kind === "ranked_lobby" && (
+          <RankedLobby
+            key="ranked-lobby"
+            onViewBracket={() => setView({ kind: "ranked_bracket" })}
+            onManageDeck={() => setView({ kind: "ranked_deck" })}
+          />
+        )}
+        {view.kind === "ranked_deck" && (
+          <DeckManager
+            key="ranked-deck"
+            onClose={() => setView({ kind: "ranked_lobby" })}
+          />
+        )}
+        {view.kind === "ranked_bracket" && (
+          <BracketPage
+            key="ranked-bracket"
+            tournament={tournament}
+            setTournament={setTournament}
+            onStartMatch={(name, avatar) => setView({ kind: "ranked_match", oppName: name, oppAvatar: avatar })}
+            onBack={() => setView({ kind: "ranked_lobby" })}
+          />
+        )}
+        {view.kind === "ranked_match" && (
+          <motion.div
+            key={`ranked-match-${view.oppName}`}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.25 }}
+            className="flex-1 flex flex-col min-h-0"
+          >
+            <RankedGame
+              winTo={3}
+              opponentName={view.oppName}
+              onQuit={() => setView({ kind: "ranked_bracket" })}
+              onMatchResult={(won) => {
+                setTournament((t) => resolvePlayerMatch(t, won));
+                setView({ kind: "ranked_bracket" });
+              }}
+            />
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );
@@ -117,22 +175,24 @@ export function PlayPage({
 // "online" + "constellation" are UI-only home cards. Constellation routes to
 // a local vs-CPU 3-lanes match; the real GameMode union covers CPU/hotseat
 // recorded matches.
-type ModeCardId = GameMode | "online" | "constellation";
+type ModeCardId = GameMode | "online" | "constellation" | "ranked_constellation";
 
-// Order: Training, Casual, Online (live), Constellation (NEW vs CPU), Ranked, Hot-seat.
+// Order: Training, Casual, Online (live), Constellation (vs CPU),
+// Constellation Ranked (cards+mana), Ranked, Hot-seat.
 const ALL_CARDS: ModeCardId[] = [
-  "training", "casual", "online", "constellation", "ranked", "hotseat",
+  "training", "casual", "online", "constellation", "ranked_constellation", "ranked", "hotseat",
 ];
 
 // Hand-drawn icons that replace the emoji on each mode tile. Lives in
 // public/MenuIcons (renamed to kebab-case to dodge URL-encoding traps).
 const MODE_ICONS: Record<ModeCardId, string> = {
-  training:      "/MenuIcons/entrainement.png",
-  casual:        "/MenuIcons/detendu.png",
-  ranked:        "/MenuIcons/classe.png",
-  hotseat:       "/MenuIcons/hot-seat.png",
-  online:        "/MenuIcons/en-ligne.png",
-  constellation: "/MenuIcons/constellation.png",
+  training:             "/MenuIcons/entrainement.png",
+  casual:               "/MenuIcons/detendu.png",
+  ranked:               "/MenuIcons/classe.png",
+  hotseat:              "/MenuIcons/hot-seat.png",
+  online:               "/MenuIcons/en-ligne.png",
+  constellation:        "/MenuIcons/constellation.png",
+  ranked_constellation: "/MenuIcons/constellation.png", // Phase A: reuse art with a distinct tint.
 };
 
 /** Renders the mode tile icon — a PNG from /MenuIcons, sized to match the
@@ -151,10 +211,12 @@ function ModeSelect({
   onStart,
   onGoOnline,
   onGoConstellation,
+  onGoRanked,
 }: {
   onStart: (mode: GameMode, bestOf: number, questCtx?: { title: string; reward: number }) => void;
   onGoOnline?: () => void;
   onGoConstellation?: (winTo: number) => void;
+  onGoRanked?: () => void;
 }) {
   const [mode, setMode] = useState<GameMode>("casual");
   const [bestOf, setBestOf] = useState(3);
@@ -242,6 +304,39 @@ function ModeSelect({
                   </div>
                   <p className="text-[10px] sm:text-xs text-zinc-400 mt-0.5 line-clamp-2">
                     3 lanes en parallèle vs IA
+                  </p>
+                </div>
+              </motion.button>
+            );
+          }
+          if (m === "ranked_constellation") {
+            return (
+              <motion.button
+                key="ranked_constellation"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05 * i, duration: 0.25 }}
+                whileHover={{ y: -3 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => onGoRanked?.()}
+                disabled={!onGoRanked}
+                className={
+                  "text-left p-2.5 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1.5 relative overflow-hidden min-h-[124px] " +
+                  "border-amber-400/40 bg-gradient-to-br from-amber-500/15 via-rose-500/10 to-fuchsia-500/15 " +
+                  "hover:from-amber-500/25 hover:via-rose-500/20 hover:to-fuchsia-500/25 hover:border-amber-400/70 " +
+                  "shadow-lg shadow-amber-500/10"
+                }
+              >
+                <ModeIcon mode="ranked_constellation" />
+                <div className="min-w-0 w-full">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold text-sm sm:text-base">{t("mode.ranked_constellation")}</span>
+                    <span className="text-[9px] uppercase tracking-wider text-amber-200 bg-amber-500/30 px-1 rounded-full">
+                      NEW · CARDS
+                    </span>
+                  </div>
+                  <p className="text-[10px] sm:text-xs text-zinc-400 mt-0.5 line-clamp-2">
+                    {t("mode.ranked_constellation.tag")}
                   </p>
                 </div>
               </motion.button>

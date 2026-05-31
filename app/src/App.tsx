@@ -15,6 +15,7 @@ import { ContactPage } from "./ContactPage";
 import { Welcome } from "./Welcome";
 import { FloatingMatchBackButton } from "./sharedMatchUI";
 import { UserHeader } from "./UserHeader";
+import { LevelUpWatcher } from "./LevelUpOverlay";
 import { useT } from "./i18n";
 import { setHapticSettings } from "./haptic";
 
@@ -92,6 +93,8 @@ export default function App() {
           >
             <Sidebar page={page} onNavigate={navigateTo} />
             <MobileShell page={page} onNavigate={navigateTo} />
+            {/* Global LEVEL UP celebration — catches an XP gain from any surface. */}
+            <LevelUpWatcher />
             {/* Global "back to Play" arrow, parked right next to the burger
                 on every non-Play page. Avoids the Android system back button
                 (which closes the app) being the only escape route. */}
