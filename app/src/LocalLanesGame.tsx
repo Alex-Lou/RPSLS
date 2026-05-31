@@ -49,6 +49,7 @@ export function LocalLanesGame({
 }) {
   const profileNickname = useStore((s) => s.player.nickname);
   const difficulty = useStore((s) => s.player.difficulty);
+  const recordMatch = useStore((s) => s.recordMatch);
 
   // Match info — set once at start, persists through the run.
   const matchInfo: LanesMatchInfo = {
@@ -190,8 +191,24 @@ export function LocalLanesGame({
       lanes: LANE_COUNT, winTo, pickDeadlineMs: PICK_DEADLINE_MS,
     });
     if (status.kind === "won") {
+      const youWon = status.winner === "a";
+      // Log this vs-CPU Constellation match to history (simplified entry — the
+      // 3-lane rounds don't map to the per-move round log). Earns casual-like XP.
+      recordMatch({
+        id: `lanes-cpu-${Date.now()}`,
+        mode: "constellation",
+        bestOf: winTo,
+        opponent: { kind: "cpu", mood: moodRef.current },
+        scorePlayer: battle.roundWinsA,
+        scoreOpponent: battle.roundWinsB,
+        outcome: youWon ? "win" : "loss",
+        rounds: [],
+        xpDelta: youWon ? 40 : 10,
+        lpDelta: 0,
+        timestamp: Date.now(),
+        forfeit: false,
+      });
       window.setTimeout(() => {
-        const youWon = status.winner === "a";
         if (youWon) hapticMatchWin(); else hapticMatchLoss();
         setEnd({
           winner: status.winner,
