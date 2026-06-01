@@ -23,13 +23,23 @@ export function isAvatarImage(v: string): boolean {
  *  PNGs are already cleanly framed in their own dark hexagon, so 1 is
  *  enough. Uploaded photos use 1 too. */
 export function avatarScale(v: string): number {
-  if (v.includes("/chibi_")) return 1.6;
+  if (v.includes("/chibi_")) return 1.85;
   return 1;
 }
 
 /** CSS style object to drop on an `<img>` so the avatar zooms in by the
- *  correct factor. Convenience wrapper around avatarScale(). */
+ *  correct factor AND fades the outermost ring of pixels to transparent
+ *  via a radial mask — a belt-and-braces fix to kill any white halo the
+ *  bare scale missed (the chibi stickers have wide baked-in outlines that
+ *  even scale-1.85 can't fully crop on tighter aspect ratios). */
 export function avatarImgStyle(v: string): import("react").CSSProperties {
   const s = avatarScale(v);
-  return s === 1 ? {} : { transform: `scale(${s})` };
+  const base: import("react").CSSProperties = {
+    // Soft circular mask: opaque centre to ~88 %, fades to fully transparent
+    // at the very edge. Same on every avatar so the look is consistent.
+    WebkitMaskImage: "radial-gradient(circle, black 88%, transparent 100%)",
+    maskImage: "radial-gradient(circle, black 88%, transparent 100%)",
+  };
+  if (s !== 1) base.transform = `scale(${s})`;
+  return base;
 }
