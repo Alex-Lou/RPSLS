@@ -19,27 +19,23 @@ export function isAvatarImage(v: string): boolean {
 }
 
 /** Per-PNG zoom factor so the chibi stickers' wide white outline gets
- *  pushed outside the visible (typically rounded-full) crop. The badge
- *  PNGs are already cleanly framed in their own dark hexagon, so 1 is
- *  enough. Uploaded photos use 1 too. */
+ *  pushed outside the visible crop. */
 export function avatarScale(v: string): number {
-  if (v.includes("/chibi_")) return 1.85;
+  if (v.includes("/chibi_")) return 2.0;
   return 1;
 }
 
-/** CSS style object to drop on an `<img>` so the avatar zooms in by the
- *  correct factor AND fades the outermost ring of pixels to transparent
- *  via a radial mask — a belt-and-braces fix to kill any white halo the
- *  bare scale missed (the chibi stickers have wide baked-in outlines that
- *  even scale-1.85 can't fully crop on tighter aspect ratios). */
+/** CSS style for an avatar <img>: a hard `clip-path: circle(...)` (vs the
+ *  previously-tried mask-image radial-gradient, which isn't reliably
+ *  honoured by the Tauri Android WebView on every device), plus the
+ *  per-PNG zoom. Hard clip = anything outside the inscribed circle is
+ *  alpha-0, no exceptions. The chibi's baked-in white sticker outline
+ *  lives outside that circle once we scale-2.0, so it never paints. */
 export function avatarImgStyle(v: string): import("react").CSSProperties {
   const s = avatarScale(v);
-  const base: import("react").CSSProperties = {
-    // Soft circular mask: opaque centre to ~88 %, fades to fully transparent
-    // at the very edge. Same on every avatar so the look is consistent.
-    WebkitMaskImage: "radial-gradient(circle, black 88%, transparent 100%)",
-    maskImage: "radial-gradient(circle, black 88%, transparent 100%)",
+  return {
+    clipPath: "circle(46% at 50% 50%)",
+    WebkitClipPath: "circle(46% at 50% 50%)",
+    transform: s === 1 ? undefined : `scale(${s})`,
   };
-  if (s !== 1) base.transform = `scale(${s})`;
-  return base;
 }
