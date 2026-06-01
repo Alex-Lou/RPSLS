@@ -50,12 +50,12 @@ export const CARDS: Record<CardId, RankedCard> = {
     targetHintKey: "ranked.cards.augur.targetHint",
     art: "/Cards Bonus/augur.png",
   },
-  echo: {
-    id: "echo", cost: 2, rarity: "rare",
-    target: "lane-copy", palette: "pink", glyph: "🪞",
-    nameKey: "ranked.cards.echo.name", descKey: "ranked.cards.echo.desc",
-    targetHintKey: "ranked.cards.echo.targetHint",
-    art: "/Cards Bonus/echo.png",
+  riposte: {
+    id: "riposte", cost: 2, rarity: "rare",
+    target: "lane", palette: "pink", glyph: "⚔️",
+    nameKey: "ranked.cards.riposte.name", descKey: "ranked.cards.riposte.desc",
+    targetHintKey: "ranked.cards.riposte.targetHint",
+    art: "/Cards Bonus/riposte.png",
   },
   curse: {
     id: "curse", cost: 2, rarity: "rare",

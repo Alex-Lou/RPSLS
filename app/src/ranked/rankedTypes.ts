@@ -10,7 +10,7 @@ import type { LanePlay } from "../online";
 
 export type CardId =
   | "aegis" | "precision" | "anchor" | "second-wind"   // commons (1 mana)
-  | "surge" | "augur" | "echo" | "curse"                // rares (2 mana)
+  | "surge" | "augur" | "riposte" | "curse"             // rares (2 mana)
   | "heist" | "tide" | "oracle" | "vortex"              // epics (3 mana)
   | "supernova";                                        // legendary (4 mana)
 
@@ -33,10 +33,9 @@ export interface RankedCard {
 }
 
 export type PlayedCard =
-  | { id: "aegis" | "surge" | "precision" | "anchor" | "curse" | "tide" | "heist"; lane: LaneTarget }
+  | { id: "aegis" | "surge" | "precision" | "anchor" | "curse" | "tide" | "heist" | "riposte"; lane: LaneTarget }
   | { id: "augur"; lane: LaneTarget; revealed: Move }
   | { id: "oracle"; revealed: [Move, Move, Move] }
-  | { id: "echo"; fromLane: LaneTarget; toLane: LaneTarget }
   | { id: "vortex" }
   | { id: "supernova" }
   | { id: "second-wind" };

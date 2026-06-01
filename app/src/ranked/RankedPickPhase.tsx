@@ -53,23 +53,13 @@ export function RankedPickPhase({
   const reservedMana = cardPlayed ? CARDS[cardPlayed.id].cost : 0;
   const isAugurTargeting = selectedCard === "augur";
   const isOracleTargeting = selectedCard === "oracle";
-  const [echoFromLane, setEchoFromLane] = useState<LaneTarget | null>(null);
 
   function handleMyLaneTap(lane: LaneTarget) {
     if (selectedCard) {
       const card = CARDS[selectedCard];
       if (card.target === "lane") {
-        onPlayCard({ id: selectedCard as "aegis" | "surge" | "precision" | "anchor" | "curse" | "tide", lane });
+        onPlayCard({ id: selectedCard as "aegis" | "surge" | "precision" | "anchor" | "curse" | "tide" | "riposte", lane });
         setSelectedCard(null);
-      } else if (card.target === "lane-copy") {
-        // Echo: first tap = source, second tap = target
-        if (echoFromLane === null) {
-          setEchoFromLane(lane);
-        } else if (echoFromLane !== lane) {
-          onPlayCard({ id: "echo", fromLane: echoFromLane, toLane: lane });
-          setSelectedCard(null);
-          setEchoFromLane(null);
-        }
       }
       return;
     }
@@ -86,7 +76,6 @@ export function RankedPickPhase({
 
   function handleSelectCard(id: CardId | null) {
     if (cardPlayed) onCancelCard();
-    setEchoFromLane(null);
     const card = id ? CARDS[id] : null;
     // Cards with no lane target: activate immediately
     if (card && (card.target === "lane-reveal-all" || card.target === "lane-rotate" || card.target === "self" || card.target === "gamble")) {
@@ -110,7 +99,7 @@ export function RankedPickPhase({
 
   function handleLock() {
     if (!allFilled) return;
-    if (selectedCard && !cardPlayed) { setSelectedCard(null); setEchoFromLane(null); }
+    if (selectedCard && !cardPlayed) setSelectedCard(null);
     onLock();
   }
 
@@ -118,7 +107,6 @@ export function RankedPickPhase({
     if (!selectedCard) return null;
     const card = CARDS[selectedCard];
     if (card.target === "lane-reveal") return t("ranked.cta.augurReveal");
-    if (card.target === "lane-copy") return echoFromLane === null ? t("ranked.cards.echo.targetHint") : "Touche la lane cible";
     return t("ranked.cta.playCard");
   })();
 

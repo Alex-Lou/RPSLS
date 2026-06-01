@@ -120,7 +120,7 @@ function applyRankedUnlocks(
       h.scorePlayer === h.bestOf &&
       h.scoreOpponent === 0,
   ).length;
-  if (constellWins >= 5) set.add("echo");
+  if (constellWins >= 5) set.add("riposte");
   if (constellWins >= 10) set.add("curse");
   if (constellSweeps >= 3) set.add("vortex");
   if (rankLp >= 1100) set.add("heist");

@@ -171,7 +171,7 @@ export function RankedLobby({ onViewBracket, onManageDeck }: { onViewBracket: ()
             <div className="text-[10px] uppercase tracking-wider font-bold text-blue-400 mt-1">🔵 Rares (2 mana)</div>
             <CardRule id="surge" />
             <CardRule id="augur" />
-            <CardRule id="echo" />
+            <CardRule id="riposte" />
             <CardRule id="curse" />
 
             <div className="text-[10px] uppercase tracking-wider font-bold text-violet-400 mt-1">🟣 Épiques (3 mana)</div>

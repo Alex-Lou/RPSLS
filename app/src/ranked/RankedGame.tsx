@@ -15,6 +15,7 @@ import type { AiMood, Move } from "../game";
 import { useStore } from "../store";
 import {
   resolveLanesRound,
+  rpslsBeats,
   type RoundOutcome,
 } from "../lanesEngine";
 import { detectPlayerCombo } from "../lanesCombos";
@@ -53,7 +54,7 @@ const MAX_MANA = 4;
  *  CPU doesn't track a real deck/hand, but we filter one-shots out across the
  *  match so it can't replay an epic/legendary it already played. */
 const BASE_CPU_HAND_POOL: CardId[] = [
-  "aegis", "surge", "augur", "curse", "precision", "echo",
+  "aegis", "surge", "augur", "curse", "precision", "riposte",
   "heist", "tide", "vortex",
 ];
 
@@ -61,7 +62,7 @@ const BASE_CPU_HAND_POOL: CardId[] = [
  *  itself is excluded (you can't steal someone's one-shot they've already
  *  burned). */
 const STEALABLE_FROM_CPU: CardId[] = [
-  "aegis", "surge", "augur", "curse", "precision", "echo", "tide", "vortex",
+  "aegis", "surge", "augur", "curse", "precision", "riposte", "tide", "vortex",
 ];
 
 function makeBattle(savedDeck?: string[]): RankedBattleState {
@@ -120,6 +121,17 @@ export function RankedGame({
   const [battle, setBattle] = useState<RankedBattleState>(() => makeBattle(savedDeck));
   const [lastResult, setLastResult] = useState<RankedRoundResultData | null>(null);
   const [end, setEnd] = useState<RankedEndData | null>(null);
+  /** Riposte sub-phase: when set, the player played Riposte on a lane and
+   *  lost it. The reveal finishes first, then a mini "rejoue ce lane" phase
+   *  fires — picking it correctly flips the lane outcome from loss to win
+   *  and possibly the round winner. */
+  const [riposteData, setRiposteData] = useState<{
+    lane: LaneTarget;
+    phase: "pick" | "reveal";
+    playerMove?: Move;
+    cpuMove?: Move;
+    flipped?: boolean;
+  } | null>(null);
 
   /* ──────────── Refs (never leaked to children) ──────────── */
   const cpuDecisionRef = useRef<CpuRoundDecision | null>(null);
@@ -255,28 +267,14 @@ export function RankedGame({
       setAugurRevealed(null); // Clear single augur, we use oracle state
       setOracleRevealed(r);
       setAugurCooldown(3);
-    } else if (card.id === "echo") {
-      // Copy pick from source to target lane
-      setPicks((cur) => {
-        const next = cur.slice() as [Move | null, Move | null, Move | null];
-        next[card.toLane] = next[card.fromLane];
-        return next;
-      });
     }
-    // vortex, supernova, second-wind, tide, precision, anchor, curse, surge, aegis
-    // → applied at resolve time, no immediate UI effect beyond the card badge
+    // riposte, vortex, supernova, second-wind, tide, precision, anchor,
+    // curse, surge, aegis, heist → applied at resolve time, no immediate
+    // UI effect beyond the card badge.
   }
   function handleCancelCard() {
     if (cardPlayed?.id === "augur") setAugurRevealed(null);
     if (cardPlayed?.id === "oracle") setOracleRevealed(null);
-    if (cardPlayed?.id === "echo") {
-      // Undo the copy
-      setPicks((cur) => {
-        const next = cur.slice() as [Move | null, Move | null, Move | null];
-        next[(cardPlayed as { toLane: LaneTarget }).toLane] = null;
-        return next;
-      });
-    }
     setCardPlayed(null);
   }
   function revealAugurFor(lane: LaneTarget): Move {
@@ -450,8 +448,18 @@ export function RankedGame({
       else hapticTap();
     }, REVEAL_SUSPENSE_MS);
 
-    // End-of-match check.
-    if (nextRoundWinsA >= winTo || nextRoundWinsB >= winTo) {
+    // Riposte: if the player played Riposte on a lane that ended up lost,
+    // defer end-of-match and next-round; instead schedule the Riposte
+    // sub-phase to fire after the reveal.
+    const myRiposteLane = !timedOut && myCard?.id === "riposte"
+      ? (myCard as { lane: LaneTarget }).lane
+      : null;
+    const riposteWillFire =
+      myRiposteLane !== null && fx.outcome.lanes[myRiposteLane]?.winner === "b";
+
+    // End-of-match check (skipped when Riposte is pending — the rematch can
+    // still flip the round).
+    if (!riposteWillFire && (nextRoundWinsA >= winTo || nextRoundWinsB >= winTo)) {
       const youWon = nextRoundWinsA >= winTo;
       recordMatch({
         id: `ranked-cpu-${Date.now()}`,
@@ -476,6 +484,10 @@ export function RankedGame({
           forfeit: false,
         });
       }, ROUND_PAUSE_MS);
+    } else if (riposteWillFire) {
+      window.setTimeout(() => {
+        setRiposteData({ lane: myRiposteLane as LaneTarget, phase: "pick" });
+      }, ROUND_PAUSE_MS);
     } else {
       window.setTimeout(() => startNextRound(), ROUND_PAUSE_MS);
     }
@@ -489,6 +501,7 @@ export function RankedGame({
     setCardPlayed(null);
     setAugurRevealed(null);
     setOracleRevealed(null);
+    setRiposteData(null);
     setAugurCooldown(0);
     setMana(1);
     setBattle(makeBattle(savedDeck));
@@ -507,31 +520,259 @@ export function RankedGame({
     window.setTimeout(() => startNextRound(), MATCH_FOUND_SPLASH_MS);
   }
 
+  /* ──────────── Riposte sub-phase ──────────── */
+
+  /** Player picks the rematch move. We then roll the CPU's counter and run
+   *  the suspense reveal, then apply the flip and either start the next
+   *  round or end the match (depending on the recalculated score). */
+  function handleRipostePick(move: Move) {
+    if (!riposteData || riposteData.phase !== "pick") return;
+    hapticLock();
+    const cpuPlay = cpuRankedDecision(
+      {
+        mood: moodRef.current,
+        difficulty,
+        playerHistory: playerHistoryRef.current,
+        mana: 1,
+        hand: [],
+      },
+      1,
+    );
+    const cpuMove = cpuPlay.plays[0].mv;
+    // Determine outcome of the rematch.
+    const aBeatsB = rpslsBeats(move, cpuMove);
+    const bBeatsA = rpslsBeats(cpuMove, move);
+    const playerWonRematch = !!aBeatsB && !bBeatsA;
+    setRiposteData({
+      lane: riposteData.lane,
+      phase: "reveal",
+      playerMove: move,
+      cpuMove,
+      flipped: playerWonRematch,
+    });
+    window.setTimeout(() => {
+      if (playerWonRematch) hapticWin(); else if (bBeatsA) hapticLoss(); else hapticTap();
+    }, REVEAL_SUSPENSE_MS);
+    // After a short pause, apply the flip and proceed.
+    window.setTimeout(() => applyRiposteOutcome(playerWonRematch), ROUND_PAUSE_MS);
+  }
+
+  /** Apply the lane flip (if the rematch was won), recompute the round
+   *  winner, then either start the next round or end the match. */
+  function applyRiposteOutcome(playerWonRematch: boolean) {
+    if (!riposteData || !lastResult) {
+      setRiposteData(null);
+      window.setTimeout(() => startNextRound(), 200);
+      return;
+    }
+    if (!playerWonRematch) {
+      // Lane stays as a loss — just continue.
+      setRiposteData(null);
+      const nextWinsA = lastResult.roundWinsYou;
+      const nextWinsB = lastResult.roundWinsOpp;
+      if (nextWinsA >= winTo || nextWinsB >= winTo) {
+        finalizeMatch(nextWinsA, nextWinsB);
+      } else {
+        startNextRound();
+      }
+      return;
+    }
+    // Flip the targeted lane from "b" to "a", recount the round winner,
+    // and patch lastResult + battle scores so the UI reflects the change.
+    const flippedLanes = lastResult.laneResults.map((lr, i) =>
+      i === riposteData.lane
+        ? { ...lr, winner: "a" as const, points: 1 }
+        : lr,
+    );
+    const aWins = flippedLanes.filter((l) => l.winner === "a").length;
+    const bWins = flippedLanes.filter((l) => l.winner === "b").length;
+    const newRoundWinner: "a" | "b" | "draw" =
+      aWins > bWins ? "a" : bWins > aWins ? "b" : "draw";
+    // Score delta from the original round outcome → the new one.
+    const origRoundWinner = lastResult.roundWinner;
+    let deltaA = 0, deltaB = 0;
+    if (newRoundWinner === "a" && origRoundWinner !== "a") {
+      deltaA = 1;
+      if (origRoundWinner === "b") deltaB = -1;
+    } else if (newRoundWinner === "b" && origRoundWinner !== "b") {
+      deltaB = 1;
+      if (origRoundWinner === "a") deltaA = -1;
+    } else if (newRoundWinner === "draw") {
+      if (origRoundWinner === "a") deltaA = -1;
+      if (origRoundWinner === "b") deltaB = -1;
+    }
+    const nextWinsA = Math.max(0, lastResult.roundWinsYou + deltaA);
+    const nextWinsB = Math.max(0, lastResult.roundWinsOpp + deltaB);
+    setBattle((b) => ({
+      ...b,
+      roundWinsA: Math.max(0, b.roundWinsA + deltaA),
+      roundWinsB: Math.max(0, b.roundWinsB + deltaB),
+    }));
+    setLastResult((prev) => prev ? {
+      ...prev,
+      laneResults: flippedLanes,
+      roundWinner: newRoundWinner,
+      roundWinsYou: nextWinsA,
+      roundWinsOpp: nextWinsB,
+    } : prev);
+    wonLastRoundRef.current = newRoundWinner === "a";
+    setRiposteData(null);
+    if (nextWinsA >= winTo || nextWinsB >= winTo) {
+      finalizeMatch(nextWinsA, nextWinsB);
+    } else {
+      window.setTimeout(() => startNextRound(), ROUND_PAUSE_MS / 2);
+    }
+  }
+
+  /** Helper shared by the normal end-of-match path and the post-Riposte
+   *  path: record the result + show the cinematic end screen. */
+  function finalizeMatch(winsA: number, winsB: number) {
+    const youWon = winsA > winsB;
+    recordMatch({
+      id: `ranked-cpu-${Date.now()}`,
+      mode: "constellation",
+      bestOf: winTo,
+      opponent: { kind: "cpu", mood: moodRef.current },
+      scorePlayer: winsA,
+      scoreOpponent: winsB,
+      outcome: youWon ? "win" : "loss",
+      rounds: [],
+      xpDelta: youWon ? 60 : 15,
+      lpDelta: 0,
+      timestamp: Date.now(),
+      forfeit: false,
+    });
+    window.setTimeout(() => {
+      if (youWon) hapticMatchWin(); else hapticMatchLoss();
+      setEnd({
+        winner: youWon ? "a" : "b",
+        roundWinsYou: winsA,
+        roundWinsOpp: winsB,
+        forfeit: false,
+      });
+    }, ROUND_PAUSE_MS);
+  }
+
   return (
-    <RankedMatchView
-      nickname={profileNickname}
-      match={matchInfo}
-      round={round}
-      lastResult={lastResult}
-      end={end}
-      picks={picks}
-      cardPlayed={cardPlayed}
-      augurRevealed={augurRevealed}
-      mana={mana}
-      hand={battle.hand}
-      oppHandSize={battle.oppHandSize}
-      roundWinsYou={battle.roundWinsA}
-      roundWinsOpp={battle.roundWinsB}
-      augurCooldown={augurCooldown}
-      onPickMove={handlePickMove}
-      onClearLane={handleClearLane}
-      onPlayCard={handlePlayCard}
-      onCancelCard={handleCancelCard}
-      onLock={handleLock}
-      revealAugurFor={revealAugurFor}
-      onLeave={onMatchResult ? undefined : onQuit}
-      onRematch={onMatchResult ? undefined : rematch}
-      onNext={onMatchResult && end ? () => onMatchResult(end.winner === "a") : undefined}
-    />
+    <>
+      <RankedMatchView
+        nickname={profileNickname}
+        match={matchInfo}
+        round={round}
+        lastResult={lastResult}
+        end={end}
+        picks={picks}
+        cardPlayed={cardPlayed}
+        augurRevealed={augurRevealed}
+        mana={mana}
+        hand={battle.hand}
+        oppHandSize={battle.oppHandSize}
+        roundWinsYou={battle.roundWinsA}
+        roundWinsOpp={battle.roundWinsB}
+        augurCooldown={augurCooldown}
+        onPickMove={handlePickMove}
+        onClearLane={handleClearLane}
+        onPlayCard={handlePlayCard}
+        onCancelCard={handleCancelCard}
+        onLock={handleLock}
+        revealAugurFor={revealAugurFor}
+        onLeave={onMatchResult ? undefined : onQuit}
+        onRematch={onMatchResult ? undefined : rematch}
+        onNext={onMatchResult && end ? () => onMatchResult(end.winner === "a") : undefined}
+      />
+      {riposteData && (
+        <RiposteOverlay
+          data={riposteData}
+          onPick={handleRipostePick}
+        />
+      )}
+    </>
+  );
+}
+
+/* ──────────── Riposte sub-phase UI ──────────── */
+
+import { MoveGlyph, MOVE_PALETTE } from "../icons";
+
+const LANE_LABEL = ["FORCE", "SAGESSE", "RUSE"] as const;
+const RANKED_MOVES: Move[] = ["rock", "paper", "scissors", "lizard", "spock"];
+
+function RiposteOverlay({
+  data,
+  onPick,
+}: {
+  data: { lane: LaneTarget; phase: "pick" | "reveal"; playerMove?: Move; cpuMove?: Move; flipped?: boolean };
+  onPick: (mv: Move) => void;
+}) {
+  const verdict = data.phase === "reveal" && data.playerMove && data.cpuMove
+    ? data.flipped ? "win"
+      : data.playerMove === data.cpuMove ? "draw"
+      : "loss"
+    : null;
+  return (
+    <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md px-4">
+      <div className="text-[10px] sm:text-xs uppercase tracking-[0.4em] text-amber-300 mb-1.5">
+        Riposte
+      </div>
+      <div className="text-2xl sm:text-3xl font-extrabold text-white mb-1 text-center">
+        Rejoue la lane {LANE_LABEL[data.lane]}
+      </div>
+      <div className="text-xs sm:text-sm text-zinc-400 mb-6 max-w-xs text-center">
+        Gagne ce duel pour flipper la défaite en victoire.
+      </div>
+      {data.phase === "pick" && (
+        <div className="grid grid-cols-5 gap-2 w-full max-w-md">
+          {RANKED_MOVES.map((mv) => {
+            const pal = MOVE_PALETTE[mv];
+            return (
+              <button
+                key={mv}
+                onClick={() => onPick(mv)}
+                className={
+                  "aspect-[4/5] rounded-xl flex flex-col items-center justify-center gap-1 py-1.5 transition active:scale-92 " +
+                  "bg-gradient-to-br " + pal.from + " " + pal.to + " ring-2 " + pal.ring + " " + pal.glow +
+                  " text-zinc-900 shadow-md"
+                }
+              >
+                <MoveGlyph move={mv} className="w-7 h-7" />
+                <span className="text-[8px] uppercase tracking-wider font-bold leading-none">{mv}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {data.phase === "reveal" && data.playerMove && data.cpuMove && (
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex items-center gap-6">
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wider text-emerald-300">Toi</span>
+              <div className={"w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br " +
+                MOVE_PALETTE[data.playerMove].from + " " + MOVE_PALETTE[data.playerMove].to +
+                " ring-2 " + MOVE_PALETTE[data.playerMove].ring}>
+                <MoveGlyph move={data.playerMove} className="w-9 h-9" />
+              </div>
+            </div>
+            <div className="text-3xl font-black text-zinc-500">vs</div>
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wider text-rose-300">CPU</span>
+              <div className={"w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br " +
+                MOVE_PALETTE[data.cpuMove].from + " " + MOVE_PALETTE[data.cpuMove].to +
+                " ring-2 " + MOVE_PALETTE[data.cpuMove].ring}>
+                <MoveGlyph move={data.cpuMove} className="w-9 h-9" />
+              </div>
+            </div>
+          </div>
+          <div className={
+            "text-xl sm:text-2xl font-black " +
+            (verdict === "win" ? "text-emerald-300" :
+             verdict === "loss" ? "text-rose-300" : "text-zinc-300")
+          }>
+            {verdict === "win" ? "Lane flippée — victoire !"
+              : verdict === "loss" ? "Riposte perdue, défaite conservée."
+              : "Égalité — la défaite reste."}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
