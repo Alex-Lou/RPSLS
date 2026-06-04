@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { useStore } from "./store";
 import { useT } from "./i18n";
 import { Hand, MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "./icons";
+import { QuitConfirmModal } from "./match/QuitConfirmModal";
 import { MOVES, type Move } from "./game";
 import {
   OnlineClient,
@@ -162,6 +163,9 @@ export function OnlinePage() {
   const player = useStore((s) => s.player);
   const serverConfig = useStore((s) => s.serverConfig);
   const recordMatch = useStore((s) => s.recordMatch);
+  const recordAbandon = useStore((s) => s.recordAbandon);
+  /** Open state for the themed forfeit-confirm modal (classic 1v1). */
+  const [quitOpen, setQuitOpen] = useState(false);
 
   // Mode toggle: classic 1v1 (current) vs Constellation Lanes (Phase 1).
   // Once a user picks a mode in the menu, the rest of the flow follows.
@@ -859,11 +863,20 @@ export function OnlinePage() {
             </div>
 
             <button
-              onClick={leaveMatch}
+              onClick={() => setQuitOpen(true)}
               className="mt-2 self-center px-4 py-2 rounded-xl bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-500/40 text-zinc-400 hover:text-rose-200 text-xs transition"
             >
               🏳️ Forfeit match
             </button>
+            <AnimatePresence>
+              {quitOpen && (
+                <QuitConfirmModal
+                  competitive
+                  onCancel={() => setQuitOpen(false)}
+                  onConfirm={() => { setQuitOpen(false); recordAbandon(); leaveMatch(); }}
+                />
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
 

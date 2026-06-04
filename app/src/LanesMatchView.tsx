@@ -17,6 +17,8 @@ import { MOVES, type Move } from "./game";
 import { hapticAlert, hapticTap } from "./haptic";
 import { useT } from "./i18n";
 import { MatchScoreBar, hapticTick, PickShock, CinematicMatchEnd, useAndroidBackPrompt } from "./sharedMatchUI";
+import { QuitConfirmModal } from "./match/QuitConfirmModal";
+import { useStore } from "./store";
 import type { LanePlay, LaneResult, PlayerSlot } from "./online";
 import {
   detectOutcomeCombo,
@@ -108,6 +110,7 @@ export function LanesMatchView({
   onRematch,
 }: LanesMatchViewProps & { onRematch?: () => void }) {
   const t = useT();
+  const recordAbandon = useStore((s) => s.recordAbandon);
   /* The phase is derived from the props — no listener, no race. */
   const phase: Phase = (() => {
     if (end) return "match_end";
@@ -271,41 +274,17 @@ export function LanesMatchView({
 
       <AnimatePresence>
         {quitConfirmOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-            onClick={() => setQuitConfirmOpen(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 12 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 280, damping: 22 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-sm bg-zinc-950/95 border border-white/10 rounded-3xl p-5 sm:p-6 shadow-2xl"
-            >
-              <h3 className="text-base sm:text-lg font-bold text-white mb-1.5">Quitter le match ?</h3>
-              <p className="text-sm text-zinc-400 leading-relaxed mb-5">
-                Tu vas perdre la manche en cours. Ce sera compté comme défaite.
-              </p>
-              <div className="flex gap-2.5">
-                <button
-                  onClick={() => setQuitConfirmOpen(false)}
-                  className="flex-1 py-2.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 font-semibold text-sm text-zinc-200 transition active:scale-[0.97]"
-                >
-                  Continuer
-                </button>
-                <button
-                  onClick={() => { setQuitConfirmOpen(false); onLeave(); }}
-                  className="flex-1 py-2.5 rounded-2xl bg-gradient-to-r from-rose-500 to-red-600 font-bold text-sm text-white shadow-lg shadow-rose-500/30 transition active:scale-[0.97]"
-                >
-                  Forfait
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
+          <QuitConfirmModal
+            competitive
+            onCancel={() => setQuitConfirmOpen(false)}
+            onConfirm={() => {
+              setQuitConfirmOpen(false);
+              // Online lanes = competitive → register the abandon so repeat
+              // quitters take the escalating LP penalty before we leave.
+              recordAbandon();
+              onLeave();
+            }}
+          />
         )}
       </AnimatePresence>
     </div>
