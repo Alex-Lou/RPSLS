@@ -4,6 +4,7 @@ import { useStore } from "./store";
 import { QUESTS, questState, type QuestDef } from "./quests";
 import { THEMES } from "./theme";
 import { useT } from "./i18n";
+import { hapticMatchWin } from "./haptic";
 
 export function QuestsPage() {
   const player = useStore((s) => s.player);
@@ -117,28 +118,43 @@ function QuestRow({
   const pct = (s.value / s.target) * 100;
   const dim = s.claimed;
   const [burst, setBurst] = useState(false);
+  const claimable = s.complete && !s.claimed;
+
+  const handleClaim = () => {
+    hapticMatchWin();      // native reward buzz
+    setBurst(true);
+    onClaim();
+  };
 
   return (
-    <div
+    <motion.div
       className={
-        "relative rounded-2xl border p-4 flex items-center gap-4 transition " +
+        "relative overflow-hidden rounded-2xl border p-4 flex items-center gap-4 transition " +
         (s.claimed
           ? "bg-white/[0.02] border-white/5 opacity-60"
-          : s.complete
-          ? "bg-amber-500/10 border-amber-400/40 shadow-lg shadow-amber-900/20"
+          : claimable
+          ? "bg-amber-500/10 border-amber-400/40"
           : "bg-white/5 border-white/10")
       }
+      // Claimable rows breathe with an amber glow to pull the eye.
+      animate={
+        claimable
+          ? { boxShadow: ["0 0 0px rgba(251,191,36,0)", "0 0 22px -4px rgba(251,191,36,0.55)", "0 0 0px rgba(251,191,36,0)"] }
+          : { boxShadow: "0 0 0px rgba(0,0,0,0)" }
+      }
+      transition={claimable ? { duration: 2.2, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3 }}
     >
-      <div
+      <motion.div
         className={
           "w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0 " +
-          (s.complete && !s.claimed
-            ? "bg-amber-500/30 ring-2 ring-amber-400/60"
-            : "bg-white/5")
+          (claimable ? "bg-amber-500/30 ring-2 ring-amber-400/60" : "bg-white/5")
         }
+        // The icon does a little victory dance while the reward is waiting.
+        animate={claimable ? { rotate: [0, -9, 9, -5, 0], scale: [1, 1.12, 1] } : { rotate: 0, scale: 1 }}
+        transition={claimable ? { duration: 1.6, repeat: Infinity, repeatDelay: 1.0 } : { duration: 0.3 }}
       >
         {q.emoji}
-      </div>
+      </motion.div>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
@@ -181,37 +197,101 @@ function QuestRow({
 
       <div className="shrink-0">
         {s.claimed ? (
-          <span className="text-emerald-400 text-xl">✓</span>
+          <motion.span
+            initial={{ scale: 0, rotate: -90 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: "spring", stiffness: 320, damping: 16 }}
+            className="text-emerald-400 text-xl"
+          >
+            ✓
+          </motion.span>
         ) : s.complete ? (
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => { setBurst(true); onClaim(); }}
-            className="px-4 py-2 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-zinc-900 font-bold text-sm shadow-lg shadow-amber-900/40"
+            animate={{ scale: [1, 1.05, 1] }}
+            transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+            onClick={handleClaim}
+            className="relative overflow-hidden px-4 py-2 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-zinc-900 font-bold text-sm shadow-lg shadow-amber-900/40"
           >
-            {t("quests.btn.claim")}
+            {/* Shimmer sweep across the claim button. */}
+            <motion.span
+              aria-hidden
+              className="absolute inset-y-0 -left-1/3 w-1/3"
+              style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)", transform: "skewX(-18deg)" }}
+              animate={{ left: ["-33%", "133%"] }}
+              transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 0.6, ease: "easeInOut" }}
+            />
+            <span className="relative">{t("quests.btn.claim")}</span>
           </motion.button>
         ) : (
           <span className="text-zinc-600 text-xs">{t("quests.status.progress")}</span>
         )}
       </div>
 
-      {/* XP burst on claim — floats up from the action area and survives the
-          button → ✓ flip (it lives on the row, not inside the button). The same
-          gain also lands in the global header's XP bar. */}
+      {/* Claim celebration — reward chip floats up + a small burst of themed
+          particles fans out. Lives on the row so it survives the button→✓ flip. */}
       <AnimatePresence>
         {burst && (
-          <motion.span
-            initial={{ opacity: 0, y: 0, scale: 0.6 }}
-            animate={{ opacity: [0, 1, 1, 0], y: -36, scale: 1.1 }}
-            transition={{ duration: 1.2, ease: "easeOut" }}
-            onAnimationComplete={() => setBurst(false)}
-            className="absolute right-4 top-2 whitespace-nowrap text-emerald-300 font-black text-sm drop-shadow-[0_2px_6px_rgba(0,0,0,0.7)] pointer-events-none z-10"
-          >
-            +{q.xpReward} XP ✨
-          </motion.span>
+          <RewardBurst
+            key="burst"
+            xp={q.xpReward}
+            lp={q.lpReward}
+            primary={themePrimary}
+            secondary={themeSecondary}
+            onDone={() => setBurst(false)}
+          />
         )}
       </AnimatePresence>
+    </motion.div>
+  );
+}
+
+/** One-shot claim celebration: a rising +XP/+LP chip plus ~12 particles
+ *  fanning out from the action area. Pure Motion/CSS, no assets. */
+function RewardBurst({
+  xp, lp, primary, secondary, onDone,
+}: {
+  xp: number;
+  lp?: number;
+  primary: string;
+  secondary: string;
+  onDone: () => void;
+}) {
+  const parts = Array.from({ length: 12 }, (_, i) => {
+    const ang = (i / 12) * Math.PI * 2 + (i % 2) * 0.3;
+    const dist = 34 + (i % 4) * 12;
+    return {
+      id: i,
+      x: Math.cos(ang) * dist,
+      y: Math.sin(ang) * dist - 8,
+      color: i % 2 === 0 ? primary : secondary,
+      delay: (i % 5) * 0.015,
+    };
+  });
+  return (
+    <div className="absolute right-3 top-1 z-10 pointer-events-none">
+      {parts.map((p) => (
+        <motion.span
+          key={p.id}
+          initial={{ opacity: 1, x: 0, y: 0, scale: 0 }}
+          animate={{ opacity: [1, 1, 0], x: p.x, y: p.y, scale: [0, 1, 0.4] }}
+          transition={{ duration: 0.9, delay: p.delay, ease: [0.2, 0.7, 0.3, 1] }}
+          className="absolute w-1.5 h-1.5 rounded-full"
+          style={{ background: p.color }}
+        />
+      ))}
+      <motion.div
+        initial={{ opacity: 0, y: 0, scale: 0.6 }}
+        animate={{ opacity: [0, 1, 1, 0], y: -40, scale: 1.1 }}
+        transition={{ duration: 1.3, ease: "easeOut" }}
+        onAnimationComplete={onDone}
+        className="absolute right-0 whitespace-nowrap font-black text-sm drop-shadow-[0_2px_6px_rgba(0,0,0,0.7)]"
+      >
+        <span className="text-emerald-300">+{xp} XP</span>
+        {lp !== undefined && lp > 0 && <span className="text-rose-300 ml-1.5">+{lp} LP</span>}
+        <span className="ml-1">✨</span>
+      </motion.div>
     </div>
   );
 }
