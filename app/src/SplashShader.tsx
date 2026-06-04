@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { ThemedBackdrop, type BackdropScene } from "./backdrops/ThemedBackdrop";
 
 /**
  * SplashShader — WebGL fluid cosmic backdrop for the splash screen.
@@ -20,8 +21,23 @@ import { useEffect, useRef } from "react";
  *
  * The canvas is positioned fixed inset-0 z-0 — the splash UI (logo,
  * title, tap hint) renders on top at z-10+.
+ *
+ * When the player has already picked a coded scene (player.backgroundId →
+ * BACKGROUNDS_BY_ID[id].scene), the splash uses that scene instead of the
+ * default cosmic shader so the opening matches the chosen ambience.
  */
-export function SplashShader() {
+export function SplashShader({ scene }: { scene?: BackdropScene | null } = {}) {
+  // Reuse the same scene catalogue as the in-app backdrop so the splash
+  // already shows the player's chosen ambience. The default cosmic shader
+  // below kicks in only when no scene is set (first launch / "default" /
+  // "custom" bg — none of which advertise a procedural scene).
+  if (scene) {
+    return <ThemedBackdrop scene={scene} />;
+  }
+  return <DefaultCosmicShader />;
+}
+
+function DefaultCosmicShader() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
 

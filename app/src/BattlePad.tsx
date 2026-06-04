@@ -951,17 +951,32 @@ function GalaxyPad({ compact = false, ...props }: React.SVGProps<SVGSVGElement> 
           <stop offset="55%" stopColor="#0c0922" />
           <stop offset="100%" stopColor="#04030d" />
         </radialGradient>
+        {/* Disc glow — softer, slightly tinted so it doesn't wash the centre.
+            The colour stops animate (purple → cyan → rose → purple) to drive
+            the whole-pad colour cycle requested by Alex. */}
         <radialGradient id="gx-disc" cx="50%" cy="50%" r="50%">
-          <stop offset="0%"  stopColor="#c4b5fd" stopOpacity="0.5" />
-          <stop offset="45%" stopColor="#7c3aed" stopOpacity="0.22" />
+          <stop offset="0%"  stopColor="#a78bfa" stopOpacity="0.32">
+            <animate attributeName="stop-color"
+              values="#a78bfa;#7dd3fc;#f0abfc;#a78bfa" dur="22s" repeatCount="indefinite" />
+          </stop>
+          <stop offset="45%" stopColor="#6d28d9" stopOpacity="0.16">
+            <animate attributeName="stop-color"
+              values="#6d28d9;#0e7490;#a21caf;#6d28d9" dur="22s" repeatCount="indefinite" />
+          </stop>
+          <stop offset="100%" stopColor="#5b21b6" stopOpacity="0" />
+        </radialGradient>
+        {/* Core — far less bright and tinted (no pure-white burnout). The
+            inner stop cycles colours so the bulge breathes hue instead of just
+            brightness. */}
+        <radialGradient id="gx-core" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"  stopColor="#d8b4fe" stopOpacity="0.62">
+            <animate attributeName="stop-color"
+              values="#d8b4fe;#a5f3fc;#fbcfe8;#fcd34d;#d8b4fe" dur="18s" repeatCount="indefinite" />
+          </stop>
+          <stop offset="45%" stopColor="#7c3aed" stopOpacity="0.32" />
           <stop offset="100%" stopColor="#7c3aed" stopOpacity="0" />
         </radialGradient>
-        <radialGradient id="gx-core" cx="50%" cy="50%" r="50%">
-          <stop offset="0%"  stopColor="#ffffff" stopOpacity="0.95" />
-          <stop offset="35%" stopColor="#ffd9a8" stopOpacity="0.7" />
-          <stop offset="100%" stopColor="#f0abfc" stopOpacity="0" />
-        </radialGradient>
-        <filter id="gx-glow"><feGaussianBlur stdDeviation="5" /></filter>
+        <filter id="gx-glow"><feGaussianBlur stdDeviation="3.5" /></filter>
       </defs>
 
       <rect width={W} height={H} fill="url(#gx-bg)" />
@@ -971,7 +986,7 @@ function GalaxyPad({ compact = false, ...props }: React.SVGProps<SVGSVGElement> 
         {Array.from({ length: 90 }).map((_, i) => {
           const x = (i * 167) % W;
           const y = (i * 97) % H;
-          const o = 0.2 + ((i * 13) % 10) / 18;
+          const o = 0.18 + ((i * 13) % 10) / 22;
           return (
             <circle key={i} cx={x} cy={y} r={(i % 3) * 0.5 + 0.5} fillOpacity={o}>
               {i % 8 === 0 && (
@@ -982,21 +997,34 @@ function GalaxyPad({ compact = false, ...props }: React.SVGProps<SVGSVGElement> 
         })}
       </g>
 
-      {/* The galaxy itself — disc glow + rotating arms + bright bulge. */}
+      {/* The galaxy itself — disc glow + rotating arms + soft bulge. */}
       <g transform={`translate(${W / 2} ${H / 2 + 10})`}>
         <ellipse rx="430" ry="260" fill="url(#gx-disc)" />
         <g>
           <animateTransform attributeName="transform" type="rotate" from="0" to="360"
             dur={compact ? "120s" : "75s"} repeatCount="indefinite" />
-          {GALAXY_ARMS.map((s, i) => (
-            <circle key={i} cx={s.x} cy={s.y} r={s.r} fill={i % 5 === 0 ? "#f0abfc" : "#dbeafe"} fillOpacity={s.o} />
-          ))}
+          {/* Arm stars: ⅕ swap colours on a slow cycle so the spiral hue evolves
+              instead of being a static violet/blue field. */}
+          {GALAXY_ARMS.map((s, i) => {
+            const tint = i % 5 === 0;
+            return (
+              <circle key={i} cx={s.x} cy={s.y} r={s.r} fillOpacity={s.o * 0.85}
+                      fill={tint ? "#f0abfc" : "#c7d2fe"}>
+                {tint && (
+                  <animate attributeName="fill"
+                    values="#f0abfc;#7dd3fc;#fbcfe8;#a5f3fc;#f0abfc"
+                    dur="16s" begin={`${(i * 0.07) % 6}s`} repeatCount="indefinite" />
+                )}
+              </circle>
+            );
+          })}
         </g>
-        {/* Bright bulge */}
-        <circle r="70" fill="url(#gx-core)" filter="url(#gx-glow)">
-          <animate attributeName="opacity" values="0.8;1;0.8" dur="4s" repeatCount="indefinite" />
+        {/* Soft bulge — capped at 60% opacity so it never burns the centre. */}
+        <circle r="62" fill="url(#gx-core)" filter="url(#gx-glow)" opacity="0.55">
+          <animate attributeName="opacity" values="0.45;0.62;0.45" dur="4.6s" repeatCount="indefinite" />
         </circle>
-        <circle r="9" fill="#ffffff" fillOpacity="0.9" />
+        {/* Tiny core pinprick — keeps a focal point without flooding light. */}
+        <circle r="5" fill="#fde68a" fillOpacity="0.55" />
       </g>
 
       {/* Frame */}

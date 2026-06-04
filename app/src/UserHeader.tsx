@@ -41,7 +41,7 @@ export function UserHeader({ onNavigate }: { onNavigate: (p: Page) => void }) {
   return (
     <div
       className={
-        "md:hidden sticky top-0 shrink-0 w-full max-w-3xl mx-auto px-5 pt-1 pb-2 transition-[z-index] " +
+        "md:hidden shrink-0 w-full max-w-3xl mx-auto px-5 pt-1 pb-2 transition-[z-index] " +
         // While XP is landing, jump above any open modal (e.g. the daily-quest
         // claim modal) so the bar visibly fills, then drop back behind it.
         (gain > 0 ? "z-[60]" : "z-20")
