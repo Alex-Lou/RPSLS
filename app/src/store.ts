@@ -5,6 +5,7 @@ import type { MatchRecord, PadId, Player, ThemeId } from "./types";
 import type { Locale } from "./i18n";
 import { todayDateKey } from "./daily";
 import { sanitisePersisted } from "./storeMigrationGuard";
+import { abandonPenaltyLp, activeAbandonCount, nextAbandon } from "./match/forfeit";
 
 const emptyByMove = () => ({
   rock:     { picked: 0, won: 0 },
@@ -61,8 +62,12 @@ interface AppState {
   locale: Locale;
   serverConfig: ServerConfig;
 
-  updateProfile: (patch: Partial<Pick<Player, "nickname" | "avatar" | "themeId" | "padId" | "difficulty" | "hapticEnabled" | "hapticIntensity" | "backgroundId" | "crashReports">>) => void;
+  updateProfile: (patch: Partial<Pick<Player, "nickname" | "avatar" | "themeId" | "padId" | "difficulty" | "hapticEnabled" | "hapticIntensity" | "backgroundId" | "crashReports" | "fontScale">>) => void;
   recordMatch: (m: MatchRecord) => void;
+  /** Register a competitive forfeit. Bumps the rolling abandon counter and
+   *  applies the escalating extra LP penalty for repeat offenders. Returns
+   *  the extra LP removed (0 for a first offence) so the UI can surface it. */
+  recordAbandon: () => number;
   claimQuest: (id: string, xpReward: number, lpReward?: number) => void;
   claimDailyQuest: (id: string, xpReward: number) => void;
   recordDailyComplete: (date: string) => void;
@@ -132,7 +137,7 @@ function applyRankedUnlocks(
 
 export const useStore = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       player: defaultPlayer(),
       history: [],
       onboarded: false,
@@ -167,6 +172,20 @@ export const useStore = create<AppState>()(
             history: newHistory,
           };
         }),
+
+      recordAbandon: () => {
+        const now = Date.now();
+        const prior = activeAbandonCount(get().player.abandons, now);
+        const extra = abandonPenaltyLp(prior);
+        set((s) => ({
+          player: {
+            ...s.player,
+            rankLp: Math.max(0, s.player.rankLp + extra),
+            abandons: nextAbandon(s.player.abandons, now),
+          },
+        }));
+        return extra;
+      },
 
       claimQuest: (id, xpReward, lpReward = 0) =>
         set((s) => {

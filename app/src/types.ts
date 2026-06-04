@@ -10,7 +10,9 @@ export type PadId =
 export type BackgroundId =
   | "default"
   | "ancient" | "astrolab" | "casino" | "cyberpunk"
-  | "galaxy" | "holy" | "quantum" | "steampunk";
+  | "galaxy" | "holy" | "quantum" | "steampunk"
+  // Coded / animated WebGL backdrops (no PNG — fully procedural).
+  | "nebula" | "aurora" | "grid";
 
 export type GameMode = "training" | "casual" | "ranked" | "hotseat";
 
@@ -71,6 +73,12 @@ export interface Player {
    *  the privacy-first stance laid out in the policy. The toggle lives in
    *  Settings; flipping it at runtime calls initSentry / shutdownSentry. */
   crashReports?: boolean;
+  /** Global UI text-size multiplier (accessibility). 1 = default, 1.15 =
+   *  large, 1.3 = extra-large. Applied via the --font-scale CSS var. */
+  fontScale?: number;
+  /** Rolling forfeit tracker for the abandon-penalty system (match/forfeit.ts).
+   *  Repeat ranked/online quitters take escalating LP hits. */
+  abandons?: { count: number; lastAt: number };
 }
 
 export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: string }> = {

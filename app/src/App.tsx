@@ -5,6 +5,7 @@ import { applyTheme } from "./theme";
 import { BACKGROUNDS_BY_ID, resolveFontFamily } from "./themes";
 import { RTL_LOCALES } from "./i18n";
 import { SplashShader } from "./SplashShader";
+import { ThemedBackdrop } from "./backdrops/ThemedBackdrop";
 import { Sidebar, MobileShell, type Page } from "./Sidebar";
 // PlayPage stays eagerly imported — it's the initial route after splash
 // so lazy-loading it would just add a flicker for no gain.
@@ -41,6 +42,13 @@ export default function App() {
   const hapticEnabled  = useStore((s) => s.player.hapticEnabled ?? true);
   const hapticIntensity = useStore((s) => s.player.hapticIntensity ?? "med");
   const crashReports = useStore((s) => s.player.crashReports ?? false);
+  const fontScale = useStore((s) => s.player.fontScale ?? 1);
+
+  // Accessibility text scale → drives the global --font-scale var that the
+  // html font-size (and therefore every rem-based size) keys off.
+  useEffect(() => {
+    document.documentElement.style.setProperty("--font-scale", String(fontScale));
+  }, [fontScale]);
 
   // Honour the privacy toggle: when the user flips "Send crash reports"
   // in Settings we boot or tear down Sentry on the spot.
@@ -142,8 +150,14 @@ export default function App() {
 
   const afterSplash = () => setStage(onboarded ? "shell" : "welcome");
 
+  // Live coded backdrop — rendered behind everything when the chosen
+  // background is a procedural scene (nebula/aurora/grid) and we're past
+  // the splash. Sits at z-0; the app shell renders above it.
+  const activeScene = BACKGROUNDS_BY_ID[backgroundId]?.scene;
+
   return (
     <div className="h-full w-full select-none overflow-hidden">
+      {activeScene && stage !== "splash" && <ThemedBackdrop scene={activeScene} />}
       {/* mode="wait" — Alex wanted the sequence to read as "splash ONLY, then
           menu ONLY", never overlapping. The splash fully exits before the
           shell mounts so the player never sees the theme bg leaking through
@@ -164,7 +178,8 @@ export default function App() {
             animate={{ opacity: 1 }}
             // Clean fade-in after the splash has fully exited (mode="wait").
             transition={{ duration: 0.5, ease: [0.4, 0.0, 0.2, 1] }}
-            className="flex h-full min-h-0"
+            // relative z-10 keeps the shell above the z-0 coded backdrop.
+            className="relative z-10 flex h-full min-h-0"
           >
             <Sidebar page={page} onNavigate={navigateTo} />
             <MobileShell page={page} onNavigate={navigateTo} />

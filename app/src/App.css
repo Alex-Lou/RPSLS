@@ -4,6 +4,18 @@
   --theme-primary:   #7c5cff;
   --theme-secondary: #2dd4bf;
   --theme-bg:        #0b0d12;
+  /* Global text scale multiplier, driven by the "Taille du texte" setting
+     in Profile (App.tsx writes it). Because every rem-based Tailwind size
+     (text-xs/sm/base/lg/xl…) resolves against the html font-size below,
+     bumping this one number proportionally enlarges ~all UI text — the
+     accessibility win for small screens / low vision / high glare. */
+  --font-scale: 1;
+}
+
+/* 106.25% of 16px = 17px baseline (a deliberate, comfortable bump from the
+   browser default) times the user's chosen scale. rem everywhere follows. */
+html {
+  font-size: calc(106.25% * var(--font-scale));
 }
 
 html, body, #root {

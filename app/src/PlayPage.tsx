@@ -371,13 +371,15 @@ function ModeSelect({
               whileTap={{ scale: 0.98 }}
               onClick={() => { setMode(m); setPendingMode(m); }}
               className={
-                "text-left p-2.5 sm:p-4 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition flex flex-col items-start gap-1.5 min-h-[124px]" +
-                (wide ? " col-span-2" : "")
+                "p-2.5 sm:p-4 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition flex flex-col gap-1.5 min-h-[124px] " +
+                // Wide tile (hot-seat) spans both columns, so left-aligning
+                // its content leaves an ugly empty right half. Center it.
+                (wide ? "col-span-2 items-center text-center justify-center" : "text-left items-start")
               }
             >
               <ModeIcon mode={m} />
-              <div className="min-w-0 w-full">
-                <div className="flex items-center gap-1.5 flex-wrap">
+              <div className={"min-w-0 w-full" + (wide ? " flex flex-col items-center" : "")}>
+                <div className={"flex items-center gap-1.5 flex-wrap" + (wide ? " justify-center" : "")}>
                   <span className="font-semibold text-sm sm:text-base">{t("mode." + m)}</span>
                   {rewards.lpWin > 0 && (
                     <span className="text-[9px] uppercase tracking-wider text-rose-300 bg-rose-500/15 px-1 rounded-full">

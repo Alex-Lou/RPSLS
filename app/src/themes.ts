@@ -22,6 +22,7 @@
 
 import type { BackgroundId, PadId } from "./types";
 import { FONT_STACK, type FontStackKey } from "./fonts";
+import type { BackdropScene } from "./backdrops/ThemedBackdrop";
 
 export interface ThemeSkin {
   /** Display family for big titles, headlines, banners. */
@@ -39,6 +40,9 @@ export interface BackgroundDef {
   /** Path to the PNG under /public, or null to fall back to the original
    *  CSS radial-gradient default. */
   src: string | null;
+  /** When set, this background is a live CODED WebGL scene (no PNG). App.tsx
+   *  renders <ThemedBackdrop scene=…> instead of painting an image. */
+  scene?: BackdropScene;
   /** Pad that visually goes with this background. Selecting the background
    *  applies this pad too unless the user has manually overridden it. */
   defaultPadId: PadId | null;
@@ -131,6 +135,29 @@ export const BACKGROUNDS: BackgroundDef[] = [
     skin: { fontHeadline: "medieval",     fontBody: "imFell",       fontMono: "bevan"      },
     miniature: `${MINI}/steampunk.png`,
     accent: { from: "#b45309", to: "#f59e0b" },
+  },
+
+  // ── CODED / ANIMATED backdrops (live WebGL, no PNG) ──
+  {
+    id: "nebula",    label: "Nebula ✦",       emoji: "🌌",
+    src: null, scene: "nebula",               defaultPadId: "cosmos",
+    skin: { fontHeadline: "audiowide",    fontBody: "exo2",         fontMono: "spaceMono"  },
+    miniature: null,
+    accent: { from: "#a855f7", to: "#22d3ee" },
+  },
+  {
+    id: "aurora",    label: "Aurora ✦",       emoji: "🌠",
+    src: null, scene: "aurora",               defaultPadId: "cosmos",
+    skin: { fontHeadline: "spaceGrotesk", fontBody: "exo2",         fontMono: "spaceMono"  },
+    miniature: null,
+    accent: { from: "#34d399", to: "#8b5cf6" },
+  },
+  {
+    id: "grid",      label: "Neon Grid ✦",    emoji: "🌐",
+    src: null, scene: "grid",                 defaultPadId: "neon",
+    skin: { fontHeadline: "orbitron",     fontBody: "rajdhani",     fontMono: "shareTech"  },
+    miniature: null,
+    accent: { from: "#06b6d4", to: "#f0abfc" },
   },
 ];
 

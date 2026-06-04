@@ -427,10 +427,19 @@ export function ProfilePage() {
                 }
               >
                 <div
-                  className="aspect-[3/2] w-full relative bg-zinc-950"
+                  className="aspect-[3/2] w-full relative bg-zinc-950 overflow-hidden"
                   style={
                     bg.src
                       ? { backgroundImage: `url("${bg.src}")`, backgroundSize: "cover", backgroundPosition: "center" }
+                      : bg.accent
+                      ? {
+                          // Coded scene OR accent-only: preview its palette as a
+                          // soft two-point glow so the thumbnail telegraphs the
+                          // live colours of the procedural backdrop.
+                          backgroundImage:
+                            `radial-gradient(120% 90% at 15% 0%, ${bg.accent.from}99, transparent 60%), ` +
+                            `radial-gradient(120% 90% at 100% 100%, ${bg.accent.to}88, transparent 60%)`,
+                        }
                       : {
                           backgroundImage:
                             "radial-gradient(120% 80% at 20% 0%, rgba(124,92,255,0.45), transparent 60%), radial-gradient(120% 80% at 100% 100%, rgba(45,212,191,0.35), transparent 60%)",
@@ -440,6 +449,11 @@ export function ProfilePage() {
                   {active && (
                     <div className="absolute top-2 right-2 bg-emerald-500/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                       ACTIVE
+                    </div>
+                  )}
+                  {bg.scene && (
+                    <div className="absolute top-2 left-2 bg-cyan-500/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                      ✦ LIVE
                     </div>
                   )}
                 </div>
@@ -537,6 +551,36 @@ export function ProfilePage() {
           </div>
         </section>
       )}
+
+      {/* Accessibility — global text size. Drives --font-scale in App.tsx. */}
+      <section className="bg-white/5 border border-white/10 rounded-3xl p-5">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-3">Accessibilité</h2>
+        <p className="text-xs text-zinc-500 mb-3">Taille du texte dans toute l'application.</p>
+        <div className="grid grid-cols-3 gap-2">
+          {([
+            { label: "Normal", value: 1, demo: "text-sm" },
+            { label: "Grand", value: 1.15, demo: "text-base" },
+            { label: "Très grand", value: 1.3, demo: "text-lg" },
+          ] as const).map((opt) => {
+            const active = (player.fontScale ?? 1) === opt.value;
+            return (
+              <button
+                key={opt.label}
+                onClick={() => { hapticTap(); updateProfile({ fontScale: opt.value }); }}
+                className={
+                  "flex flex-col items-center gap-1 py-3 rounded-xl border transition " +
+                  (active
+                    ? "border-white/40 bg-white/10 text-white"
+                    : "border-white/10 bg-white/5 text-zinc-400 hover:border-white/25")
+                }
+              >
+                <span className={opt.demo + " font-bold leading-none"}>Aa</span>
+                <span className="text-[11px] font-medium">{opt.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       {/* Privacy — anonymized crash reports + link to the policy. The
           toggle drives Sentry.init / Sentry.close in App.tsx. */}
