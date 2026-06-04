@@ -94,16 +94,24 @@ export function aiMove(
   difficulty: Difficulty = "normal",
   playerRecent: Move[] = []
 ): Move {
-  if (difficulty === "easy" && playerRecent.length > 0) {
-    if (Math.random() < 0.6) {
-      const last = playerRecent[playerRecent.length - 1];
-      const dumbPicks = losesTo(last);
+  if (difficulty === "easy") {
+    // Easy must FEEL easy from round 1. With no history yet, throw a move
+    // that loses to a uniformly-random move (still a genuine "bad" pick),
+    // so the player isn't facing a fair mood-random CPU on the opening
+    // rounds of a short Bo3. Once history exists, throw vs the last move.
+    // 0.8 throw-rate (was 0.6) lands easy-CPU win-rate in the intended
+    // ~35-45% band instead of the old near-coinflip.
+    if (Math.random() < 0.8) {
+      const ref = playerRecent.length > 0
+        ? playerRecent[playerRecent.length - 1]
+        : MOVES[Math.floor(Math.random() * MOVES.length)];
+      const dumbPicks = losesTo(ref);
       return dumbPicks[Math.floor(Math.random() * dumbPicks.length)];
     }
     return moodPick(mood);
   }
 
-  if (difficulty === "hard" && playerRecent.length >= 2) {
+  if (difficulty === "hard" && playerRecent.length >= 1) {
     if (Math.random() < 0.6) {
       // Most-used move in the last 5
       const window = playerRecent.slice(-5);

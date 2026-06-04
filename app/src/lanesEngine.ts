@@ -141,21 +141,21 @@ export function cpuLanesPicks(ctx: LanesAiContext, laneCount: number): LanePlay[
   return picks.map((mv) => ({ mv, mana: 0 }));
 }
 
-/** Returns a move that *loses* to `m` — used by easy AI to throw matches. */
+/** Returns a RANDOM move that *loses* to `m` — used by easy AI to throw
+ *  matches. Randomising among the two valid losers (instead of always the
+ *  first in MOVES order) stops the CPU being trivially predictable. */
 function counterableBy(m: Move): Move {
-  // Pick the first move in MOVES that loses to `m`.
-  for (const o of MOVES) {
-    if (rpslsBeats(m, o)) return o;
-  }
-  return "rock";
+  const losers = MOVES.filter((o) => rpslsBeats(m, o));
+  return losers.length ? losers[Math.floor(Math.random() * losers.length)] : "rock";
 }
 
-/** Returns a move that *beats* `m`. */
+/** Returns a RANDOM move that *beats* `m`. Each move is beaten by exactly
+ *  two others in RPSLS; picking randomly between them means a player can't
+ *  learn "if I play rock, hard-CPU always plays paper" and hard-counter the
+ *  counter — the previous deterministic version was fully exploitable. */
 function counterTo(m: Move): Move {
-  for (const o of MOVES) {
-    if (rpslsBeats(o, m)) return o;
-  }
-  return "spock";
+  const winners = MOVES.filter((o) => rpslsBeats(o, m));
+  return winners.length ? winners[Math.floor(Math.random() * winners.length)] : "spock";
 }
 
 /* ──────────── Local Battle state (server-less) ──────────── */

@@ -171,7 +171,10 @@ export function RankedGame({
     const nextNo = roundNoRef.current + 1;
     roundNoRef.current = nextNo;
 
-    const newMana = Math.min(MAX_MANA, nextNo);
+    // +1 base mana so the curve is round1:2 → round3:4. The old `nextNo`
+    // curve locked the 4-cost Supernova until round 4, by which point most
+    // Bo3 matches are already over — it was effectively a dead card.
+    const newMana = Math.min(MAX_MANA, nextNo + 1);
     setAugurCooldown((c) => Math.max(0, c - 1));
 
     const shouldDraw = nextNo === 1 || wonLastRoundRef.current;
