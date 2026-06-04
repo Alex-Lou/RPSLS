@@ -6,6 +6,8 @@
   "permissions": [
     "core:default",
     "opener:default",
-    "haptics:default"
+    "haptics:default",
+    "haptics:allow-vibrate",
+    "haptics:allow-impact-feedback"
   ]
 }
