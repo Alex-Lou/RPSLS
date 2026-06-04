@@ -27,6 +27,28 @@ export async function resolveRound(a: Move, b: Move): Promise<RoundResult> {
   return invoke<RoundResult>("resolve_round", { a, b });
 }
 
+/** RPSLS verbs, indexed VERBS[winner][loser]. Mirrors the Rust canon. */
+const VERBS: Record<Move, Partial<Record<Move, string>>> = {
+  rock:     { scissors: "crushes", lizard: "crushes" },
+  paper:    { rock: "covers", spock: "disproves" },
+  scissors: { paper: "cuts", lizard: "decapitates" },
+  lizard:   { spock: "poisons", paper: "eats" },
+  spock:    { scissors: "smashes", rock: "vaporizes" },
+};
+
+/**
+ * Pure, synchronous round resolver — same canon as the Rust `resolve_round`
+ * command, but works with no IPC and no network (used by the offline bot
+ * fallback). `a` is "you", `b` is the opponent.
+ */
+export function localResolve(a: Move, b: Move): RoundResult {
+  if (a === b) return { move_a: a, move_b: b, outcome: { kind: "draw" } };
+  if (BEATS[a].includes(b)) {
+    return { move_a: a, move_b: b, outcome: { kind: "a_wins", verb: VERBS[a][b] ?? "beats" } };
+  }
+  return { move_a: a, move_b: b, outcome: { kind: "b_wins", verb: VERBS[b][a] ?? "beats" } };
+}
+
 /* ───────── AI personalities (client-side, weighted random) ───────── */
 
 export type AiMood = "random" | "aggressive" | "logical";

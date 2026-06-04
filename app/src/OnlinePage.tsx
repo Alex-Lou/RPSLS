@@ -4,7 +4,8 @@ import { useStore } from "./store";
 import { useT } from "./i18n";
 import { Hand, MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "./icons";
 import { QuitConfirmModal } from "./match/QuitConfirmModal";
-import { MOVES, type Move } from "./game";
+import { MOVES, type Move, aiMove, rollAiMood, localResolve, type AiMood } from "./game";
+import { LocalLanesGame } from "./LocalLanesGame";
 import {
   OnlineClient,
   normalizeServerUrl,
@@ -41,7 +42,14 @@ type Phase =
   | "reveal"
   | "match_end"
   | "lanes_match"  // Constellation Lanes match in progress (LanesMatchView)
+  | "lanes_bot"    // Local CPU fallback for Lanes (no opponent found / offline)
   | "error";
+
+/** How long we look for a real opponent before dropping into a bot match. */
+const QUEUE_BOT_TIMEOUT_MS = 10_000;
+
+/** Believable opponent handles for the practice-bot fallback. */
+const BOT_NAMES = ["Nova", "Blitz", "Echo", "Vortex", "Cipher", "Riot", "Saber", "Quasar"];
 
 interface MatchState {
   matchId: string;
@@ -208,6 +216,22 @@ export function OnlinePage() {
 
   const clientRef = useRef<OnlineClient | null>(null);
 
+  // ── Bot fallback ──
+  // When no real opponent shows up within QUEUE_BOT_TIMEOUT_MS (or we're
+  // offline), we silently drop into a local CPU match so the player always
+  // gets a game. `vsBot` drives the classic flow locally; lanes route to the
+  // standalone LocalLanesGame via the "lanes_bot" phase.
+  const [vsBot, setVsBot] = useState(false);
+  const botMoodRef = useRef<AiMood>("random");
+  const playerRecentRef = useRef<Move[]>([]);
+  const botFallbackTimer = useRef<number | null>(null);
+  const botRoundTimer = useRef<number | null>(null);
+  const botDeadlineTimer = useRef<number | null>(null);
+
+  // Phase mirror so timers can read the live phase without stale closures.
+  const phaseRef = useRef(phase);
+  useEffect(() => { phaseRef.current = phase; }, [phase]);
+
   // Latest match snapshots, so the WS message handler can write a one-shot
   // history entry at match end without trusting its stale closure (and without
   // recording inside a state updater, which StrictMode double-invokes).
@@ -273,6 +297,9 @@ export function OnlinePage() {
       clientRef.current = null;
       if (splashTimer.current) window.clearTimeout(splashTimer.current);
       if (revealTimer.current) window.clearTimeout(revealTimer.current);
+      if (botFallbackTimer.current) window.clearTimeout(botFallbackTimer.current);
+      if (botRoundTimer.current) window.clearTimeout(botRoundTimer.current);
+      if (botDeadlineTimer.current) window.clearTimeout(botDeadlineTimer.current);
     };
   }, []);
 
@@ -293,6 +320,7 @@ export function OnlinePage() {
         break;
       case "match_found":
         clearRematch();
+        disarmBotFallback();
         setM({
           ...emptyMatch(),
           matchId: msg.match_id,
@@ -406,6 +434,7 @@ export function OnlinePage() {
       case "lanes_match_found":
         // Fresh match — wipe any stale state from a previous one.
         clearRematch();
+        disarmBotFallback();
         setLanesMatch({
           matchId: msg.match_id,
           opponent: msg.opponent.nickname,
@@ -548,20 +577,149 @@ export function OnlinePage() {
 
   async function joinQueue() {
     setErrMsg(null);
+    // Offline / unreachable server → no point queueing, play a bot now.
+    if (connStatus === "offline") {
+      startBotFallback();
+      return;
+    }
     setPhase("connecting");
+    armBotFallback(); // 10s safety net: no opponent → CPU
     try {
       const c = await ensureClient();
+      // The 10s timer (or a cancel) may have already moved us on while the
+      // socket was still connecting — only queue if we're still waiting.
+      if (phaseRef.current !== "connecting") return;
       if (mode === "lanes") {
         c.send({ type: "join_lanes_queue", win_to: lanesWinTo });
       } else {
         c.send({ type: "join_queue", best_of: bestOf });
       }
-    } catch (e) {
-      handleConnectError(e);
+    } catch {
+      // Couldn't reach the server within budget → fall back to a bot instead
+      // of dead-ending on an error screen.
+      if (phaseRef.current === "connecting") startBotFallback();
     }
   }
 
+  /* ── Bot fallback engine ──
+     A self-contained local match that reuses the same cinematic phases as a
+     real online game, so the opponent simply "is" the next player you face. */
+
+  function armBotFallback() {
+    disarmBotFallback();
+    botFallbackTimer.current = window.setTimeout(() => {
+      // Only kick in if we're still hunting (not already matched).
+      if (phaseRef.current === "connecting" || phaseRef.current === "queued") {
+        startBotFallback();
+      }
+    }, QUEUE_BOT_TIMEOUT_MS);
+  }
+  function disarmBotFallback() {
+    if (botFallbackTimer.current) {
+      window.clearTimeout(botFallbackTimer.current);
+      botFallbackTimer.current = null;
+    }
+  }
+  function clearBotTimers() {
+    if (botRoundTimer.current) { window.clearTimeout(botRoundTimer.current); botRoundTimer.current = null; }
+    if (botDeadlineTimer.current) { window.clearTimeout(botDeadlineTimer.current); botDeadlineTimer.current = null; }
+  }
+
+  function startBotFallback() {
+    disarmBotFallback();
+    // Fully drop the socket so no late "queued"/"match_found" can yank the
+    // player out of the local match (the cloud server may still wake up and
+    // try to pair us seconds later).
+    try { clientRef.current?.disconnect(); } catch { /* ignore */ }
+    clientRef.current = null;
+    setQueueStartAt(null);
+
+    // Lanes mode has a full local CPU experience already — use it.
+    if (mode === "lanes") {
+      setVsBot(false);
+      setPhase("lanes_bot");
+      return;
+    }
+
+    // Classic: drive the existing online flow locally.
+    botMoodRef.current = rollAiMood();
+    playerRecentRef.current = [];
+    const botName = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)];
+    setVsBot(true);
+    setM({ ...emptyMatch(), matchId: `bot-${Date.now()}`, opponent: botName, bestOf, youAre: "a" });
+    setPhase("matched");
+    hapticMatchStart();
+    setShowMatchFoundSplash(true);
+    if (splashTimer.current) window.clearTimeout(splashTimer.current);
+    splashTimer.current = window.setTimeout(() => {
+      setShowMatchFoundSplash(false);
+      startBotRound();
+    }, 2500);
+  }
+
+  function startBotRound() {
+    clearBotTimers();
+    setM((cur) => ({ ...cur, roundNo: cur.roundNo + 1, deadlineMs: 10_000, myMove: null, lastResult: null }));
+    setPhase("round");
+    setPickStartedAt(Date.now());
+    setRevealRevealed(false);
+    // Auto-pick a random move if the player lets the clock run out.
+    botDeadlineTimer.current = window.setTimeout(() => {
+      if (mRef.current.myMove == null) {
+        doBotPlay(MOVES[Math.floor(Math.random() * MOVES.length)]);
+      }
+    }, 10_300);
+  }
+
+  function doBotPlay(mv: Move) {
+    if (mRef.current.myMove) return; // already locked this round
+    if (botDeadlineTimer.current) { window.clearTimeout(botDeadlineTimer.current); botDeadlineTimer.current = null; }
+    hapticLock();
+    setM((cur) => ({ ...cur, myMove: mv }));
+    resolveBotRound(mv);
+  }
+
+  function resolveBotRound(playerMv: Move) {
+    playerRecentRef.current = [...playerRecentRef.current, playerMv].slice(-10);
+    const botMv = aiMove(botMoodRef.current, "normal", playerRecentRef.current);
+    const res = localResolve(playerMv, botMv); // a = you, b = bot
+    setM((cur) => {
+      const scoreA = cur.scoreA + (res.outcome.kind === "a_wins" ? 1 : 0);
+      const scoreB = cur.scoreB + (res.outcome.kind === "b_wins" ? 1 : 0);
+      return { ...cur, scoreA, scoreB, lastResult: { aMove: res.move_a, bMove: res.move_b, outcome: res.outcome } };
+    });
+    setPhase("reveal");
+    setRevealRevealed(false);
+    clearBotTimers();
+    // 1.4s "Rock… Paper… Scissors… SHOOT!" suspense, mirroring the server.
+    botRoundTimer.current = window.setTimeout(() => {
+      setRevealRevealed(true);
+      if (res.outcome.kind === "draw") hapticTap();
+      else if (res.outcome.kind === "a_wins") hapticWin();
+      else hapticLoss();
+      const cur = mRef.current;
+      const tgt = Math.floor(cur.bestOf / 2) + 1;
+      const over = cur.scoreA >= tgt || cur.scoreB >= tgt;
+      botRoundTimer.current = window.setTimeout(
+        () => (over ? endBotMatch() : startBotRound()),
+        over ? 1400 : 1600,
+      );
+    }, 1400);
+  }
+
+  function endBotMatch() {
+    const cur = mRef.current;
+    const tgt = Math.floor(cur.bestOf / 2) + 1;
+    const winner: PlayerSlot | null = cur.scoreA >= tgt ? "a" : cur.scoreB >= tgt ? "b" : null;
+    if (winner === "a") hapticMatchWin();
+    else if (winner === "b") hapticMatchLoss();
+    else hapticTap();
+    setM((c) => ({ ...c, ended: { winner, forfeit: false } }));
+    setPhase("match_end");
+  }
+
   function cancel() {
+    disarmBotFallback();
     clientRef.current?.send({ type: "cancel" });
     setPhase("menu");
     setLobbyCode("");
@@ -569,6 +727,7 @@ export function OnlinePage() {
   }
 
   function playMove(mv: Move) {
+    if (vsBot) { doBotPlay(mv); return; }
     if (m.myMove) return;
     hapticLock();
     setM((cur) => ({ ...cur, myMove: mv }));
@@ -576,12 +735,17 @@ export function OnlinePage() {
   }
 
   function leaveMatch() {
+    if (vsBot) { backToMenu(); return; } // local match — nothing to tell the server
     clientRef.current?.send({ type: "leave_match" });
     setPhase("menu");
     setM(emptyMatch());
   }
 
   function backToMenu() {
+    disarmBotFallback();
+    clearBotTimers();
+    setVsBot(false);
+    playerRecentRef.current = [];
     setPhase("menu");
     setM(emptyMatch());
     setLobbyCode("");
@@ -662,6 +826,7 @@ export function OnlinePage() {
             youName={player.nickname}
             opponentName={m.opponent}
             bestOf={m.bestOf}
+            isBot={vsBot}
           />
         )}
       </AnimatePresence>
@@ -871,9 +1036,9 @@ export function OnlinePage() {
             <AnimatePresence>
               {quitOpen && (
                 <QuitConfirmModal
-                  competitive
+                  competitive={!vsBot}
                   onCancel={() => setQuitOpen(false)}
-                  onConfirm={() => { setQuitOpen(false); recordAbandon(); leaveMatch(); }}
+                  onConfirm={() => { setQuitOpen(false); if (!vsBot) recordAbandon(); leaveMatch(); }}
                 />
               )}
             </AnimatePresence>
@@ -890,7 +1055,7 @@ export function OnlinePage() {
             oppScore={oppScore}
             opponentName={m.opponent}
             onBack={backToMenu}
-            onRematch={requestRematch}
+            onRematch={vsBot ? startBotFallback : requestRematch}
           />
         )}
 
@@ -928,6 +1093,21 @@ export function OnlinePage() {
               }}
               onRematch={requestRematch}
             />
+          </motion.div>
+        )}
+
+        {phase === "lanes_bot" && (
+          <motion.div
+            key="lanes-bot"
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex-1 flex flex-col min-h-0"
+          >
+            <div className="mb-2 self-center px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-200 text-[11px] font-semibold">
+              🤖 Aucun joueur trouvé — match d'entraînement
+            </div>
+            <LocalLanesGame winTo={lanesWinTo} onQuit={backToMenu} />
           </motion.div>
         )}
 
@@ -1273,10 +1453,12 @@ function MatchFoundSplash({
   youName,
   opponentName,
   bestOf,
+  isBot = false,
 }: {
   youName: string;
   opponentName: string;
   bestOf: number;
+  isBot?: boolean;
 }) {
   return (
     <motion.div
@@ -1292,7 +1474,7 @@ function MatchFoundSplash({
         transition={{ delay: 0.1, type: "spring", stiffness: 240, damping: 16 }}
         className="text-xs tracking-[0.5em] text-violet-300/80 uppercase mb-3"
       >
-        Match found
+        {isBot ? "🤖 Practice match" : "Match found"}
       </motion.div>
       <motion.div
         initial={{ scale: 0.4, opacity: 0 }}
@@ -1935,6 +2117,9 @@ function QueueRadar({
         <div className="text-xs text-zinc-400 mt-1">
           {position > 0 ? `Position #${position}` : "Scanning the network…"} ·{" "}
           Best of {bestOf} · {elapsedSec}s
+        </div>
+        <div className="text-[11px] text-amber-300/70 mt-1">
+          🤖 Un adversaire CPU prendra le relais si personne ne se présente
         </div>
       </div>
       <button
