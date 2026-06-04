@@ -5,6 +5,17 @@ import { PAD_IMAGES } from "./themes";
 const W = 1500;
 const H = 1000;
 
+// A sine wave wider than the pad so it can slide one wavelength and loop
+// seamlessly (used by the Quantum pad's travelling wavefunctions).
+const SINE_PATH = (() => {
+  let d = "M -300 0";
+  for (let x = -300; x <= W + 300; x += 10) {
+    const y = Math.sin((x / 300) * Math.PI * 2) * 22;
+    d += ` L ${x} ${y.toFixed(1)}`;
+  }
+  return d;
+})();
+
 export function BattlePad({
   padId,
   className,
@@ -34,7 +45,9 @@ export function BattlePad({
     case "chalkboard": return <ChalkboardPad {...common} />;
     case "vintage":    return <VintagePad {...common} />;
     case "cosmos":     return <CosmosPad {...common} compact={compact} />;
-    case "neon":       return <NeonPad {...common} />;
+    case "neon":       return <NeonPad {...common} compact={compact} />;
+    case "holy":       return <HolyPad {...common} compact={compact} />;
+    case "quantum":    return <QuantumPad {...common} compact={compact} />;
     case "comics":     return <ComicsPad {...common} />;
     default:           return <ChalkboardPad {...common} />;
   }
@@ -243,7 +256,7 @@ function VintagePad(props: React.SVGProps<SVGSVGElement>) {
    Synthwave grid + horizon, neon glow, 80s arcade vibe.
 */
 
-function NeonPad(props: React.SVGProps<SVGSVGElement>) {
+function NeonPad({ compact = false, ...props }: React.SVGProps<SVGSVGElement> & { compact?: boolean }) {
   return (
     <svg {...props}>
       <defs>
@@ -271,6 +284,10 @@ function NeonPad(props: React.SVGProps<SVGSVGElement>) {
 
       {/* Distant sun (semi-circle on horizon) */}
       <g transform={`translate(${W / 2} 470)`}>
+        {/* Pulsing halo behind the sun — slow neon breath. */}
+        <circle r="300" fill="url(#neon-sun)" opacity="0.18" filter="url(#neon-glow)">
+          <animate attributeName="opacity" values="0.10;0.30;0.10" dur="4.2s" repeatCount="indefinite" />
+        </circle>
         <circle r="220" fill="url(#neon-sun)" opacity="0.85" />
         {/* Horizontal slits cutting through sun */}
         {[20, 60, 100, 140, 180].map((y, i) => (
@@ -305,13 +322,22 @@ function NeonPad(props: React.SVGProps<SVGSVGElement>) {
           <line key={`h${i}`} x1="-100" y1={y} x2={W + 100} y2={y} />
         ))}
       </g>
+
+      {/* Scanline sweeping down the grid floor — that retro CRT pulse. */}
+      <rect x="0" width={W} height="4" fill="#7df9ff" opacity={compact ? 0.18 : 0.3}>
+        <animate attributeName="y" values="500;1000" dur="3.6s" repeatCount="indefinite" />
+        <animate attributeName="opacity"
+                 values={compact ? "0;0.18;0" : "0;0.35;0"} dur="3.6s" repeatCount="indefinite" />
+      </rect>
       {/* Top fade above horizon to keep grid from showing in the sky */}
       <rect x="0" y="0" width={W} height="480" fill="url(#neon-fade)" opacity="0" />
 
       {/* Frame neon */}
       <rect x="40" y="40" width={W - 80} height={H - 80} rx="20"
             fill="none" stroke="#ff3df7" strokeOpacity="0.9" strokeWidth="2"
-            filter="url(#neon-glow)" />
+            filter="url(#neon-glow)">
+        <animate attributeName="stroke-opacity" values="0.45;0.95;0.45" dur="2.8s" repeatCount="indefinite" />
+      </rect>
       <rect x="40" y="40" width={W - 80} height={H - 80} rx="20"
             fill="none" stroke="#ff3df7" strokeOpacity="0.9" strokeWidth="2" />
       <rect x="55" y="55" width={W - 110} height={H - 110} rx="14"
@@ -510,12 +536,30 @@ function CosmosPad({ compact = false, ...props }: React.SVGProps<SVGSVGElement> 
       <rect width={W} height={H} fill="url(#cs-nebula)" />
       <rect width={W} height={H} fill="url(#cs-nebula2)" />
 
-      {/* Stars */}
+      {/* Stars — every 9th one slowly twinkles (cheap, staggered). */}
       <g>
         {stars.map((s, i) => (
           <circle key={i} cx={s.x} cy={s.y} r={s.r}
-                  fill="#ffffff" fillOpacity={s.o} />
+                  fill="#ffffff" fillOpacity={s.o}>
+            {i % 9 === 0 && (
+              <animate attributeName="fill-opacity"
+                       values={`${s.o};${s.o * 0.25};${s.o}`}
+                       dur={`${2.4 + (i % 5) * 0.7}s`}
+                       begin={`${(i % 7) * 0.4}s`}
+                       repeatCount="indefinite" />
+            )}
+          </circle>
         ))}
+      </g>
+
+      {/* Lone shooting star drifting across the upper sky. */}
+      <g opacity={compact ? 0.5 : 0.9}>
+        <line x1="-80" y1="0" x2="-10" y2="22" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
+        <circle cx="0" cy="28" r="3.5" fill="#ffffff" />
+        <animateTransform attributeName="transform" type="translate"
+          values="200,80; 1300,360" dur="7s" begin="1s"
+          repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.8;1" dur="7s" begin="1s" repeatCount="indefinite" />
       </g>
 
       {/* ── Galaxy spirals ── */}
@@ -609,9 +653,12 @@ function CosmosPad({ compact = false, ...props }: React.SVGProps<SVGSVGElement> 
       <rect x="56" y="56" width={W - 112} height={H - 112} rx="20"
             fill="none" stroke="#88e2ff" strokeOpacity="0.14" strokeWidth="1" strokeDasharray="2 10" />
 
-      {/* Subtle centre pulsar */}
+      {/* Subtle centre pulsar — slow breathing glow. */}
       <g transform={`translate(${W/2} ${H/2 + 10})`}>
-        <circle r="28" fill="url(#cs-pulsar)" filter="url(#cs-glow)" opacity="0.35" />
+        <circle r="28" fill="url(#cs-pulsar)" filter="url(#cs-glow)" opacity="0.35">
+          <animate attributeName="opacity" values="0.18;0.45;0.18" dur="3.8s" repeatCount="indefinite" />
+          <animate attributeName="r" values="24;32;24" dur="3.8s" repeatCount="indefinite" />
+        </circle>
         <circle r="6" fill="#ffffff" fillOpacity="0.55" />
       </g>
 
@@ -653,6 +700,206 @@ function CosmosPad({ compact = false, ...props }: React.SVGProps<SVGSVGElement> 
               fontSize="22" fill="#cfe8ff" fillOpacity="0.70" letterSpacing="14">
           INTERSTELLAR DUEL
         </text>
+      </g>
+    </svg>
+  );
+}
+
+/* ════════════════════ Holy ════════════════════
+   Cathedral light: indigo nave, gilded frame, a slowly rotating rose-window,
+   sweeping god-rays from above and gold motes rising. Coded replacement for
+   the old PNG so the Holy theme's mat is alive.
+*/
+
+function HolyPad({ compact = false, ...props }: React.SVGProps<SVGSVGElement> & { compact?: boolean }) {
+  const gold = "#e8c46a";
+  const goldDeep = "#b8862f";
+  return (
+    <svg {...props}>
+      <defs>
+        <radialGradient id="hp-bg" cx="50%" cy="20%" r="95%">
+          <stop offset="0%"  stopColor="#2a2350" />
+          <stop offset="45%" stopColor="#16122e" />
+          <stop offset="100%" stopColor="#080611" />
+        </radialGradient>
+        <radialGradient id="hp-halo" cx="50%" cy="10%" r="48%">
+          <stop offset="0%"  stopColor="#ffe9a8" stopOpacity="0.5" />
+          <stop offset="100%" stopColor="#ffe9a8" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id="hp-gold" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor="#f6e3a6" />
+          <stop offset="100%" stopColor={goldDeep} />
+        </linearGradient>
+        <linearGradient id="hp-ray" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"  stopColor="#ffe9a8" stopOpacity="0.5" />
+          <stop offset="100%" stopColor="#ffe9a8" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+
+      <rect width={W} height={H} fill="url(#hp-bg)" />
+
+      {/* God-ray shafts fanning from above — each shimmers on its own clock. */}
+      <g style={{ mixBlendMode: "screen" }}>
+        {[-40, -22, -6, 10, 26, 42].map((a, i) => (
+          <g key={i} transform={`translate(${W / 2} -40) rotate(${a})`}>
+            <polygon points="-26,0 26,0 95,1120 -95,1120" fill="url(#hp-ray)">
+              <animate attributeName="opacity"
+                values={compact ? "0.05;0.14;0.05" : "0.08;0.24;0.08"}
+                dur={`${5 + i}s`} begin={`${i * 0.5}s`} repeatCount="indefinite" />
+            </polygon>
+          </g>
+        ))}
+      </g>
+
+      {/* Warm halo (the light source up high). */}
+      <rect width={W} height={H} fill="url(#hp-halo)" />
+
+      {/* Rose window — top centre, very slow rotation. */}
+      <g transform={`translate(${W / 2} 210)`} stroke={gold} fill="none">
+        <g>
+          <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="120s" repeatCount="indefinite" />
+          {Array.from({ length: 12 }).map((_, i) => {
+            const ang = (i / 12) * Math.PI * 2;
+            return <line key={i} x1="0" y1="0" x2={Math.cos(ang) * 118} y2={Math.sin(ang) * 118} strokeOpacity="0.28" strokeWidth="1.5" />;
+          })}
+          {Array.from({ length: 8 }).map((_, i) => {
+            const ang = (i / 8) * Math.PI * 2;
+            return <circle key={i} cx={Math.cos(ang) * 76} cy={Math.sin(ang) * 76} r="20" strokeOpacity="0.4" strokeWidth="1.5" />;
+          })}
+        </g>
+        <circle r="118" strokeOpacity="0.5" strokeWidth="2" />
+        <circle r="46" strokeOpacity="0.6" strokeWidth="2" />
+        <circle r="8" fill={gold} stroke="none" fillOpacity="0.85" />
+      </g>
+
+      {/* Ornate gilded frame. */}
+      <rect x="34" y="34" width={W - 68} height={H - 68} rx="26" fill="none" stroke="url(#hp-gold)" strokeWidth="5" />
+      <rect x="54" y="54" width={W - 108} height={H - 108} rx="20" fill="none" stroke={gold} strokeOpacity="0.4" strokeWidth="1.5" />
+      <rect x="68" y="68" width={W - 136} height={H - 136} rx="16" fill="none" stroke={gold} strokeOpacity="0.18" strokeWidth="1" strokeDasharray="2 10" />
+
+      {/* Corner crosses. */}
+      {[[120, 120], [W - 120, 120], [120, H - 120], [W - 120, H - 120]].map(([x, y], i) => (
+        <g key={i} transform={`translate(${x} ${y})`} stroke={gold} strokeOpacity="0.5" strokeWidth="3">
+          <line x1="0" y1="-26" x2="0" y2="26" />
+          <line x1="-18" y1="-7" x2="18" y2="-7" />
+        </g>
+      ))}
+
+      {/* Gold motes drifting upward toward the light. */}
+      {!compact && Array.from({ length: 14 }).map((_, i) => {
+        const x = 120 + (i * 97) % (W - 240);
+        const dur = 6 + (i % 5);
+        const delay = (i % 6) * 1.1;
+        return (
+          <circle key={i} cx={x} cy={H - 60} r={1.6 + (i % 3) * 0.6} fill="#ffe9a8" opacity="0">
+            <animate attributeName="cy" values={`${H - 60};170`} dur={`${dur}s`} begin={`${delay}s`} repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0;0.7;0" dur={`${dur}s`} begin={`${delay}s`} repeatCount="indefinite" />
+          </circle>
+        );
+      })}
+
+      {/* Scripture banner. */}
+      <g transform={`translate(${W / 2} ${H - 92})`} textAnchor="middle">
+        <line x1="-180" y1="0" x2="-70" y2="0" stroke={gold} strokeOpacity="0.5" />
+        <line x1="70" y1="0" x2="180" y2="0" stroke={gold} strokeOpacity="0.5" />
+        <text fontFamily="Cinzel,Georgia,serif" fontSize="20" fill={gold} fillOpacity="0.7" letterSpacing="8">SANCTVM</text>
+      </g>
+    </svg>
+  );
+}
+
+/* ════════════════════ Quantum ════════════════════
+   Physics lab table: faint grid, travelling wavefunctions on the edges,
+   electron orbits spinning in each corner, drifting particles and a soft
+   reactor core. Coded replacement for the old PNG.
+*/
+
+function QuantumPad({ compact = false, ...props }: React.SVGProps<SVGSVGElement> & { compact?: boolean }) {
+  const cyan = "#5eead4";
+  const blue = "#60a5fa";
+  const orbits = [
+    { x: 240, y: 240, d: 5 },
+    { x: W - 240, y: 240, d: 6.5 },
+    { x: 240, y: H - 240, d: 7 },
+    { x: W - 240, y: H - 240, d: 5.8 },
+  ];
+  return (
+    <svg {...props}>
+      <defs>
+        <radialGradient id="qp-bg" cx="50%" cy="50%" r="85%">
+          <stop offset="0%"  stopColor="#0b1733" />
+          <stop offset="55%" stopColor="#070d20" />
+          <stop offset="100%" stopColor="#03060f" />
+        </radialGradient>
+        <radialGradient id="qp-core" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"  stopColor="#a5f3fc" stopOpacity="0.9" />
+          <stop offset="60%" stopColor="#22d3ee" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="#22d3ee" stopOpacity="0" />
+        </radialGradient>
+        <filter id="qp-glow"><feGaussianBlur stdDeviation="3" /></filter>
+      </defs>
+
+      <rect width={W} height={H} fill="url(#qp-bg)" />
+
+      {/* Faint lab grid */}
+      <g stroke={blue} strokeOpacity="0.07" strokeWidth="1">
+        {Array.from({ length: 15 }).map((_, i) => <line key={`v${i}`} x1={i * 100} y1="0" x2={i * 100} y2={H} />)}
+        {Array.from({ length: 10 }).map((_, i) => <line key={`h${i}`} x1="0" y1={i * 100} x2={W} y2={i * 100} />)}
+      </g>
+
+      {/* Travelling wavefunctions along top & bottom. */}
+      {[150, H - 150].map((y, idx) => (
+        <g key={idx} transform={`translate(0 ${y})`} stroke={idx === 0 ? cyan : blue} fill="none"
+           strokeWidth="2" strokeOpacity={compact ? 0.28 : 0.42}>
+          <path d={SINE_PATH}>
+            <animateTransform attributeName="transform" type="translate"
+              from="0,0" to="-300,0" dur={`${idx === 0 ? 6 : 8}s`} repeatCount="indefinite" />
+          </path>
+        </g>
+      ))}
+
+      {/* Corner electron orbits. */}
+      {orbits.map((o, i) => (
+        <g key={i} transform={`translate(${o.x} ${o.y})`}>
+          <ellipse rx="120" ry="44" fill="none" stroke={cyan} strokeOpacity="0.3" strokeWidth="1.5" />
+          <ellipse rx="120" ry="44" fill="none" stroke={blue} strokeOpacity="0.3" strokeWidth="1.5" transform="rotate(60)" />
+          <ellipse rx="120" ry="44" fill="none" stroke="#a78bfa" strokeOpacity="0.25" strokeWidth="1.5" transform="rotate(-60)" />
+          <circle r="7" fill="url(#qp-core)" />
+          <circle r="4" fill={cyan}>
+            <animateMotion dur={`${o.d}s`} repeatCount="indefinite"
+              path="M -120,0 a 120,44 0 1,0 240,0 a 120,44 0 1,0 -240,0" />
+          </circle>
+        </g>
+      ))}
+
+      {/* Drifting particles. */}
+      {!compact && Array.from({ length: 18 }).map((_, i) => {
+        const x = 80 + (i * 83) % (W - 160);
+        const y = 120 + (i * 137) % (H - 240);
+        const d = 4 + (i % 6);
+        return (
+          <circle key={i} cx={x} cy={y} r={1.6} fill="#a5f3fc" opacity="0.4">
+            <animate attributeName="opacity" values="0.1;0.7;0.1" dur={`${d}s`} begin={`${(i % 5) * 0.6}s`} repeatCount="indefinite" />
+          </circle>
+        );
+      })}
+
+      {/* Frame */}
+      <rect x="40" y="40" width={W - 80} height={H - 80} rx="22" fill="none" stroke={cyan} strokeOpacity="0.4" strokeWidth="2" />
+      <rect x="56" y="56" width={W - 112} height={H - 112} rx="16" fill="none" stroke={blue} strokeOpacity="0.2" strokeWidth="1" strokeDasharray="2 10" />
+
+      {/* Equation labels along the edges. */}
+      <g fontFamily='"JetBrains Mono","Consolas",monospace' fill={cyan} fillOpacity="0.4">
+        <text x="92" y={H / 2} fontSize="14" transform={`rotate(-90 92 ${H / 2})`}>iℏ ∂ψ/∂t = Ĥψ</text>
+        <text x={W - 72} y={H / 2} fontSize="14" transform={`rotate(90 ${W - 72} ${H / 2})`}>Δx·Δp ≥ ℏ/2</text>
+        <text x={W / 2} y="118" fontSize="13" textAnchor="middle">|ψ⟩ = α|0⟩ + β|1⟩</text>
+      </g>
+
+      {/* Soft reactor core (mostly hidden by the in-game vignette). */}
+      <g transform={`translate(${W / 2} ${H / 2})`}>
+        <circle r="40" fill="url(#qp-core)" filter="url(#qp-glow)" opacity="0.3">
+          <animate attributeName="opacity" values="0.15;0.4;0.15" dur="3.2s" repeatCount="indefinite" />
+        </circle>
       </g>
     </svg>
   );

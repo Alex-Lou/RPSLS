@@ -140,14 +140,14 @@ export const BACKGROUNDS_BY_ID: Record<BackgroundId, BackgroundDef> = Object.fro
   BACKGROUNDS.map((b) => [b.id, b]),
 ) as Record<BackgroundId, BackgroundDef>;
 
-/** PNG playmats — the SVG ones are switched on padId inside BattlePad. */
+/** PNG playmats — the SVG/coded ones are switched on padId inside BattlePad.
+ *  holy + quantum are now fully CODED animated pads (BattlePad), so they're no
+ *  longer listed here — the live themes all pair with coded, animated mats. */
 export const PAD_IMAGES: Partial<Record<PadId, string>> = {
   ancient:   "/Pads/Ancient Mythical Pad.png",
   astrolab:  "/Pads/Astrolab.png",
   casino:    "/Pads/Casino Royale.png",
   cyberpunk: "/Pads/CyberPunk Pad.png",
-  holy:      "/Pads/Holy Game.png",
-  quantum:   "/Pads/Quantum.png",
   steampunk: "/Pads/Steampunk.png",
 };
 
