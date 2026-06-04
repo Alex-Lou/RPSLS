@@ -29,7 +29,9 @@ export function UserHeader({ onNavigate }: { onNavigate: (p: Page) => void }) {
   useEffect(() => {
     if (player.xp > prevXp.current) {
       setGain(player.xp - prevXp.current);
-      const id = window.setTimeout(() => setGain(0), 1600);
+      // Linger ~3.4s (was 1.6s) so the player actually SEES the bar fill +
+      // the +N XP chip rather than it flashing past.
+      const id = window.setTimeout(() => setGain(0), 3400);
       prevXp.current = player.xp;
       return () => window.clearTimeout(id);
     }
@@ -93,16 +95,22 @@ export function UserHeader({ onNavigate }: { onNavigate: (p: Page) => void }) {
             )}
           </div>
 
-          {/* XP bar — the landing target for every XP gain. */}
-          <div className="mt-1 relative h-2 rounded-full bg-white/10 overflow-hidden">
+          {/* XP bar — the landing target for every XP gain. Taller + a slower
+              fill so the progression reads clearly; the glow lingers ~3.4s. */}
+          <div className="mt-1 relative h-3 rounded-full bg-white/10 overflow-hidden">
             <motion.div
-              animate={{ width: `${info.progress * 100}%` }}
-              transition={{ type: "spring", stiffness: 120, damping: 20 }}
-              className="h-full rounded-full"
-              style={{
-                background: gradientFromTheme(theme, "90deg"),
-                boxShadow: gain > 0 ? `0 0 12px ${theme.primary}` : "none",
+              animate={{
+                width: `${info.progress * 100}%`,
+                boxShadow: gain > 0
+                  ? [`0 0 0px ${theme.primary}`, `0 0 16px ${theme.primary}`, `0 0 6px ${theme.primary}`]
+                  : "0 0 0px transparent",
               }}
+              transition={{
+                width: { duration: 0.9, ease: [0.22, 1, 0.36, 1] },
+                boxShadow: { duration: 1.4, ease: "easeOut" },
+              }}
+              className="h-full rounded-full"
+              style={{ background: gradientFromTheme(theme, "90deg") }}
             />
             <AnimatePresence>
               {gain > 0 && (

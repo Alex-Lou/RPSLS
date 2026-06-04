@@ -115,21 +115,26 @@ export function cpuLanesPicks(ctx: LanesAiContext, laneCount: number): LanePlay[
         picks.push(last ? counterableBy(last) : moodPick(ctx.mood));
       }
       break;
-    case "normal":
-      for (let i = 0; i < laneCount; i++) picks.push(moodPick(ctx.mood));
-      break;
-    case "hard": {
-      // Build a frequency map of the player's last 5 picks across lanes, then
-      // pick a counter to the most common one. Pads with mood-weighted picks.
-      const recent = ctx.playerHistory.slice(-5);
-      const freq: Record<Move, number> = {
-        rock: 0, paper: 0, scissors: 0, lizard: 0, spock: 0,
-      };
-      for (const m of recent) freq[m]++;
-      const sorted = (Object.keys(freq) as Move[]).sort((a, b) => freq[b] - freq[a]);
-      const top = sorted[0];
+    case "normal": {
+      // Normal is no longer a pure coin-flip: it lightly reads the player so
+      // mindlessly spamming one move gets punished ~40% of the time, while
+      // staying very beatable. Counters the most-frequent recent pick.
+      const top = mostFrequent(ctx.playerHistory.slice(-5));
       for (let i = 0; i < laneCount; i++) {
-        if (recent.length >= 2 && Math.random() < 0.65) {
+        if (top && Math.random() < 0.4) picks.push(counterTo(top));
+        else picks.push(moodPick(ctx.mood));
+      }
+      break;
+    }
+    case "hard": {
+      // Hard reads hard. Counters the most-frequent recent pick from the very
+      // first repeat (recent ≥1) at 75%, so spam is heavily punished — but
+      // counterTo() randomises between the two valid counters, so the player
+      // can still mix to throw it off.
+      const recent = ctx.playerHistory.slice(-5);
+      const top = mostFrequent(recent);
+      for (let i = 0; i < laneCount; i++) {
+        if (top && recent.length >= 1 && Math.random() < 0.75) {
           picks.push(counterTo(top));
         } else {
           picks.push(moodPick(ctx.mood));
@@ -139,6 +144,17 @@ export function cpuLanesPicks(ctx: LanesAiContext, laneCount: number): LanePlay[
     }
   }
   return picks.map((mv) => ({ mv, mana: 0 }));
+}
+
+/** The move the player has thrown most in `hist` (null if empty). Ties break
+ *  toward the most RECENT of the tied moves so the AI tracks momentum. */
+function mostFrequent(hist: Move[]): Move | null {
+  if (hist.length === 0) return null;
+  const freq: Record<Move, number> = { rock: 0, paper: 0, scissors: 0, lizard: 0, spock: 0 };
+  for (const m of hist) freq[m]++;
+  let best = hist[hist.length - 1];
+  for (const m of MOVES) if (freq[m] > freq[best]) best = m;
+  return best;
 }
 
 /** Returns a RANDOM move that *loses* to `m` — used by easy AI to throw

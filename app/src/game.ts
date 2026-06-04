@@ -130,6 +130,21 @@ export function aiMove(
     return moodPick(mood);
   }
 
+  // Normal: light pattern-reading so spamming one move isn't a free win.
+  // 35% of the time it counters the player's most-frequent recent move;
+  // otherwise it's mood-weighted random. Beatable, but not exploitable.
+  if (difficulty === "normal" && playerRecent.length >= 2) {
+    if (Math.random() < 0.35) {
+      const window = playerRecent.slice(-5);
+      const counts: Record<Move, number> = { rock: 0, paper: 0, scissors: 0, lizard: 0, spock: 0 };
+      for (const m of window) counts[m]++;
+      let target: Move = window[window.length - 1];
+      for (const m of MOVES) if (counts[m] > counts[target]) target = m;
+      const ctr = countersOf(target);
+      return ctr[Math.floor(Math.random() * ctr.length)];
+    }
+  }
+
   return moodPick(mood);
 }
 
