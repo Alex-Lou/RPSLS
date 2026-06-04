@@ -962,7 +962,10 @@ function Game({
       {/* Board: pad as canvas, takes ALL remaining vertical space */}
       <div className="relative flex-1 min-h-0 rounded-2xl sm:rounded-3xl overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
-          <BattlePad padId={padId} className="w-full h-full opacity-90" />
+          {/* compact = suppress the big animated centrepiece (orbiting
+              electrons, etc.) so the pad reads as a CALM, stable backdrop
+              behind the cards instead of churning during the match. */}
+          <BattlePad padId={padId} className="w-full h-full opacity-90" compact />
           <div
             className="absolute inset-0"
             style={{

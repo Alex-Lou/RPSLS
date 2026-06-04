@@ -405,9 +405,9 @@ function GameTable({
   return (
     <div
       className="w-full max-w-2xl rounded-2xl p-2 sm:p-4 flex flex-col gap-2 sm:gap-3
-                 border border-emerald-900/40
-                 bg-gradient-to-b from-emerald-950/40 via-zinc-950/60 to-emerald-950/40
-                 shadow-[inset_0_0_36px_rgba(0,0,0,0.55)]"
+                 border border-emerald-800/50
+                 bg-gradient-to-b from-emerald-950/85 via-zinc-950/90 to-emerald-950/85
+                 shadow-[inset_0_0_36px_rgba(0,0,0,0.6)]"
     >
       {/* Opponent header */}
       <div className="flex items-center justify-between px-0.5">
@@ -442,17 +442,19 @@ function GameTable({
 }
 
 /** Tiny "?" face-down card for an opponent lane we can't see yet.
- *  Rectangular (3/2) instead of square so the row stays short on mobile. */
-function FaceDownLaneCard({ index, pulsing = false }: { index: number; pulsing?: boolean }) {
+ *  Perfectly STATIC — no opacity pulse — so the opponent row reads as a calm,
+ *  solid surface instead of three cards randomly fading in and out (which felt
+ *  unstable). The `index`/`pulsing` props are kept for call-site compatibility
+ *  but no longer drive any animation. A solid dark fill stops the animated
+ *  app backdrop from showing through. */
+function FaceDownLaneCard({ index: _index, pulsing: _pulsing = false }: { index: number; pulsing?: boolean }) {
   return (
-    <motion.div
-      animate={pulsing ? { opacity: [0.55, 1, 0.55] } : { opacity: 1 }}
-      transition={pulsing ? { duration: 1.4, repeat: Infinity, delay: index * 0.18 } : undefined}
-      className="aspect-square w-full rounded-xl border-2 border-dashed border-white/10 bg-black/30
+    <div
+      className="aspect-square w-full rounded-xl border-2 border-dashed border-white/15 bg-zinc-900/80
                  flex items-center justify-center"
     >
-      <span className="text-xl sm:text-2xl text-zinc-700 font-black">?</span>
-    </motion.div>
+      <span className="text-xl sm:text-2xl text-zinc-600 font-black">?</span>
+    </div>
   );
 }
 
@@ -602,22 +604,21 @@ function LaneSlot({
           "aspect-square w-full rounded-xl border-2 transition flex items-center justify-center relative ring-2 " +
           (favoured ? ringFav : ringIdle) + " " +
           (pick
-            ? "border-emerald-400/40 bg-emerald-500/10 hover:bg-rose-500/10 hover:border-rose-400/50"
-            : "border-dashed border-white/15 bg-black/20")
+            ? "border-emerald-400/50 bg-emerald-600/25 hover:bg-rose-500/20 hover:border-rose-400/50"
+            : "border-dashed border-white/15 bg-zinc-900/70")
         }
         title={pick ? t("lanes.clearLane", { move: pick }) : hint}
       >
-        {/* Soft halo glow when the placed move is on its favoured lane */}
+        {/* Soft halo glow when the placed move is on its favoured lane —
+            a STEADY constant glow (no opacity pulse) so the board stays calm. */}
         {favoured && (
-          <motion.div
+          <div
             aria-hidden
-            initial={{ opacity: 0 }}
-            animate={{ opacity: [0.45, 0.8, 0.45] }}
-            transition={{ duration: 2.2, repeat: Infinity }}
             className="absolute inset-0 rounded-xl pointer-events-none"
             style={{
               background: `radial-gradient(circle at 50% 50%, ${haloColor}, transparent 70%)`,
               filter: "blur(8px)",
+              opacity: 0.6,
             }}
           />
         )}
@@ -815,13 +816,16 @@ function LockedStage({
             {picks.map((mv, i) => (
               <motion.div
                 key={i}
-                animate={{ y: [0, -3, 0] }}
-                transition={{ duration: 1.4, delay: i * 0.18, repeat: Infinity }}
-                className="aspect-square w-full rounded-2xl border-2 border-emerald-400/40 bg-emerald-500/10
+                // One-shot settle on lock — then perfectly still. No infinite
+                // bob (the old y-loop made the locked cards feel jittery).
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: i * 0.08, ease: [0.22, 1, 0.36, 1] }}
+                className="aspect-square w-full rounded-2xl border-2 border-emerald-400/50 bg-emerald-600/25
                            flex flex-col items-center justify-center gap-1 ring-2 ring-emerald-400/30"
               >
                 <Hand move={mv} size="md" />
-                <span className="text-[9px] uppercase tracking-wider text-emerald-300/80">L{i + 1}</span>
+                <span className="text-[9px] uppercase tracking-wider text-emerald-200/90">L{i + 1}</span>
               </motion.div>
             ))}
           </div>
@@ -1120,9 +1124,9 @@ function SideLaneCard({
     isLoss ? "border-rose-400/30"    :
              "border-zinc-500/20";
   const bg =
-    isWin  ? "bg-emerald-500/10" :
-    isLoss ? "bg-rose-500/10"    :
-             "bg-black/30";
+    isWin  ? "bg-emerald-600/25" :
+    isLoss ? "bg-rose-600/25"    :
+             "bg-zinc-900/75";
 
   return (
     <motion.div
