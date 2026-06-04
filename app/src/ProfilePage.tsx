@@ -104,8 +104,14 @@ export function ProfilePage() {
     reader.readAsDataURL(f);
   };
 
+  /** Personal image library cap. JPEG-encoded at quality 0.82 at MAX×MAX
+   *  yields ~150-400 KB each, so 6 images stays well under localStorage's
+   *  ~5 MB ceiling alongside the rest of the persisted state. */
+  const MAX_CUSTOM_IMAGES = 6;
+
   /** Upload a personal background: fit within 1080px (portrait-friendly),
-   *  JPEG-compress, store as customBgUrl, and select the "custom" theme. */
+   *  JPEG-compress, prepend to the library (deduped, capped), and select
+   *  it as the active background. */
   const onUploadBg = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -121,18 +127,24 @@ export function ProfilePage() {
         const canvas = document.createElement("canvas");
         canvas.width = w; canvas.height = h;
         const ctx = canvas.getContext("2d");
-        if (!ctx) { updateProfile({ customBgUrl: reader.result as string, backgroundId: "custom" }); return; }
-        ctx.drawImage(img, 0, 0, w, h);
-        updateProfile({ customBgUrl: canvas.toDataURL("image/jpeg", 0.82), backgroundId: "custom" });
+        const fallback = reader.result as string;
+        const dataUrl = ctx
+          ? (ctx.drawImage(img, 0, 0, w, h), canvas.toDataURL("image/jpeg", 0.82))
+          : fallback;
+        const prev = (useStore.getState().player.customBgs ?? []).filter((u) => u !== dataUrl);
+        const next = [dataUrl, ...prev].slice(0, MAX_CUSTOM_IMAGES);
+        updateProfile({ customBgUrl: dataUrl, customBgs: next, backgroundId: "custom" });
       };
       img.onerror = () => alert(t("profile.avatar.invalid"));
       img.src = reader.result as string;
     };
     reader.readAsDataURL(f);
+    // Allow re-uploading the same file (browsers ignore identical-value selects).
+    e.target.value = "";
   };
 
   /** Upload a personal battle pad: fit within 1500px (landscape 3:2-friendly),
-   *  JPEG-compress, store as customPadUrl, and select the "custom" pad. */
+   *  JPEG-compress, prepend to the library, and select it as the active pad. */
   const onUploadPad = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -148,14 +160,54 @@ export function ProfilePage() {
         const canvas = document.createElement("canvas");
         canvas.width = w; canvas.height = h;
         const ctx = canvas.getContext("2d");
-        if (!ctx) { updateProfile({ customPadUrl: reader.result as string, padId: "custom", padChosen: true }); return; }
-        ctx.drawImage(img, 0, 0, w, h);
-        updateProfile({ customPadUrl: canvas.toDataURL("image/jpeg", 0.82), padId: "custom", padChosen: true });
+        const fallback = reader.result as string;
+        const dataUrl = ctx
+          ? (ctx.drawImage(img, 0, 0, w, h), canvas.toDataURL("image/jpeg", 0.82))
+          : fallback;
+        const prev = (useStore.getState().player.customPads ?? []).filter((u) => u !== dataUrl);
+        const next = [dataUrl, ...prev].slice(0, MAX_CUSTOM_IMAGES);
+        updateProfile({ customPadUrl: dataUrl, customPads: next, padId: "custom", padChosen: true });
       };
       img.onerror = () => alert(t("profile.avatar.invalid"));
       img.src = reader.result as string;
     };
     reader.readAsDataURL(f);
+    e.target.value = "";
+  };
+
+  /** Pick an already-imported background — swaps customBgUrl + selects the
+   *  custom slot. No new upload needed. */
+  const selectStoredBg = (url: string) => {
+    updateProfile({ customBgUrl: url, backgroundId: "custom" });
+  };
+  /** Pick an already-imported pad. */
+  const selectStoredPad = (url: string) => {
+    updateProfile({ customPadUrl: url, padId: "custom", padChosen: true });
+  };
+  /** Delete an entry from the bg library. If it was the active background,
+   *  fall back to the most-recent remaining entry (or no custom bg). */
+  const deleteStoredBg = (url: string) => {
+    const list = (player.customBgs ?? []).filter((u) => u !== url);
+    const wasActive = player.customBgUrl === url;
+    const fallback = list[0];
+    updateProfile({
+      customBgs: list,
+      ...(wasActive
+        ? { customBgUrl: fallback, ...(fallback ? {} : { backgroundId: "default" as BackgroundId }) }
+        : {}),
+    });
+  };
+  /** Delete an entry from the pad library. */
+  const deleteStoredPad = (url: string) => {
+    const list = (player.customPads ?? []).filter((u) => u !== url);
+    const wasActive = player.customPadUrl === url;
+    const fallback = list[0];
+    updateProfile({
+      customPads: list,
+      ...(wasActive
+        ? { customPadUrl: fallback, ...(fallback ? {} : { padId: "chalkboard" as PadId }) }
+        : {}),
+    });
   };
 
   return (
@@ -438,7 +490,7 @@ export function ProfilePage() {
       <section className="bg-zinc-950/55 border border-white/12 rounded-3xl p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-3">Background</h2>
         <p className="text-xs text-zinc-500 mb-3">
-          Des thèmes 100% animés et codés. Choisis « Mon image » pour mettre la tienne (portrait 9:16, ex. 1080×1920 — affichée plein écran).
+          Des thèmes 100% animés et codés. « Mon image » importe la tienne (portrait 9:16, ex. 1080×1920 — affichée plein écran). Tu peux en garder jusqu'à {MAX_CUSTOM_IMAGES} dans ta bibliothèque.
         </p>
         <input
           ref={bgFileRef}
@@ -454,10 +506,15 @@ export function ProfilePage() {
               <button
                 key={bg.id}
                 onClick={() => {
-                  // "Mon image" → open the file picker if none stored yet OR
-                  // if it's already the active background (tap-again to change).
-                  if (bg.custom && (!player.customBgUrl || active)) {
-                    bgFileRef.current?.click();
+                  // "Mon image" → the dedicated library below handles the picker;
+                  // tapping the tile just switches to custom (if there's anything
+                  // imported) or opens the file picker.
+                  if (bg.custom) {
+                    if ((player.customBgs?.length ?? 0) === 0) {
+                      bgFileRef.current?.click();
+                      return;
+                    }
+                    updateProfile({ backgroundId: "custom" });
                     return;
                   }
                   const patch: Partial<{ backgroundId: BackgroundId; padId: PadId }> = { backgroundId: bg.id };
@@ -506,14 +563,14 @@ export function ProfilePage() {
                       ✦ LIVE
                     </div>
                   )}
-                  {bg.custom && !player.customBgUrl && (
+                  {bg.custom && (player.customBgs?.length ?? 0) === 0 && (
                     <div className="absolute inset-0 flex items-center justify-center text-zinc-300 text-xs font-bold">
                       ＋ Importer
                     </div>
                   )}
-                  {bg.custom && player.customBgUrl && (
+                  {bg.custom && (player.customBgs?.length ?? 0) > 0 && (
                     <div className="absolute bottom-1.5 right-1.5 bg-black/60 text-zinc-200 text-[9px] font-bold px-1.5 py-0.5 rounded-full">
-                      Changer ↻
+                      {player.customBgs?.length} ✦
                     </div>
                   )}
                 </div>
@@ -536,13 +593,25 @@ export function ProfilePage() {
             );
           })}
         </div>
+
+        {/* Personal background library — newest first, "+" tile to add another. */}
+        <ImageLibraryRow
+          title="Ma bibliothèque d'images"
+          items={player.customBgs ?? []}
+          activeUrl={player.backgroundId === "custom" ? player.customBgUrl : undefined}
+          max={MAX_CUSTOM_IMAGES}
+          aspect="aspect-[9/16]"
+          onPick={selectStoredBg}
+          onDelete={deleteStoredBg}
+          onAdd={() => bgFileRef.current?.click()}
+        />
       </section>
 
       {/* Battle pad picker */}
       <section className="bg-zinc-950/55 border border-white/12 rounded-3xl p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-3">Battle pad</h2>
         <p className="text-xs text-zinc-500 mb-3">
-          Le tapis sur lequel se jouent tes parties — 100% codés et animés. Indépendant du background. Choisis « Mon image » pour le tien (paysage 3:2, ex. 1500×1000 — couvre tout le tapis).
+          Le tapis sur lequel se jouent tes parties — 100% codés et animés. Indépendant du background. « Mon image » importe le tien (paysage 3:2, ex. 1500×1000 — couvre tout le tapis). Tu peux en garder jusqu'à {MAX_CUSTOM_IMAGES}.
         </p>
         <input
           ref={padFileRef}
@@ -556,15 +625,20 @@ export function ProfilePage() {
             const meta = PAD_META[id];
             const active = player.padId === id;
             const isCustom = id === "custom";
-            const needsImport = isCustom && !player.customPadUrl;
+            const needsImport = isCustom && (player.customPads?.length ?? 0) === 0;
             return (
               <button
                 key={id}
                 onClick={() => {
-                  // "Mon image" → open the file picker if none stored yet OR
-                  // if it's already active (tap-again to change).
-                  if (isCustom && (!player.customPadUrl || active)) {
-                    padFileRef.current?.click();
+                  // "Mon image" → if nothing's imported yet, open the file picker.
+                  // Otherwise just switch to the custom slot; the library row
+                  // below handles per-image select / delete.
+                  if (isCustom) {
+                    if ((player.customPads?.length ?? 0) === 0) {
+                      padFileRef.current?.click();
+                      return;
+                    }
+                    updateProfile({ padId: "custom", padChosen: true });
                     return;
                   }
                   // Pad pick is independent — it never changes the background.
@@ -590,9 +664,9 @@ export function ProfilePage() {
                       ＋ Importer
                     </div>
                   )}
-                  {isCustom && player.customPadUrl && (
+                  {isCustom && (player.customPads?.length ?? 0) > 0 && (
                     <div className="absolute bottom-1.5 right-1.5 bg-black/60 text-zinc-200 text-[9px] font-bold px-1.5 py-0.5 rounded-full">
-                      Changer ↻
+                      {player.customPads?.length} ✦
                     </div>
                   )}
                 </div>
@@ -607,6 +681,18 @@ export function ProfilePage() {
             );
           })}
         </div>
+
+        {/* Personal pad library — same UX as the bg library above. */}
+        <ImageLibraryRow
+          title="Ma bibliothèque de tapis"
+          items={player.customPads ?? []}
+          activeUrl={player.padId === "custom" ? player.customPadUrl : undefined}
+          max={MAX_CUSTOM_IMAGES}
+          aspect="aspect-[3/2]"
+          onPick={selectStoredPad}
+          onDelete={deleteStoredPad}
+          onAdd={() => padFileRef.current?.click()}
+        />
       </section>
 
       {/* By-move stats */}
@@ -729,6 +815,92 @@ function Stat({ label, value, accent }: { label: string; value: number | string;
       <span className="text-lg font-bold" style={accent ? { color: accent } : undefined}>
         {value}
       </span>
+    </div>
+  );
+}
+
+/**
+ * ImageLibraryRow — horizontal strip of the player's imported data-URL
+ * images (backgrounds OR pads). Each tile shows the picture, marks the
+ * active pick with a green ring, and exposes a "×" overlay to delete it
+ * from the library. A trailing "+" tile triggers `onAdd` until the cap
+ * is reached.
+ */
+function ImageLibraryRow({
+  title, items, activeUrl, max, aspect, onPick, onDelete, onAdd,
+}: {
+  title: string;
+  items: string[];
+  activeUrl: string | undefined;
+  max: number;
+  /** Tailwind aspect-ratio class for the tiles, e.g. "aspect-[9/16]" or "aspect-[3/2]". */
+  aspect: string;
+  onPick: (url: string) => void;
+  onDelete: (url: string) => void;
+  onAdd: () => void;
+}) {
+  if (items.length === 0) return null;
+  const full = items.length >= max;
+  return (
+    <div className="mt-4 pt-4 border-t border-white/8">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+          {title}
+        </h3>
+        <span className="text-[10px] text-zinc-500 tabular-nums">{items.length} / {max}</span>
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {items.map((url) => {
+          const isActive = activeUrl === url;
+          return (
+            <div key={url} className="relative shrink-0 group">
+              <button
+                type="button"
+                onClick={() => onPick(url)}
+                className={
+                  "block w-20 " + aspect + " rounded-xl overflow-hidden border-2 transition " +
+                  (isActive
+                    ? "border-emerald-400/80 ring-2 ring-emerald-400/30 shadow-md shadow-emerald-500/30"
+                    : "border-white/15 hover:border-white/40")
+                }
+                style={{
+                  backgroundImage: `url("${url}")`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                }}
+                aria-label={isActive ? "Image active" : "Sélectionner cette image"}
+              />
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onDelete(url); }}
+                aria-label="Supprimer cette image"
+                className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-rose-500/90 hover:bg-rose-500 text-white text-xs font-bold flex items-center justify-center shadow-md border border-rose-300/60"
+              >
+                ×
+              </button>
+              {isActive && (
+                <div className="absolute bottom-1 left-1 bg-emerald-500/90 text-white text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded">
+                  Actif
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {!full && (
+          <button
+            type="button"
+            onClick={onAdd}
+            className={
+              "shrink-0 w-20 " + aspect +
+              " rounded-xl border-2 border-dashed border-white/20 hover:border-white/45 hover:bg-white/5 transition flex flex-col items-center justify-center gap-1 text-zinc-400"
+            }
+            aria-label="Ajouter une image"
+          >
+            <span className="text-xl leading-none">＋</span>
+            <span className="text-[10px] font-semibold">Ajouter</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }

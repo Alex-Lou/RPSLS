@@ -43,6 +43,8 @@ export function defaultPlayer(): Player {
     cardCollection: ["aegis", "precision", "anchor", "second-wind", "surge", "augur"],
     rankedDeck: ["aegis", "precision", "surge", "augur", "anchor", "second-wind"],
     backgroundId: "default",
+    customBgs: [],
+    customPads: [],
   };
 }
 
@@ -63,7 +65,7 @@ interface AppState {
   locale: Locale;
   serverConfig: ServerConfig;
 
-  updateProfile: (patch: Partial<Pick<Player, "nickname" | "avatar" | "themeId" | "padId" | "difficulty" | "hapticEnabled" | "hapticIntensity" | "backgroundId" | "crashReports" | "fontScale" | "customBgUrl" | "customPadUrl" | "padChosen">>) => void;
+  updateProfile: (patch: Partial<Pick<Player, "nickname" | "avatar" | "themeId" | "padId" | "difficulty" | "hapticEnabled" | "hapticIntensity" | "backgroundId" | "crashReports" | "fontScale" | "customBgUrl" | "customPadUrl" | "customBgs" | "customPads" | "padChosen">>) => void;
   recordMatch: (m: MatchRecord) => void;
   /** Register a competitive forfeit. Bumps the rolling abandon counter and
    *  applies the escalating extra LP penalty for repeat offenders. Returns
@@ -249,7 +251,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "rpsls-app-state",
-      version: 14,
+      version: 15,
       migrate: (persisted: unknown, version: number): AppState => {
         const state = persisted as {
           player?: Partial<Player> & { customVariants?: unknown };
@@ -312,6 +314,17 @@ export const useStore = create<AppState>()(
         // v14: cosmetic background — default to the original gradient.
         if (version < 14 && state?.player && !("backgroundId" in state.player)) {
           state.player.backgroundId = "default";
+        }
+        // v15: personal image library — seed customBgs/customPads from the
+        // single-active customBgUrl/customPadUrl so a player upgrading from
+        // v14 keeps their current import as the first library entry.
+        if (version < 15 && state?.player) {
+          if (!("customBgs" in state.player)) {
+            state.player.customBgs = state.player.customBgUrl ? [state.player.customBgUrl] : [];
+          }
+          if (!("customPads" in state.player)) {
+            state.player.customPads = state.player.customPadUrl ? [state.player.customPadUrl] : [];
+          }
         }
         // Final pass — sanitise the persisted shape so a tampered
         // localStorage can never inject a payload that would crash the

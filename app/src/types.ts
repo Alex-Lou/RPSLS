@@ -86,11 +86,19 @@ export interface Player {
    *  bonus XP; a loss resets it. */
   winStreak?: number;
   /** Player's own uploaded background image (data URL), shown when the
-   *  "custom" background is selected. */
+   *  "custom" background is selected. Pre-bibliothèque: stores ONLY the
+   *  current pick. Post-bibliothèque: mirrors customBgs[0] for back-compat. */
   customBgUrl?: string;
   /** Player's own uploaded battle pad (data URL), shown when the "custom"
    *  pad is selected. Landscape 3:2 (≈1500×1000), cover-fit on the mat. */
   customPadUrl?: string;
+  /** Personal library of imported background images (data URLs), newest first.
+   *  Capped client-side so the persisted state stays under localStorage limits.
+   *  Picking one writes it to customBgUrl. */
+  customBgs?: string[];
+  /** Personal library of imported battle-pad images (data URLs), newest first.
+   *  Same cap as customBgs. Picking one writes it to customPadUrl. */
+  customPads?: string[];
   /** True once the player has explicitly picked a battle pad. Until then,
    *  choosing a background applies that background's default pad; afterwards
    *  pad and background are fully independent. */
