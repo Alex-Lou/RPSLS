@@ -16,7 +16,7 @@ import { Hand, MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "./icons";
 import { MOVES, type Move } from "./game";
 import { hapticAlert, hapticTap } from "./haptic";
 import { useT } from "./i18n";
-import { MatchScoreBar, hapticTick, PickShock, CinematicMatchEnd, useAndroidBackPrompt } from "./sharedMatchUI";
+import { MatchScoreBar, hapticTick, PickShock, CinematicMatchEnd, useAndroidBackPrompt, ScaleToFit } from "./sharedMatchUI";
 import { QuitConfirmModal } from "./match/QuitConfirmModal";
 import { useStore } from "./store";
 import type { LanePlay, LaneResult, PlayerSlot } from "./online";
@@ -224,11 +224,11 @@ export function LanesMatchView({
         )}
       </AnimatePresence>
 
-      {/* Stage — scroll container that CENTERS the phase when it fits and
-          SCROLLS when it doesn't (m-auto on a flex-column child), so the
-          board + picker + lock are never clipped top/bottom after picking. */}
-      <div className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden flex flex-col">
-        <div className="m-auto w-full flex flex-col items-center py-1">
+      {/* Stage — ScaleToFit guarantees the whole phase (board + picker + LOCK)
+          always fits the available height, so the player NEVER scrolls to
+          reach the Lock button. Shrinks uniformly on short screens. */}
+      <ScaleToFit className="relative">
+        <div className="w-full flex flex-col items-center py-1">
         {phase === "matched" && !showSplash && (
           <div className="text-sm text-zinc-400">{t("lanes.preparingFirstRound")}</div>
         )}
@@ -263,7 +263,7 @@ export function LanesMatchView({
           <MatchEndScene end={end} onBack={onLeave} onRematch={onRematch} />
         )}
         </div>
-      </div>
+      </ScaleToFit>
 
       {/* Forfeit button — shown anytime but match-end. */}
       {phase !== "match_end" && (

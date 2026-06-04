@@ -12,10 +12,73 @@
  *   - AmbientFlavor: ~10 rotating geek one-liners. Atmosphere, not signal.
  */
 
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useT } from "./i18n";
 import { classifyEnd, pickEndSubtitleKey } from "./flavor/endphrases";
+
+/**
+ * ScaleToFit — guarantees its child ALWAYS fits the available height without
+ * scrolling. Measures the child's natural (pre-transform) size and applies a
+ * uniform `transform: scale()` so it shrinks to fit a short viewport and never
+ * needs a scrollbar. At/under capacity the scale is 1 (no change). This is how
+ * the match views promise "you never scroll to reach the Lock button".
+ *
+ * offsetWidth/offsetHeight are read pre-transform, so scaling never feeds back
+ * into the measurement (no loops); a ResizeObserver re-fits on viewport changes
+ * (rotation, keyboard) and on content changes (combo banner appearing, etc.).
+ */
+export function ScaleToFit({
+  children,
+  className = "",
+  align = "center",
+}: {
+  children: React.ReactNode;
+  className?: string;
+  /** Vertical anchor of the scaled content within the available box. */
+  align?: "center" | "top";
+}) {
+  const outerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useLayoutEffect(() => {
+    const outer = outerRef.current;
+    const inner = innerRef.current;
+    if (!outer || !inner) return;
+    const measure = () => {
+      const availH = outer.clientHeight;
+      const needH = inner.offsetHeight; // pre-transform layout height
+      if (!availH || !needH) return;
+      const next = needH > availH ? Math.max(0.4, availH / needH) : 1;
+      setScale((prev) => (Math.abs(prev - next) > 0.005 ? next : prev));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(outer);
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={outerRef}
+      className={
+        "flex-1 min-h-0 w-full overflow-hidden flex justify-center " +
+        (align === "top" ? "items-start " : "items-center ") +
+        className
+      }
+    >
+      <div
+        ref={innerRef}
+        className="w-full"
+        style={{ transform: `scale(${scale})`, transformOrigin: align === "top" ? "center top" : "center center" }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
 
 /**
  * Hook: while a match is mounted, intercept the Android system back button
