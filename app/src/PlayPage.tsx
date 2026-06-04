@@ -127,6 +127,7 @@ export function PlayPage({
         {view.kind === "ranked_lobby" && (
           <RankedLobby
             key="ranked-lobby"
+            onBack={() => setView({ kind: "select" })}
             onViewBracket={() => {
               // Fresh start after a finished or lost run, otherwise resume.
               setTournament((t) =>

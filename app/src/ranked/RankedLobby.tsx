@@ -12,9 +12,10 @@ import { CardImage } from "./CardImage";
 import { useT } from "../i18n";
 import { InfoBubble } from "../flavor/InfoBubble";
 import { avatarImgStyle } from "../avatar";
+import { FloatingMatchBackButton } from "../sharedMatchUI";
 // Tournament state now lives in PlayPage
 
-export function RankedLobby({ onViewBracket, onManageDeck }: { onViewBracket: () => void; onManageDeck: () => void }) {
+export function RankedLobby({ onViewBracket, onManageDeck, onBack }: { onViewBracket: () => void; onManageDeck: () => void; onBack?: () => void }) {
   const t = useT();
   const player = useStore((s) => s.player);
   const tier = rankFromLp(player.rankLp);
@@ -38,6 +39,10 @@ export function RankedLobby({ onViewBracket, onManageDeck }: { onViewBracket: ()
       transition={{ duration: 0.3 }}
       className="flex flex-col gap-3 sm:gap-5 flex-1 py-2 px-1 max-w-lg mx-auto w-full overflow-y-auto"
     >
+      {/* Back to the main menu — docked next to the burger so the player never
+          has to rely on the Android back button (which could minimise the app). */}
+      {onBack && <FloatingMatchBackButton onClick={onBack} label={t("nav.backToPlay")} />}
+
       {/* Title */}
       <div className="text-center">
         <h1
