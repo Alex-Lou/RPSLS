@@ -7,13 +7,13 @@
    and crowd the game UI). To isolate text from layout:
 
    1. html font-size stays FIXED at 18px so rem-based sizes (w-12, p-4,
-      gap-2, …) are stable regardless of the chosen text scale.
-   2. Tailwind v4 sources each text-*/leading-* utility from a CSS var
-      (`var(--text-sm)` …). By multiplying those vars by --font-scale in
+      gap-2 …) are stable regardless of the chosen text scale.
+   2. Tailwind v4 sources each text-N and leading-N utility from a CSS var
+      (var(--text-sm) …). By multiplying those vars by --font-scale in
       @theme, every text size in the app scales automatically while
       icons stay still. Arbitrary text sizes (text-[9px], text-[10px])
-      bypass the system on purpose — they're already explicit pixel
-      values for fine-grained labels. */
+      bypass the system on purpose — they are explicit pixel values for
+      fine-grained labels. */
 :root {
   --theme-primary:   #7c5cff;
   --theme-secondary: #2dd4bf;
