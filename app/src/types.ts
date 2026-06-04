@@ -4,8 +4,11 @@ import type { AiMood } from "./game";
 export type ThemeId = "violet" | "neon" | "pastel" | "sunset" | "forest";
 
 export type PadId =
-  | "chalkboard" | "vintage" | "cosmos" | "neon" | "comics"      // original SVG playmats
-  | "ancient" | "astrolab" | "casino" | "cyberpunk" | "holy" | "quantum" | "steampunk";  // image playmats
+  // Fully coded, animated playmats (SVG/SMIL — no PNGs anymore).
+  | "chalkboard" | "vintage" | "cosmos" | "galaxy" | "neon" | "comics"
+  | "cyberpunk" | "holy" | "quantum"
+  // Player's own uploaded mat (data URL on the player).
+  | "custom";
 
 export type BackgroundId =
   | "default"
@@ -85,6 +88,9 @@ export interface Player {
   /** Player's own uploaded background image (data URL), shown when the
    *  "custom" background is selected. */
   customBgUrl?: string;
+  /** Player's own uploaded battle pad (data URL), shown when the "custom"
+   *  pad is selected. Landscape 3:2 (≈1500×1000), cover-fit on the mat. */
+  customPadUrl?: string;
   /** True once the player has explicitly picked a battle pad. Until then,
    *  choosing a background applies that background's default pad; afterwards
    *  pad and background are fully independent. */
@@ -95,15 +101,13 @@ export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: st
   chalkboard: { label: "Blackboard",     emoji: "🧪", tagline: "Hand-drawn chalk, formulas, lab vibes." },
   vintage:    { label: "Vintage Hall",   emoji: "🎲", tagline: "Felt mat, gold trim, retro lounge." },
   cosmos:     { label: "Cosmos",         emoji: "🌌", tagline: "Dark sky, orbits, particle trails." },
+  galaxy:     { label: "Galaxy",         emoji: "🌀", tagline: "Spiral arms turning around a bright core." },
   neon:       { label: "Neon Arcade",    emoji: "🕹️", tagline: "Synthwave grid, neon lines, 80s arcade." },
   comics:     { label: "Comics",         emoji: "💥", tagline: "Halftone dots, BAM-POW, pop-art comic page." },
-  ancient:    { label: "Ancient Codex",  emoji: "📜", tagline: "Worn parchment, gold leaf, arcane runes." },
-  astrolab:   { label: "Astrolab",       emoji: "🔭", tagline: "Brass instruments, parchment, star charts." },
-  casino:     { label: "Casino Royale",  emoji: "🎰", tagline: "Emerald felt + Art Deco gold trim." },
-  cyberpunk:  { label: "Cyberpunk",      emoji: "🌆", tagline: "Neon hex grid, holographic HUD." },
+  cyberpunk:  { label: "Cyberpunk",      emoji: "🌆", tagline: "Neon hex grid, holographic HUD, scanlines." },
   holy:       { label: "Holy Game",      emoji: "✝️", tagline: "Cathedral light, gilded relics, sacred geometry." },
   quantum:    { label: "Quantum Lab",    emoji: "⚛️", tagline: "Particle traces, physics equations." },
-  steampunk:  { label: "Steampunk",      emoji: "⚙️", tagline: "Brass gears, leather, amber filaments." },
+  custom:     { label: "Mon image",      emoji: "🖼️", tagline: "Ton propre tapis (paysage 3:2, ex. 1500×1000)." },
 };
 
 export type Opponent =

@@ -7,17 +7,16 @@
  *    the default radial-gradient body background. `src: null` means "keep the
  *    default gradient" — i.e. the original look.
  *
- *  - PAD_IMAGES: a PadId → PNG path mapping for the new image-based playmats
- *    (Ancient / Astrolab / Casino / Cyberpunk / Quantum / Steampunk). The
- *    classic 5 SVG pads (chalkboard / vintage / cosmos / neon / comics)
- *    live in BattlePad.tsx and don't appear here.
+ *  - Battle pads are now ALL coded animated SVGs (BattlePad.tsx) — there are
+ *    no PNG playmats left. The only image-based pad is the player's own
+ *    uploaded "custom" mat (player.customPadUrl).
  *
  * Each background advertises a `defaultPadId` it pairs naturally with (set
  * automatically when the user picks the background, unless they later
  * override). Players are free to mix-and-match.
  *
- * To add a new background: drop the PNG in /public/Backgrounds/, append an
- * entry here, optionally extend PadId in types.ts + PAD_META + PAD_IMAGES.
+ * To add a new background: append an entry here; to add a pad, code it in
+ * BattlePad.tsx and extend PadId in types.ts + PAD_META.
  */
 
 import type { BackgroundId, PadId } from "./types";
@@ -85,7 +84,7 @@ export const BACKGROUNDS: BackgroundDef[] = [
   },
   {
     id: "galaxy",    label: "Galaxy",         emoji: "✨",
-    src: null, scene: "galaxy",               defaultPadId: "cosmos",
+    src: null, scene: "galaxy",               defaultPadId: "galaxy",
     skin: { fontHeadline: "audiowide",    fontBody: "exo2",         fontMono: "spaceMono"  },
     miniature: null,
     accent: { from: "#a855f7", to: "#22d3ee" },
@@ -139,17 +138,6 @@ export function resolveFontFamily(key: FontStackKey): string {
 export const BACKGROUNDS_BY_ID: Record<BackgroundId, BackgroundDef> = Object.fromEntries(
   BACKGROUNDS.map((b) => [b.id, b]),
 ) as Record<BackgroundId, BackgroundDef>;
-
-/** PNG playmats — the SVG/coded ones are switched on padId inside BattlePad.
- *  holy + quantum are now fully CODED animated pads (BattlePad), so they're no
- *  longer listed here — the live themes all pair with coded, animated mats. */
-export const PAD_IMAGES: Partial<Record<PadId, string>> = {
-  ancient:   "/Pads/Ancient Mythical Pad.png",
-  astrolab:  "/Pads/Astrolab.png",
-  casino:    "/Pads/Casino Royale.png",
-  cyberpunk: "/Pads/CyberPunk Pad.png",
-  steampunk: "/Pads/Steampunk.png",
-};
 
 /** Reverse pairing for the "did I match my pad to my background?" affordance
  *  in the picker UI — handy when surfacing "Pair: Casino bg + Casino pad". */

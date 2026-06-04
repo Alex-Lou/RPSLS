@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { PadId } from "./types";
-import { PAD_IMAGES } from "./themes";
+import { useStore } from "./store";
 
 const W = 1500;
 const H = 1000;
@@ -29,6 +29,9 @@ export function BattlePad({
    *  atom orbits) so they read as quiet backdrops behind game content. */
   compact?: boolean;
 }) {
+  // The only image-based pad left is the player's own uploaded mat.
+  const customPadUrl = useStore((s) => s.player.customPadUrl);
+
   const common = {
     className,
     style,
@@ -37,18 +40,21 @@ export function BattlePad({
     xmlns: "http://www.w3.org/2000/svg",
   };
 
-  // Image-based pads delegate to a shared <image>-renderer.
-  const imgSrc = PAD_IMAGES[padId];
-  if (imgSrc) return <ImagePad src={imgSrc} {...common} />;
-
   switch (padId) {
     case "chalkboard": return <ChalkboardPad {...common} />;
     case "vintage":    return <VintagePad {...common} />;
     case "cosmos":     return <CosmosPad {...common} compact={compact} />;
+    case "galaxy":     return <GalaxyPad {...common} compact={compact} />;
     case "neon":       return <NeonPad {...common} compact={compact} />;
     case "holy":       return <HolyPad {...common} compact={compact} />;
     case "quantum":    return <QuantumPad {...common} compact={compact} />;
+    case "cyberpunk":  return <CyberpunkPad {...common} compact={compact} />;
     case "comics":     return <ComicsPad {...common} />;
+    case "custom":
+      // Uploaded mat, or a graceful coded fallback until one is imported.
+      return customPadUrl
+        ? <ImagePad src={customPadUrl} {...common} />
+        : <CosmosPad {...common} compact={compact} />;
     default:           return <ChalkboardPad {...common} />;
   }
 }
@@ -900,6 +906,188 @@ function QuantumPad({ compact = false, ...props }: React.SVGProps<SVGSVGElement>
         <circle r="40" fill="url(#qp-core)" filter="url(#qp-glow)" opacity="0.3">
           <animate attributeName="opacity" values="0.15;0.4;0.15" dur="3.2s" repeatCount="indefinite" />
         </circle>
+      </g>
+    </svg>
+  );
+}
+
+/* ════════════════════ Galaxy ════════════════════
+   A tilted spiral galaxy: two logarithmic arms of stars turning slowly
+   around a bright bulge. Distinct from Cosmos (a starfield with planets) —
+   here the whole disc rotates as one piece.
+*/
+
+// Pre-computed spiral-arm stars (relative to the disc centre), so the heavy
+// trig runs once at module load rather than every render.
+const GALAXY_ARMS = (() => {
+  const pts: Array<{ x: number; y: number; r: number; o: number }> = [];
+  const armCount = 2;
+  const perArm = 100;
+  for (let a = 0; a < armCount; a++) {
+    const phase = (a / armCount) * Math.PI * 2;
+    for (let i = 0; i < perArm; i++) {
+      const t = i / perArm;
+      const theta = phase + t * Math.PI * 3.0;     // ~1.5 turns
+      const rad = 34 + t * 360;
+      const jx = ((i * 53) % 19) - 9;
+      const jy = ((i * 31) % 19) - 9;
+      pts.push({
+        x: Math.cos(theta) * rad + jx,
+        y: Math.sin(theta) * rad * 0.6 + jy,        // squash → tilted disc
+        r: 0.6 + (1 - t) * 2.0,
+        o: 0.22 + (1 - t) * 0.6,
+      });
+    }
+  }
+  return pts;
+})();
+
+function GalaxyPad({ compact = false, ...props }: React.SVGProps<SVGSVGElement> & { compact?: boolean }) {
+  return (
+    <svg {...props}>
+      <defs>
+        <radialGradient id="gx-bg" cx="50%" cy="50%" r="80%">
+          <stop offset="0%"  stopColor="#1a1140" />
+          <stop offset="55%" stopColor="#0c0922" />
+          <stop offset="100%" stopColor="#04030d" />
+        </radialGradient>
+        <radialGradient id="gx-disc" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"  stopColor="#c4b5fd" stopOpacity="0.5" />
+          <stop offset="45%" stopColor="#7c3aed" stopOpacity="0.22" />
+          <stop offset="100%" stopColor="#7c3aed" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id="gx-core" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"  stopColor="#ffffff" stopOpacity="0.95" />
+          <stop offset="35%" stopColor="#ffd9a8" stopOpacity="0.7" />
+          <stop offset="100%" stopColor="#f0abfc" stopOpacity="0" />
+        </radialGradient>
+        <filter id="gx-glow"><feGaussianBlur stdDeviation="5" /></filter>
+      </defs>
+
+      <rect width={W} height={H} fill="url(#gx-bg)" />
+
+      {/* Scattered far stars */}
+      <g fill="#ffffff">
+        {Array.from({ length: 90 }).map((_, i) => {
+          const x = (i * 167) % W;
+          const y = (i * 97) % H;
+          const o = 0.2 + ((i * 13) % 10) / 18;
+          return (
+            <circle key={i} cx={x} cy={y} r={(i % 3) * 0.5 + 0.5} fillOpacity={o}>
+              {i % 8 === 0 && (
+                <animate attributeName="fill-opacity" values={`${o};${o * 0.3};${o}`} dur={`${3 + (i % 4)}s`} begin={`${(i % 5) * 0.5}s`} repeatCount="indefinite" />
+              )}
+            </circle>
+          );
+        })}
+      </g>
+
+      {/* The galaxy itself — disc glow + rotating arms + bright bulge. */}
+      <g transform={`translate(${W / 2} ${H / 2 + 10})`}>
+        <ellipse rx="430" ry="260" fill="url(#gx-disc)" />
+        <g>
+          <animateTransform attributeName="transform" type="rotate" from="0" to="360"
+            dur={compact ? "120s" : "75s"} repeatCount="indefinite" />
+          {GALAXY_ARMS.map((s, i) => (
+            <circle key={i} cx={s.x} cy={s.y} r={s.r} fill={i % 5 === 0 ? "#f0abfc" : "#dbeafe"} fillOpacity={s.o} />
+          ))}
+        </g>
+        {/* Bright bulge */}
+        <circle r="70" fill="url(#gx-core)" filter="url(#gx-glow)">
+          <animate attributeName="opacity" values="0.8;1;0.8" dur="4s" repeatCount="indefinite" />
+        </circle>
+        <circle r="9" fill="#ffffff" fillOpacity="0.9" />
+      </g>
+
+      {/* Frame */}
+      <rect x="40" y="40" width={W - 80} height={H - 80} rx="24" fill="none" stroke="#c4b5fd" strokeOpacity="0.32" strokeWidth="2" />
+      <rect x="56" y="56" width={W - 112} height={H - 112} rx="18" fill="none" stroke="#f0abfc" strokeOpacity="0.14" strokeWidth="1" strokeDasharray="2 10" />
+
+      {/* Title */}
+      <g transform={`translate(${W / 2} 116)`} textAnchor="middle">
+        <text fontFamily='"Inter",sans-serif' fontWeight="600" fontSize="22" fill="#e9d5ff" fillOpacity="0.7" letterSpacing="14">
+          SPIRAL ARENA
+        </text>
+      </g>
+    </svg>
+  );
+}
+
+/* ════════════════════ Cyberpunk ════════════════════
+   Neon hex grid, holographic HUD, CRT scanline and a glitching frame in
+   magenta + cyan. Coded replacement for the old PNG.
+*/
+
+function CyberpunkPad({ compact = false, ...props }: React.SVGProps<SVGSVGElement> & { compact?: boolean }) {
+  const magenta = "#ff2bd6";
+  const cyan = "#22d3ee";
+  return (
+    <svg {...props}>
+      <defs>
+        <linearGradient id="cp-bg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"  stopColor="#0a0a18" />
+          <stop offset="60%" stopColor="#0d0820" />
+          <stop offset="100%" stopColor="#160a22" />
+        </linearGradient>
+        <pattern id="cp-hex" width="60" height="52" patternUnits="userSpaceOnUse" patternTransform="scale(1)">
+          <path d="M15 1 L45 1 L60 26 L45 51 L15 51 L0 26 Z" fill="none" stroke={cyan} strokeOpacity="0.16" strokeWidth="1.2" />
+        </pattern>
+        <filter id="cp-glow"><feGaussianBlur stdDeviation="6" /></filter>
+      </defs>
+
+      <rect width={W} height={H} fill="url(#cp-bg)" />
+      <rect width={W} height={H} fill="url(#cp-hex)" />
+
+      {/* Faint horizon glow at the bottom. */}
+      <rect x="0" y={H - 280} width={W} height="280" fill={magenta} opacity="0.06" />
+
+      {/* CRT scanline sweeping down. */}
+      <rect x="0" width={W} height="3" fill={cyan} opacity={compact ? 0.18 : 0.32}>
+        <animate attributeName="y" values="60;940" dur="3s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values={compact ? "0;0.18;0" : "0;0.34;0"} dur="3s" repeatCount="indefinite" />
+      </rect>
+
+      {/* Glitch bars — magenta slivers that blink in and out. */}
+      {!compact && [
+        { y: 300, w: 220, x: 120, d: "4.5s" },
+        { y: 660, w: 180, x: W - 320, d: "5.5s" },
+        { y: 470, w: 120, x: W - 240, d: "7s" },
+      ].map((g, i) => (
+        <rect key={i} x={g.x} y={g.y} width={g.w} height="6" fill={magenta} opacity="0">
+          <animate attributeName="opacity" values="0;0;0.8;0" keyTimes="0;0.7;0.78;1" dur={g.d} repeatCount="indefinite" />
+        </rect>
+      ))}
+
+      {/* Corner HUD brackets. */}
+      {[
+        { x: 80, y: 80, sx: 1, sy: 1 },
+        { x: W - 80, y: 80, sx: -1, sy: 1 },
+        { x: W - 80, y: H - 80, sx: -1, sy: -1 },
+        { x: 80, y: H - 80, sx: 1, sy: -1 },
+      ].map((c, i) => (
+        <g key={i} transform={`translate(${c.x} ${c.y}) scale(${c.sx} ${c.sy})`} stroke={magenta} strokeWidth="3" strokeOpacity="0.9" fill="none">
+          <line x1="0" y1="0" x2="56" y2="0" />
+          <line x1="0" y1="0" x2="0" y2="56" />
+        </g>
+      ))}
+
+      {/* Neon frame — glitchy breathing. */}
+      <rect x="44" y="44" width={W - 88} height={H - 88} rx="16" fill="none" stroke={cyan} strokeOpacity="0.8" strokeWidth="2" filter="url(#cp-glow)">
+        <animate attributeName="stroke-opacity" values="0.35;0.85;0.35" dur="2.6s" repeatCount="indefinite" />
+      </rect>
+      <rect x="44" y="44" width={W - 88} height={H - 88} rx="16" fill="none" stroke={cyan} strokeOpacity="0.9" strokeWidth="1.5" />
+
+      {/* HUD readouts. */}
+      <g fontFamily='"JetBrains Mono","Consolas",monospace' fontWeight="700">
+        <g transform={`translate(${W / 2} 120)`} textAnchor="middle">
+          <text fontSize="30" fill={magenta} letterSpacing="10" filter="url(#cp-glow)">NIGHT CITY</text>
+          <text fontSize="30" fill="#ff8df0" letterSpacing="10">NIGHT CITY</text>
+        </g>
+        <text x="100" y={H - 70} fontSize="14" fill={cyan} fillOpacity="0.75">SYS//
+          <tspan fill="#7CFC00">ONLINE</tspan>
+          <animate attributeName="fill-opacity" values="0.4;0.85;0.4" dur="1.8s" repeatCount="indefinite" />
+        </text>
+        <text x={W - 230} y={H - 70} fontSize="14" fill={cyan} fillOpacity="0.7">NET·77.0.0.1</text>
       </g>
     </svg>
   );

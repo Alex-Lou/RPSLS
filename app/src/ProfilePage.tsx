@@ -48,6 +48,7 @@ export function ProfilePage() {
   const [confirmReset, setConfirmReset] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const bgFileRef = useRef<HTMLInputElement>(null);
+  const padFileRef = useRef<HTMLInputElement>(null);
 
   const info = levelFromXp(player.xp);
   const theme = THEMES[player.themeId];
@@ -123,6 +124,33 @@ export function ProfilePage() {
         if (!ctx) { updateProfile({ customBgUrl: reader.result as string, backgroundId: "custom" }); return; }
         ctx.drawImage(img, 0, 0, w, h);
         updateProfile({ customBgUrl: canvas.toDataURL("image/jpeg", 0.82), backgroundId: "custom" });
+      };
+      img.onerror = () => alert(t("profile.avatar.invalid"));
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(f);
+  };
+
+  /** Upload a personal battle pad: fit within 1500px (landscape 3:2-friendly),
+   *  JPEG-compress, store as customPadUrl, and select the "custom" pad. */
+  const onUploadPad = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > 12 * 1024 * 1024) { alert(t("profile.avatar.tooBig")); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1500;
+        const ratio = Math.min(1, MAX / Math.max(img.width, img.height));
+        const w = Math.round(img.width * ratio);
+        const h = Math.round(img.height * ratio);
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { updateProfile({ customPadUrl: reader.result as string, padId: "custom", padChosen: true }); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        updateProfile({ customPadUrl: canvas.toDataURL("image/jpeg", 0.82), padId: "custom", padChosen: true });
       };
       img.onerror = () => alert(t("profile.avatar.invalid"));
       img.src = reader.result as string;
@@ -514,16 +542,31 @@ export function ProfilePage() {
       <section className="bg-white/5 border border-white/10 rounded-3xl p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-3">Battle pad</h2>
         <p className="text-xs text-zinc-500 mb-3">
-          Le tapis sur lequel se jouent tes parties. Indépendant du background : choisis-les librement. (Sans choix de pad, celui du thème s'applique.)
+          Le tapis sur lequel se jouent tes parties — 100% codés et animés. Indépendant du background. Choisis « Mon image » pour le tien (paysage 3:2, ex. 1500×1000 — couvre tout le tapis).
         </p>
+        <input
+          ref={padFileRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={onUploadPad}
+        />
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {(Object.keys(PAD_META) as PadId[]).map((id) => {
             const meta = PAD_META[id];
             const active = player.padId === id;
+            const isCustom = id === "custom";
+            const needsImport = isCustom && !player.customPadUrl;
             return (
               <button
                 key={id}
                 onClick={() => {
+                  // "Mon image" → open the file picker if none stored yet OR
+                  // if it's already active (tap-again to change).
+                  if (isCustom && (!player.customPadUrl || active)) {
+                    padFileRef.current?.click();
+                    return;
+                  }
                   // Pad pick is independent — it never changes the background.
                   // Mark padChosen so backgrounds stop auto-overriding it.
                   updateProfile({ padId: id, padChosen: true });
@@ -540,6 +583,16 @@ export function ProfilePage() {
                   {active && (
                     <div className="absolute top-2 right-2 bg-emerald-500/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                       ACTIVE
+                    </div>
+                  )}
+                  {needsImport && (
+                    <div className="absolute inset-0 flex items-center justify-center text-zinc-100 text-xs font-bold bg-black/45">
+                      ＋ Importer
+                    </div>
+                  )}
+                  {isCustom && player.customPadUrl && (
+                    <div className="absolute bottom-1.5 right-1.5 bg-black/60 text-zinc-200 text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                      Changer ↻
                     </div>
                   )}
                 </div>
