@@ -933,7 +933,7 @@ function Game({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -16 }}
       transition={{ duration: 0.3 }}
-      className="flex flex-col gap-3 sm:gap-4 flex-1 min-h-0 overflow-hidden"
+      className="flex flex-col gap-3 sm:gap-4 flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
     >
       {/* Daily-challenge context — shows *why* this match was started (from a
           challenge) and the reward at stake, so the point is visible in-game. */}

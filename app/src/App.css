@@ -1,21 +1,45 @@
 @import "tailwindcss";
 
+/* ─── Font scale: text-only ─────────────────────────────────────────────
+   --font-scale is set by App.tsx from player.fontScale (1 / 1.15 / 1.3).
+   The scale must affect TEXT, not icons or rem-based layout boxes (a 1.3
+   scale on the html font-size would balloon every w-12/h-12 icon by 30%
+   and crowd the game UI). To isolate text from layout:
+
+   1. html font-size stays FIXED at 18px so rem-based sizes (w-12, p-4,
+      gap-2, …) are stable regardless of the chosen text scale.
+   2. Tailwind v4 sources each text-*/leading-* utility from a CSS var
+      (`var(--text-sm)` …). By multiplying those vars by --font-scale in
+      @theme, every text size in the app scales automatically while
+      icons stay still. Arbitrary text sizes (text-[9px], text-[10px])
+      bypass the system on purpose — they're already explicit pixel
+      values for fine-grained labels. */
 :root {
   --theme-primary:   #7c5cff;
   --theme-secondary: #2dd4bf;
   --theme-bg:        #0b0d12;
-  /* Global text scale multiplier, driven by the "Taille du texte" setting
-     in Profile (App.tsx writes it). Because every rem-based Tailwind size
-     (text-xs/sm/base/lg/xl…) resolves against the html font-size below,
-     bumping this one number proportionally enlarges ~all UI text — the
-     accessibility win for small screens / low vision / high glare. */
-  --font-scale: 1;
+  --font-scale:      1;
 }
 
-/* 112.5% of 16px = 18px baseline (a comfortable bump from the browser
-   default) times the user's chosen scale. rem everywhere follows. */
+@theme {
+  --text-xs:   calc(0.75rem  * var(--font-scale));
+  --text-sm:   calc(0.875rem * var(--font-scale));
+  --text-base: calc(1rem     * var(--font-scale));
+  --text-lg:   calc(1.125rem * var(--font-scale));
+  --text-xl:   calc(1.25rem  * var(--font-scale));
+  --text-2xl:  calc(1.5rem   * var(--font-scale));
+  --text-3xl:  calc(1.875rem * var(--font-scale));
+  --text-4xl:  calc(2.25rem  * var(--font-scale));
+  --text-5xl:  calc(3rem     * var(--font-scale));
+  --text-6xl:  calc(3.75rem  * var(--font-scale));
+  --text-7xl:  calc(4.5rem   * var(--font-scale));
+  --text-8xl:  calc(6rem     * var(--font-scale));
+  --text-9xl:  calc(8rem     * var(--font-scale));
+}
+
+/* 18px baseline, fixed. Icons / layout rem values lock to it. */
 html {
-  font-size: calc(112.5% * var(--font-scale));
+  font-size: 112.5%;
 }
 
 html, body, #root {
