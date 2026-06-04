@@ -12,30 +12,43 @@
  * heuristic in every file.
  */
 
+/** Whitelist of allowed data: MIME types for avatars. Any data: URL whose
+ *  prefix doesn't match one of these is rejected — prevents a tampered
+ *  localStorage from smuggling a `data:image/svg+xml,<svg onload=...>`
+ *  payload (self-XSS only, but cheap to close). */
+const SAFE_DATA_PREFIXES = [
+  "data:image/png;base64,",
+  "data:image/jpeg;base64,",
+  "data:image/webp;base64,",
+];
+
 /** True when a stored avatar value should be rendered as an <img> rather
- *  than a text node. */
+ *  than a text node. data: URLs are only accepted for the three raster
+ *  MIME types we ourselves produce via canvas.toDataURL. /assets and http(s)
+ *  URLs are passed through as-is. */
 export function isAvatarImage(v: string): boolean {
-  return v.startsWith("data:") || v.startsWith("/") || v.startsWith("http");
+  if (v.startsWith("data:")) {
+    return SAFE_DATA_PREFIXES.some((p) => v.startsWith(p));
+  }
+  return v.startsWith("/") || v.startsWith("http");
 }
 
-/** Per-PNG zoom factor so the chibi stickers' wide white outline gets
- *  pushed outside the visible crop. */
-export function avatarScale(v: string): number {
-  if (v.includes("/chibi_")) return 2.0;
+/** Per-PNG zoom factor. The new chibis ship without white sticker outlines
+ *  (clean transparent PNGs) so we no longer need the 2.0 zoom-and-crop hack
+ *  that used to push the halo off-screen — everything renders at native
+ *  scale now, full body visible. */
+export function avatarScale(_v: string): number {
   return 1;
 }
 
-/** CSS style for an avatar <img>: a hard `clip-path: circle(...)` (vs the
+/** CSS style for an avatar <img>: a soft `clip-path: circle(...)` (vs the
  *  previously-tried mask-image radial-gradient, which isn't reliably
- *  honoured by the Tauri Android WebView on every device), plus the
- *  per-PNG zoom. Hard clip = anything outside the inscribed circle is
- *  alpha-0, no exceptions. The chibi's baked-in white sticker outline
- *  lives outside that circle once we scale-2.0, so it never paints. */
-export function avatarImgStyle(v: string): import("react").CSSProperties {
-  const s = avatarScale(v);
+ *  honoured by the Tauri Android WebView on every device). At 50% the
+ *  circle is inscribed in the square — full chibi body visible, just the
+ *  four square corners shaved off. */
+export function avatarImgStyle(_v: string): import("react").CSSProperties {
   return {
-    clipPath: "circle(46% at 50% 50%)",
-    WebkitClipPath: "circle(46% at 50% 50%)",
-    transform: s === 1 ? undefined : `scale(${s})`,
+    clipPath: "circle(50% at 50% 50%)",
+    WebkitClipPath: "circle(50% at 50% 50%)",
   };
 }

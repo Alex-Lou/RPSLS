@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store";
 import { useT } from "./i18n";
-import { THEMES } from "./theme";
+import { THEMES, gradientFromTheme } from "./theme";
 import {
   PACKS,
   Pack,
@@ -76,7 +76,7 @@ export function PacksPage() {
                     onClick={() => setView({ kind: "play", pack })}
                     className="mt-auto px-5 py-2.5 rounded-2xl font-semibold text-white shadow-lg text-sm"
                     style={{
-                      background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`,
+                      background: gradientFromTheme(theme),
                     }}
                   >
                     {t("packs.btn.play")}
@@ -321,7 +321,7 @@ function PackMatch({ pack, onQuit }: { pack: Pack; onQuit: () => void }) {
                 onClick={reset}
                 className="px-5 py-3 rounded-2xl font-semibold text-white"
                 style={{
-                  background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`,
+                  background: gradientFromTheme(theme),
                 }}
               >
                 {t("match.playAgain")}

@@ -122,12 +122,12 @@ export function RankedPickPhase({
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -2 }}
-            className="text-[10px] uppercase tracking-[0.2em] text-amber-300 font-bold flex items-center gap-1.5"
+            className="text-[12px] sm:text-sm uppercase tracking-[0.18em] text-amber-300 font-bold flex items-center gap-2"
           >
             {targetingHint}
             <button
               onClick={() => setSelectedCard(null)}
-              className="px-1.5 py-0.5 rounded-full bg-white/10 hover:bg-white/15 text-[9px]"
+              className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/15 text-[11px] font-bold"
             >
               {t("ranked.cta.cancelCard")}
             </button>
@@ -176,11 +176,27 @@ export function RankedPickPhase({
       <button
         onClick={handleLock}
         disabled={!allFilled}
+        aria-label={allFilled ? t("lanes.lockButton") : t("lanes.pickRemaining", { n: remaining })}
         className={
           "shrink-0 mt-1 sm:mt-2 px-7 py-2.5 rounded-2xl font-bold text-white text-sm transition " +
           (allFilled
-            ? "bg-gradient-to-r from-violet-500 via-fuchsia-500 to-teal-400 shadow-lg shadow-violet-500/30 hover:scale-[1.02]"
+            ? "shadow-lg hover:scale-[1.02]"
             : "bg-white/5 text-zinc-500 cursor-not-allowed")
+        }
+        // Theme-driven gradient: reads the active theme's CSS vars instead
+        // of hardcoded violet/fuchsia/teal so the Lock button blends with
+        // the player's chosen palette (Casino gold, Cyberpunk neon, etc.)
+        // rather than sticking out as a fixed cosmic look.
+        style={
+          allFilled
+            ? {
+                background:
+                  "linear-gradient(to right, var(--theme-primary), var(--theme-secondary))",
+                boxShadow: "0 8px 24px -8px color-mix(in oklab, var(--theme-primary) 55%, transparent)",
+                fontFamily: "var(--font-headline)",
+                letterSpacing: "0.06em",
+              }
+            : undefined
         }
       >
         {allFilled ? t("lanes.lockButton") : t("lanes.pickRemaining", { n: remaining })}
@@ -190,9 +206,10 @@ export function RankedPickPhase({
 }
 
 function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void }) {
+  const t = useT();
   const [shockMove, setShockMove] = useState<Move | null>(null);
   return (
-    <div className="grid grid-cols-5 gap-1.5 sm:gap-3 w-full max-w-md">
+    <div className="grid grid-cols-5 gap-1.5 sm:gap-3 w-full max-w-md" role="group" aria-label="Move picker">
       {MOVES.map((mv, i) => {
         const pal = MOVE_PALETTE[mv];
         return (
@@ -204,20 +221,28 @@ function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void
               setTimeout(() => setShockMove((cur) => (cur === mv ? null : cur)), 450);
               onPickInNextEmpty(mv);
             }}
+            aria-label={`Pick ${t("element." + mv)}`}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 * i }}
             whileHover={{ y: -4, scale: 1.04 }}
             whileTap={{ scale: 0.86 }}
-            className={
-              "relative aspect-[4/5] rounded-xl flex flex-col items-center justify-center gap-0.5 py-1 " +
-              "bg-gradient-to-br " + pal.from + " " + pal.to + " ring-2 " + pal.ring + " " + pal.glow +
-              " text-zinc-900 shadow-md transition"
-            }
+            className="relative aspect-[4/5] rounded-xl flex flex-col items-center justify-center gap-0.5 py-1 text-white transition"
+            // Dark glass surface so the white-silhouette PNG glyph reads
+            // unambiguously on every theme. The per-move identity comes
+            // from a 2px coloured ring + a soft accent glow — never from
+            // the fill, which would either over-saturate the PNG glow OR
+            // (worse) get inverted by some Android WebView's compositor
+            // and turn the icon invisible.
+            style={{
+              background: "linear-gradient(160deg, rgba(20,22,32,0.92) 0%, rgba(10,12,20,0.92) 100%)",
+              border: `2px solid ${pal.hex}`,
+              boxShadow: `0 0 12px -2px ${pal.hex}50, inset 0 1px 0 rgba(255,255,255,0.08)`,
+            }}
           >
             <PickShock show={shockMove === mv} />
-            <MoveGlyph move={mv} className="w-6 h-6 sm:w-8 sm:h-8" />
-            <span className="text-[8px] uppercase tracking-wider font-bold leading-none">{mv}</span>
+            <MoveGlyph move={mv} className="w-12 h-12 sm:w-14 sm:h-14" />
+            <span className="text-[11px] sm:text-xs uppercase tracking-wider font-bold leading-none" style={{ color: pal.hex }}>{mv}</span>
           </motion.button>
         );
       })}
@@ -254,10 +279,10 @@ function TimerBar({ startedAt, durationMs }: { startedAt: number; durationMs: nu
         key={num}
         initial={{ scale: critical ? 1.4 : 1 }}
         animate={{ scale: 1 }}
-        className={"text-sm font-mono tabular-nums w-10 text-right font-bold " +
-          (critical ? "text-rose-300" : urgent ? "text-amber-300" : "text-zinc-300")}
+        className={"text-lg sm:text-xl font-mono tabular-nums w-14 text-right font-extrabold " +
+          (critical ? "text-rose-300" : urgent ? "text-amber-300" : "text-zinc-200")}
       >{num}s</motion.span>
-      <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
+      <div className="flex-1 h-2.5 rounded-full bg-white/10 overflow-hidden">
         <motion.div
           className={"h-full " + color}
           animate={{ width: `${(progress * 100).toFixed(1)}%`, opacity: critical ? [0.5, 1, 0.5] : 1 }}
@@ -265,7 +290,7 @@ function TimerBar({ startedAt, durationMs }: { startedAt: number; durationMs: nu
         />
       </div>
       {urgent && !critical && (
-        <span className="text-[10px] uppercase tracking-[0.3em] text-amber-300/80 font-bold">{tr("lanes.hurry")}</span>
+        <span className="text-[11px] sm:text-xs uppercase tracking-[0.25em] text-amber-300/90 font-bold">{tr("lanes.hurry")}</span>
       )}
     </div>
   );

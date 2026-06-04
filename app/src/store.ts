@@ -4,6 +4,7 @@ import type { Move } from "./game";
 import type { MatchRecord, PadId, Player, ThemeId } from "./types";
 import type { Locale } from "./i18n";
 import { todayDateKey } from "./daily";
+import { sanitisePersisted } from "./storeMigrationGuard";
 
 const emptyByMove = () => ({
   rock:     { picked: 0, won: 0 },
@@ -60,7 +61,7 @@ interface AppState {
   locale: Locale;
   serverConfig: ServerConfig;
 
-  updateProfile: (patch: Partial<Pick<Player, "nickname" | "avatar" | "themeId" | "padId" | "difficulty" | "hapticEnabled" | "hapticIntensity" | "backgroundId">>) => void;
+  updateProfile: (patch: Partial<Pick<Player, "nickname" | "avatar" | "themeId" | "padId" | "difficulty" | "hapticEnabled" | "hapticIntensity" | "backgroundId" | "crashReports">>) => void;
   recordMatch: (m: MatchRecord) => void;
   claimQuest: (id: string, xpReward: number, lpReward?: number) => void;
   claimDailyQuest: (id: string, xpReward: number) => void;
@@ -284,7 +285,10 @@ export const useStore = create<AppState>()(
         if (version < 14 && state?.player && !("backgroundId" in state.player)) {
           state.player.backgroundId = "default";
         }
-        return state as AppState;
+        // Final pass — sanitise the persisted shape so a tampered
+        // localStorage can never inject a payload that would crash the
+        // app at render OR open a self-XSS via avatar URL.
+        return sanitisePersisted(state) as AppState;
       },
     }
   )

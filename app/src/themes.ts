@@ -49,64 +49,88 @@ export interface BackgroundDef {
   /** Path to the small "miniature" badge icon used next to the theme label
    *  in the picker (instead of the generic emoji). null = fall back to emoji. */
   miniature: string | null;
+  /** Accent palette extracted from this background's dominant tones. When
+   *  set, these hex colors OVERRIDE the global theme primary/secondary CSS
+   *  vars, so every "primary action" surface (Lock button, Fight button,
+   *  rank badges) blends with the background instead of locking to the
+   *  five default theme palettes. null = let the global theme drive. */
+  accent: { from: string; to: string } | null;
 }
 
 const MINI = "/Backgrounds/Miniatures Icons Theme";
 
 export const BACKGROUNDS: BackgroundDef[] = [
+  // Default: no override — the global theme picker still drives the colours.
   {
     id: "default",   label: "Original",       emoji: "🌌",
     src: null,                                          defaultPadId: null,
     skin: { fontHeadline: "inter",        fontBody: "inter",        fontMono: "jetbrains"  },
     miniature: `${MINI}/default.png`,
+    accent: null,
   },
+  // Ancient: dark navy parchment + warm bronze sigils + amethyst gems.
   {
     id: "ancient",   label: "Ancient",        emoji: "📜",
-    src: "/Backgrounds/Ancient Playmat Backgruond.png", defaultPadId: "ancient",
+    src: "/Backgrounds/ancient.png", defaultPadId: "ancient",
     skin: { fontHeadline: "cinzel",       fontBody: "cormorant",    fontMono: "imFell"     },
     miniature: `${MINI}/ancient.png`,
+    accent: { from: "#c9a55a", to: "#9d6ef7" },
   },
+  // Astrolab: warm brass instruments on midnight blue, occasional cyan glow.
   {
     id: "astrolab",  label: "Astrolab",       emoji: "🔭",
-    src: "/Backgrounds/AstroLab Bckground.png",         defaultPadId: "astrolab",
+    src: "/Backgrounds/astrolab.png",         defaultPadId: "astrolab",
     skin: { fontHeadline: "cinzel",       fontBody: "ebGaramond",   fontMono: "jetbrains"  },
     miniature: `${MINI}/astrolab.png`,
+    accent: { from: "#d4a849", to: "#4adbe8" },
   },
+  // Casino: emerald felt + gold filigree + crimson chip accents.
   {
     id: "casino",    label: "Casino Royale",  emoji: "🎰",
-    src: "/Backgrounds/CasinoRoyale Background.png",    defaultPadId: "casino",
+    src: "/Backgrounds/casino.png",    defaultPadId: "casino",
     skin: { fontHeadline: "playfair",     fontBody: "cormorant",    fontMono: "bebas"      },
     miniature: `${MINI}/casino.png`,
+    accent: { from: "#16a34a", to: "#facc15" },
   },
+  // Cyberpunk: saturated magenta + electric cyan neons on wet asphalt.
   {
     id: "cyberpunk", label: "Cyberpunk",      emoji: "🌆",
-    src: "/Backgrounds/CyberPunk Background.png",       defaultPadId: "cyberpunk",
+    src: "/Backgrounds/cyberpunk.png",       defaultPadId: "cyberpunk",
     skin: { fontHeadline: "orbitron",     fontBody: "rajdhani",     fontMono: "shareTech"  },
     miniature: `${MINI}/cyberpunk.png`,
+    accent: { from: "#f0abfc", to: "#06b6d4" },
   },
+  // Galaxy: deep violet nebula + fuchsia + cyan starlight.
   {
     id: "galaxy",    label: "Galaxy",         emoji: "✨",
-    src: "/Backgrounds/Galaxy Background.png",          defaultPadId: "cosmos",
+    src: "/Backgrounds/galaxy.png",          defaultPadId: "cosmos",
     skin: { fontHeadline: "audiowide",    fontBody: "exo2",         fontMono: "spaceMono"  },
     miniature: `${MINI}/galaxy.png`,
+    accent: { from: "#a855f7", to: "#22d3ee" },
   },
+  // Holy: divine amber gold + cathedral indigo + stained-glass jewel tones.
   {
     id: "holy",      label: "Holy Game",      emoji: "✝️",
-    src: "/Backgrounds/Holy Game Background.png",       defaultPadId: "holy",
+    src: "/Backgrounds/holy.png",       defaultPadId: "holy",
     skin: { fontHeadline: "cinzel",       fontBody: "cormorant",    fontMono: "imFell"     },
     miniature: `${MINI}/holy.png`,
+    accent: { from: "#fbbf24", to: "#6366f1" },
   },
+  // Quantum: bright cyan plasma + electric blue arcs + steel.
   {
     id: "quantum",   label: "Quantum Lab",    emoji: "⚛️",
-    src: "/Backgrounds/Quantum Lab Background.png",     defaultPadId: "quantum",
+    src: "/Backgrounds/quantum.png",     defaultPadId: "quantum",
     skin: { fontHeadline: "spaceGrotesk", fontBody: "ibmPlex",      fontMono: "fira"       },
     miniature: `${MINI}/quantum.png`,
+    accent: { from: "#22d3ee", to: "#3b82f6" },
   },
+  // Steampunk: copper + brass + amber gaslight on dark wood.
   {
     id: "steampunk", label: "Steampunk",      emoji: "⚙️",
-    src: "/Backgrounds/SteamPunk Workshop Background.png", defaultPadId: "steampunk",
+    src: "/Backgrounds/steampunk.png", defaultPadId: "steampunk",
     skin: { fontHeadline: "medieval",     fontBody: "imFell",       fontMono: "bevan"      },
     miniature: `${MINI}/steampunk.png`,
+    accent: { from: "#b45309", to: "#f59e0b" },
   },
 ];
 

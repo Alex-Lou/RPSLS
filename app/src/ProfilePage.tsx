@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store";
-import { THEMES } from "./theme";
+import { THEMES, gradientFromTheme } from "./theme";
 import { levelFromXp } from "./leveling";
 import { DIFFICULTY_META, PAD_META } from "./types";
 import type { BackgroundId, Difficulty, PadId, ThemeId } from "./types";
@@ -10,11 +10,13 @@ import { isAvatarImage, avatarImgStyle } from "./avatar";
 import { MOVES } from "./game";
 import { BattlePad } from "./BattlePad";
 import { useT } from "./i18n";
-import { hapticTap, hapticMatchStart } from "./haptic";
+import { hapticTap, hapticMatchStart, hapticMatchWin } from "./haptic";
+import { LevelUpOverlay } from "./LevelUpOverlay";
 
-/** 16 themed PNG avatars under /public/Profile miniatures/.
- *  Mix of 8 dark-fantasy badge sigils and 8 cute kawaii chibis (one per
- *  RPSLS move + 3 gaming staples). Custom uploads still work alongside. */
+/** 17 themed PNG avatars under /public/Profile miniatures/.
+ *  Mix of 8 dark-fantasy badge sigils and 9 cute kawaii chibis (one per
+ *  RPSLS move + 3 gaming staples + 1 frost dragon). Custom uploads still
+ *  work alongside. */
 const AVATAR_PRESETS: string[] = [
   "/Profile miniatures/badge_crown.png",
   "/Profile miniatures/badge_eye.png",
@@ -31,6 +33,7 @@ const AVATAR_PRESETS: string[] = [
   "/Profile miniatures/chibi_spock.png",
   "/Profile miniatures/chibi_gamepad.png",
   "/Profile miniatures/chibi_d20.png",
+  "/Profile miniatures/chibi_dragon_blue.png",
   "/Profile miniatures/chibi_crown.png",
 ];
 
@@ -44,6 +47,10 @@ export function ProfilePage() {
   const [editingNick, setEditingNick] = useState(false);
   const [nickDraft, setNickDraft] = useState(player.nickname);
   const [confirmReset, setConfirmReset] = useState(false);
+  /** Manual trigger for the level-up celebration, used by the debug
+   *  "Tester level-up" button so the player (or me) can preview the
+   *  animation without grinding XP. */
+  const [previewLevel, setPreviewLevel] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const info = levelFromXp(player.xp);
@@ -114,7 +121,7 @@ export function ProfilePage() {
         <div
           className="w-28 h-28 rounded-3xl flex items-center justify-center text-6xl shrink-0 ring-2 shadow-2xl"
           style={{
-            background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`,
+            background: gradientFromTheme(theme),
           }}
         >
           {isAvatarImage(player.avatar) ? (
@@ -176,7 +183,7 @@ export function ProfilePage() {
                 className="h-full rounded-full"
                 style={{
                   width: `${info.progress * 100}%`,
-                  background: `linear-gradient(90deg, ${theme.primary}, ${theme.secondary})`,
+                  background: gradientFromTheme(theme, "90deg"),
                   boxShadow: `0 0 12px ${theme.primary}80`,
                 }}
               />
@@ -185,9 +192,27 @@ export function ProfilePage() {
               <span>{info.xpInLevel} / {info.xpForNext} XP to next level</span>
               <span>Lvl {info.level} → {info.level + 1}</span>
             </div>
+            {/* Debug / showcase trigger so the celebration can be previewed
+                without grinding XP. Uses the *next* level number so it
+                feels like a real promotion when shown. */}
+            <button
+              onClick={() => {
+                hapticMatchWin();
+                setPreviewLevel(info.level + 1);
+                window.setTimeout(() => setPreviewLevel(null), 2800);
+              }}
+              className="mt-3 w-full px-3 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500/20 via-fuchsia-500/20 to-cyan-500/20 border border-white/15 text-zinc-200 hover:from-amber-500/30 hover:via-fuchsia-500/30 hover:to-cyan-500/30 transition"
+            >
+              ✨ Tester l'animation de level-up
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Manual preview overlay — fires only when the test button is clicked. */}
+      <AnimatePresence>
+        {previewLevel !== null && <LevelUpOverlay level={previewLevel} />}
+      </AnimatePresence>
 
       {/* Avatar picker */}
       <section className="bg-white/5 border border-white/10 rounded-3xl p-5">
@@ -263,7 +288,7 @@ export function ProfilePage() {
               >
                 <div
                   className="w-full h-12 rounded-xl"
-                  style={{ background: `linear-gradient(135deg, ${t.primary}, ${t.secondary})` }}
+                  style={{ background: gradientFromTheme(t) }}
                 />
                 <span className="text-xs">
                   {t.emoji} {t.label}
@@ -512,6 +537,33 @@ export function ProfilePage() {
           </div>
         </section>
       )}
+
+      {/* Privacy — anonymized crash reports + link to the policy. The
+          toggle drives Sentry.init / Sentry.close in App.tsx. */}
+      <section className="bg-white/5 border border-white/10 rounded-3xl p-5">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-3">Confidentialité</h2>
+        <label className="flex items-center justify-between gap-3 mb-3 p-3 rounded-xl bg-white/5 border border-white/10 cursor-pointer hover:border-white/20 transition">
+          <span className="flex flex-col">
+            <span className="text-sm font-bold text-zinc-200">📡 Envoyer les rapports de crash</span>
+            <span className="text-[10px] text-zinc-500 leading-snug">
+              Trace anonymisée envoyée à Sentry quand l'app plante. Aucune donnée personnelle.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={player.crashReports ?? false}
+            onChange={(e) => updateProfile({ crashReports: e.target.checked })}
+            aria-label="Toggle crash reports"
+            className="w-5 h-5 accent-violet-500 cursor-pointer"
+          />
+        </label>
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent("rpsls:navigate", { detail: "privacy" }))}
+          className="w-full text-left text-xs text-violet-300 hover:text-violet-200 underline underline-offset-2"
+        >
+          Voir la politique de confidentialité complète →
+        </button>
+      </section>
 
       {/* Reset */}
       <section className="bg-rose-950/30 border border-rose-900/40 rounded-3xl p-5">

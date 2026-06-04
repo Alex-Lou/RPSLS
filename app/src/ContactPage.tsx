@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import { useT } from "./i18n";
 import { useStore } from "./store";
-import { THEMES } from "./theme";
+import { THEMES, gradientFromTheme } from "./theme";
 
 const RECIPIENT = "alex.guennad@gmail.com";
 
@@ -77,7 +77,7 @@ export function ContactPage() {
           className="w-full px-5 py-3.5 rounded-2xl font-semibold text-white shadow-lg disabled:opacity-40 disabled:cursor-not-allowed transition"
           style={{
             background: message.trim()
-              ? `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`
+              ? gradientFromTheme(theme)
               : "#3f3f46",
           }}
         >

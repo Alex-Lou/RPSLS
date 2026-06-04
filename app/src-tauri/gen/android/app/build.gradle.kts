@@ -13,6 +13,17 @@ val tauriProperties = Properties().apply {
     }
 }
 
+// Release signing config — reads from ../../../keystore/keystore.properties
+// (the file is gitignored, generated locally by the dev). If the file is
+// missing we fall back to the debug keystore so dev builds keep working.
+val releaseKeystoreProps = Properties().apply {
+    val propsFile = rootProject.file("../../../keystore/keystore.properties")
+    if (propsFile.exists()) {
+        propsFile.inputStream().use { load(it) }
+    }
+}
+val hasReleaseKeystore = releaseKeystoreProps.getProperty("storeFile") != null
+
 android {
     compileSdk = 36
     namespace = "com.alex.rpsls"
@@ -23,6 +34,16 @@ android {
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+    }
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            create("release") {
+                storeFile = rootProject.file("../../../keystore/${releaseKeystoreProps.getProperty("storeFile")}")
+                storePassword = releaseKeystoreProps.getProperty("storePassword")
+                keyAlias = releaseKeystoreProps.getProperty("keyAlias")
+                keyPassword = releaseKeystoreProps.getProperty("keyPassword")
+            }
+        }
     }
     buildTypes {
         getByName("debug") {
@@ -43,6 +64,14 @@ android {
                     .plus(getDefaultProguardFile("proguard-android-optimize.txt"))
                     .toList().toTypedArray()
             )
+            // Use the release keystore if available; otherwise fall back to
+            // the debug keystore so the release build still produces *an*
+            // artifact (won't be Play-Store-uploadable, but useful for QA).
+            signingConfig = if (hasReleaseKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
     kotlinOptions {

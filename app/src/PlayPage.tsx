@@ -26,7 +26,7 @@ import {
   Outcome,
   REWARDS,
 } from "./types";
-import { THEMES } from "./theme";
+import { THEMES, gradientFromTheme } from "./theme";
 import { todayDailyQuests, matchesToday, todayDateKey, type DailyChallenge, type DailyQuestDef } from "./daily";
 import { useT } from "./i18n";
 import type { Page } from "./Sidebar";
@@ -232,10 +232,25 @@ function ModeSelect({
       className="flex flex-col gap-3 sm:gap-5 flex-1 justify-center py-1"
     >
       <div className="text-center">
-        <h1 className="text-2xl sm:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-violet-400 via-fuchsia-400 to-teal-300 bg-clip-text text-transparent leading-tight">
+        <h1
+          // Refined title: lighter weight (semibold instead of black), slight
+          // tracking spread, dropped one size step so the title doesn't
+          // dominate the page anymore. The colours stay theme-driven so the
+          // header still belongs to whichever background is active.
+          className="text-3xl sm:text-5xl font-semibold bg-clip-text text-transparent leading-[1.1]"
+          style={{
+            backgroundImage:
+              "linear-gradient(135deg, color-mix(in oklab, var(--theme-primary) 85%, #fff) 0%, color-mix(in oklab, var(--theme-secondary) 85%, #fff) 100%)",
+            fontFamily: "var(--font-headline)",
+            letterSpacing: "0.01em",
+          }}
+        >
           {t("play.title")}
         </h1>
-        <p className="mt-0.5 sm:mt-2 text-zinc-400 text-[11px] sm:text-sm leading-tight">
+        <p
+          className="mt-1.5 sm:mt-2.5 text-zinc-400 text-xs sm:text-sm leading-snug tracking-[0.18em] uppercase"
+          style={{ fontFamily: "var(--font-body)" }}
+        >
           {t("splash.tagline")}
         </p>
       </div>
@@ -487,7 +502,7 @@ function ModeConfirmModal({
             onClick={onConfirm}
             className="flex-1 px-4 py-3 rounded-2xl font-semibold text-white shadow-lg"
             style={{
-              background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`,
+              background: gradientFromTheme(theme),
             }}
           >
             {t("play.start")}

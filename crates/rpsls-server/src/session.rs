@@ -1,5 +1,6 @@
 //! A connected client session — wraps the WebSocket send half and metadata.
 
+use std::net::IpAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
@@ -18,15 +19,21 @@ pub struct Session {
     /// Set to true when this session is in an active match. Used by the
     /// lobby/queue to avoid double-matching.
     pub in_match: AtomicBool,
+    /// Peer IP — used by the lobby brute-force tracker so a single
+    /// attacker can't dodge the cap by reconnecting (which would yield a
+    /// fresh session_id). Behind the Render proxy this resolves via the
+    /// X-Forwarded-For header upstream.
+    pub peer_ip: IpAddr,
 }
 
 impl Session {
-    pub fn new(id: String, nickname: String, tx: Tx) -> Self {
+    pub fn new(id: String, nickname: String, tx: Tx, peer_ip: IpAddr) -> Self {
         Self {
             id,
             nickname: Mutex::new(nickname),
             tx,
             in_match: AtomicBool::new(false),
+            peer_ip,
         }
     }
 

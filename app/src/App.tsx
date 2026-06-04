@@ -1,25 +1,35 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store";
 import { applyTheme } from "./theme";
 import { BACKGROUNDS_BY_ID, resolveFontFamily } from "./themes";
-import { LoadingTip } from "./flavor/LoadingTip";
 import { RTL_LOCALES } from "./i18n";
+import { SplashShader } from "./SplashShader";
 import { Sidebar, MobileShell, type Page } from "./Sidebar";
+// PlayPage stays eagerly imported — it's the initial route after splash
+// so lazy-loading it would just add a flicker for no gain.
 import { PlayPage } from "./PlayPage";
-import { OnlinePage } from "./OnlinePage";
-import { ProfilePage } from "./ProfilePage";
-import { HistoryPage } from "./HistoryPage";
-import { QuestsPage } from "./QuestsPage";
-import { PacksPage } from "./PacksPage";
-import { AboutPage } from "./AboutPage";
-import { ContactPage } from "./ContactPage";
-import { Welcome } from "./Welcome";
 import { FloatingMatchBackButton } from "./sharedMatchUI";
 import { UserHeader } from "./UserHeader";
 import { LevelUpWatcher } from "./LevelUpOverlay";
 import { useT } from "./i18n";
 import { setHapticSettings } from "./haptic";
+import { initSentry, shutdownSentry } from "./monitoring/sentry";
+
+// Code-split heavy pages — each becomes its own JS chunk that Vite ships
+// on demand the first time the user navigates there. Cuts the initial
+// bundle from ~770 kB to ~250 kB, which is what the splash actually
+// blocks on. Vite picks chunk names from the import path so the network
+// tab shows "OnlinePage-<hash>.js" rather than an anonymous blob.
+const OnlinePage   = lazy(() => import("./OnlinePage").then(m => ({ default: m.OnlinePage })));
+const ProfilePage  = lazy(() => import("./ProfilePage").then(m => ({ default: m.ProfilePage })));
+const HistoryPage  = lazy(() => import("./HistoryPage").then(m => ({ default: m.HistoryPage })));
+const QuestsPage   = lazy(() => import("./QuestsPage").then(m => ({ default: m.QuestsPage })));
+const PacksPage    = lazy(() => import("./PacksPage").then(m => ({ default: m.PacksPage })));
+const AboutPage    = lazy(() => import("./AboutPage").then(m => ({ default: m.AboutPage })));
+const ContactPage  = lazy(() => import("./ContactPage").then(m => ({ default: m.ContactPage })));
+const PrivacyPage  = lazy(() => import("./legal/PrivacyPage").then(m => ({ default: m.PrivacyPage })));
+const Welcome      = lazy(() => import("./Welcome").then(m => ({ default: m.Welcome })));
 
 type Stage = "splash" | "welcome" | "shell";
 
@@ -30,6 +40,26 @@ export default function App() {
   const locale = useStore((s) => s.locale);
   const hapticEnabled  = useStore((s) => s.player.hapticEnabled ?? true);
   const hapticIntensity = useStore((s) => s.player.hapticIntensity ?? "med");
+  const crashReports = useStore((s) => s.player.crashReports ?? false);
+
+  // Honour the privacy toggle: when the user flips "Send crash reports"
+  // in Settings we boot or tear down Sentry on the spot.
+  useEffect(() => {
+    if (crashReports) initSentry(true);
+    else shutdownSentry();
+  }, [crashReports]);
+
+  // Custom navigation channel used by deep sub-components (e.g. Profile's
+  // "View privacy policy" link) to ask the App to switch pages without
+  // having to thread an `onNavigate` prop through every level.
+  useEffect(() => {
+    const onNav = (e: Event) => {
+      const target = (e as CustomEvent).detail as Page | undefined;
+      if (target) setPage(target);
+    };
+    window.addEventListener("rpsls:navigate", onNav);
+    return () => window.removeEventListener("rpsls:navigate", onNav);
+  }, []);
   const [stage, setStage] = useState<Stage>("splash");
   const [page, setPage] = useState<Page>("play");
   // Nonce bumped every time the user explicitly clicks "Home" so PlayPage
@@ -54,15 +84,21 @@ export default function App() {
     applyTheme(themeId);
   }, [themeId]);
 
-  // Apply the chosen cosmetic background image AND skin (fonts, later
-  // colours) to <body> via CSS variables. body { font-family: var(...) }
-  // and body { background-image: var(...) } in App.css consume them;
-  // "default" clears the bg image so the original gradient remains.
+  // Apply the chosen cosmetic background image AND skin (fonts) to <body>
+  // via CSS variables. body { font-family: var(...) } and
+  // body { background-image: var(...) } in App.css consume them. The
+  // "default" theme has src: null which clears the var so the original
+  // CSS radial-gradient default remains visible.
+  //
+  // While the splash is showing we deliberately suppress the bg image so
+  // the player never sees the theme PNG flash through behind the WebGL
+  // shader during boot or during the splash-out transition.
   useEffect(() => {
     const def = BACKGROUNDS_BY_ID[backgroundId];
     const root = document.documentElement;
-    if (def?.src) {
-      root.style.setProperty("--app-bg-image", `url("${def.src}")`);
+    const showBg = stage !== "splash" && !!def?.src;
+    if (showBg) {
+      root.style.setProperty("--app-bg-image", `url("${def!.src}")`);
     } else {
       root.style.removeProperty("--app-bg-image");
     }
@@ -71,7 +107,17 @@ export default function App() {
       root.style.setProperty("--font-body",     resolveFontFamily(def.skin.fontBody));
       root.style.setProperty("--font-mono",     resolveFontFamily(def.skin.fontMono));
     }
-  }, [backgroundId]);
+    // Accent override — when the chosen background ships an accent palette,
+    // it WINS over the global theme. Every "primary action" surface uses
+    // var(--theme-primary)/secondary, so this single switch repaints them
+    // all (Lock, Fight, rank chips, focus rings) to match the ambience.
+    if (def?.accent) {
+      root.style.setProperty("--theme-primary",   def.accent.from);
+      root.style.setProperty("--theme-secondary", def.accent.to);
+    }
+    // Note: if def.accent is null (default bg), we leave the theme-driven
+    // values alone — they were set by applyTheme(themeId) right above.
+  }, [backgroundId, stage]);
 
   // Mirror the locale onto <html> so Tailwind / browser can pick up text
   // direction and language-aware features (forms, hyphenation, screen reader).
@@ -98,19 +144,26 @@ export default function App() {
 
   return (
     <div className="h-full w-full select-none overflow-hidden">
+      {/* mode="wait" — Alex wanted the sequence to read as "splash ONLY, then
+          menu ONLY", never overlapping. The splash fully exits before the
+          shell mounts so the player never sees the theme bg leaking through
+          mid-transition. */}
       <AnimatePresence mode="wait">
         {stage === "splash" && (
           <Splash key="splash" onDone={afterSplash} />
         )}
         {stage === "welcome" && (
-          <Welcome key="welcome" onDone={() => setStage("shell")} />
+          <Suspense key="welcome" fallback={<RouteFallback />}>
+            <Welcome onDone={() => setStage("shell")} />
+          </Suspense>
         )}
         {stage === "shell" && (
           <motion.div
             key="shell"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.4 }}
+            // Clean fade-in after the splash has fully exited (mode="wait").
+            transition={{ duration: 0.5, ease: [0.4, 0.0, 0.2, 1] }}
             className="flex h-full min-h-0"
           >
             <Sidebar page={page} onNavigate={navigateTo} />
@@ -144,13 +197,18 @@ export default function App() {
                 )}
                 <AnimatePresence mode="wait">
                   {page === "play"    && <PageWrap key="play"><PlayPage onNavigate={navigateTo} homeNonce={homeNonce} /></PageWrap>}
-                  {page === "online"  && <PageWrap key="online"><OnlinePage /></PageWrap>}
-                  {page === "quests"  && <PageWrap key="quests"><QuestsPage /></PageWrap>}
-                  {page === "packs"   && <PageWrap key="packs"><PacksPage /></PageWrap>}
-                  {page === "profile" && <PageWrap key="profile"><ProfilePage /></PageWrap>}
-                  {page === "history" && <PageWrap key="history"><HistoryPage /></PageWrap>}
-                  {page === "about"   && <PageWrap key="about"><AboutPage /></PageWrap>}
-                  {page === "contact" && <PageWrap key="contact"><ContactPage /></PageWrap>}
+                  {page !== "play" && (
+                    <Suspense key="lazy-routes" fallback={<RouteFallback />}>
+                      {page === "online"  && <PageWrap key="online"><OnlinePage /></PageWrap>}
+                      {page === "quests"  && <PageWrap key="quests"><QuestsPage /></PageWrap>}
+                      {page === "packs"   && <PageWrap key="packs"><PacksPage /></PageWrap>}
+                      {page === "profile" && <PageWrap key="profile"><ProfilePage /></PageWrap>}
+                      {page === "history" && <PageWrap key="history"><HistoryPage /></PageWrap>}
+                      {page === "about"   && <PageWrap key="about"><AboutPage /></PageWrap>}
+                      {page === "contact" && <PageWrap key="contact"><ContactPage /></PageWrap>}
+                      {page === "privacy" && <PageWrap key="privacy"><PrivacyPage onClose={() => navigateTo("about")} /></PageWrap>}
+                    </Suspense>
+                  )}
                 </AnimatePresence>
               </main>
             </div>
@@ -158,6 +216,28 @@ export default function App() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+/** Minimal Suspense fallback for lazy-loaded routes. Renders a dark
+ *  full-screen panel with a faint pulse — short enough that even on a
+ *  slow chunk fetch it doesn't feel like an error state. */
+function RouteFallback() {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.15 }}
+      className="flex-1 flex items-center justify-center"
+      aria-busy
+      aria-live="polite"
+    >
+      <motion.div
+        animate={{ opacity: [0.3, 0.7, 0.3] }}
+        transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+        className="w-2.5 h-2.5 rounded-full bg-violet-400"
+      />
+    </motion.div>
   );
 }
 
@@ -177,84 +257,145 @@ function PageWrap({ children }: { children: React.ReactNode }) {
 
 /* ─────────────── Splash ─────────────── */
 
+/**
+ * Splash — opening video played fullscreen behind a fade-in logo + title.
+ *
+ * Choreography (matches the 8s opening.mp4 duration):
+ *   0.0s  Video starts dark (cosmic build-up), overlay UI hidden.
+ *   1.4s  Logo PNG fades + scale-springs in.
+ *   2.2s  RPSLS wordmark + subtitle fade in.
+ *   3.0s  "tap to continue" hint fades in.
+ *   8.0s  Video onEnded → onDone(). Safety auto-advance at 8.5s.
+ *
+ * Tap anywhere to skip. Video is muted + playsInline so Android WebView
+ * autoplay policy lets it run without user gesture. If the video fails
+ * (no codec, no asset), the dark gradient backdrop still shows and the
+ * logo/title sequence still fires — graceful degradation.
+ */
 function Splash({ onDone }: { onDone: () => void }) {
+  const [phase, setPhase] = useState<"intro" | "logo" | "title" | "hint">("intro");
+
   useEffect(() => {
-    const t = setTimeout(onDone, 2400);
-    return () => clearTimeout(t);
+    const t1 = window.setTimeout(() => setPhase("logo"),  1100);
+    const t2 = window.setTimeout(() => setPhase("title"), 1800);
+    const t3 = window.setTimeout(() => setPhase("hint"),  2600);
+    // Auto-advance at 5s. The WebGL shader loops indefinitely on its
+    // own so there's no codec/onEnded race like with the old <video>.
+    const safety = window.setTimeout(onDone, 5000);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      window.clearTimeout(t3);
+      window.clearTimeout(safety);
+    };
   }, [onDone]);
 
   return (
     <motion.div
       onClick={onDone}
-      className="h-full cursor-pointer flex flex-col items-center justify-center gap-6 sm:gap-10 py-10 px-4 text-center"
+      // fixed inset-0 escapes the #root safe-area padding so the splash
+      // truly fills every pixel of the screen edge-to-edge, including
+      // under the status bar and Android nav bar.
+      className="fixed inset-0 z-[80] cursor-pointer overflow-hidden bg-black"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0, scale: 1.05 }}
-      transition={{ duration: 0.4 }}
+      // Short clean fade-out — mode="wait" upstream means the shell only
+      // mounts AFTER this exit completes, so the player sees: animation
+      // only → fade to black → theme. Never both at once.
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.5, ease: [0.4, 0.0, 0.2, 1] }}
     >
-      {/* Logo */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.6, rotate: -8 }}
-        animate={{ opacity: 1, scale: 1, rotate: 0 }}
-        transition={{ delay: 0.15, type: "spring", stiffness: 220, damping: 14 }}
-        className="relative"
-      >
-        {/* Halo */}
-        <motion.div
-          aria-hidden
-          initial={{ opacity: 0 }}
-          animate={{ opacity: [0, 0.45, 0.25] }}
-          transition={{ delay: 0.4, duration: 1.6, ease: "easeOut" }}
-          className="absolute -inset-12 -z-10 rounded-full blur-3xl"
-          style={{
-            background:
-              "radial-gradient(circle, rgba(168,85,247,0.55), rgba(45,212,191,0.3) 50%, transparent 75%)",
-          }}
-        />
-        <motion.img
-          src="/Logo-RLSPS.png"
-          alt="RPSLS"
-          className="w-44 h-44 sm:w-56 sm:h-56 md:w-64 md:h-64 drop-shadow-2xl"
-          animate={{ y: [0, -6, 0] }}
-          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-        />
-      </motion.div>
+      {/* Procedural WebGL fluid backdrop — replaces the previous <video>
+          tag. No native media controls flashing on Android WebView, no
+          codec compatibility issues, no asset to ship. Paints frame 1
+          instantly and loops forever. */}
+      <SplashShader />
 
-      <motion.h1
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6, duration: 0.4 }}
-        className="text-5xl sm:text-6xl font-black tracking-tight bg-gradient-to-br from-violet-300 via-fuchsia-400 to-teal-300 bg-clip-text text-transparent"
-      >
-        RPSLS
-      </motion.h1>
+      {/* Soft dark gradient overlay for legibility of the logo/title on top. */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.15) 35%, rgba(0,0,0,0.15) 65%, rgba(0,0,0,0.7) 100%)",
+        }}
+      />
 
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.0, duration: 0.4 }}
-        className="text-zinc-400 text-xs sm:text-sm tracking-widest uppercase"
-      >
-        Rock · Paper · Scissors · Lizard · Spock
-      </motion.p>
+      <div className="relative h-full flex flex-col items-center justify-center gap-5 px-6 text-center">
+        {/* Logo with a glowing halo behind it. */}
+        <AnimatePresence>
+          {(phase === "logo" || phase === "title" || phase === "hint") && (
+            <motion.div
+              key="logo-wrap"
+              className="relative"
+              initial={{ opacity: 0, scale: 0.55, filter: "blur(10px)" }}
+              animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+              transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <motion.div
+                aria-hidden
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [0, 0.55, 0.3] }}
+                transition={{ duration: 1.8, ease: "easeOut" }}
+                className="absolute -inset-12 -z-10 rounded-full blur-3xl"
+                style={{
+                  background:
+                    "radial-gradient(circle, rgba(168,85,247,0.7), rgba(45,212,191,0.4) 45%, transparent 75%)",
+                }}
+              />
+              <motion.img
+                src="/Logo-RLSPS.png"
+                alt="RPSLS"
+                className="w-40 h-40 sm:w-52 sm:h-52 md:w-60 md:h-60 drop-shadow-2xl"
+                animate={{ y: [0, -6, 0] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.4, duration: 0.4 }}
-        className="max-w-xs px-4"
-      >
-        <LoadingTip rotateMs={0} className="justify-center text-center" />
-      </motion.div>
+        <AnimatePresence>
+          {(phase === "title" || phase === "hint") && (
+            <motion.h1
+              key="title"
+              initial={{ opacity: 0, y: 28, filter: "blur(14px)", scale: 0.92 }}
+              animate={{ opacity: 1, y: 0,  filter: "blur(0px)",  scale: 1 }}
+              transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
+              className="text-5xl sm:text-6xl font-black tracking-tight bg-gradient-to-br from-violet-300 via-fuchsia-400 to-teal-300 bg-clip-text text-transparent"
+              style={{ textShadow: "0 0 28px rgba(168,85,247,0.4)" }}
+            >
+              RPSLS
+            </motion.h1>
+          )}
+        </AnimatePresence>
 
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 0.6 }}
-        transition={{ delay: 1.8, duration: 0.4 }}
-        className="text-zinc-500 text-xs"
-      >
-        tap to continue
-      </motion.p>
+        <AnimatePresence>
+          {(phase === "title" || phase === "hint") && (
+            <motion.p
+              key="subtitle"
+              initial={{ opacity: 0, y: 14, filter: "blur(8px)" }}
+              animate={{ opacity: 0.9, y: 0, filter: "blur(0px)" }}
+              transition={{ duration: 0.9, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              className="text-zinc-200 text-xs sm:text-sm tracking-[0.3em] uppercase"
+            >
+              Rock · Paper · Scissors · Lizard · Spock
+            </motion.p>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <AnimatePresence>
+        {phase === "hint" && (
+          <motion.p
+            key="hint"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.7 }}
+            transition={{ duration: 0.5 }}
+            className="absolute bottom-10 left-0 right-0 text-center text-zinc-300 text-xs tracking-[0.25em] uppercase pointer-events-none"
+          >
+            tap to continue
+          </motion.p>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

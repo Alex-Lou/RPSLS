@@ -1,20 +1,4 @@
-import {
-  FaHandRock,
-  FaHandPaper,
-  FaHandScissors,
-  FaHandLizard,
-  FaHandSpock,
-} from "react-icons/fa";
-import type { IconType } from "react-icons";
 import type { Move } from "./game";
-
-export const MOVE_ICON: Record<Move, IconType> = {
-  rock: FaHandRock,
-  paper: FaHandPaper,
-  scissors: FaHandScissors,
-  lizard: FaHandLizard,
-  spock: FaHandSpock,
-};
 
 /** Per-move accent palette — used for halos, gradients, button focus. */
 export const MOVE_PALETTE: Record<
@@ -64,11 +48,11 @@ export function Hand({ move, size = "md", emphasis = "default", className = "" }
   const pal = MOVE_PALETTE[move];
   const s = SIZE[size];
 
-  const base =
-    `relative ${s.box} rounded-2xl sm:rounded-3xl flex items-center justify-center ` +
-    `bg-gradient-to-br ${pal.from} ${pal.to} ` +
-    `text-zinc-900 ring-2 ${pal.ring} shadow-xl ${pal.glow} ` +
-    `transition-all`;
+  // Match the PickerBar treatment: dark surface + coloured border + soft
+  // glow. Reads consistently across all 9 backgrounds because the bg is
+  // *always* dark — the per-move identity comes from the rim, not the fill.
+  const dark = "linear-gradient(160deg, rgba(20,22,32,0.92) 0%, rgba(10,12,20,0.92) 100%)";
+  const glow = `0 0 18px -2px ${pal.hex}55, inset 0 1px 0 rgba(255,255,255,0.08)`;
 
   const emp =
     emphasis === "winner"
@@ -78,45 +62,44 @@ export function Hand({ move, size = "md", emphasis = "default", className = "" }
       : "";
 
   return (
-    <div className={`${base} ${emp} ${className}`}>
+    <div
+      className={`relative ${s.box} rounded-2xl sm:rounded-3xl flex items-center justify-center text-white transition-all ${emp} ${className}`}
+      style={{
+        background: dark,
+        border: `2.5px solid ${pal.hex}`,
+        boxShadow: glow,
+      }}
+    >
       <MoveGlyph move={move} className={s.icon} />
     </div>
   );
 }
 
-/** Renders a move silhouette via CSS mask so the baked-in dark backdrop in
- *  the source PNG disappears and only the bright silhouette shows, filled
- *  with `color` (defaults to white). Uses mask-mode: luminance so the PNG's
- *  brightness drives the mask — bright pixels visible, dark bg invisible
- *  (the source PNGs are NOT alpha-transparent). A small drop-shadow gives
- *  the silhouette a faint white halo for that "lit from below" feel. */
+/** Renders a move silhouette as a direct <img>. We tried the CSS mask
+ *  approaches (luminance + alpha mode) and both failed on at least one
+ *  Android WebView version Alex tested on (either invisible glyph OR
+ *  unmasked white square depending on which mode-mode the device honoured).
+ *  Going back to a plain <img> is the universal-compat option — every
+ *  WebView renders an <img> correctly. The PNGs ship as white silhouettes
+ *  with a subtle violet glow on transparent bg, so as long as the parent
+ *  button has a DARK background (which we enforce in PickerBar / Hand
+ *  below), the silhouette reads clearly. */
 export function MoveGlyph({
   move,
   className = "",
-  color = "white",
 }: {
   move: Move;
   className?: string;
+  /** Legacy prop kept for API back-compat. The colour now comes from the
+   *  PNG itself (white silhouette + violet glow). Ignored. */
   color?: string;
 }) {
-  const url = `url("${MOVE_PNG[move]}")`;
   return (
-    <div
-      className={className + " select-none pointer-events-none"}
-      style={{
-        WebkitMaskImage: url,
-        maskImage: url,
-        WebkitMaskSize: "contain",
-        maskSize: "contain",
-        WebkitMaskPosition: "center",
-        maskPosition: "center",
-        WebkitMaskRepeat: "no-repeat",
-        maskRepeat: "no-repeat",
-        backgroundColor: color,
-        filter: "drop-shadow(0 0 4px rgba(255,255,255,0.45)) drop-shadow(0 0 1px rgba(0,0,0,0.6))",
-        // TS lib types haven't caught up with mask-mode yet, hence the cast.
-        ...({ WebkitMaskMode: "luminance", maskMode: "luminance" } as React.CSSProperties),
-      }}
+    <img
+      src={MOVE_PNG[move]}
+      alt={move}
+      draggable={false}
+      className={className + " select-none pointer-events-none object-contain"}
     />
   );
 }

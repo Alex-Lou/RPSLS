@@ -125,9 +125,9 @@ export function MatchScoreBar({
       <div className="flex items-center justify-between rounded-2xl bg-black/30 border border-white/10 px-3 sm:px-4 py-2.5 sm:py-3 min-w-0">
         <div className="flex flex-col min-w-0 flex-1">
           {youTag && (
-            <span className="text-[10px] uppercase tracking-wider text-zinc-500">{youTag}</span>
+            <span className="text-[12px] sm:text-xs uppercase tracking-wider text-zinc-400 font-medium">{youTag}</span>
           )}
-          <span className="font-semibold truncate text-emerald-200 flex items-center gap-1.5">
+          <span className="text-base sm:text-lg font-bold truncate text-emerald-200 flex items-center gap-1.5">
             <span className="truncate">{youName}</span>
             <StreakBadge streak={youStreak} />
           </span>
@@ -139,16 +139,16 @@ export function MatchScoreBar({
         </div>
         <div className="flex flex-col text-right min-w-0 flex-1">
           {oppTag && (
-            <span className="text-[10px] uppercase tracking-wider text-zinc-500">{oppTag}</span>
+            <span className="text-[12px] sm:text-xs uppercase tracking-wider text-zinc-400 font-medium">{oppTag}</span>
           )}
-          <span className="font-semibold truncate text-rose-200 flex items-center gap-1.5 justify-end">
+          <span className="text-base sm:text-lg font-bold truncate text-rose-200 flex items-center gap-1.5 justify-end">
             <StreakBadge streak={oppStreak} />
             <span className="truncate">{oppName}</span>
           </span>
         </div>
       </div>
       {caption && (
-        <div className="text-center text-[11px] uppercase tracking-[0.25em] text-zinc-500">
+        <div className="text-center text-[13px] sm:text-sm uppercase tracking-[0.2em] text-zinc-400 font-medium">
           {caption}
         </div>
       )}

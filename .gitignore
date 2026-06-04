@@ -23,10 +23,11 @@ src-tauri/gen/android/app/build/
 src-tauri/gen/android/app/.cxx/
 src-tauri/gen/android/app/src/main/jniLibs/
 
-## ────── IDE ──────
+## ────── IDE / agent tooling ──────
 .idea/
 .vscode/
 *.iml
+.claude/
 
 ## ────── OS ──────
 .DS_Store
@@ -34,4 +35,20 @@ Thumbs.db
 
 ## ────── Build artifacts / temp ──────
 *.apk
+*.aab
 logo-source.png
+
+## ────── Release signing (NEVER commit) ──────
+# The Android upload keystore + its props file. Losing these blocks future
+# Play Store updates (see app/src-tauri/keystore/README.md for setup).
+**/keystore/*.jks
+**/keystore/*.keystore
+**/keystore/keystore.properties
+
+## ────── Sentry ──────
+# Crash reporting DSN lives in a local .env file, not in the repo.
+.env
+.env.local
+
+## ────── Misc ──────
+.sentryclirc

@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use axum::{
     extract::{
+        connect_info::ConnectInfo,
         ws::{Message, WebSocket, WebSocketUpgrade},
         State,
     },
@@ -20,7 +21,6 @@ use axum::{
 use dashmap::DashMap;
 use futures_util::{sink::SinkExt, stream::StreamExt};
 use tokio::sync::mpsc;
-use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -29,16 +29,20 @@ use crate::lanes_engine::{start_lanes_match, LanesCommand};
 use crate::lobby::LobbyManager;
 use crate::match_engine::{start_match, MatchCommand};
 use crate::protocol::{ClientMessage, PlayerSlot, ServerMessage};
+use crate::security::{cors_layer, governor_layer, LobbyAttemptTracker, MsgRateLimit};
 use crate::session::Session;
 
 mod lanes_engine;
 mod lobby;
 mod match_engine;
 mod protocol;
+mod security;
 mod session;
 
 struct AppState {
     lobbies: Arc<LobbyManager>,
+    /// Brute-force protection on JoinLobby — tracks failed attempts per IP.
+    lobby_attempts: Arc<LobbyAttemptTracker>,
     /// session_id → (match_tx, our_slot) — classic 1v1 mode.
     in_match: DashMap<String, (mpsc::UnboundedSender<MatchCommand>, PlayerSlot)>,
     /// session_id → (lanes_tx, our_slot) — Constellation Lanes mode (Phase 1+).
@@ -56,17 +60,20 @@ async fn main() {
 
     let state = Arc::new(AppState {
         lobbies: Arc::new(LobbyManager::new()),
+        lobby_attempts: Arc::new(LobbyAttemptTracker::default()),
         in_match: DashMap::new(),
         in_lanes: DashMap::new(),
     });
 
-    let cors = CorsLayer::new().allow_origin(Any).allow_methods(Any);
-
+    // Layer order is bottom-up: trace → cors → governor → router.
+    // Governor sits OUTSIDE the routes so requests get throttled before
+    // they touch any handler. CORS is the very first gate (preflight).
     let app = Router::new()
         .route("/health", get(health))
         .route("/ws", get(ws_handler))
         .with_state(state)
-        .layer(cors)
+        .layer(governor_layer())
+        .layer(cors_layer())
         .layer(TraceLayer::new_for_http());
 
     let port: u16 = std::env::var("PORT")
@@ -77,26 +84,48 @@ async fn main() {
     info!("listening on {addr}");
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    // ConnectInfo is required by tower_governor's SmartIpKeyExtractor to
+    // grab the peer SocketAddr when no X-Forwarded-For header is present
+    // (i.e. during local dev without a reverse proxy).
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await
+    .unwrap();
 }
 
 async fn health() -> &'static str {
     "ok"
 }
 
-async fn ws_handler(ws: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    ws.on_upgrade(move |sock| handle_socket(sock, state))
+async fn ws_handler(
+    ws: WebSocketUpgrade,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    // Cap frame + message size so a malicious client can't OOM the server
+    // by streaming a 60 MB JSON blob. 64 KiB is well above any legit
+    // payload (lobby code, move enum, deck of 6 ids).
+    ws.max_frame_size(64 * 1024)
+        .max_message_size(64 * 1024)
+        .on_upgrade(move |sock| handle_socket(sock, state, peer.ip()))
 }
 
-async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
+async fn handle_socket(socket: WebSocket, state: Arc<AppState>, peer_ip: std::net::IpAddr) {
     let session_id = Uuid::new_v4().to_string();
     let (mut sink, mut stream) = socket.split();
     let (tx, mut rx) = mpsc::unbounded_channel::<ServerMessage>();
+
+    // Per-session message rate limit. Lives on the stack so it's dropped
+    // when the connection closes — zero cleanup work elsewhere.
+    let mut rate = MsgRateLimit::default();
 
     let session = Arc::new(Session::new(
         session_id.clone(),
         "Anonymous".to_string(),
         tx.clone(),
+        peer_ip,
     ));
 
     session.send(ServerMessage::Welcome {
@@ -125,6 +154,13 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
     while let Some(Ok(msg)) = stream.next().await {
         match msg {
             Message::Text(text) => {
+                // Per-session WS message throttle. Past 30 msg/s the peer
+                // either has a bug or is hostile — drop silently rather
+                // than echo an error (which would itself eat bandwidth).
+                if !rate.allow() {
+                    warn!(session_id = %session_id, peer = %peer_ip, "ws message rate exceeded — dropped");
+                    continue;
+                }
                 let parsed: Result<ClientMessage, _> = serde_json::from_str(&text);
                 match parsed {
                     Ok(m) => handle_client_message(&state, &session, m).await,
@@ -163,8 +199,23 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
 async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, msg: ClientMessage) {
     match msg {
         ClientMessage::Hello { nickname } => {
-            let clean = nickname.trim();
-            if !clean.is_empty() && clean.len() <= 32 {
+            // Sanitize: strip control chars + RTL/bidi overrides + zero-width
+            // joiners. Cap at 24 chars (was 32) to leave room for the
+            // streak emoji we suffix in some surfaces. Reject if empty after.
+            let clean: String = nickname
+                .chars()
+                .filter(|c| {
+                    !c.is_control()
+                        && *c != '\u{200B}' && *c != '\u{200C}' && *c != '\u{200D}'  // ZWS / ZWNJ / ZWJ
+                        && *c != '\u{202A}' && *c != '\u{202B}' && *c != '\u{202C}'  // bidi: LRE / RLE / PDF
+                        && *c != '\u{202D}' && *c != '\u{202E}'                       // bidi: LRO / RLO
+                        && *c != '\u{2066}' && *c != '\u{2067}' && *c != '\u{2068}'  // bidi: LRI / RLI / FSI
+                        && *c != '\u{2069}'                                           // bidi: PDI
+                        && *c != '\u{FEFF}'                                           // BOM
+                })
+                .collect();
+            let clean = clean.trim();
+            if !clean.is_empty() && clean.chars().count() <= 24 {
                 session.set_nickname(clean.to_string());
             }
         }
@@ -178,13 +229,33 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
         }
 
         ClientMessage::JoinLobby { code } => {
-            let Some(lobby) = state.lobbies.join_lobby(&code) else {
+            // Brute-force gate. If this peer has already burned through the
+            // attempt budget in the active window, we stop the request right
+            // here without even consulting the lobby map — that way a
+            // scripted attacker can't piggy-back on the lookup cost.
+            if state.lobby_attempts.is_blocked(session.peer_ip) {
+                return reply_error(
+                    session,
+                    "lobby_rate_limited",
+                    "too many invalid lobby codes — try again in a minute",
+                );
+            }
+            // Reject obviously-malformed codes before consulting the map.
+            let normalized = code.trim().to_ascii_uppercase();
+            if normalized.len() != 6 || !normalized.chars().all(|c| c.is_ascii_alphanumeric()) {
+                state.lobby_attempts.record_failed(session.peer_ip);
+                return reply_error(session, "bad_code", "lobby codes are 6 chars A-Z 2-9");
+            }
+            let Some(lobby) = state.lobbies.join_lobby(&normalized) else {
+                state.lobby_attempts.record_failed(session.peer_ip);
                 return reply_error(session, "lobby_not_found", "no lobby with that code");
             };
             // Don't let yourself join your own lobby.
             if lobby.host.id == session.id {
                 return reply_error(session, "self_lobby", "cannot join your own lobby");
             }
+            // Legit join — clear any pent-up counter for this IP.
+            state.lobby_attempts.record_success(session.peer_ip);
             let match_tx = start_match(lobby.host.clone(), session.clone(), lobby.best_of);
             state
                 .in_match
@@ -264,9 +335,27 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
         }
 
         ClientMessage::Chat { emoji } => {
+            // Hard cap chat payload: max 8 graphemes, strip control + bidi
+            // chars. Prevents a hostile peer from flooding 60 KB "emoji"
+            // text at the opponent.
+            let clean: String = emoji
+                .chars()
+                .filter(|c| {
+                    !c.is_control()
+                        && *c != '\u{200B}' && *c != '\u{200C}' && *c != '\u{200D}'
+                        && *c != '\u{202A}' && *c != '\u{202B}' && *c != '\u{202C}'
+                        && *c != '\u{202D}' && *c != '\u{202E}'
+                        && *c != '\u{2066}' && *c != '\u{2067}' && *c != '\u{2068}'
+                        && *c != '\u{2069}' && *c != '\u{FEFF}'
+                })
+                .take(16) // 16 codepoints accounts for compound emoji (e.g. flags = 2 cp).
+                .collect();
+            if clean.is_empty() {
+                return;
+            }
             if let Some(entry) = state.in_match.get(&session.id) {
                 let (tx, slot) = entry.value().clone();
-                let _ = tx.send(MatchCommand::Chat { slot, emoji });
+                let _ = tx.send(MatchCommand::Chat { slot, emoji: clean });
             }
         }
 

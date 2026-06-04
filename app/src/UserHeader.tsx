@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store";
 import { levelFromXp } from "./leveling";
 import { rankFromLp } from "./rank";
-import { THEMES } from "./theme";
+import { THEMES, gradientFromTheme } from "./theme";
 import { avatarImgStyle } from "./avatar";
 import { useT } from "./i18n";
 import type { Page } from "./Sidebar";
@@ -52,7 +52,7 @@ export function UserHeader({ onNavigate }: { onNavigate: (p: Page) => void }) {
         {/* Avatar */}
         <div
           className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl shrink-0 ring-1 ring-white/20 shadow-lg overflow-hidden"
-          style={{ background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})` }}
+          style={{ background: gradientFromTheme(theme) }}
         >
           {/^(data:|\/|https?:)/.test(player.avatar) ? (
             <img
@@ -87,7 +87,7 @@ export function UserHeader({ onNavigate }: { onNavigate: (p: Page) => void }) {
               transition={{ type: "spring", stiffness: 120, damping: 20 }}
               className="h-full rounded-full"
               style={{
-                background: `linear-gradient(90deg, ${theme.primary}, ${theme.secondary})`,
+                background: gradientFromTheme(theme, "90deg"),
                 boxShadow: gain > 0 ? `0 0 12px ${theme.primary}` : "none",
               }}
             />

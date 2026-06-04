@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store";
 import { levelFromXp } from "./leveling";
-import { THEMES } from "./theme";
+import { THEMES, gradientFromTheme } from "./theme";
 import { useT } from "./i18n";
 import { LanguagePicker } from "./LanguagePicker";
 import { avatarImgStyle } from "./avatar";
 
-export type Page = "play" | "online" | "quests" | "packs" | "profile" | "history" | "about" | "contact";
+export type Page = "play" | "online" | "quests" | "packs" | "profile" | "history" | "about" | "contact" | "privacy";
 
 interface NavItem {
   id: Page;
@@ -58,7 +58,7 @@ function SidebarBody({
         <div
           className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0 ring-2 shadow-lg overflow-hidden"
           style={{
-            background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`,
+            background: gradientFromTheme(theme),
           }}
         >
           {/^(data:|\/|https?:)/.test(player.avatar) ? (
@@ -73,8 +73,8 @@ function SidebarBody({
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold truncate">{player.nickname}</div>
-          <div className="text-[10px] text-zinc-400 uppercase tracking-wider">
+          <div className="text-base font-bold truncate" style={{ fontFamily: "var(--font-headline)" }}>{player.nickname}</div>
+          <div className="text-[12px] text-zinc-300 uppercase tracking-wider font-bold">
             {t("sidebar.lvl")} {info.level}
           </div>
         </div>
@@ -89,14 +89,14 @@ function SidebarBody({
             transition={{ type: "spring", stiffness: 120, damping: 20 }}
             className="h-full rounded-full"
             style={{
-              background: `linear-gradient(90deg, ${theme.primary}, ${theme.secondary})`,
+              background: gradientFromTheme(theme, "90deg"),
               boxShadow: `0 0 12px ${theme.primary}80`,
             }}
           />
         </div>
-        <div className="mt-1 flex justify-between text-[10px] text-zinc-500">
+        <div className="mt-1.5 flex justify-between text-[12px] text-zinc-400 font-medium">
           <span>{info.xpInLevel} / {info.xpForNext} {t("sidebar.xp")}</span>
-          <span className="text-zinc-400">{player.rankLp} {t("sidebar.lp")}</span>
+          <span className="text-zinc-300 font-bold">{player.rankLp} {t("sidebar.lp")}</span>
         </div>
       </div>
 
@@ -109,15 +109,16 @@ function SidebarBody({
               key={item.id}
               onClick={() => handleNav(item.id)}
               className={
-                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition " +
+                "flex items-center gap-3 px-3 py-3 rounded-xl text-base font-semibold tracking-wide transition " +
                 (active
                   ? "bg-white/10 text-white"
-                  : "text-zinc-400 hover:text-white hover:bg-white/5")
+                  : "text-zinc-300 hover:text-white hover:bg-white/5")
               }
+              style={{ fontFamily: "var(--font-body)" }}
             >
               <span
                 className={
-                  "inline-block w-1 h-5 rounded-r-full transition " +
+                  "inline-block w-1 h-6 rounded-r-full transition " +
                   (active ? "" : "opacity-0")
                 }
                 style={{ background: theme.primary }}
@@ -126,7 +127,7 @@ function SidebarBody({
                 src={item.iconSrc}
                 alt=""
                 draggable={false}
-                className="w-7 h-7 shrink-0 select-none"
+                className="w-8 h-8 shrink-0 select-none"
               />
               <span>{t(item.labelKey)}</span>
             </button>

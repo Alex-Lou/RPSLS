@@ -138,15 +138,61 @@ export function BracketPage({
       {/* Player's match CTA */}
       {playerMatch && (
         <motion.button
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          whileTap={{ scale: 0.97 }}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileHover={{ y: -1 }}
+          whileTap={{ scale: 0.98 }}
+          transition={{ type: "spring", stiffness: 280, damping: 22 }}
           onClick={() => onStartMatch(playerMatch.opp.name + " (CPU)", playerMatch.opp.avatar)}
-          className="w-full py-4 rounded-2xl font-extrabold text-lg text-white
-                     bg-gradient-to-r from-emerald-500 to-teal-500
-                     shadow-xl shadow-emerald-500/30 transition animate-pulse"
+          aria-label={`Combattre ${playerMatch.opp.name}`}
+          // Refined primary CTA: a quiet glass surface tinted with the
+          // active theme accents, framed by a 1px hairline border in the
+          // primary accent. The text uses the theme headline font with a
+          // small icon left-aligned. Reads cinematic, not "html button".
+          className="group relative w-full overflow-hidden rounded-xl transition"
+          style={{
+            background:
+              "linear-gradient(135deg, " +
+              "color-mix(in oklab, var(--theme-primary) 22%, rgba(8,10,18,0.85)) 0%, " +
+              "color-mix(in oklab, var(--theme-secondary) 22%, rgba(8,10,18,0.85)) 100%)",
+            border: "1px solid color-mix(in oklab, var(--theme-primary) 55%, transparent)",
+            boxShadow:
+              "inset 0 1px 0 rgba(255,255,255,0.08), " +
+              "inset 0 -1px 0 rgba(0,0,0,0.25), " +
+              "0 4px 18px -10px color-mix(in oklab, var(--theme-primary) 50%, transparent)",
+          }}
         >
-          ⚔️ Combattre {playerMatch.opp.name} (CPU)
+          {/* Subtle moving sheen — reads as life without being flashy. */}
+          <span
+            aria-hidden
+            className="absolute inset-y-0 left-[-30%] w-[40%] opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{
+              background:
+                "linear-gradient(90deg, transparent, rgba(255,255,255,0.10), transparent)",
+              transform: "skewX(-18deg)",
+            }}
+          />
+          <span
+            className="relative flex items-center justify-center gap-3 py-4 px-5 text-white"
+            style={{
+              fontFamily: "var(--font-headline)",
+              fontWeight: 700,
+              fontSize: "1.0625rem",
+              letterSpacing: "0.08em",
+              textShadow: "0 1px 2px rgba(0,0,0,0.35)",
+            }}
+          >
+            <span
+              aria-hidden
+              className="inline-block w-1.5 h-1.5 rounded-full"
+              style={{
+                backgroundColor: "color-mix(in oklab, var(--theme-primary) 100%, transparent)",
+                boxShadow: "0 0 10px color-mix(in oklab, var(--theme-primary) 80%, transparent)",
+              }}
+            />
+            COMBATTRE
+            <span className="opacity-80">{playerMatch.opp.name.toUpperCase()}</span>
+          </span>
         </motion.button>
       )}
 

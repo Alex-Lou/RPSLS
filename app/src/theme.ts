@@ -24,3 +24,19 @@ export function applyTheme(themeId: ThemeId) {
   root.style.setProperty("--theme-secondary", t.secondary);
   root.style.setProperty("--theme-bg", t.bg);
 }
+
+/** Single source of truth for the "primary → secondary" linear gradient
+ *  used by buttons / banners / headers across the app. Previously this
+ *  exact `linear-gradient(...)` string was hand-written in 6 files; now
+ *  they all call this. Defaults to the live CSS vars so the gradient
+ *  follows the active background's accent override (see App.tsx), not just
+ *  the global theme.
+ *
+ *  Pass an explicit ThemeDef only when you need a STATIC gradient that
+ *  ignores the background accent override (rare — e.g. the theme picker
+ *  swatches that must each show their own colours). */
+export function gradientFromTheme(theme?: ThemeDef, angle = "135deg"): string {
+  const from = theme ? theme.primary : "var(--theme-primary)";
+  const to = theme ? theme.secondary : "var(--theme-secondary)";
+  return `linear-gradient(${angle}, ${from}, ${to})`;
+}

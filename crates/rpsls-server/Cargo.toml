@@ -32,3 +32,8 @@ dashmap = "6.1"
 uuid = { version = "1.10", features = ["v4"] }
 rand = "0.8"
 futures-util = "0.3"
+
+# Rate limiting — sliding-window per-IP / per-session helper.
+# tower_governor wraps the governor crate with axum-friendly extractors.
+tower_governor = "0.4"
+governor = "0.6"

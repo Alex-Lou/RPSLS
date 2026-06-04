@@ -67,6 +67,10 @@ export interface Player {
   /** Cosmetic background image painted behind every page. Defaults to the
    *  original radial-gradient. */
   backgroundId?: BackgroundId;
+  /** Opt-in to anonymized Sentry crash reports. Defaults to false to honour
+   *  the privacy-first stance laid out in the policy. The toggle lives in
+   *  Settings; flipping it at runtime calls initSentry / shutdownSentry. */
+  crashReports?: boolean;
 }
 
 export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: string }> = {
