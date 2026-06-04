@@ -117,26 +117,30 @@ export function RankedPickPhase({
     <div className="w-full flex flex-col items-center gap-1.5 sm:gap-3 pb-2 sm:pb-3">
       {showTimer && <TimerBar startedAt={startedAt} durationMs={deadlineMs} />}
 
-      {/* Targeting hint */}
-      <AnimatePresence>
-        {targetingHint && (
-          <motion.div
-            key={targetingHint}
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -2 }}
-            className="text-[12px] sm:text-sm uppercase tracking-[0.18em] text-amber-300 font-bold flex items-center gap-2"
-          >
-            {targetingHint}
-            <button
-              onClick={() => setSelectedCard(null)}
-              className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/15 text-[11px] font-bold"
+      {/* Targeting hint — rendered in a FIXED-height slot (always reserved)
+          so selecting a card doesn't change the layout height and make the
+          scale-to-fit wrapper bounce (shrink then grow). */}
+      <div className="h-7 flex items-center justify-center shrink-0">
+        <AnimatePresence>
+          {targetingHint && (
+            <motion.div
+              key={targetingHint}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -2 }}
+              className="text-[12px] sm:text-sm uppercase tracking-[0.18em] text-amber-300 font-bold flex items-center gap-2"
             >
-              {t("ranked.cta.cancelCard")}
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              {targetingHint}
+              <button
+                onClick={() => setSelectedCard(null)}
+                className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/15 text-[11px] font-bold"
+              >
+                {t("ranked.cta.cancelCard")}
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* Board — natural height; the parent stage scrolls if the whole pick
           phase exceeds the viewport, so nothing gets clipped. */}

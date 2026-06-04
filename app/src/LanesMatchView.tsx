@@ -856,12 +856,12 @@ function RevealCountdown() {
     >
       <div className="text-[10px] uppercase tracking-[0.4em] text-zinc-500">{tCount("lanes.reveal")}</div>
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xl sm:text-3xl font-black leading-tight">
-        {[tCount("online.reveal.rock"), tCount("online.reveal.paper"), tCount("online.reveal.scissors")].map((w, i) => (
+        {[tCount("online.reveal.rock"), tCount("online.reveal.paper"), tCount("online.reveal.scissors"), tCount("online.reveal.lizard"), tCount("online.reveal.spock")].map((w, i) => (
           <motion.span
             key={i}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 + i * 0.18 }}
+            transition={{ delay: 0.12 + i * 0.13 }}
             className="bg-gradient-to-br from-zinc-100 to-zinc-400 bg-clip-text text-transparent"
           >
             {w}
@@ -871,7 +871,7 @@ function RevealCountdown() {
       <motion.div
         initial={{ opacity: 0, scale: 0.7 }}
         animate={{ opacity: 1, scale: [0.7, 1.3, 1] }}
-        transition={{ delay: 0.78, duration: 0.4 }}
+        transition={{ delay: 0.9, duration: 0.4 }}
         className="text-3xl sm:text-5xl font-black bg-gradient-to-br from-amber-300 to-rose-400 bg-clip-text text-transparent"
       >
         {tCount("lanes.shoot")}
@@ -1066,21 +1066,23 @@ function ComboBanner({ combo }: { combo: ComboTheme }) {
       }}
       exit={{ opacity: 0, scale: 0.8, y: -8 }}
       transition={{ duration: epic ? 0.7 : 0.4, type: "spring", stiffness: 220, damping: 14 }}
-      className="flex flex-col items-center gap-1 mt-2"
+      className="flex flex-col items-center gap-1 mt-2 w-full max-w-full px-2"
     >
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0 max-w-full min-w-0">
         <motion.span
           animate={{ rotate: [0, -10, 10, -5, 5, 0] }}
           transition={{ duration: 0.8, repeat: epic ? Infinity : 1, repeatType: "loop" }}
-          className={"text-3xl sm:text-4xl"}
+          className={"text-2xl sm:text-4xl shrink-0"}
         >
           {combo.glyph}
         </motion.span>
         <span
           className={
-            (epic ? "text-3xl sm:text-5xl" : rare ? "text-2xl sm:text-3xl" : "text-xl sm:text-2xl") +
-            " font-black tracking-wider bg-gradient-to-br " + combo.gradient +
-            " bg-clip-text text-transparent drop-shadow-[0_4px_16px_rgba(0,0,0,0.4)] text-center"
+            // Smaller on mobile + wrap-friendly so long names (ANÉANTISSEMENT…)
+            // never bleed off the screen edge.
+            (epic ? "text-2xl sm:text-4xl" : rare ? "text-xl sm:text-3xl" : "text-lg sm:text-2xl") +
+            " font-black tracking-tight bg-gradient-to-br " + combo.gradient +
+            " bg-clip-text text-transparent drop-shadow-[0_4px_16px_rgba(0,0,0,0.4)] text-center break-words min-w-0 max-w-full"
           }
         >
           {name}
@@ -1088,7 +1090,7 @@ function ComboBanner({ combo }: { combo: ComboTheme }) {
         <motion.span
           animate={{ rotate: [0, 10, -10, 5, -5, 0] }}
           transition={{ duration: 0.8, repeat: epic ? Infinity : 1, repeatType: "loop" }}
-          className="text-3xl sm:text-4xl"
+          className="text-2xl sm:text-4xl shrink-0"
         >
           {combo.glyph}
         </motion.span>

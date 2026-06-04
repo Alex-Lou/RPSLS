@@ -69,7 +69,7 @@ export const CARDS: Record<CardId, RankedCard> = {
     target: "lane", palette: "cyan", glyph: "🪞",
     nameKey: "ranked.cards.mirror.name", descKey: "ranked.cards.mirror.desc",
     targetHintKey: "ranked.cards.mirror.targetHint",
-    art: null, // glyph fallback until art ships
+    art: "/Cards Bonus/mirror.png",
   },
 
   /* 🟣 EPICS — 3 mana */
@@ -106,7 +106,7 @@ export const CARDS: Record<CardId, RankedCard> = {
     target: "gamble", palette: "rose", glyph: "🎲",
     nameKey: "ranked.cards.gambit.name", descKey: "ranked.cards.gambit.desc",
     targetHintKey: "ranked.cards.gambit.targetHint",
-    art: null, // glyph fallback until art ships
+    art: "/Cards Bonus/gambit.png",
   },
 
   /* 🟡 LEGENDARY — 4 mana */

@@ -1589,12 +1589,12 @@ function RevealCountdown() {
         {t("online.reveal.label")}
       </div>
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xl sm:text-3xl font-black max-w-full leading-tight">
-        {[t("online.reveal.rock"), t("online.reveal.paper"), t("online.reveal.scissors")].map((w, i) => (
+        {[t("online.reveal.rock"), t("online.reveal.paper"), t("online.reveal.scissors"), t("online.reveal.lizard"), t("online.reveal.spock")].map((w, i) => (
           <motion.span
             key={w}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 + i * 0.18, duration: 0.25 }}
+            transition={{ delay: 0.12 + i * 0.13, duration: 0.25 }}
             className="bg-gradient-to-br from-zinc-100 to-zinc-400 bg-clip-text text-transparent"
           >
             {w}
@@ -1604,7 +1604,7 @@ function RevealCountdown() {
       <motion.div
         initial={{ opacity: 0, scale: 0.7 }}
         animate={{ opacity: 1, scale: [0.7, 1.3, 1] }}
-        transition={{ delay: 0.78, duration: 0.4 }}
+        transition={{ delay: 0.9, duration: 0.4 }}
         className="text-3xl sm:text-5xl font-black bg-gradient-to-br from-amber-300 to-rose-400 bg-clip-text text-transparent"
       >
         {t("online.reveal.shoot")}
