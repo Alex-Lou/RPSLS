@@ -137,3 +137,21 @@ body::-webkit-scrollbar,
 .bg-themed-br {
   background-image: linear-gradient(135deg, var(--theme-primary), var(--theme-secondary));
 }
+
+/* ─────────── Global button baseline ───────────
+   One consistent feel + accessibility for EVERY button in the app, applied
+   without touching each call site (and without a CSS transform that would
+   fight Motion's whileTap on motion.button). */
+button {
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+/* Keyboard / focus ring in the active theme colour — a Play-Store a11y win. */
+button:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--theme-primary) 75%, transparent);
+  outline-offset: 2px;
+}
