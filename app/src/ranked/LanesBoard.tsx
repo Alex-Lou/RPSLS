@@ -196,24 +196,22 @@ function PlayerRow({
   );
 }
 
-function FaceDownCard({ index, pulsing, clickable = false, onClick }: {
+function FaceDownCard({ index: _index, pulsing: _pulsing, clickable = false, onClick }: {
   index: number; pulsing: boolean; clickable?: boolean; onClick?: () => void;
 }) {
+  // Static, solid card — no opacity pulse (that read as "unstable/random").
+  // A clickable Augur target keeps a steady highlight instead of flickering.
   const cls =
     "aspect-[5/4] w-full rounded-xl border-2 flex items-center justify-center " +
     (clickable
-      ? "border-violet-400/60 bg-violet-500/20 cursor-pointer hover:bg-violet-500/30 ring-2 ring-violet-400/40"
-      : "border-dashed border-white/10 bg-black/30");
+      ? "border-violet-400/60 bg-violet-500/25 cursor-pointer hover:bg-violet-500/35 ring-2 ring-violet-400/40"
+      : "border-dashed border-white/15 bg-zinc-900/80");
   const inner = (
-    <motion.div
-      animate={pulsing ? { opacity: [0.55, 1, 0.55] } : { opacity: 1 }}
-      transition={pulsing ? { duration: 1.4, repeat: Infinity, delay: index * 0.18 } : undefined}
-      className={cls}
-    >
-      <span className={"text-3xl sm:text-4xl font-black " + (clickable ? "text-violet-300" : "text-zinc-700")}>
+    <div className={cls}>
+      <span className={"text-3xl sm:text-4xl font-black " + (clickable ? "text-violet-300" : "text-zinc-600")}>
         {clickable ? "👁️" : "?"}
       </span>
-    </motion.div>
+    </div>
   );
   if (clickable) return <button onClick={onClick} className="w-full">{inner}</button>;
   return inner;
@@ -232,7 +230,7 @@ function FaceUpOppCard({ move, verdict, revealed, preReveal }: {
       initial={{ opacity: 0, scale: 0.7, rotateY: 90 }}
       animate={revealed ? { opacity: 1, scale: 1, rotateY: 0 } : { opacity: 0.3, scale: 0.85, rotateY: 90 }}
       transition={{ type: "spring", stiffness: 280, damping: 22 }}
-      className={"aspect-[5/4] w-full rounded-xl ring-2 flex items-center justify-center " + ring + " " + (preReveal ? "bg-violet-500/15" : "bg-black/30")}
+      className={"aspect-[5/4] w-full rounded-xl ring-2 flex items-center justify-center " + ring + " " + (preReveal ? "bg-violet-500/20" : "bg-zinc-900/75")}
       style={{ transformPerspective: 800 }}
     >
       <Hand move={move} size="md" emphasis={verdict === "win" ? "winner" : verdict === "loss" ? "loser" : "default"} />
@@ -268,7 +266,7 @@ function LaneSlot({ index, pick, favoured, verdict, cardHere, onClick, disabled 
         className={
           "aspect-[5/4] w-full rounded-xl border-2 transition flex items-center justify-center relative ring-2 " +
           (verdictRing ?? (favoured ? ringFav : ringIdle)) + " " +
-          (pick ? "border-emerald-400/40 bg-emerald-500/10" : "border-dashed border-white/15 bg-black/20")
+          (pick ? "border-emerald-400/50 bg-emerald-600/25" : "border-dashed border-white/15 bg-zinc-900/70")
         }
       >
         {pick ? (

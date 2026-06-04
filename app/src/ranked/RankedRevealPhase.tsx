@@ -72,9 +72,9 @@ export function RankedRevealPhase({
     <motion.div
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="w-full h-full flex flex-col items-center gap-2 sm:gap-3"
+      className="w-full flex flex-col items-center gap-2 sm:gap-3"
     >
-      <div className="flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden">
+      <div className="w-full flex items-center justify-center">
         <LanesBoard
           youName={youName}
           opponentName={opponentName}

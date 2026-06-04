@@ -113,7 +113,7 @@ export function RankedPickPhase({
   })();
 
   return (
-    <div className="w-full h-full [@media(max-height:560px)]:h-auto flex flex-col items-center gap-1.5 sm:gap-3 pb-2 sm:pb-3">
+    <div className="w-full flex flex-col items-center gap-1.5 sm:gap-3 pb-2 sm:pb-3">
       <TimerBar startedAt={startedAt} durationMs={deadlineMs} />
 
       {/* Targeting hint */}
@@ -137,8 +137,9 @@ export function RankedPickPhase({
         )}
       </AnimatePresence>
 
-      {/* Board */}
-      <div className="flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden">
+      {/* Board — natural height; the parent stage scrolls if the whole pick
+          phase exceeds the viewport, so nothing gets clipped. */}
+      <div className="w-full flex items-center justify-center">
         <LanesBoard
           youName={youName}
           opponentName={opponentName}

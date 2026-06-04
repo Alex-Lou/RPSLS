@@ -185,7 +185,7 @@ export function LanesMatchView({
 
   /* ──────────── Render ──────────── */
   return (
-    <div className="relative flex flex-col gap-2 sm:gap-3 flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+    <div className="relative flex flex-col gap-2 sm:gap-3 flex-1 min-h-0 overflow-hidden">
       {/* Splash overlay */}
       <AnimatePresence>
         {showSplash && (
@@ -224,9 +224,11 @@ export function LanesMatchView({
         )}
       </AnimatePresence>
 
-      {/* Stage — claims all remaining vertical space inside the locked
-          overflow-hidden container. No min-height so it shrinks to fit. */}
-      <div className="relative flex-1 min-h-0 flex items-center justify-center overflow-hidden">
+      {/* Stage — scroll container that CENTERS the phase when it fits and
+          SCROLLS when it doesn't (m-auto on a flex-column child), so the
+          board + picker + lock are never clipped top/bottom after picking. */}
+      <div className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden flex flex-col">
+        <div className="m-auto w-full flex flex-col items-center py-1">
         {phase === "matched" && !showSplash && (
           <div className="text-sm text-zinc-400">{t("lanes.preparingFirstRound")}</div>
         )}
@@ -260,6 +262,7 @@ export function LanesMatchView({
         {phase === "match_end" && end && (
           <MatchEndScene end={end} onBack={onLeave} onRematch={onRematch} />
         )}
+        </div>
       </div>
 
       {/* Forfeit button — shown anytime but match-end. */}
@@ -477,13 +480,13 @@ function PickStage({
   // Combo preview — only triggers once all 3 picks are placed, before lock.
   const preview = allFilled ? detectPlayerCombo(picks as Move[]) : null;
   return (
-    <div className="w-full h-full flex flex-col items-center gap-2 sm:gap-3">
+    <div className="w-full flex flex-col items-center gap-2 sm:gap-3">
       {/* Timer — pinned top */}
       <TimerBar startedAt={startedAt} durationMs={deadlineMs} />
 
-      {/* Table is the ONLY part allowed to compress, so the picker + LOCK
-          button below it stay reachable on every phone height. */}
-      <div className="flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden">
+      {/* Table at natural height; the parent stage scrolls if the whole pick
+          phase exceeds the viewport so the picker + LOCK stay reachable. */}
+      <div className="w-full flex items-center justify-center">
       <GameTable
         opponentName={opponentName}
         youName={youName}
@@ -796,9 +799,9 @@ function LockedStage({
     <motion.div
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="w-full h-full flex flex-col items-center gap-2 sm:gap-4"
+      className="w-full flex flex-col items-center gap-2 sm:gap-4"
     >
-      <div className="flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden">
+      <div className="w-full flex items-center justify-center">
       <GameTable
         opponentName={opponentName}
         youName={youName}
@@ -933,9 +936,9 @@ function RevealStage({
     <motion.div
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="w-full h-full flex flex-col items-center gap-2 sm:gap-3"
+      className="w-full flex flex-col items-center gap-2 sm:gap-3"
     >
-      <div className="flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden">
+      <div className="w-full flex items-center justify-center">
       <GameTable
         opponentName={opponentName}
         youName={youName}

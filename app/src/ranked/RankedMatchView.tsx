@@ -163,7 +163,12 @@ export function RankedMatchView({
         caption={t("lanes.scoreCaption", { round: round?.no ?? 1, target: match.winTo })}
       />
 
-      <div className="relative flex-1 min-h-0 flex items-center justify-center overflow-hidden [@media(max-height:560px)]:overflow-y-auto [@media(max-height:560px)]:items-start">
+      {/* Scroll container that CENTERS the phase when it fits and SCROLLS
+          when it doesn't (m-auto on a flex-column child) — so the board +
+          cards + picker + lock are never clipped top/bottom once the player
+          has picked, on any phone height. */}
+      <div className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden flex flex-col">
+        <div className="m-auto w-full flex flex-col items-center py-1">
         {phase === "matched" && !showSplash && (
           <div className="flex flex-col items-center gap-3 max-w-sm px-4">
             <div className="text-sm text-zinc-400">{t("lanes.preparingFirstRound")}</div>
@@ -229,6 +234,7 @@ export function RankedMatchView({
             backLabel={onNext ? "Suivant →" : undefined}
           />
         )}
+        </div>
       </div>
     </div>
   );
