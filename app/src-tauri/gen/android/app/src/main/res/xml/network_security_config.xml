@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Network security posture for the Play Store build.
+
+  Base: cleartext (plain http/ws) is DENIED app-wide. All production traffic
+  goes to the cloud server over wss:// (TLS), so this is the correct, secure
+  default and a positive signal to Google's security review.
+
+  Exceptions: localhost / 10.0.2.2 (the Android emulator's host loopback)
+  are allowed cleartext so local development against a dev server still works.
+  Arbitrary LAN-by-IP play is intentionally NOT whitelisted in the release
+  build — CIDR ranges aren't expressible here and shipping blanket cleartext
+  would be a review flag. LAN mode remains available in debug builds.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>

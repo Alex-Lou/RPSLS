@@ -17,3 +17,15 @@ authors = ["Alex <alex.guennad@gmail.com>"]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rpsls-core = { path = "crates/rpsls-core" }
+
+# Release profile — shrinks the Android .so / server binary for the Play
+# Store. The default kept ~83 MB of debug tables in the .so; `strip` removes
+# those for the bulk of the win at near-zero compile cost, keeping our fast
+# debug-install iteration loop intact. opt-level "s" trims a bit more.
+#
+# For the FINAL store AAB you can temporarily add `lto = "fat"` and
+# `codegen-units = 1` for an extra ~10-15% size cut (slow compile, worth it
+# once before upload, not during dev).
+[profile.release]
+opt-level = "s"
+strip = true
