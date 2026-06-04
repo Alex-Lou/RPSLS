@@ -15,7 +15,7 @@ import {
   aiMove,
   rollAiMood,
 } from "./game";
-import { Hand, MysteryHand, MOVE_PALETTE } from "./icons";
+import { Hand, MysteryHand, MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "./icons";
 import { BattlePad } from "./BattlePad";
 import { useStore } from "./store";
 import {
@@ -1340,9 +1340,10 @@ function PickPanel({
         </div>
       )}
 
-      {/* 5 hands: on mobile, 3 cols → centered row of 3 + centered row of 2 via 6-col trick.
-          On desktop, single row of 5. */}
-      <div className="grid grid-cols-6 sm:grid-cols-5 gap-2 sm:gap-4 w-full max-w-3xl">
+      {/* 5 hands in one clean, proportional row — same compact picker model
+          as the Lanes / Ranked modes (was big 'lg' cards in a 3+2 grid, which
+          felt oversized and crowded on phones). */}
+      <div className="grid grid-cols-5 gap-1.5 sm:gap-3 w-full max-w-md">
         {MOVES.map((m, i) => (
           <PickHandButton
             key={m}
@@ -1377,6 +1378,7 @@ function PickHandButton({
   onPick: (m: Move) => void;
 }) {
   const [shock, setShock] = useState(false);
+  const pal = MOVE_PALETTE[move];
 
   function handleClick() {
     if (disabled) return;
@@ -1395,17 +1397,25 @@ function PickHandButton({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.04 * index, duration: 0.25 }}
-      whileHover={{ y: -6, scale: 1.05 }}
-      whileTap={{ scale: 0.88 }}
-      className={
-        "relative col-span-2 sm:col-span-1 " +
-        (index === 3 ? "col-start-2 sm:col-start-auto " : "") +
-        "group rounded-2xl p-2 sm:p-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 disabled:opacity-50 disabled:cursor-not-allowed transition flex flex-col items-center gap-1.5 sm:gap-2.5"
-      }
+      whileHover={{ y: -4, scale: 1.04 }}
+      whileTap={{ scale: 0.86 }}
+      aria-label={label}
+      className="relative aspect-[4/5] rounded-xl flex flex-col items-center justify-center gap-0.5 py-1 text-white transition disabled:opacity-50 disabled:cursor-not-allowed"
+      // Dark glass + theme-blended rim — identical treatment to the Lanes /
+      // Ranked pickers so every mode's move buttons look consistent and adapt
+      // to the active background accent.
+      style={{
+        background: "linear-gradient(160deg, rgba(20,22,32,0.92) 0%, rgba(10,12,20,0.92) 100%)",
+        border: `2px solid ${moveRim(pal.hex)}`,
+        boxShadow: `0 0 12px -2px ${moveGlow(pal.hex)}, inset 0 1px 0 rgba(255,255,255,0.08)`,
+      }}
     >
       <PickShock show={shock} />
-      <Hand move={move} size="lg" />
-      <span className="text-xs sm:text-sm font-medium text-zinc-300 group-hover:text-white">
+      <MoveGlyph move={move} className="w-9 h-9 sm:w-11 sm:h-11" />
+      <span
+        className="text-[10px] sm:text-[11px] uppercase tracking-wider font-bold leading-none"
+        style={{ color: moveRim(pal.hex) }}
+      >
         {label}
       </span>
     </motion.button>
