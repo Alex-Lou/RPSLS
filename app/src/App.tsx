@@ -207,7 +207,7 @@ export default function App() {
                   double-count it here). Bottom pad = minimal nav-bar clearance
                   on top of #root's safe-area. Keeps the match using the full
                   vertical space instead of floating with big top/bottom voids. */}
-              <main className="flex-1 flex flex-col min-h-0 overflow-x-hidden overflow-y-auto pt-12 pb-4 md:pt-0 md:pb-0">
+              <main className="flex-1 flex flex-col min-h-0 overflow-x-hidden overflow-y-auto pt-12 pb-4 md:pt-0 md:pb-0 [@media(max-height:540px)]:pt-2 [@media(max-height:540px)]:pb-1">
                 {/* Persistent player header — shown on every menu page, never on
                     a match surface (Play / Online own internal match states). Its
                     XP bar is where quest/match XP gains visibly land. */}

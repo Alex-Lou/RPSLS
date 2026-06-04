@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import { useStore } from "./store";
 import { THEMES, gradientFromTheme } from "./theme";
 import { levelFromXp } from "./leveling";
@@ -10,8 +10,7 @@ import { isAvatarImage, avatarImgStyle } from "./avatar";
 import { MOVES } from "./game";
 import { BattlePad } from "./BattlePad";
 import { useT } from "./i18n";
-import { hapticTap, hapticMatchStart, hapticMatchWin } from "./haptic";
-import { LevelUpOverlay } from "./LevelUpOverlay";
+import { hapticTap, hapticMatchStart } from "./haptic";
 
 /** 17 themed PNG avatars under /public/Profile miniatures/.
  *  Mix of 8 dark-fantasy badge sigils and 9 cute kawaii chibis (one per
@@ -47,10 +46,6 @@ export function ProfilePage() {
   const [editingNick, setEditingNick] = useState(false);
   const [nickDraft, setNickDraft] = useState(player.nickname);
   const [confirmReset, setConfirmReset] = useState(false);
-  /** Manual trigger for the level-up celebration, used by the debug
-   *  "Tester level-up" button so the player (or me) can preview the
-   *  animation without grinding XP. */
-  const [previewLevel, setPreviewLevel] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const bgFileRef = useRef<HTMLInputElement>(null);
 
@@ -220,27 +215,9 @@ export function ProfilePage() {
               <span>{info.xpInLevel} / {info.xpForNext} XP to next level</span>
               <span>Lvl {info.level} → {info.level + 1}</span>
             </div>
-            {/* Debug / showcase trigger so the celebration can be previewed
-                without grinding XP. Uses the *next* level number so it
-                feels like a real promotion when shown. */}
-            <button
-              onClick={() => {
-                hapticMatchWin();
-                setPreviewLevel(info.level + 1);
-                window.setTimeout(() => setPreviewLevel(null), 2800);
-              }}
-              className="mt-3 w-full px-3 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500/20 via-fuchsia-500/20 to-cyan-500/20 border border-white/15 text-zinc-200 hover:from-amber-500/30 hover:via-fuchsia-500/30 hover:to-cyan-500/30 transition"
-            >
-              ✨ Tester l'animation de level-up
-            </button>
           </div>
         </div>
       </div>
-
-      {/* Manual preview overlay — fires only when the test button is clicked. */}
-      <AnimatePresence>
-        {previewLevel !== null && <LevelUpOverlay level={previewLevel} />}
-      </AnimatePresence>
 
       {/* Avatar picker */}
       <section className="bg-white/5 border border-white/10 rounded-3xl p-5">

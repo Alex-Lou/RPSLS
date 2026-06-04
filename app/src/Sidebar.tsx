@@ -196,13 +196,12 @@ export function MobileShell({
       <button
         aria-label="Open menu"
         onClick={() => setOpen(true)}
-        className="md:hidden fixed top-3 left-3 z-30 w-11 h-11 rounded-2xl bg-black/55 backdrop-blur border border-white/15 flex items-center justify-center text-zinc-100 active:scale-95 transition shadow-lg"
-        style={{
-          top: "max(env(safe-area-inset-top), 32px)",
-          left: "max(env(safe-area-inset-left), 12px)",
-        }}
+        // Position via Tailwind (not inline) so the short-viewport overrides
+        // actually apply. Smaller + tighter to the corner on landscape so it
+        // stops eating the play area; full size in portrait.
+        className="md:hidden fixed z-30 w-11 h-11 rounded-2xl bg-black/55 backdrop-blur border border-white/15 flex items-center justify-center text-zinc-100 active:scale-95 transition shadow-lg top-[max(env(safe-area-inset-top),32px)] left-[max(env(safe-area-inset-left),12px)] [@media(max-height:540px)]:w-8 [@media(max-height:540px)]:h-8 [@media(max-height:540px)]:top-1 [@media(max-height:540px)]:left-1"
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
           <line x1="4" y1="7" x2="20" y2="7" />
           <line x1="4" y1="12" x2="20" y2="12" />
           <line x1="4" y1="17" x2="20" y2="17" />
