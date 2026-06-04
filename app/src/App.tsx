@@ -162,6 +162,19 @@ export default function App() {
   return (
     <div className="h-full w-full select-none overflow-hidden">
       {activeScene && stage !== "splash" && <ThemedBackdrop scene={activeScene} />}
+      {/* Readability scrim over a player's OWN uploaded image — coded scenes
+          already ship their own vignette, but a raw photo can be bright/busy
+          enough to drown menu text. A very light dark wash keeps every page
+          legible without hiding the chosen picture. */}
+      {stage !== "splash" && backgroundId === "custom" && customBgUrl && (
+        <div
+          className="fixed inset-0 z-0 pointer-events-none"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.26) 28%, rgba(0,0,0,0.26) 72%, rgba(0,0,0,0.46) 100%)",
+          }}
+        />
+      )}
       {/* mode="wait" — Alex wanted the sequence to read as "splash ONLY, then
           menu ONLY", never overlapping. The splash fully exits before the
           shell mounts so the player never sees the theme bg leaking through

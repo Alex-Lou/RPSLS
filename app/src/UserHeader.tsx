@@ -102,7 +102,7 @@ export function UserHeader({ onNavigate }: { onNavigate: (p: Page) => void }) {
               animate={{
                 width: `${info.progress * 100}%`,
                 boxShadow: gain > 0
-                  ? [`0 0 0px ${theme.primary}`, `0 0 16px ${theme.primary}`, `0 0 6px ${theme.primary}`]
+                  ? ["0 0 0px var(--theme-primary)", "0 0 16px var(--theme-primary)", "0 0 6px var(--theme-primary)"]
                   : "0 0 0px transparent",
               }}
               transition={{
@@ -110,7 +110,9 @@ export function UserHeader({ onNavigate }: { onNavigate: (p: Page) => void }) {
                 boxShadow: { duration: 1.4, ease: "easeOut" },
               }}
               className="h-full rounded-full"
-              style={{ background: gradientFromTheme(theme, "90deg") }}
+              // Follow the chosen background's accent (App.tsx maps it onto
+              // --theme-primary/secondary) so the XP bar matches the theme/bg.
+              style={{ background: "linear-gradient(90deg, var(--theme-primary), var(--theme-secondary))" }}
             />
             <AnimatePresence>
               {gain > 0 && (
@@ -120,7 +122,7 @@ export function UserHeader({ onNavigate }: { onNavigate: (p: Page) => void }) {
                   exit={{ opacity: 0 }}
                   transition={{ duration: 1.1, ease: "easeOut" }}
                   className="absolute inset-y-0 w-1/3"
-                  style={{ background: `linear-gradient(90deg, transparent, ${theme.secondary}, transparent)` }}
+                  style={{ background: "linear-gradient(90deg, transparent, var(--theme-secondary), transparent)" }}
                 />
               )}
             </AnimatePresence>

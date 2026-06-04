@@ -89,8 +89,8 @@ function SidebarBody({
             transition={{ type: "spring", stiffness: 120, damping: 20 }}
             className="h-full rounded-full"
             style={{
-              background: gradientFromTheme(theme, "90deg"),
-              boxShadow: `0 0 12px ${theme.primary}80`,
+              background: "linear-gradient(90deg, var(--theme-primary), var(--theme-secondary))",
+              boxShadow: "0 0 12px color-mix(in oklab, var(--theme-primary) 50%, transparent)",
             }}
           />
         </div>

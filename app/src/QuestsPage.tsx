@@ -185,7 +185,7 @@ function QuestRow({
                     ? "#52525b"
                     : s.complete
                     ? "linear-gradient(90deg, #fbbf24, #f59e0b)"
-                    : `linear-gradient(90deg, ${themePrimary}, ${themeSecondary})`,
+                    : "linear-gradient(90deg, var(--theme-primary), var(--theme-secondary))",
               }}
             />
           </div>

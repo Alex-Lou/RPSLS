@@ -40,7 +40,10 @@ export function RankedLobby({ onViewBracket, onManageDeck }: { onViewBracket: ()
     >
       {/* Title */}
       <div className="text-center">
-        <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-amber-300 via-rose-400 to-fuchsia-400 bg-clip-text text-transparent leading-tight">
+        <h1
+          className="text-2xl sm:text-4xl font-extrabold tracking-tight text-themed leading-tight"
+          style={{ fontFamily: "var(--font-headline)" }}
+        >
           Constellation Ranked
         </h1>
         <p className="mt-1 text-zinc-400 text-xs sm:text-sm">3 lanes · Best of 5 · Mana & Cartes</p>

@@ -1323,7 +1323,7 @@ function PickPanel({
             <motion.div
               className={
                 "h-full rounded-full " +
-                (urgent ? "bg-rose-400" : "bg-gradient-to-r from-violet-400 to-fuchsia-400")
+                (urgent ? "bg-rose-400" : "bg-themed")
               }
               animate={{
                 width: `${pct * 100}%`,

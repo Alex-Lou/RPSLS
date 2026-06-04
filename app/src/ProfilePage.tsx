@@ -286,8 +286,8 @@ export function ProfilePage() {
                 className="h-full rounded-full"
                 style={{
                   width: `${info.progress * 100}%`,
-                  background: gradientFromTheme(theme, "90deg"),
-                  boxShadow: `0 0 12px ${theme.primary}80`,
+                  background: "linear-gradient(90deg, var(--theme-primary), var(--theme-secondary))",
+                  boxShadow: "0 0 12px color-mix(in oklab, var(--theme-primary) 50%, transparent)",
                 }}
               />
             </div>

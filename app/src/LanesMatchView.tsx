@@ -722,7 +722,7 @@ function TimerBar({ startedAt, durationMs }: { startedAt: number; durationMs: nu
     }
   }, [level]);
 
-  const color = critical || expired ? "bg-rose-500" : urgent ? "bg-amber-400" : "bg-violet-400";
+  const color = critical || expired ? "bg-rose-500" : urgent ? "bg-amber-400" : "bg-themed";
   const num = Math.ceil(remaining / 1000);
 
   return (

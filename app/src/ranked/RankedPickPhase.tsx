@@ -272,7 +272,7 @@ function TimerBar({ startedAt, durationMs }: { startedAt: number; durationMs: nu
       prevLevel.current = level;
     }
   }, [level]);
-  const color = critical ? "bg-rose-500" : urgent ? "bg-amber-400" : "bg-violet-400";
+  const color = critical ? "bg-rose-500" : urgent ? "bg-amber-400" : "bg-themed";
   const num = Math.ceil(remaining / 1000);
   return (
     <div className="w-full max-w-md flex items-center gap-3">
