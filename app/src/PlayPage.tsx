@@ -35,7 +35,7 @@ import { LocalLanesGame } from "./LocalLanesGame";
 import { QuitConfirmModal } from "./match/QuitConfirmModal";
 import { RankedGame } from "./ranked/RankedGame";
 import { RankedLobby } from "./ranked/RankedLobby";
-import { makeTournament, resolvePlayerMatch, type TournamentState } from "./ranked/TournamentBracket";
+import { initialTournament, resolvePlayerMatch, isPlayerEliminated, type TournamentState } from "./ranked/TournamentBracket";
 import { BracketPage } from "./ranked/BracketPage";
 import { DeckManager } from "./ranked/DeckManager";
 import { levelFromXp } from "./leveling";
@@ -64,7 +64,7 @@ export function PlayPage({
   const [tournament, setTournament] = useState<TournamentState>(() => {
     const p = useStore.getState().player;
     const l = levelFromXp(p.xp);
-    return makeTournament(p.nickname, p.avatar, l.level);
+    return initialTournament(p.nickname, p.avatar, l.level);
   });
 
   // Reset to mode-select on explicit Home clicks (not on first mount).
@@ -127,7 +127,15 @@ export function PlayPage({
         {view.kind === "ranked_lobby" && (
           <RankedLobby
             key="ranked-lobby"
-            onViewBracket={() => setView({ kind: "ranked_bracket" })}
+            onViewBracket={() => {
+              // Fresh start after a finished or lost run, otherwise resume.
+              setTournament((t) =>
+                t.phase === "complete" || isPlayerEliminated(t)
+                  ? initialTournament(t.you.name, t.you.avatar, t.you.level)
+                  : t,
+              );
+              setView({ kind: "ranked_bracket" });
+            }}
             onManageDeck={() => setView({ kind: "ranked_deck" })}
           />
         )}
