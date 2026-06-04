@@ -58,7 +58,7 @@ export function RankedPickPhase({
     if (selectedCard) {
       const card = CARDS[selectedCard];
       if (card.target === "lane") {
-        onPlayCard({ id: selectedCard as "aegis" | "surge" | "precision" | "anchor" | "curse" | "tide" | "riposte", lane });
+        onPlayCard({ id: selectedCard as "aegis" | "surge" | "precision" | "anchor" | "curse" | "tide" | "riposte" | "mirror", lane });
         setSelectedCard(null);
       }
       return;
@@ -91,6 +91,8 @@ export function RankedPickPhase({
       } else if (id === "tide") {
         // Tide targets "self" but we store a dummy lane 0
         onPlayCard({ id: "tide", lane: 0 as LaneTarget });
+      } else if (id === "gambit") {
+        onPlayCard({ id: "gambit" });
       }
       return;
     }

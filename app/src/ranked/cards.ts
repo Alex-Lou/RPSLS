@@ -64,6 +64,13 @@ export const CARDS: Record<CardId, RankedCard> = {
     targetHintKey: "ranked.cards.curse.targetHint",
     art: "/Cards Bonus/curse.png",
   },
+  mirror: {
+    id: "mirror", cost: 2, rarity: "rare",
+    target: "lane", palette: "cyan", glyph: "🪞",
+    nameKey: "ranked.cards.mirror.name", descKey: "ranked.cards.mirror.desc",
+    targetHintKey: "ranked.cards.mirror.targetHint",
+    art: null, // glyph fallback until art ships
+  },
 
   /* 🟣 EPICS — 3 mana */
   heist: {
@@ -93,6 +100,13 @@ export const CARDS: Record<CardId, RankedCard> = {
     nameKey: "ranked.cards.vortex.name", descKey: "ranked.cards.vortex.desc",
     targetHintKey: "ranked.cards.vortex.targetHint",
     art: "/Cards Bonus/vortex.png",
+  },
+  gambit: {
+    id: "gambit", cost: 2, rarity: "epic",
+    target: "gamble", palette: "rose", glyph: "🎲",
+    nameKey: "ranked.cards.gambit.name", descKey: "ranked.cards.gambit.desc",
+    targetHintKey: "ranked.cards.gambit.targetHint",
+    art: null, // glyph fallback until art ships
   },
 
   /* 🟡 LEGENDARY — 4 mana */

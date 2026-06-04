@@ -22,8 +22,10 @@ const TOTAL = MAIN_SLOTS + RESERVE_SLOTS;
 const STARTER_CARDS: CardId[] = ["aegis", "precision", "anchor", "second-wind", "surge", "augur"];
 
 const UNLOCK_HINTS: Partial<Record<CardId, string>> = {
+  mirror: "Gagne 3 matchs en mode classé",
   riposte: "Gagne 5 matchs en mode classé",
   curse: "Gagne 10 matchs en mode classé",
+  gambit: "Atteins 1200 LP",
   heist: "Atteins le rang Silver",
   tide: "Gagne un tournoi",
   oracle: "Atteins le rang Gold",

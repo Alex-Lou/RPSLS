@@ -133,6 +133,9 @@ function applyRankedUnlocks(
   if (rankLp >= 1100) set.add("heist");
   if (rankLp >= 1300) set.add("oracle");
   if (rankLp >= 1500) set.add("supernova");
+  // New mechanics cards.
+  if (constellWins >= 3) set.add("mirror");   // early rare — anti-counter tool
+  if (rankLp >= 1200) set.add("gambit");      // mid-tier high-roll epic
   return set.size === collection.length ? collection : Array.from(set);
 }
 

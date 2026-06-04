@@ -311,6 +311,15 @@ export function RankedGame({
     const vortexActive = !timedOut && cardPlayed?.id === "vortex";
     const cpuPlays: LanePlay[] = vortexActive ? applyVortex(cpu.plays) : cpu.plays;
 
+    // Mirror: copy the opponent's move on the targeted lane → that lane
+    // becomes identical moves → a guaranteed draw, neutralising a coup the
+    // player can't otherwise beat. Applied before resolution so the engine
+    // scores it naturally.
+    if (!timedOut && cardPlayed?.id === "mirror") {
+      const ml = (cardPlayed as { lane: LaneTarget }).lane;
+      playerPlays[ml] = { mv: cpuPlays[ml].mv, mana: 0 };
+    }
+
     let base: RoundOutcome;
     if (timedOut) {
       base = {
@@ -341,9 +350,15 @@ export function RankedGame({
       fx,
     );
     const finalWinner = finalRoundWinner(fx.outcome, bonuses, myCard, oppCard);
-    const yourTotal = Math.max(0,
+    // Gambit (high-roll): a won Gambit round counts DOUBLE toward the match
+    // (extra round-win) and doubles the shown points; a lost Gambit round
+    // costs an extra card (the normal loss-discard PLUS one). Pure swing.
+    const gambitActive = !timedOut && myCard?.id === "gambit";
+    const gambitWinBonus = gambitActive && finalWinner === "a" ? 1 : 0;
+    const yourTotalRaw = Math.max(0,
       fx.outcome.aPoints + bonuses.comboBonusA + bonuses.favouredBonusA +
       bonuses.surgeBonusA + bonuses.surgePenaltyB + bonuses.tideBonusA - bonuses.cursePenaltyA);
+    const yourTotal = gambitActive ? yourTotalRaw * 2 : yourTotalRaw;
     const oppTotal = Math.max(0,
       fx.outcome.bPoints + bonuses.comboBonusB + bonuses.favouredBonusB +
       bonuses.surgeBonusB + bonuses.surgePenaltyA + bonuses.tideBonusB - bonuses.cursePenaltyB);
@@ -400,8 +415,15 @@ export function RankedGame({
         handAfter = dr.hand;
         discardAfter = dr.discard;
         usedOneShotAfter = dr.usedOneShotCards;
+        // Gambit backfire: a lost Gambit round burns an EXTRA card.
+        if (gambitActive && handAfter.length > 0) {
+          const dr2 = discardRandom(handAfter, discardAfter, usedOneShotAfter);
+          handAfter = dr2.hand;
+          discardAfter = dr2.discard;
+          usedOneShotAfter = dr2.usedOneShotCards;
+        }
       }
-      const winsA = b.roundWinsA + (finalWinner === "a" ? 1 : 0);
+      const winsA = b.roundWinsA + (finalWinner === "a" ? 1 : 0) + gambitWinBonus;
       const winsB = b.roundWinsB + (finalWinner === "b" ? 1 : 0);
       // Mirror the player's draw/discard rules onto the notional opp hand so
       // the indicator above OpponentRow tracks meaningfully across rounds.
@@ -426,7 +448,7 @@ export function RankedGame({
     });
     setMana((m) => Math.max(0, m - spentMana));
 
-    const nextRoundWinsA = battle.roundWinsA + (finalWinner === "a" ? 1 : 0);
+    const nextRoundWinsA = battle.roundWinsA + (finalWinner === "a" ? 1 : 0) + gambitWinBonus;
     const nextRoundWinsB = battle.roundWinsB + (finalWinner === "b" ? 1 : 0);
 
     // Hand to reveal phase.

@@ -10,8 +10,8 @@ import type { LanePlay } from "../online";
 
 export type CardId =
   | "aegis" | "precision" | "anchor" | "second-wind"   // commons (1 mana)
-  | "surge" | "augur" | "riposte" | "curse"             // rares (2 mana)
-  | "heist" | "tide" | "oracle" | "vortex"              // epics (3 mana)
+  | "surge" | "augur" | "riposte" | "curse" | "mirror" // rares (2 mana)
+  | "heist" | "tide" | "oracle" | "vortex" | "gambit"  // epics (3 mana / gambit 2)
   | "supernova";                                        // legendary (4 mana)
 
 export type CardRarity = "common" | "rare" | "epic" | "legendary";
@@ -33,11 +33,12 @@ export interface RankedCard {
 }
 
 export type PlayedCard =
-  | { id: "aegis" | "surge" | "precision" | "anchor" | "curse" | "tide" | "heist" | "riposte"; lane: LaneTarget }
+  | { id: "aegis" | "surge" | "precision" | "anchor" | "curse" | "tide" | "heist" | "riposte" | "mirror"; lane: LaneTarget }
   | { id: "augur"; lane: LaneTarget; revealed: Move }
   | { id: "oracle"; revealed: [Move, Move, Move] }
   | { id: "vortex" }
   | { id: "supernova" }
+  | { id: "gambit" }
   | { id: "second-wind" };
 
 /* ──────────── Round / battle state ──────────── */
