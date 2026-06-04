@@ -212,23 +212,23 @@ function ComboBanner({ combo }: { combo: ComboTheme }) {
       }}
       exit={{ opacity: 0, scale: 0.85, y: -6 }}
       transition={{ duration: epic ? 0.6 : 0.4, type: "spring", stiffness: 220, damping: 16 }}
-      className="flex flex-col items-center gap-0.5 mt-1"
+      className="flex flex-col items-center gap-0.5 mt-1 w-full px-2"
     >
-      <div className="flex items-center gap-1.5">
-        <span className="text-2xl">{combo.glyph}</span>
+      <div className="flex items-center justify-center gap-1.5 w-full">
+        <span className="text-xl shrink-0">{combo.glyph}</span>
         <span
           className={
-            (epic ? "text-2xl sm:text-3xl" : rare ? "text-xl sm:text-2xl" : "text-lg sm:text-xl") +
-            " font-black tracking-wider bg-gradient-to-br " + combo.gradient +
+            (epic ? "text-xl sm:text-2xl" : rare ? "text-lg sm:text-xl" : "text-base sm:text-lg") +
+            " font-black tracking-wide whitespace-nowrap bg-gradient-to-br " + combo.gradient +
             " bg-clip-text text-transparent"
           }
         >
           {name}
         </span>
-        <span className="text-2xl">{combo.glyph}</span>
+        <span className="text-xl shrink-0">{combo.glyph}</span>
       </div>
       <div className={
-        "text-[10px] uppercase tracking-[0.2em] text-center px-3 " +
+        "text-[11px] tracking-wide text-center leading-tight " +
         (epic ? "text-amber-300/90" : rare ? "text-fuchsia-300/80" : "text-zinc-400")
       }>
         {tag}

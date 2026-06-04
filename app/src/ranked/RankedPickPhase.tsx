@@ -113,7 +113,7 @@ export function RankedPickPhase({
   })();
 
   return (
-    <div className="w-full h-full flex flex-col items-center gap-1.5 sm:gap-3 pb-2 sm:pb-3">
+    <div className="w-full h-full [@media(max-height:560px)]:h-auto flex flex-col items-center gap-1.5 sm:gap-3 pb-2 sm:pb-3">
       <TimerBar startedAt={startedAt} durationMs={deadlineMs} />
 
       {/* Targeting hint */}
