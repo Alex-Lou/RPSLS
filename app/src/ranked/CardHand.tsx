@@ -8,11 +8,31 @@
  * The opponent's mirror (face-down) lives in OppHandIndicator.
  */
 
+import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { CARDS } from "./cards";
 import { CardImage } from "./CardImage";
 import type { CardId } from "./rankedTypes";
 import { useT } from "../i18n";
+
+/** True on short viewports (landscape phones) where the hand must shrink so
+ *  the board + move picker still fit. Self-contained so callers don't thread
+ *  a flag through. */
+function useShortViewport(maxH = 540): boolean {
+  const [short, setShort] = useState(
+    typeof window !== "undefined" ? window.innerHeight < maxH : false,
+  );
+  useEffect(() => {
+    const onResize = () => setShort(window.innerHeight < maxH);
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
+  }, [maxH]);
+  return short;
+}
 
 const RING_BY_RARITY: Record<string, string> = {
   common: "ring-zinc-400/40",
@@ -51,6 +71,7 @@ export function CardHand({
   augurCooldown?: number;
 }) {
   const t = useT();
+  const compact = useShortViewport();
   if (hand.length === 0) {
     return (
       <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 text-center py-1">
@@ -70,8 +91,8 @@ export function CardHand({
       // CardHand is now at the bottom of the screen (player's side). Outer
       // cards rise UPWARD from the centre (yLift is applied as a negative y
       // in CardThumb), so paddingTop reserves room for that rise plus the
-      // selected/played lift. paddingBottom stays tiny — bottoms are anchored.
-      style={{ paddingTop: geo.lift + 26, paddingBottom: 2 }}
+      // selected/played lift. Compact (landscape) shrinks the reserve.
+      style={{ paddingTop: geo.lift + (compact ? 14 : 26), paddingBottom: 2 }}
     >
       {hand.map((id, i) => {
         const card = CARDS[id];
@@ -96,6 +117,7 @@ export function CardHand({
             raised={raised}
             zIndex={raised ? 50 : 10 + i}
             index={i}
+            compact={compact}
             onClick={() => {
               if (!playable) return;
               onSelect(isSelected ? null : id);
@@ -108,7 +130,7 @@ export function CardHand({
 }
 
 function CardThumb({
-  id, selected, played, playable, angle, yLift, overlap, raised, zIndex, index, onClick,
+  id, selected, played, playable, angle, yLift, overlap, raised, zIndex, index, compact, onClick,
 }: {
   id: CardId;
   selected: boolean;
@@ -124,6 +146,8 @@ function CardThumb({
   raised: boolean;
   zIndex: number;
   index: number;
+  /** Short-viewport (landscape) → smaller card footprint. */
+  compact: boolean;
   onClick: () => void;
 }) {
   const t = useT();
@@ -160,7 +184,10 @@ function CardThumb({
         transformOrigin: "bottom center",
       }}
       className={
-        "relative w-[56px] h-[76px] sm:w-[68px] sm:h-[92px] rounded-xl overflow-hidden transition bg-zinc-950 " +
+        "relative rounded-xl overflow-hidden transition bg-zinc-950 " +
+        (compact
+          ? "w-[44px] h-[60px] "
+          : "w-[56px] h-[76px] sm:w-[68px] sm:h-[92px] ") +
         "ring-2 " + ring + " " + glow +
         (!playable ? " grayscale cursor-not-allowed" : "")
       }
