@@ -101,12 +101,16 @@ export default function App() {
   // While the splash is showing we deliberately suppress the bg image so
   // the player never sees the theme PNG flash through behind the WebGL
   // shader during boot or during the splash-out transition.
+  const customBgUrl = useStore((s) => s.player.customBgUrl);
   useEffect(() => {
     const def = BACKGROUNDS_BY_ID[backgroundId];
     const root = document.documentElement;
-    const showBg = stage !== "splash" && !!def?.src;
-    if (showBg) {
-      root.style.setProperty("--app-bg-image", `url("${def!.src}")`);
+    // "custom" paints the player's own uploaded image; coded scenes paint
+    // nothing here (the WebGL canvas handles them); everything else clears.
+    const customActive = stage !== "splash" && def?.custom && !!customBgUrl;
+    const imgSrc = customActive ? customBgUrl : (stage !== "splash" ? def?.src : null);
+    if (imgSrc) {
+      root.style.setProperty("--app-bg-image", `url("${imgSrc}")`);
     } else {
       root.style.removeProperty("--app-bg-image");
     }
@@ -125,7 +129,7 @@ export default function App() {
     }
     // Note: if def.accent is null (default bg), we leave the theme-driven
     // values alone — they were set by applyTheme(themeId) right above.
-  }, [backgroundId, stage]);
+  }, [backgroundId, stage, customBgUrl]);
 
   // Mirror the locale onto <html> so Tailwind / browser can pick up text
   // direction and language-aware features (forms, hyphenation, screen reader).

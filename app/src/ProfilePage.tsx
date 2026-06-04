@@ -52,6 +52,7 @@ export function ProfilePage() {
    *  animation without grinding XP. */
   const [previewLevel, setPreviewLevel] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const bgFileRef = useRef<HTMLInputElement>(null);
 
   const info = levelFromXp(player.xp);
   const theme = THEMES[player.themeId];
@@ -103,6 +104,33 @@ export function ProfilePage() {
       };
       img.onerror = () => alert(t("profile.avatar.invalid"));
       img.src = dataUrl;
+    };
+    reader.readAsDataURL(f);
+  };
+
+  /** Upload a personal background: fit within 1080px (portrait-friendly),
+   *  JPEG-compress, store as customBgUrl, and select the "custom" theme. */
+  const onUploadBg = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > 12 * 1024 * 1024) { alert(t("profile.avatar.tooBig")); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1080;
+        const ratio = Math.min(1, MAX / Math.max(img.width, img.height));
+        const w = Math.round(img.width * ratio);
+        const h = Math.round(img.height * ratio);
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { updateProfile({ customBgUrl: reader.result as string, backgroundId: "custom" }); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        updateProfile({ customBgUrl: canvas.toDataURL("image/jpeg", 0.82), backgroundId: "custom" });
+      };
+      img.onerror = () => alert(t("profile.avatar.invalid"));
+      img.src = reader.result as string;
     };
     reader.readAsDataURL(f);
   };
@@ -401,13 +429,19 @@ export function ProfilePage() {
         </button>
       </section>
 
-      {/* Background picker — full-screen image behind every page. Picking one
-          also applies the paired pad (user can override below). */}
+      {/* Background picker — fully coded animated scenes (+ your own image). */}
       <section className="bg-white/5 border border-white/10 rounded-3xl p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-3">Background</h2>
         <p className="text-xs text-zinc-500 mb-3">
-          The wallpaper painted behind every page. Picking a themed background also switches the battle pad to match — change the pad below if you'd rather mix.
+          Des thèmes 100% animés et codés. Choisis « Mon image » pour mettre la tienne (portrait 9:16, ex. 1080×1920 — affichée plein écran).
         </p>
+        <input
+          ref={bgFileRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={onUploadBg}
+        />
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {BACKGROUNDS.map((bg) => {
             const active = (player.backgroundId ?? "default") === bg.id;
@@ -415,6 +449,12 @@ export function ProfilePage() {
               <button
                 key={bg.id}
                 onClick={() => {
+                  // "Mon image" → open the file picker if none stored yet OR
+                  // if it's already the active background (tap-again to change).
+                  if (bg.custom && (!player.customBgUrl || active)) {
+                    bgFileRef.current?.click();
+                    return;
+                  }
                   const patch: Partial<{ backgroundId: BackgroundId; padId: PadId }> = { backgroundId: bg.id };
                   if (bg.defaultPadId) patch.padId = bg.defaultPadId;
                   updateProfile(patch);
@@ -429,7 +469,9 @@ export function ProfilePage() {
                 <div
                   className="aspect-[3/2] w-full relative bg-zinc-950 overflow-hidden"
                   style={
-                    bg.src
+                    bg.custom && player.customBgUrl
+                      ? { backgroundImage: `url("${player.customBgUrl}")`, backgroundSize: "cover", backgroundPosition: "center" }
+                      : bg.src
                       ? { backgroundImage: `url("${bg.src}")`, backgroundSize: "cover", backgroundPosition: "center" }
                       : bg.accent
                       ? {
@@ -454,6 +496,16 @@ export function ProfilePage() {
                   {bg.scene && (
                     <div className="absolute top-2 left-2 bg-cyan-500/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                       ✦ LIVE
+                    </div>
+                  )}
+                  {bg.custom && !player.customBgUrl && (
+                    <div className="absolute inset-0 flex items-center justify-center text-zinc-300 text-xs font-bold">
+                      ＋ Importer
+                    </div>
+                  )}
+                  {bg.custom && player.customBgUrl && (
+                    <div className="absolute bottom-1.5 right-1.5 bg-black/60 text-zinc-200 text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                      Changer ↻
                     </div>
                   )}
                 </div>

@@ -9,10 +9,10 @@ export type PadId =
 
 export type BackgroundId =
   | "default"
-  | "ancient" | "astrolab" | "casino" | "cyberpunk"
-  | "galaxy" | "holy" | "quantum" | "steampunk"
   // Coded / animated WebGL backdrops (no PNG — fully procedural).
-  | "nebula" | "aurora" | "grid";
+  | "nebula" | "galaxy" | "aurora" | "holy" | "quantum" | "grid"
+  // Player's own uploaded image.
+  | "custom";
 
 export type GameMode = "training" | "casual" | "ranked" | "hotseat";
 
@@ -82,6 +82,9 @@ export interface Player {
   /** Current consecutive-win streak (match/streak.ts). Grants escalating
    *  bonus XP; a loss resets it. */
   winStreak?: number;
+  /** Player's own uploaded background image (data URL), shown when the
+   *  "custom" background is selected. */
+  customBgUrl?: string;
 }
 
 export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: string }> = {

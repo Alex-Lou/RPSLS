@@ -43,6 +43,9 @@ export interface BackgroundDef {
   /** When set, this background is a live CODED WebGL scene (no PNG). App.tsx
    *  renders <ThemedBackdrop scene=…> instead of painting an image. */
   scene?: BackdropScene;
+  /** When true, this entry is the player's OWN uploaded image (stored as a
+   *  data URL on the player). App.tsx paints player.customBgUrl. */
+  custom?: boolean;
   /** Pad that visually goes with this background. Selecting the background
    *  applies this pad too unless the user has manually overridden it. */
   defaultPadId: PadId | null;
@@ -61,103 +64,69 @@ export interface BackgroundDef {
   accent: { from: string; to: string } | null;
 }
 
-const MINI = "/Backgrounds/Miniatures Icons Theme";
-
 export const BACKGROUNDS: BackgroundDef[] = [
   // Default: no override — the global theme picker still drives the colours.
   {
     id: "default",   label: "Original",       emoji: "🌌",
     src: null,                                          defaultPadId: null,
     skin: { fontHeadline: "inter",        fontBody: "inter",        fontMono: "jetbrains"  },
-    miniature: `${MINI}/default.png`,
+    miniature: null,
     accent: null,
   },
-  // Ancient: dark navy parchment + warm bronze sigils + amethyst gems.
-  {
-    id: "ancient",   label: "Ancient",        emoji: "📜",
-    src: "/Backgrounds/ancient.png", defaultPadId: "ancient",
-    skin: { fontHeadline: "cinzel",       fontBody: "cormorant",    fontMono: "imFell"     },
-    miniature: `${MINI}/ancient.png`,
-    accent: { from: "#c9a55a", to: "#9d6ef7" },
-  },
-  // Astrolab: warm brass instruments on midnight blue, occasional cyan glow.
-  {
-    id: "astrolab",  label: "Astrolab",       emoji: "🔭",
-    src: "/Backgrounds/astrolab.png",         defaultPadId: "astrolab",
-    skin: { fontHeadline: "cinzel",       fontBody: "ebGaramond",   fontMono: "jetbrains"  },
-    miniature: `${MINI}/astrolab.png`,
-    accent: { from: "#d4a849", to: "#4adbe8" },
-  },
-  // Casino: emerald felt + gold filigree + crimson chip accents.
-  {
-    id: "casino",    label: "Casino Royale",  emoji: "🎰",
-    src: "/Backgrounds/casino.png",    defaultPadId: "casino",
-    skin: { fontHeadline: "playfair",     fontBody: "cormorant",    fontMono: "bebas"      },
-    miniature: `${MINI}/casino.png`,
-    accent: { from: "#16a34a", to: "#facc15" },
-  },
-  // Cyberpunk: saturated magenta + electric cyan neons on wet asphalt.
-  {
-    id: "cyberpunk", label: "Cyberpunk",      emoji: "🌆",
-    src: "/Backgrounds/cyberpunk.png",       defaultPadId: "cyberpunk",
-    skin: { fontHeadline: "orbitron",     fontBody: "rajdhani",     fontMono: "shareTech"  },
-    miniature: `${MINI}/cyberpunk.png`,
-    accent: { from: "#f0abfc", to: "#06b6d4" },
-  },
-  // Galaxy: deep violet nebula + fuchsia + cyan starlight.
-  {
-    id: "galaxy",    label: "Galaxy",         emoji: "✨",
-    src: "/Backgrounds/galaxy.png",          defaultPadId: "cosmos",
-    skin: { fontHeadline: "audiowide",    fontBody: "exo2",         fontMono: "spaceMono"  },
-    miniature: `${MINI}/galaxy.png`,
-    accent: { from: "#a855f7", to: "#22d3ee" },
-  },
-  // Holy: divine amber gold + cathedral indigo + stained-glass jewel tones.
-  {
-    id: "holy",      label: "Holy Game",      emoji: "✝️",
-    src: "/Backgrounds/holy.png",       defaultPadId: "holy",
-    skin: { fontHeadline: "cinzel",       fontBody: "cormorant",    fontMono: "imFell"     },
-    miniature: `${MINI}/holy.png`,
-    accent: { from: "#fbbf24", to: "#6366f1" },
-  },
-  // Quantum: bright cyan plasma + electric blue arcs + steel.
-  {
-    id: "quantum",   label: "Quantum Lab",    emoji: "⚛️",
-    src: "/Backgrounds/quantum.png",     defaultPadId: "quantum",
-    skin: { fontHeadline: "spaceGrotesk", fontBody: "ibmPlex",      fontMono: "fira"       },
-    miniature: `${MINI}/quantum.png`,
-    accent: { from: "#22d3ee", to: "#3b82f6" },
-  },
-  // Steampunk: copper + brass + amber gaslight on dark wood.
-  {
-    id: "steampunk", label: "Steampunk",      emoji: "⚙️",
-    src: "/Backgrounds/steampunk.png", defaultPadId: "steampunk",
-    skin: { fontHeadline: "medieval",     fontBody: "imFell",       fontMono: "bevan"      },
-    miniature: `${MINI}/steampunk.png`,
-    accent: { from: "#b45309", to: "#f59e0b" },
-  },
 
-  // ── CODED / ANIMATED backdrops (live WebGL, no PNG) ──
+  // ── CODED / ANIMATED backdrops (live WebGL, no PNG). The ONLY built-in
+  //    backgrounds now — the old static PNG themes were retired. ──
   {
-    id: "nebula",    label: "Nebula ✦",       emoji: "🌌",
+    id: "nebula",    label: "Nebula",         emoji: "🌌",
     src: null, scene: "nebula",               defaultPadId: "cosmos",
     skin: { fontHeadline: "audiowide",    fontBody: "exo2",         fontMono: "spaceMono"  },
     miniature: null,
     accent: { from: "#a855f7", to: "#22d3ee" },
   },
   {
-    id: "aurora",    label: "Aurora ✦",       emoji: "🌠",
+    id: "galaxy",    label: "Galaxy",         emoji: "✨",
+    src: null, scene: "galaxy",               defaultPadId: "cosmos",
+    skin: { fontHeadline: "audiowide",    fontBody: "exo2",         fontMono: "spaceMono"  },
+    miniature: null,
+    accent: { from: "#a855f7", to: "#22d3ee" },
+  },
+  {
+    id: "aurora",    label: "Aurora",         emoji: "🌠",
     src: null, scene: "aurora",               defaultPadId: "cosmos",
     skin: { fontHeadline: "spaceGrotesk", fontBody: "exo2",         fontMono: "spaceMono"  },
     miniature: null,
     accent: { from: "#34d399", to: "#8b5cf6" },
   },
   {
-    id: "grid",      label: "Neon Grid ✦",    emoji: "🌐",
+    id: "holy",      label: "Holy",           emoji: "✝️",
+    src: null, scene: "holy",                 defaultPadId: "holy",
+    skin: { fontHeadline: "cinzel",       fontBody: "cormorant",    fontMono: "imFell"     },
+    miniature: null,
+    accent: { from: "#fbbf24", to: "#6366f1" },
+  },
+  {
+    id: "quantum",   label: "Quantum",        emoji: "⚛️",
+    src: null, scene: "quantum",              defaultPadId: "quantum",
+    skin: { fontHeadline: "spaceGrotesk", fontBody: "ibmPlex",      fontMono: "fira"       },
+    miniature: null,
+    accent: { from: "#22d3ee", to: "#3b82f6" },
+  },
+  {
+    id: "grid",      label: "Neon Grid",      emoji: "🌐",
     src: null, scene: "grid",                 defaultPadId: "neon",
     skin: { fontHeadline: "orbitron",     fontBody: "rajdhani",     fontMono: "shareTech"  },
     miniature: null,
     accent: { from: "#06b6d4", to: "#f0abfc" },
+  },
+
+  // Player's OWN image — uploaded in Profile, stored as a data URL. The
+  // recommended format is shown in the picker (portrait 9:16, cover-fit).
+  {
+    id: "custom",    label: "Mon image",      emoji: "🖼️",
+    src: null, custom: true,                  defaultPadId: null,
+    skin: { fontHeadline: "inter",        fontBody: "inter",        fontMono: "jetbrains"  },
+    miniature: null,
+    accent: null,
   },
 ];
 
