@@ -52,7 +52,13 @@ export function RankedLobby({ onViewBracket, onManageDeck }: { onViewBracket: ()
       {/* Profile card */}
       <div className="bg-zinc-950/55 border border-white/12 rounded-3xl p-4 sm:p-5 flex flex-col gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-violet-500/30 to-fuchsia-500/30 border border-white/15 flex items-center justify-center text-3xl overflow-hidden">
+          <div
+            className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl border border-white/15 flex items-center justify-center text-3xl overflow-hidden"
+            style={{
+              background:
+                "linear-gradient(135deg, color-mix(in oklab, var(--theme-primary) 32%, transparent), color-mix(in oklab, var(--theme-secondary) 32%, transparent))",
+            }}
+          >
             {/^(data:|\/|https?:)/.test(player.avatar) ? (
               <img
                 src={player.avatar}
@@ -116,7 +122,8 @@ export function RankedLobby({ onViewBracket, onManageDeck }: { onViewBracket: ()
       <motion.button
         whileTap={{ scale: 0.98 }}
         onClick={onManageDeck}
-        className="bg-white/5 border border-violet-400/30 rounded-2xl px-4 py-3 flex items-center justify-between hover:bg-violet-500/10 transition"
+        className="bg-zinc-950/55 rounded-2xl px-4 py-3 flex items-center justify-between hover:bg-white/5 transition"
+        style={{ border: "1px solid color-mix(in oklab, var(--theme-primary) 35%, transparent)" }}
       >
         <div className="flex items-center gap-2.5">
           <span className="text-xl">🃏</span>
