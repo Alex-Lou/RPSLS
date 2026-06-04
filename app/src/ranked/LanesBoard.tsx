@@ -50,7 +50,8 @@ export function LanesBoard({
     <div
       className="relative w-full max-w-2xl rounded-2xl overflow-hidden
                  border border-emerald-900/40
-                 shadow-[inset_0_0_36px_rgba(0,0,0,0.55)]"
+                 shadow-[inset_0_0_36px_rgba(0,0,0,0.55)]
+                 [@media(max-height:560px)]:max-w-md"
     >
       {/* Battle-pad backdrop — the user-chosen pad IS the visible surface the
           lanes sit on. Fully opaque so the chosen theme actually shows. */}
@@ -69,7 +70,7 @@ export function LanesBoard({
         }}
       />
 
-      <div className="relative p-3 sm:p-4 flex flex-col gap-3 sm:gap-4">
+      <div className="relative p-3 sm:p-4 flex flex-col gap-3 sm:gap-4 [@media(max-height:560px)]:p-1.5 [@media(max-height:560px)]:gap-1.5">
       <div className="flex items-center justify-between gap-2 px-0.5">
         <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-rose-300/90 truncate">
           ✦ {opponentName}
@@ -128,7 +129,7 @@ function OpponentRow({
   }, [mode]);
 
   return (
-    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+    <div className="grid grid-cols-3 gap-2 sm:gap-3 [@media(max-height:560px)]:gap-1.5">
       {[0, 1, 2].map((i) => {
         const lane = i as LaneTarget;
         const isAugurLane = augurRevealed?.lane === lane;
@@ -170,7 +171,7 @@ function PlayerRow({
   onLaneClick?: (lane: LaneTarget) => void;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+    <div className="grid grid-cols-3 gap-2 sm:gap-3 [@media(max-height:560px)]:gap-1.5">
       {picks.map((mv, i) => {
         const lane = i as LaneTarget;
         const lr = laneResults?.[i];

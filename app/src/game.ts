@@ -101,6 +101,13 @@ export function aiMove(
     // rounds of a short Bo3. Once history exists, throw vs the last move.
     // 0.8 throw-rate (was 0.6) lands easy-CPU win-rate in the intended
     // ~35-45% band instead of the old near-coinflip.
+    // Even easy reacts a little: 20% of the time it COUNTERS your most recent
+    // move so mindless spam isn't a guaranteed win — just heavily in your
+    // favour. The rest of the time it throws into you (easy to beat).
+    if (playerRecent.length > 0 && Math.random() < 0.2) {
+      const ctr = countersOf(playerRecent[playerRecent.length - 1]);
+      return ctr[Math.floor(Math.random() * ctr.length)];
+    }
     if (Math.random() < 0.8) {
       const ref = playerRecent.length > 0
         ? playerRecent[playerRecent.length - 1]
@@ -131,10 +138,10 @@ export function aiMove(
   }
 
   // Normal: light pattern-reading so spamming one move isn't a free win.
-  // 35% of the time it counters the player's most-frequent recent move;
-  // otherwise it's mood-weighted random. Beatable, but not exploitable.
-  if (difficulty === "normal" && playerRecent.length >= 2) {
-    if (Math.random() < 0.35) {
+  // Reacts from the FIRST prior move at 45% — counters the player's
+  // most-frequent recent move; otherwise mood-weighted random.
+  if (difficulty === "normal" && playerRecent.length >= 1) {
+    if (Math.random() < 0.45) {
       const window = playerRecent.slice(-5);
       const counts: Record<Move, number> = { rock: 0, paper: 0, scissors: 0, lizard: 0, spock: 0 };
       for (const m of window) counts[m]++;
