@@ -76,7 +76,9 @@ export function matchesToday(history: MatchRecord[], now: Date = new Date()): Ma
   return history.filter((m) => m.timestamp >= since);
 }
 
-const isOnlineMatch = (m: MatchRecord) => m.mode === "online" || m.mode === "constellation";
+// A real online match always has a human opponent — that distinguishes online
+// Constellation from the local vs-CPU one (both recorded as mode "constellation").
+const isOnlineMatch = (m: MatchRecord) => m.opponent.kind === "human";
 
 const DAILY_POOL: DailyQuestDef[] = [
   // ── Offline — always doable vs CPU ──
@@ -98,6 +100,9 @@ const DAILY_POOL: DailyQuestDef[] = [
   { id: "training-2", emoji: "🤖", title: "Drills", desc: "Play 2 Training matches.",
     target: 2, xpReward: 60, scope: "offline", route: { kind: "mode", mode: "training", bestOf: 3 },
     progress: (t) => t.filter((m) => m.mode === "training").length },
+  { id: "constellation-2", emoji: "🌌", title: "Stargazer", desc: "Play 2 Constellation matches vs CPU.",
+    target: 2, xpReward: 90, scope: "offline", route: { kind: "constellation" },
+    progress: (t) => t.filter((m) => m.mode === "constellation" && m.opponent.kind === "cpu").length },
   // ── Online — need a live opponent (recorded into history at match end) ──
   { id: "online-play-1", emoji: "🌐", title: "Go live", desc: "Play an online match.",
     target: 1, xpReward: 120, scope: "online", route: { kind: "online" },
@@ -107,7 +112,7 @@ const DAILY_POOL: DailyQuestDef[] = [
     progress: (t) => t.filter((m) => isOnlineMatch(m) && m.outcome === "win").length },
   { id: "online-constellation-1", emoji: "🌌", title: "Star duel", desc: "Play an online Constellation match.",
     target: 1, xpReward: 150, scope: "online", route: { kind: "online" },
-    progress: (t) => t.filter((m) => m.mode === "constellation").length },
+    progress: (t) => t.filter((m) => m.mode === "constellation" && m.opponent.kind === "human").length },
 ];
 
 /** Deterministic 3-challenge pick for the day: 2 offline + 1 online, seeded by
