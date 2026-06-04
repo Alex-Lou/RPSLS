@@ -6,6 +6,7 @@ import type { Locale } from "./i18n";
 import { todayDateKey } from "./daily";
 import { sanitisePersisted } from "./storeMigrationGuard";
 import { abandonPenaltyLp, activeAbandonCount, nextAbandon } from "./match/forfeit";
+import { nextStreak, streakBonusXp } from "./match/streak";
 
 const emptyByMove = () => ({
   rock:     { picked: 0, won: 0 },
@@ -155,7 +156,12 @@ export const useStore = create<AppState>()(
       recordMatch: (m) =>
         set((s) => {
           const p = structuredClone(s.player);
-          p.xp = Math.max(0, p.xp + m.xpDelta);
+          // Win-streak momentum: roll the streak, then top up the win XP with
+          // the streak bonus (×1.5 at 3 wins, ×2 at 5+). Loss resets it.
+          const streak = nextStreak(p.winStreak ?? 0, m.outcome);
+          p.winStreak = streak;
+          const bonusXp = m.outcome === "win" ? streakBonusXp(m.xpDelta, streak) : 0;
+          p.xp = Math.max(0, p.xp + m.xpDelta + bonusXp);
           p.rankLp = Math.max(0, p.rankLp + m.lpDelta);
           if (m.outcome === "win") p.stats.wins++;
           else if (m.outcome === "loss") p.stats.losses++;

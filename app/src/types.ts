@@ -79,6 +79,9 @@ export interface Player {
   /** Rolling forfeit tracker for the abandon-penalty system (match/forfeit.ts).
    *  Repeat ranked/online quitters take escalating LP hits. */
   abandons?: { count: number; lastAt: number };
+  /** Current consecutive-win streak (match/streak.ts). Grants escalating
+   *  bonus XP; a loss resets it. */
+  winStreak?: number;
 }
 
 export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: string }> = {

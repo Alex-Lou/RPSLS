@@ -78,6 +78,19 @@ export function UserHeader({ onNavigate }: { onNavigate: (p: Page) => void }) {
             >
               {rank.emoji} {rank.label}
             </span>
+            {/* Win-streak momentum badge — appears at 2+, pulses, and shows
+                the active XP multiplier once the bonus kicks in (3+). */}
+            {(player.winStreak ?? 0) >= 2 && (
+              <motion.span
+                initial={{ scale: 0.6, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="shrink-0 text-[9px] font-black px-1.5 py-0.5 rounded-full bg-orange-500/25 text-orange-300 border border-orange-400/40"
+                title="Série de victoires"
+              >
+                🔥 {player.winStreak}
+                {(player.winStreak ?? 0) >= 5 ? " ×2" : (player.winStreak ?? 0) >= 3 ? " ×1.5" : ""}
+              </motion.span>
+            )}
           </div>
 
           {/* XP bar — the landing target for every XP gain. */}
