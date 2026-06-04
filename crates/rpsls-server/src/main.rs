@@ -65,15 +65,25 @@ async fn main() {
         in_lanes: DashMap::new(),
     });
 
+    // `/health` is infra-only: Render hammers it during rolling deploys
+    // (multiple probes per second to confirm the new instance is up before
+    // switching traffic) and UptimeRobot keeps it warm against the free-tier
+    // 15-min sleep. Sat behind `governor_layer()`, those bursts can clip the
+    // 30-request burst window and serve a 429 to Render's own probe — which
+    // then trips a false "service unavailable" alert. So `/health` stays
+    // OUT of the rate limiter (and CORS, which doesn't apply to non-browser
+    // infra calls); only the user-facing `/ws` endpoint is throttled.
+    //
     // Layer order is bottom-up: trace → cors → governor → router.
-    // Governor sits OUTSIDE the routes so requests get throttled before
-    // they touch any handler. CORS is the very first gate (preflight).
     let app = Router::new()
         .route("/health", get(health))
-        .route("/ws", get(ws_handler))
-        .with_state(state)
-        .layer(governor_layer())
-        .layer(cors_layer())
+        .merge(
+            Router::new()
+                .route("/ws", get(ws_handler))
+                .with_state(state)
+                .layer(governor_layer())
+                .layer(cors_layer()),
+        )
         .layer(TraceLayer::new_for_http());
 
     let port: u16 = std::env::var("PORT")
