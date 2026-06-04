@@ -295,17 +295,16 @@ function Splash({ onDone, scene }: { onDone: () => void; scene: import("./backdr
   const [phase, setPhase] = useState<"intro" | "logo" | "title" | "hint">("intro");
 
   useEffect(() => {
+    // Reveal the logo → title → "tap to continue" hint on a timeline, but
+    // NEVER auto-advance: the splash waits for a real tap (Alex wants
+    // "tap or nothing", no silent fall-through into the menu).
     const t1 = window.setTimeout(() => setPhase("logo"),  1100);
     const t2 = window.setTimeout(() => setPhase("title"), 1800);
     const t3 = window.setTimeout(() => setPhase("hint"),  2600);
-    // Auto-advance at 5s. The WebGL shader loops indefinitely on its
-    // own so there's no codec/onEnded race like with the old <video>.
-    const safety = window.setTimeout(onDone, 5000);
     return () => {
       window.clearTimeout(t1);
       window.clearTimeout(t2);
       window.clearTimeout(t3);
-      window.clearTimeout(safety);
     };
   }, [onDone]);
 

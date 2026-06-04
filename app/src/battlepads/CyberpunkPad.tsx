@@ -67,8 +67,8 @@ export function CyberpunkPad({ compact = false, ...props }: React.SVGProps<SVGSV
       {/* HUD readouts. */}
       <g fontFamily='"JetBrains Mono","Consolas",monospace' fontWeight="700">
         <g transform={`translate(${W / 2} 120)`} textAnchor="middle">
-          <text fontSize="30" fill={magenta} letterSpacing="10" filter="url(#cp-glow)">NIGHT CITY</text>
-          <text fontSize="30" fill="#ff8df0" letterSpacing="10">NIGHT CITY</text>
+          <text fontSize="30" fill={magenta} letterSpacing="10" filter="url(#cp-glow)">NEON SECTOR</text>
+          <text fontSize="30" fill="#ff8df0" letterSpacing="10">NEON SECTOR</text>
         </g>
         <text x="100" y={H - 70} fontSize="14" fill={cyan} fillOpacity="0.75">SYS//
           <tspan fill="#7CFC00">ONLINE</tspan>
