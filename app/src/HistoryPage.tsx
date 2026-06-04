@@ -52,7 +52,7 @@ export function HistoryPage() {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="bg-white/5 border border-white/10 rounded-3xl p-10 text-center">
+        <div className="bg-zinc-950/55 border border-white/12 rounded-3xl p-10 text-center">
           <p className="text-zinc-400">No matches yet.</p>
           <p className="text-xs text-zinc-500 mt-1">Play your first round to see it here.</p>
         </div>
@@ -90,7 +90,7 @@ function Row({
       : match.opponent.nickname;
 
   return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+    <div className="bg-zinc-950/55 border border-white/12 rounded-2xl overflow-hidden">
       <button
         onClick={onToggle}
         className="w-full p-4 flex items-center gap-4 hover:bg-white/5 transition text-left"

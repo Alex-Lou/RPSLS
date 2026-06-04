@@ -40,7 +40,7 @@ export function ContactPage() {
         </p>
       </div>
 
-      <div className="bg-white/5 border border-white/10 rounded-3xl p-5 sm:p-6 flex flex-col gap-4">
+      <div className="bg-zinc-950/55 border border-white/12 rounded-3xl p-5 sm:p-6 flex flex-col gap-4">
         <div>
           <label className="block text-[10px] uppercase tracking-widest text-zinc-400 mb-1.5 font-semibold">
             {t("contact.subject.label")}

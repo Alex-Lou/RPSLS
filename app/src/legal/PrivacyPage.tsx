@@ -47,7 +47,7 @@ export function PrivacyPage({ onClose }: { onClose?: () => void }) {
           {c.sections.map((s) => (
             <section
               key={s.title}
-              className="rounded-2xl bg-white/5 border border-white/10 p-4"
+              className="rounded-2xl bg-zinc-950/55 border border-white/12 p-4"
             >
               <h2 className="text-sm font-bold text-zinc-100 mb-1.5">{s.title}</h2>
               <p className="text-[13px] text-zinc-300 leading-relaxed">{s.body}</p>

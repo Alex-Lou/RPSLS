@@ -1073,7 +1073,7 @@ function MatchFacts({
   const [open, setOpen] = useState(false);
   const r = REWARDS[mode];
   return (
-    <div className="bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl overflow-hidden">
+    <div className="bg-zinc-950/55 border border-white/12 rounded-xl sm:rounded-2xl overflow-hidden">
       <button
         onClick={() => setOpen((o) => !o)}
         className="w-full px-3 py-2 flex items-center justify-between gap-3 text-left hover:bg-white/5 transition"
@@ -1280,7 +1280,7 @@ function PickPanel({
       </div>
 
       {recentOppMoves && recentOppMoves.length > 0 && (
-        <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5">
+        <div className="flex items-center gap-2 bg-zinc-950/55 border border-white/12 rounded-xl px-3 py-1.5">
           <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-zinc-400 font-medium">
             {t("match.cpu.last")}
           </span>

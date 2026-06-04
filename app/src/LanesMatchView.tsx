@@ -1266,7 +1266,7 @@ function HelpModal({ target, onClose }: { target: number; onClose: () => void })
               {RPSLS_MOVES_HELP.map(({ id, glyph, color }) => (
                 <div
                   key={id}
-                  className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center gap-3"
+                  className="rounded-xl bg-zinc-950/55 border border-white/12 p-3 flex items-center gap-3"
                 >
                   <div
                     className={
@@ -1311,7 +1311,7 @@ function HelpModal({ target, onClose }: { target: number; onClose: () => void })
               {LANE_IDENTITIES.map((id, i) => (
                 <div
                   key={i}
-                  className="rounded-xl bg-white/5 border border-white/10 p-2 text-center"
+                  className="rounded-xl bg-zinc-950/55 border border-white/12 p-2 text-center"
                 >
                   <div className="text-lg">{id.glyph}</div>
                   <div className={
@@ -1338,7 +1338,7 @@ function HelpModal({ target, onClose }: { target: number; onClose: () => void })
               {COMBO_LEXICON.map(({ id, glyph }) => (
                 <div
                   key={id}
-                  className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center gap-3"
+                  className="rounded-xl bg-zinc-950/55 border border-white/12 p-3 flex items-center gap-3"
                 >
                   <span className="text-2xl shrink-0">{glyph}</span>
                   <div className="flex-1 min-w-0 flex flex-col gap-0.5">

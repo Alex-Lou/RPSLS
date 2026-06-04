@@ -47,7 +47,7 @@ export function RankedLobby({ onViewBracket, onManageDeck }: { onViewBracket: ()
       </div>
 
       {/* Profile card */}
-      <div className="bg-white/5 border border-white/10 rounded-3xl p-4 sm:p-5 flex flex-col gap-3">
+      <div className="bg-zinc-950/55 border border-white/12 rounded-3xl p-4 sm:p-5 flex flex-col gap-3">
         <div className="flex items-center gap-3">
           <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-violet-500/30 to-fuchsia-500/30 border border-white/15 flex items-center justify-center text-3xl overflow-hidden">
             {/^(data:|\/|https?:)/.test(player.avatar) ? (
@@ -144,7 +144,7 @@ export function RankedLobby({ onViewBracket, onManageDeck }: { onViewBracket: ()
       {/* How to play — simple toggle, no AnimatePresence */}
       <button
         onClick={() => setRulesOpen((o) => !o)}
-        className="bg-white/5 border border-white/10 rounded-2xl px-4 py-2.5 flex items-center justify-between text-left hover:bg-white/[0.07] transition"
+        className="bg-zinc-950/55 border border-white/12 rounded-2xl px-4 py-2.5 flex items-center justify-between text-left hover:bg-white/[0.07] transition"
       >
         <span className="text-sm flex items-center gap-2">
           <span>💡</span>
@@ -153,7 +153,7 @@ export function RankedLobby({ onViewBracket, onManageDeck }: { onViewBracket: ()
         <span className={"text-zinc-500 text-sm transition-transform duration-200 " + (rulesOpen ? "rotate-180" : "")}>▾</span>
       </button>
       {rulesOpen && (
-        <div className="bg-white/5 border border-white/10 rounded-3xl p-4 sm:p-5 -mt-1">
+        <div className="bg-zinc-950/55 border border-white/12 rounded-3xl p-4 sm:p-5 -mt-1">
           <div className="flex flex-col gap-2.5 text-[12px] text-zinc-300 leading-relaxed">
             <RuleBlock emoji="🎯" title="Le principe"
               text="Pose 3 coups sur 3 lanes (FORCE / SAGESSE / RUSE). Révélation. Le plus de lanes gagnées = round gagné. Premier à 3 rounds." />
@@ -190,7 +190,7 @@ export function RankedLobby({ onViewBracket, onManageDeck }: { onViewBracket: ()
       )}
 
       {/* Cards overview — all 13 */}
-      <div className="bg-white/5 border border-white/10 rounded-3xl p-4 sm:p-5">
+      <div className="bg-zinc-950/55 border border-white/12 rounded-3xl p-4 sm:p-5">
         <h2 className="text-xs uppercase tracking-[0.25em] font-bold text-zinc-400 mb-3">
           Toutes les cartes
         </h2>

@@ -44,7 +44,7 @@ export function PacksPage() {
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.06, duration: 0.25 }}
-                  className="bg-white/5 border border-white/10 rounded-3xl p-5 flex flex-col gap-4"
+                  className="bg-zinc-950/55 border border-white/12 rounded-3xl p-5 flex flex-col gap-4"
                 >
                   <div>
                     <h2 className="text-xl font-bold">{t("pack." + pack.id)}</h2>
@@ -59,7 +59,7 @@ export function PacksPage() {
                       {pack.elements.map((el) => (
                         <div
                           key={el.id}
-                          className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1.5"
+                          className="flex items-center gap-1.5 bg-zinc-950/55 border border-white/12 rounded-xl px-2.5 py-1.5"
                         >
                           <span className="text-lg">{el.emoji}</span>
                           <span className="text-xs text-zinc-300">{t("element." + el.id)}</span>
@@ -190,7 +190,7 @@ function PackMatch({ pack, onQuit }: { pack: Pack; onQuit: () => void }) {
           {t("match.quit")}
         </button>
         <div className="flex flex-col items-center gap-0.5">
-          <div className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-2xl px-4 py-2">
+          <div className="flex items-center gap-4 bg-zinc-950/55 border border-white/12 rounded-2xl px-4 py-2">
             <span className="text-sm font-semibold">
               {t("cmatch.you")} {scoreA}
             </span>

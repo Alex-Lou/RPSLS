@@ -58,7 +58,7 @@ export function AboutPage() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.04 * i, duration: 0.25 }}
-            className="bg-white/5 border border-white/10 rounded-2xl p-4"
+            className="bg-zinc-950/55 border border-white/12 rounded-2xl p-4"
           >
             <div className="flex items-center gap-2.5 mb-2">
               <span className="text-2xl">{s.icon}</span>

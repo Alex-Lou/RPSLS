@@ -168,7 +168,7 @@ export function ProfilePage() {
       <h1 className="text-3xl font-extrabold tracking-tight">Profile</h1>
 
       {/* Hero card */}
-      <div className="bg-white/5 border border-white/10 rounded-3xl p-6 flex flex-col sm:flex-row gap-6 items-center sm:items-start">
+      <div className="bg-zinc-950/55 border border-white/12 rounded-3xl p-6 flex flex-col sm:flex-row gap-6 items-center sm:items-start">
         <div
           className="w-28 h-28 rounded-3xl flex items-center justify-center text-6xl shrink-0 ring-2 shadow-2xl"
           style={{
@@ -248,7 +248,7 @@ export function ProfilePage() {
       </div>
 
       {/* Avatar picker */}
-      <section className="bg-white/5 border border-white/10 rounded-3xl p-5">
+      <section className="bg-zinc-950/55 border border-white/12 rounded-3xl p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-3">Avatar</h2>
         <div className="flex flex-wrap gap-2">
           {AVATAR_PRESETS.map((a) => {
@@ -302,7 +302,7 @@ export function ProfilePage() {
       </section>
 
       {/* Theme picker */}
-      <section className="bg-white/5 border border-white/10 rounded-3xl p-5">
+      <section className="bg-zinc-950/55 border border-white/12 rounded-3xl p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-3">HUD Theme</h2>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {(Object.keys(THEMES) as ThemeId[]).map((id) => {
@@ -333,7 +333,7 @@ export function ProfilePage() {
       </section>
 
       {/* CPU difficulty */}
-      <section className="bg-white/5 border border-white/10 rounded-3xl p-4 sm:p-5">
+      <section className="bg-zinc-950/55 border border-white/12 rounded-3xl p-4 sm:p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-1">
           {t("profile.diff.title")}
         </h2>
@@ -371,7 +371,7 @@ export function ProfilePage() {
       </section>
 
       {/* Haptics — vibration on tap + result */}
-      <section className="bg-white/5 border border-white/10 rounded-3xl p-4 sm:p-5">
+      <section className="bg-zinc-950/55 border border-white/12 rounded-3xl p-4 sm:p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-1">
           {t("profile.haptic.title")}
         </h2>
@@ -435,7 +435,7 @@ export function ProfilePage() {
       </section>
 
       {/* Background picker — fully coded animated scenes (+ your own image). */}
-      <section className="bg-white/5 border border-white/10 rounded-3xl p-5">
+      <section className="bg-zinc-950/55 border border-white/12 rounded-3xl p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-3">Background</h2>
         <p className="text-xs text-zinc-500 mb-3">
           Des thèmes 100% animés et codés. Choisis « Mon image » pour mettre la tienne (portrait 9:16, ex. 1080×1920 — affichée plein écran).
@@ -539,7 +539,7 @@ export function ProfilePage() {
       </section>
 
       {/* Battle pad picker */}
-      <section className="bg-white/5 border border-white/10 rounded-3xl p-5">
+      <section className="bg-zinc-950/55 border border-white/12 rounded-3xl p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-3">Battle pad</h2>
         <p className="text-xs text-zinc-500 mb-3">
           Le tapis sur lequel se jouent tes parties — 100% codés et animés. Indépendant du background. Choisis « Mon image » pour le tien (paysage 3:2, ex. 1500×1000 — couvre tout le tapis).
@@ -611,7 +611,7 @@ export function ProfilePage() {
 
       {/* By-move stats */}
       {totalGames > 0 && (
-        <section className="bg-white/5 border border-white/10 rounded-3xl p-4 sm:p-5">
+        <section className="bg-zinc-950/55 border border-white/12 rounded-3xl p-4 sm:p-5">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-3">{t("profile.bymove.title")}</h2>
           <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
             {MOVES.map((m) => {
@@ -632,7 +632,7 @@ export function ProfilePage() {
       )}
 
       {/* Accessibility — global text size. Drives --font-scale in App.tsx. */}
-      <section className="bg-white/5 border border-white/10 rounded-3xl p-5">
+      <section className="bg-zinc-950/55 border border-white/12 rounded-3xl p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-3">Accessibilité</h2>
         <p className="text-xs text-zinc-500 mb-3">Taille du texte dans toute l'application.</p>
         <div className="grid grid-cols-3 gap-2">
@@ -663,9 +663,9 @@ export function ProfilePage() {
 
       {/* Privacy — anonymized crash reports + link to the policy. The
           toggle drives Sentry.init / Sentry.close in App.tsx. */}
-      <section className="bg-white/5 border border-white/10 rounded-3xl p-5">
+      <section className="bg-zinc-950/55 border border-white/12 rounded-3xl p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-3">Confidentialité</h2>
-        <label className="flex items-center justify-between gap-3 mb-3 p-3 rounded-xl bg-white/5 border border-white/10 cursor-pointer hover:border-white/20 transition">
+        <label className="flex items-center justify-between gap-3 mb-3 p-3 rounded-xl bg-zinc-950/55 border border-white/12 cursor-pointer hover:border-white/20 transition">
           <span className="flex flex-col">
             <span className="text-sm font-bold text-zinc-200">📡 Envoyer les rapports de crash</span>
             <span className="text-[10px] text-zinc-500 leading-snug">
