@@ -24,4 +24,5 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 rpsls-core = { workspace = true }
 rand = "0.8"
+tauri-plugin-haptics = "2.3.2"
 

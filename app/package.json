@@ -32,6 +32,7 @@
     "@fontsource/space-mono": "^5.2.9",
     "@sentry/react": "^10.56.0",
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-haptics": "^2.3.2",
     "@tauri-apps/plugin-opener": "^2",
     "motion": "^12.38.0",
     "react": "^19.1.0",

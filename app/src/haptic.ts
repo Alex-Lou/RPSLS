@@ -1,16 +1,28 @@
 /**
  * Tiny haptic feedback helper.
  *
- * Uses navigator.vibrate (Android, and a handful of desktop browsers when
- * `dom.vibrator.enabled=true`). iOS Safari ignores it — that's fine, the
- * call becomes a no-op. Everything is gated on the API existing, so we never
- * throw or warn.
+ * PRIMARY path: the native Tauri haptics plugin (@tauri-apps/plugin-haptics),
+ * which drives the Android Vibrator service directly — reliable inside the
+ * Tauri WebView where `navigator.vibrate` is often a silent no-op.
+ *
+ * FALLBACK: navigator.vibrate for plain-web / dev-in-browser runs.
+ *
+ * The plugin API is async; our callers fire-and-forget, so we ignore the
+ * returned promise. Total ms of a pattern drives the native vibration
+ * duration (the plugin's `vibrate(ms)`).
  */
+
+import { vibrate as nativeVibrate } from "@tauri-apps/plugin-haptics";
 
 type Pattern = number | number[];
 export type HapticIntensity = "low" | "med" | "high";
 
-function canVibrate(): boolean {
+/** True when running inside the Tauri runtime (native plugin available). */
+function inTauri(): boolean {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
+
+function canWebVibrate(): boolean {
   return typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
 }
 
@@ -31,14 +43,27 @@ function scale(pattern: Pattern): Pattern {
   return pattern.map((v) => Math.max(1, Math.round(v * mult)));
 }
 
-/** Fire a vibration pattern. Silently no-ops if the device doesn't support it
- *  or if the player has haptics disabled in settings. */
+/** Total active-buzz ms of a pattern (drives the native single-shot duration).
+ *  For an array we sum the "on" segments (even indices) so a triple-buzz still
+ *  feels meatier than a single tap. */
+function totalMs(pattern: Pattern): number {
+  const p = scale(pattern);
+  if (typeof p === "number") return p;
+  return p.reduce((sum, v, i) => (i % 2 === 0 ? sum + v : sum), 0);
+}
+
+/** Fire a vibration pattern. No-ops when disabled. Prefers the native Tauri
+ *  plugin, falls back to navigator.vibrate on the web. */
 export function vibrate(pattern: Pattern): void {
-  if (!_enabled || !canVibrate()) return;
-  try {
-    navigator.vibrate(scale(pattern));
-  } catch {
-    /* ignore — some browsers throw if the page is in the background. */
+  if (!_enabled) return;
+  if (inTauri()) {
+    // Native plugin — async, fire-and-forget. Clamp to a sane min so a
+    // sub-perceptible 1ms buzz still registers on the motor.
+    void nativeVibrate(Math.max(10, totalMs(pattern))).catch(() => {});
+    return;
+  }
+  if (canWebVibrate()) {
+    try { navigator.vibrate(scale(pattern)); } catch { /* background tab */ }
   }
 }
 

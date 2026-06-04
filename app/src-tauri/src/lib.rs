@@ -17,6 +17,7 @@ fn random_move() -> Move {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_haptics::init())
         .invoke_handler(tauri::generate_handler![resolve_round, random_move])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
