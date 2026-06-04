@@ -32,6 +32,7 @@ import { useT } from "./i18n";
 import type { Page } from "./Sidebar";
 import { UserHeader } from "./UserHeader";
 import { LocalLanesGame } from "./LocalLanesGame";
+import { QuitConfirmModal } from "./match/QuitConfirmModal";
 import { RankedGame } from "./ranked/RankedGame";
 import { RankedLobby } from "./ranked/RankedLobby";
 import { makeTournament, resolvePlayerMatch, type TournamentState } from "./ranked/TournamentBracket";
@@ -1188,61 +1189,6 @@ function Header({
         )}
       </AnimatePresence>
     </>
-  );
-}
-
-function QuitConfirmModal({
-  onCancel, onConfirm,
-}: { onCancel: () => void; onConfirm: () => void }) {
-  const t = useT();
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.15 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-      onClick={onCancel}
-    >
-      <motion.div
-        initial={{ scale: 0.9, y: 10 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.95 }}
-        transition={{ type: "spring", stiffness: 320, damping: 26 }}
-        onClick={(e) => e.stopPropagation()}
-        className="bg-zinc-950 border border-white/15 rounded-3xl p-6 shadow-2xl flex flex-col items-center gap-5 max-w-xs"
-      >
-        <span className="text-4xl">⚠️</span>
-        <p className="text-base font-semibold text-center">
-          {t("match.quitConfirm")}
-        </p>
-        <div className="flex items-center gap-3 w-full">
-          {/* ✓ green: YES, quit (recorded as forfeit loss). */}
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={onConfirm}
-            aria-label="Yes, quit (forfeit)"
-            className="flex-1 h-12 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold flex items-center justify-center shadow-lg"
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          </motion.button>
-          {/* ✗ rose: NO, stay in the match. */}
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={onCancel}
-            aria-label="No, stay in the match"
-            className="flex-1 h-12 rounded-2xl bg-rose-500 hover:bg-rose-400 text-white font-bold flex items-center justify-center shadow-lg"
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="6" y1="6" x2="18" y2="18" />
-              <line x1="6" y1="18" x2="18" y2="6" />
-            </svg>
-          </motion.button>
-        </div>
-      </motion.div>
-    </motion.div>
   );
 }
 

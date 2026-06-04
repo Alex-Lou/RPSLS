@@ -85,6 +85,10 @@ export interface Player {
   /** Player's own uploaded background image (data URL), shown when the
    *  "custom" background is selected. */
   customBgUrl?: string;
+  /** True once the player has explicitly picked a battle pad. Until then,
+   *  choosing a background applies that background's default pad; afterwards
+   *  pad and background are fully independent. */
+  padChosen?: boolean;
 }
 
 export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: string }> = {

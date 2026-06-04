@@ -12,10 +12,10 @@
   --font-scale: 1;
 }
 
-/* 106.25% of 16px = 17px baseline (a deliberate, comfortable bump from the
-   browser default) times the user's chosen scale. rem everywhere follows. */
+/* 112.5% of 16px = 18px baseline (a comfortable bump from the browser
+   default) times the user's chosen scale. rem everywhere follows. */
 html {
-  font-size: calc(106.25% * var(--font-scale));
+  font-size: calc(112.5% * var(--font-scale));
 }
 
 html, body, #root {

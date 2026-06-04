@@ -5,7 +5,7 @@ import { THEMES, gradientFromTheme } from "./theme";
 import { levelFromXp } from "./leveling";
 import { DIFFICULTY_META, PAD_META } from "./types";
 import type { BackgroundId, Difficulty, PadId, ThemeId } from "./types";
-import { BACKGROUNDS, BACKGROUNDS_BY_ID, PAD_DEFAULT_BG } from "./themes";
+import { BACKGROUNDS } from "./themes";
 import { isAvatarImage, avatarImgStyle } from "./avatar";
 import { MOVES } from "./game";
 import { BattlePad } from "./BattlePad";
@@ -433,7 +433,10 @@ export function ProfilePage() {
                     return;
                   }
                   const patch: Partial<{ backgroundId: BackgroundId; padId: PadId }> = { backgroundId: bg.id };
-                  if (bg.defaultPadId) patch.padId = bg.defaultPadId;
+                  // Only auto-apply the theme's default pad if the player has
+                  // never explicitly chosen one — otherwise pad stays put
+                  // (pad and background are independent once both are touched).
+                  if (bg.defaultPadId && !player.padChosen) patch.padId = bg.defaultPadId;
                   updateProfile(patch);
                 }}
                 className={
@@ -511,20 +514,19 @@ export function ProfilePage() {
       <section className="bg-white/5 border border-white/10 rounded-3xl p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300 mb-3">Battle pad</h2>
         <p className="text-xs text-zinc-500 mb-3">
-          The mat your matches are played on. Picking one also swaps in the paired background — change the background above if you'd rather mix.
+          Le tapis sur lequel se jouent tes parties. Indépendant du background : choisis-les librement. (Sans choix de pad, celui du thème s'applique.)
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {(Object.keys(PAD_META) as PadId[]).map((id) => {
             const meta = PAD_META[id];
             const active = player.padId === id;
-            const pairedBg = PAD_DEFAULT_BG[id];
             return (
               <button
                 key={id}
                 onClick={() => {
-                  const patch: Partial<{ padId: PadId; backgroundId: BackgroundId }> = { padId: id };
-                  if (pairedBg) patch.backgroundId = pairedBg;
-                  updateProfile(patch);
+                  // Pad pick is independent — it never changes the background.
+                  // Mark padChosen so backgrounds stop auto-overriding it.
+                  updateProfile({ padId: id, padChosen: true });
                 }}
                 className={
                   "group rounded-2xl border overflow-hidden transition text-left " +
@@ -538,11 +540,6 @@ export function ProfilePage() {
                   {active && (
                     <div className="absolute top-2 right-2 bg-emerald-500/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                       ACTIVE
-                    </div>
-                  )}
-                  {pairedBg && BACKGROUNDS_BY_ID[pairedBg]?.src && (
-                    <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded">
-                      pairs with {BACKGROUNDS_BY_ID[pairedBg].label}
                     </div>
                   )}
                 </div>
