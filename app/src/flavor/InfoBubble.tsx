@@ -84,7 +84,7 @@ export function InfoBubble({
               <div className="text-sm text-zinc-300 leading-relaxed">{body}</div>
               <button
                 onClick={() => setOpen(false)}
-                className="mt-5 w-full py-2.5 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 font-bold text-sm text-white shadow-lg shadow-violet-500/30 transition active:scale-[0.97]"
+                className="mt-5 w-full py-2.5 rounded-2xl bg-themed font-bold text-sm text-white shadow-lg shadow-violet-500/30 transition active:scale-[0.97]"
               >
                 OK
               </button>

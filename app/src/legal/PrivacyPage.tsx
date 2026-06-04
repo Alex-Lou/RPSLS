@@ -25,7 +25,7 @@ export function PrivacyPage({ onClose }: { onClose?: () => void }) {
       <article className="max-w-2xl mx-auto w-full px-5 py-6 flex flex-col gap-5">
         <header className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-black tracking-tight bg-gradient-to-br from-violet-300 via-fuchsia-300 to-cyan-300 bg-clip-text text-transparent">
+            <h1 className="text-2xl font-black tracking-tight text-themed">
               {c.title}
             </h1>
             <p className="text-[11px] text-zinc-500 mt-1">{c.lastUpdated}</p>
@@ -57,7 +57,7 @@ export function PrivacyPage({ onClose }: { onClose?: () => void }) {
 
         <a
           href={`mailto:${c.contactEmail}`}
-          className="self-center mt-3 px-5 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white shadow-lg shadow-violet-500/30 hover:scale-[1.02] transition"
+          className="self-center mt-3 px-5 py-2.5 rounded-xl text-sm font-bold bg-themed text-white shadow-lg shadow-violet-500/30 hover:scale-[1.02] transition"
         >
           {c.contactEmail}
         </a>

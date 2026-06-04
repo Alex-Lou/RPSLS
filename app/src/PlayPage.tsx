@@ -1480,7 +1480,7 @@ function PassPanel({
         whileHover={{ y: -2 }}
         whileTap={{ scale: 0.97 }}
         onClick={onContinue}
-        className="px-6 py-3 rounded-2xl font-semibold bg-gradient-to-br from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400 shadow-lg shadow-violet-900/30"
+        className="px-6 py-3 rounded-2xl font-semibold bg-themed shadow-lg shadow-black/30"
       >
         {t("match.pass.continue", { name: labelB })}
       </motion.button>

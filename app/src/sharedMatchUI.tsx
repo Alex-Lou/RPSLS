@@ -134,7 +134,7 @@ export function MatchScoreBar({
         </div>
         <div className="px-2 sm:px-3 flex items-center gap-1">
           <RollingScore value={youScore} color="emerald" size="lg" />
-          <span className="text-zinc-600 px-0.5">:</span>
+          <span className="text-zinc-400 px-0.5 font-bold">:</span>
           <RollingScore value={oppScore} color="rose" size="lg" />
         </div>
         <div className="flex flex-col text-right min-w-0 flex-1">
@@ -242,7 +242,7 @@ export const FloatingMatchBackButton = forwardRef<
                     "flex-1 py-2.5 rounded-2xl font-bold text-sm text-white shadow-lg transition active:scale-[0.97] " +
                     (confirm.severity === "danger"
                       ? "bg-gradient-to-r from-rose-500 to-red-600 shadow-rose-500/30"
-                      : "bg-gradient-to-r from-violet-500 to-fuchsia-500 shadow-violet-500/30")
+                      : "bg-themed shadow-violet-500/30")
                   }
                 >
                   {confirm.confirmLabel ?? "Quitter"}

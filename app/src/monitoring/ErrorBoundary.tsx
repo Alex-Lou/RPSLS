@@ -62,7 +62,7 @@ function CrashScreen({ error, onReset }: { error: Error; onReset: () => void }) 
       </details>
       <button
         onClick={onReset}
-        className="mt-2 px-6 py-2.5 rounded-xl font-bold text-white bg-gradient-to-r from-violet-500 to-fuchsia-500 shadow-lg shadow-violet-500/30 hover:scale-[1.02] transition"
+        className="mt-2 px-6 py-2.5 rounded-xl font-bold text-white bg-themed shadow-lg shadow-violet-500/30 hover:scale-[1.02] transition"
       >
         Try again
       </button>

@@ -85,7 +85,7 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
       className="flex flex-col gap-4 flex-1 py-2 px-2 max-w-lg mx-auto w-full overflow-y-auto"
     >
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-extrabold bg-gradient-to-r from-violet-300 to-fuchsia-400 bg-clip-text text-transparent">
+        <h1 className="text-xl font-extrabold text-themed">
           Mon Deck
         </h1>
         <button onClick={onClose} className="text-zinc-400 hover:text-white text-xl px-2">✕</button>
@@ -176,7 +176,7 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
       <motion.button
         whileTap={{ scale: 0.97 }}
         onClick={handleSave}
-        className="w-full py-3 rounded-2xl font-bold text-white bg-gradient-to-r from-violet-500 to-fuchsia-500 shadow-lg transition"
+        className="w-full py-3 rounded-2xl font-bold text-white bg-themed shadow-lg transition"
       >
         Sauvegarder le deck
       </motion.button>

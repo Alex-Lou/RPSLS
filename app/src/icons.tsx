@@ -12,6 +12,20 @@ export const MOVE_PALETTE: Record<
   spock:    { from: "from-cyan-300",  to: "to-violet-500",  ring: "ring-violet-400/40",  glow: "shadow-violet-500/30",  hex: "#8b5cf6" },
 };
 
+/** Blend a move's identity hex toward the active theme accent so the move
+ *  frame harmonises with the chosen background while staying recognisable.
+ *  `mix` = how much of the MOVE colour to keep (0.55 → 55% move, 45% theme).
+ *  Returns a CSS color-mix() string driven by --theme-primary, which itself
+ *  follows the background accent override set in App.tsx. */
+export function moveRim(hex: string, mix = 55): string {
+  return `color-mix(in oklab, ${hex} ${mix}%, var(--theme-primary))`;
+}
+
+/** Same blend but faded toward transparent — for soft outer glows. */
+export function moveGlow(hex: string, mix = 55, alpha = 50): string {
+  return `color-mix(in oklab, ${moveRim(hex, mix)} ${alpha}%, transparent)`;
+}
+
 interface HandProps {
   move: Move;
   size?: "sm" | "md" | "lg" | "xl";
@@ -48,11 +62,13 @@ export function Hand({ move, size = "md", emphasis = "default", className = "" }
   const pal = MOVE_PALETTE[move];
   const s = SIZE[size];
 
-  // Match the PickerBar treatment: dark surface + coloured border + soft
-  // glow. Reads consistently across all 9 backgrounds because the bg is
-  // *always* dark — the per-move identity comes from the rim, not the fill.
+  // Dark surface + theme-blended coloured border + soft glow. The rim
+  // keeps each move recognisable (rock=amber-ish, spock=violet-ish) while
+  // bending ~45% toward the active theme accent so the frame harmonises
+  // with the chosen background instead of being a fixed rainbow.
+  const rim = moveRim(pal.hex);
   const dark = "linear-gradient(160deg, rgba(20,22,32,0.92) 0%, rgba(10,12,20,0.92) 100%)";
-  const glow = `0 0 18px -2px ${pal.hex}55, inset 0 1px 0 rgba(255,255,255,0.08)`;
+  const glow = `0 0 18px -2px ${moveGlow(pal.hex)}, inset 0 1px 0 rgba(255,255,255,0.08)`;
 
   const emp =
     emphasis === "winner"
@@ -66,7 +82,7 @@ export function Hand({ move, size = "md", emphasis = "default", className = "" }
       className={`relative ${s.box} rounded-2xl sm:rounded-3xl flex items-center justify-center text-white transition-all ${emp} ${className}`}
       style={{
         background: dark,
-        border: `2.5px solid ${pal.hex}`,
+        border: `2.5px solid ${rim}`,
         boxShadow: glow,
       }}
     >

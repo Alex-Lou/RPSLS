@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useStore } from "./store";
 import { useT } from "./i18n";
-import { Hand, MoveGlyph, MOVE_PALETTE } from "./icons";
+import { Hand, MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "./icons";
 import { MOVES, type Move } from "./game";
 import {
   OnlineClient,
@@ -726,7 +726,7 @@ export function OnlinePage() {
               </p>
               <button
                 onClick={joinQueue}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 font-semibold text-white shadow-lg shadow-violet-500/30 active:scale-[0.98] transition"
+                className="w-full py-3 rounded-xl bg-themed font-semibold text-white shadow-lg shadow-violet-500/30 active:scale-[0.98] transition"
               >
                 Find an opponent
               </button>
@@ -786,7 +786,7 @@ export function OnlinePage() {
             className="flex flex-col items-center gap-4 py-10"
           >
             <div className="text-sm text-zinc-400">Share this code with a friend</div>
-            <div className="text-5xl sm:text-6xl font-black tracking-[0.4em] font-mono bg-gradient-to-br from-violet-300 to-fuchsia-300 bg-clip-text text-transparent">
+            <div className="text-5xl sm:text-6xl font-black tracking-[0.4em] font-mono text-themed">
               {lobbyCode}
             </div>
             <div className="text-xs text-zinc-500">Best of {bestOf} · waiting…</div>
@@ -1137,7 +1137,7 @@ function ModePicker({
         className={
           "flex-1 py-3 rounded-xl font-semibold transition flex flex-col items-center gap-0.5 " +
           (mode === "lanes"
-            ? "bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-500 text-white shadow-lg shadow-violet-500/30"
+            ? "bg-themed text-white shadow-lg shadow-violet-500/30"
             : "bg-white/5 hover:bg-white/10 text-zinc-300")
         }
       >
@@ -1498,15 +1498,19 @@ function PickStage({
               transition={{ delay: 0.05 * i }}
               whileHover={{ y: -4, scale: 1.04 }}
               whileTap={{ scale: 0.92 }}
-              className={
-                "aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 " +
-                "bg-gradient-to-br " + pal.from + " " + pal.to + " ring-2 " + pal.ring + " " + pal.glow +
-                " text-zinc-900 shadow-lg transition"
-              }
+              aria-label={`Pick ${mv}`}
+              className="aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 text-white transition"
+              // Dark glass + theme-blended rim — consistent with ranked +
+              // casual lanes pickers.
+              style={{
+                background: "linear-gradient(160deg, rgba(20,22,32,0.92) 0%, rgba(10,12,20,0.92) 100%)",
+                border: `2px solid ${moveRim(pal.hex)}`,
+                boxShadow: `0 0 14px -2px ${moveGlow(pal.hex)}, inset 0 1px 0 rgba(255,255,255,0.08)`,
+              }}
               title={mv}
             >
-              <MoveGlyph move={mv} className="w-8 h-8 sm:w-10 sm:h-10" />
-              <span className="text-[10px] uppercase tracking-wider font-bold">{mv}</span>
+              <MoveGlyph move={mv} className="w-10 h-10 sm:w-12 sm:h-12" />
+              <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-bold" style={{ color: moveRim(pal.hex) }}>{mv}</span>
             </motion.button>
           );
         })}

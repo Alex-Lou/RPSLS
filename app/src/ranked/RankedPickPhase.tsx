@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { MOVES, type Move } from "../game";
-import { MoveGlyph, MOVE_PALETTE } from "../icons";
+import { MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "../icons";
 import { hapticAlert, hapticTap } from "../haptic";
 import { hapticTick, PickShock } from "../sharedMatchUI";
 import { useT } from "../i18n";
@@ -230,19 +230,18 @@ function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void
             className="relative aspect-[4/5] rounded-xl flex flex-col items-center justify-center gap-0.5 py-1 text-white transition"
             // Dark glass surface so the white-silhouette PNG glyph reads
             // unambiguously on every theme. The per-move identity comes
-            // from a 2px coloured ring + a soft accent glow — never from
-            // the fill, which would either over-saturate the PNG glow OR
-            // (worse) get inverted by some Android WebView's compositor
-            // and turn the icon invisible.
+            // from the rim + glow, which now blend ~45% toward the active
+            // theme accent (moveRim/moveGlow) so the frames harmonise with
+            // the chosen background while each move stays recognisable.
             style={{
               background: "linear-gradient(160deg, rgba(20,22,32,0.92) 0%, rgba(10,12,20,0.92) 100%)",
-              border: `2px solid ${pal.hex}`,
-              boxShadow: `0 0 12px -2px ${pal.hex}50, inset 0 1px 0 rgba(255,255,255,0.08)`,
+              border: `2px solid ${moveRim(pal.hex)}`,
+              boxShadow: `0 0 12px -2px ${moveGlow(pal.hex)}, inset 0 1px 0 rgba(255,255,255,0.08)`,
             }}
           >
             <PickShock show={shockMove === mv} />
             <MoveGlyph move={mv} className="w-12 h-12 sm:w-14 sm:h-14" />
-            <span className="text-[11px] sm:text-xs uppercase tracking-wider font-bold leading-none" style={{ color: pal.hex }}>{mv}</span>
+            <span className="text-[11px] sm:text-xs uppercase tracking-wider font-bold leading-none" style={{ color: moveRim(pal.hex) }}>{mv}</span>
           </motion.button>
         );
       })}

@@ -63,7 +63,7 @@ export function Welcome({ onDone }: { onDone: () => void }) {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25, duration: 0.4 }}
-          className="text-3xl font-extrabold tracking-tight text-center bg-gradient-to-r from-violet-300 via-fuchsia-300 to-teal-300 bg-clip-text text-transparent"
+          className="text-3xl font-extrabold tracking-tight text-center text-themed"
         >
           {t("welcome.title")}
         </motion.h2>
@@ -113,7 +113,7 @@ export function Welcome({ onDone }: { onDone: () => void }) {
             whileTap={isValid ? { scale: 0.97 } : undefined}
             disabled={!isValid}
             onClick={onContinue}
-            className="flex-1 px-5 py-3 rounded-2xl font-semibold text-base bg-gradient-to-br from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-lg shadow-violet-900/30"
+            className="flex-1 px-5 py-3 rounded-2xl font-semibold text-base bg-themed disabled:opacity-40 disabled:cursor-not-allowed transition shadow-lg shadow-black/30"
           >
             {t("welcome.btn.go")}
           </motion.button>

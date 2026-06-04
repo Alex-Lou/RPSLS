@@ -43,7 +43,7 @@ export function AboutPage() {
             className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl shadow-lg"
           />
         </div>
-        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-violet-300 via-fuchsia-300 to-teal-300 bg-clip-text text-transparent">
+        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-themed">
           {t("about.title")}
         </h1>
         <p className="text-zinc-400 text-sm sm:text-base mt-2 leading-relaxed">

@@ -12,7 +12,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Hand, MoveGlyph, MOVE_PALETTE } from "./icons";
+import { Hand, MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "./icons";
 import { MOVES, type Move } from "./game";
 import { hapticAlert, hapticTap } from "./haptic";
 import { useT } from "./i18n";
@@ -201,7 +201,7 @@ export function LanesMatchView({
       <button
         onClick={() => setHelpOpen(true)}
         title={t("lanes.help.button")}
-        className="absolute -top-9 right-0 z-20 w-7 h-7 rounded-full bg-black/50 backdrop-blur hover:bg-white/10 border border-white/15 text-zinc-300 hover:text-white text-[11px] font-bold transition flex items-center justify-center"
+        className="absolute -top-9 right-0 z-20 w-9 h-9 rounded-full bg-black/50 backdrop-blur hover:bg-white/10 border border-white/15 text-zinc-200 hover:text-white text-sm font-bold transition flex items-center justify-center"
       >
         ?
       </button>
@@ -570,7 +570,7 @@ function PickStage({
         className={
           "shrink-0 mt-1 px-7 py-3 rounded-2xl font-bold text-white transition " +
           (allFilled
-            ? "bg-gradient-to-r from-violet-500 via-fuchsia-500 to-teal-400 shadow-lg shadow-violet-500/30 hover:scale-[1.02]"
+            ? "bg-themed shadow-lg shadow-violet-500/30 hover:scale-[1.02]"
             : "bg-white/5 text-zinc-500 cursor-not-allowed")
         }
       >
@@ -693,15 +693,20 @@ function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void
             transition={{ delay: 0.05 * i }}
             whileHover={{ y: -4, scale: 1.04 }}
             whileTap={{ scale: 0.86 }}
-            className={
-              "relative aspect-[4/5] rounded-xl flex flex-col items-center justify-center gap-0.5 py-1 " +
-              "bg-gradient-to-br " + pal.from + " " + pal.to + " ring-2 " + pal.ring + " " + pal.glow +
-              " text-zinc-900 shadow-md transition"
-            }
+            aria-label={`Pick ${mv}`}
+            className="relative aspect-[4/5] rounded-xl flex flex-col items-center justify-center gap-0.5 py-1 text-white transition"
+            // Dark glass + theme-blended rim — same treatment as the ranked
+            // picker so every mode's move buttons look consistent and adapt
+            // to the active background accent.
+            style={{
+              background: "linear-gradient(160deg, rgba(20,22,32,0.92) 0%, rgba(10,12,20,0.92) 100%)",
+              border: `2px solid ${moveRim(pal.hex)}`,
+              boxShadow: `0 0 12px -2px ${moveGlow(pal.hex)}, inset 0 1px 0 rgba(255,255,255,0.08)`,
+            }}
           >
             <PickShock show={shockMove === mv} />
-            <MoveGlyph move={mv} className="w-6 h-6 sm:w-8 sm:h-8" />
-            <span className="text-[8px] uppercase tracking-wider font-bold leading-none">{mv}</span>
+            <MoveGlyph move={mv} className="w-9 h-9 sm:w-11 sm:h-11" />
+            <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-bold leading-none" style={{ color: moveRim(pal.hex) }}>{mv}</span>
           </motion.button>
         );
       })}
@@ -1260,7 +1265,7 @@ function HelpModal({ target, onClose }: { target: number; onClose: () => void })
         className="w-full max-w-md max-h-[85vh] overflow-y-auto bg-zinc-950 border border-white/15 rounded-3xl p-6 shadow-2xl"
       >
         <div className="flex items-baseline justify-between mb-4">
-          <h2 className="text-xl font-black tracking-tight bg-gradient-to-br from-violet-300 via-fuchsia-300 to-cyan-300 bg-clip-text text-transparent">
+          <h2 className="text-xl font-black tracking-tight text-themed">
             🌌 {t("lanes.help.title")}
           </h2>
         </div>
@@ -1378,7 +1383,7 @@ function HelpModal({ target, onClose }: { target: number; onClose: () => void })
 
         <button
           onClick={onClose}
-          className="mt-6 w-full px-6 py-3 rounded-2xl font-bold text-white bg-gradient-to-r from-violet-500 via-fuchsia-500 to-teal-400 shadow-lg shadow-violet-500/30 transition hover:scale-[1.02]"
+          className="mt-6 w-full px-6 py-3 rounded-2xl font-bold text-white bg-themed shadow-lg shadow-violet-500/30 transition hover:scale-[1.02]"
         >
           {t("lanes.help.close")}
         </button>

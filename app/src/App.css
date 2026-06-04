@@ -100,3 +100,28 @@ body::-webkit-scrollbar,
   -webkit-appearance: none !important;
   appearance: none !important;
 }
+
+/* ─────────── Themed gradient utilities ───────────
+   Single source of truth for the "primary → secondary" theme gradient,
+   driven by the CSS vars that App.tsx keeps in sync with the active
+   background accent. Replaces ~30 hardcoded `from-violet-… to-fuchsia-…`
+   Tailwind sites so every CTA / header follows the chosen theme. */
+
+/* Text gradient (headings, wordmarks). */
+.text-themed {
+  background-image: linear-gradient(135deg, var(--theme-primary), var(--theme-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Solid button fill (primary CTAs). */
+.bg-themed {
+  background-image: linear-gradient(to right, var(--theme-primary), var(--theme-secondary));
+}
+
+/* Diagonal variant for larger surfaces. */
+.bg-themed-br {
+  background-image: linear-gradient(135deg, var(--theme-primary), var(--theme-secondary));
+}
