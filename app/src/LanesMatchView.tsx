@@ -94,6 +94,9 @@ export interface LanesMatchViewProps {
   onSubmitPicks: (picks: [Move, Move, Move]) => void;
   /** Forfeit / back to menu. */
   onLeave: () => void;
+  /** Show the pick countdown. Online (vs real players) keeps it; solo vs CPU
+   *  passes false so there's no time pressure and no move played for you. */
+  showTimer?: boolean;
 }
 
 /* ──────────── Main view ──────────── */
@@ -108,6 +111,7 @@ export function LanesMatchView({
   onSubmitPicks,
   onLeave,
   onRematch,
+  showTimer = true,
 }: LanesMatchViewProps & { onRematch?: () => void }) {
   const t = useT();
   const recordAbandon = useStore((s) => s.recordAbandon);
@@ -239,6 +243,7 @@ export function LanesMatchView({
             onClearLane={clearLane}
             startedAt={round.startedAt}
             deadlineMs={round.deadlineMs}
+            showTimer={showTimer}
             onSubmit={submitNow}
             opponentName={match.opponent}
             youName={nickname}
@@ -462,7 +467,7 @@ function FaceDownLaneCard({ index: _index, pulsing: _pulsing = false }: { index:
 }
 
 function PickStage({
-  picks, onPick, onClearLane, startedAt, deadlineMs, onSubmit, opponentName, youName,
+  picks, onPick, onClearLane, startedAt, deadlineMs, showTimer = true, onSubmit, opponentName, youName,
 }: {
   picks: (Move | null)[];
   /** Pick `mv` — drops it into the next empty lane. */
@@ -470,6 +475,7 @@ function PickStage({
   onClearLane: (lane: number) => void;
   startedAt: number;
   deadlineMs: number;
+  showTimer?: boolean;
   onSubmit: () => void;
   opponentName: string;
   youName: string;
@@ -481,8 +487,8 @@ function PickStage({
   const preview = allFilled ? detectPlayerCombo(picks as Move[]) : null;
   return (
     <div className="w-full flex flex-col items-center gap-2 sm:gap-3">
-      {/* Timer — pinned top */}
-      <TimerBar startedAt={startedAt} durationMs={deadlineMs} />
+      {/* Timer — pinned top. Hidden in solo vs CPU (no time pressure). */}
+      {showTimer && <TimerBar startedAt={startedAt} durationMs={deadlineMs} />}
 
       {/* Table at natural height; the parent stage scrolls if the whole pick
           phase exceeds the viewport so the picker + LOCK stay reachable. */}

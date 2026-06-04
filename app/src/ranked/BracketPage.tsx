@@ -22,9 +22,9 @@ import { FloatingMatchBackButton, hapticTick } from "../sharedMatchUI";
 import { LoadingTip } from "../flavor/LoadingTip";
 
 const SIZE_META: Record<TournamentSize, { title: string; sub: string; glyph: string }> = {
-  4: { title: "Rapide", sub: "4 joueurs · 2 tours", glyph: "⚡" },
-  8: { title: "Classique", sub: "8 joueurs · 3 tours", glyph: "🛡️" },
-  16: { title: "Épique", sub: "16 joueurs · 4 tours", glyph: "👑" },
+  4: { title: "Rapide", sub: "4 adversaires CPU · 2 tours", glyph: "⚡" },
+  8: { title: "Classique", sub: "8 adversaires CPU · 3 tours", glyph: "🛡️" },
+  16: { title: "Épique", sub: "16 adversaires CPU · 4 tours", glyph: "👑" },
 };
 
 export function BracketPage({
@@ -86,10 +86,10 @@ export function BracketPage({
         </h1>
         <p className="text-[11px] text-zinc-500 mt-1">
           {selecting
-            ? "Choisis la taille du tableau"
+            ? "Choisis la taille du tableau · adversaires CPU (entraînement)"
             : tournament.phase === "complete"
             ? "Tournoi terminé !"
-            : "En cours…"}
+            : "En cours… · adversaires CPU"}
         </p>
       </div>
 

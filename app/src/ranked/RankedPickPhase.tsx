@@ -30,6 +30,7 @@ export interface RankedPickPhaseProps {
   augurCooldown: number;
   startedAt: number;
   deadlineMs: number;
+  showTimer?: boolean;
   onPickMove: (mv: Move) => void;
   onPlayCard: (card: PlayedCard) => void;
   onCancelCard: () => void;
@@ -41,7 +42,7 @@ export interface RankedPickPhaseProps {
 export function RankedPickPhase({
   youName, opponentName,
   picks, augurRevealed, cardPlayed, mana, hand, oppHandSize, augurCooldown,
-  startedAt, deadlineMs,
+  startedAt, deadlineMs, showTimer = true,
   onPickMove, onPlayCard, onCancelCard, onClearLane, onLock,
   revealAugurFor,
 }: RankedPickPhaseProps) {
@@ -114,7 +115,7 @@ export function RankedPickPhase({
 
   return (
     <div className="w-full flex flex-col items-center gap-1.5 sm:gap-3 pb-2 sm:pb-3">
-      <TimerBar startedAt={startedAt} durationMs={deadlineMs} />
+      {showTimer && <TimerBar startedAt={startedAt} durationMs={deadlineMs} />}
 
       {/* Targeting hint */}
       <AnimatePresence>

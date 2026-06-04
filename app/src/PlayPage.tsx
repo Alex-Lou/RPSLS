@@ -988,7 +988,9 @@ function Game({
             subtitle={isHotseat ? t("match.pickHotseat") : t("match.pickSubtitle")}
             onPick={onP1Pick}
             onTimeout={isHotseat ? undefined : onP1Timeout}
-            withTimer
+            // Solo vs CPU = no countdown (no move played for you). Hotseat keeps
+            // the pass-and-play timer.
+            withTimer={isHotseat}
             recentOppMoves={
               !isHotseat
                 ? match.history.slice(-3).map((r) => r.move_b)

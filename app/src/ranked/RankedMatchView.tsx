@@ -97,6 +97,9 @@ export interface RankedMatchViewProps {
   onRematch?: () => void;
   /** Tournament flow: "Suivant" button after match end. */
   onNext?: () => void;
+  /** Show the pick countdown. Ranked vs CPU passes false (no time pressure,
+   *  no move auto-played for you). */
+  showTimer?: boolean;
 }
 
 type Phase = "matched" | "picking" | "reveal-intro" | "reveal" | "match-end";
@@ -107,7 +110,7 @@ export function RankedMatchView({
   picks, cardPlayed, augurRevealed, mana, hand, oppHandSize,
   roundWinsYou, roundWinsOpp, augurCooldown,
   onPickMove, onClearLane, onPlayCard, onCancelCard, onLock,
-  revealAugurFor, onLeave, onRematch, onNext,
+  revealAugurFor, onLeave, onRematch, onNext, showTimer = true,
 }: RankedMatchViewProps) {
   const t = useT();
   const phase: Phase = (() => {
@@ -189,6 +192,7 @@ export function RankedMatchView({
             augurCooldown={augurCooldown}
             startedAt={round.startedAt}
             deadlineMs={round.deadlineMs}
+            showTimer={showTimer}
             onPickMove={onPickMove}
             onClearLane={onClearLane}
             onPlayCard={onPlayCard}

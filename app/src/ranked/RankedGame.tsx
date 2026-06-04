@@ -141,8 +141,6 @@ export function RankedGame({
   const roundNoRef = useRef(0);
   const deadlineTimerRef = useRef<number | null>(null);
   const wonLastRoundRef = useRef(false);
-  const timeoutCountRef = useRef(0);
-  const MAX_TIMEOUTS = 3;
   /** Augur cooldown: rounds remaining before Augur can be played again. */
   const [augurCooldown, setAugurCooldown] = useState(0);
   /** Set true when the CPU successfully Heists the player; consumed at next
@@ -217,29 +215,8 @@ export function RankedGame({
       startedAt: Date.now(),
     });
 
-    if (deadlineTimerRef.current) window.clearTimeout(deadlineTimerRef.current);
-    deadlineTimerRef.current = window.setTimeout(() => {
-      timeoutCountRef.current += 1;
-      if (timeoutCountRef.current >= MAX_TIMEOUTS) {
-        // Forfait — auto-lose the match
-        const winsA = battle.roundWinsA;
-        const winsB = winTo;
-        recordMatch({
-          id: `ranked-forfeit-${Date.now()}`,
-          mode: "constellation",
-          bestOf: winTo,
-          opponent: { kind: "cpu", mood: moodRef.current },
-          scorePlayer: winsA, scoreOpponent: winsB,
-          outcome: "loss", rounds: [],
-          xpDelta: 0, lpDelta: -10,
-          timestamp: Date.now(), forfeit: true,
-        });
-        setEnd({ winner: "b", roundWinsYou: winsA, roundWinsOpp: winsB, forfeit: true });
-        return;
-      }
-      const filler: [Move, Move, Move] = ["rock", "rock", "rock"];
-      resolveAndAdvance(filler, true);
-    }, PICK_DEADLINE_MS + 500);
+    // Ranked vs CPU is local & solo → NO countdown / auto-loss. The player
+    // takes their time; the game never auto-plays (e.g. Rock×3) for them.
   }
 
   /* ──────────── Player actions ──────────── */
@@ -287,7 +264,6 @@ export function RankedGame({
   function handleLock() {
     if (picks.some((p) => p === null)) return;
     hapticLock();
-    timeoutCountRef.current = 0; // Player acted — reset inactivity counter
     if (deadlineTimerRef.current) {
       window.clearTimeout(deadlineTimerRef.current);
       deadlineTimerRef.current = null;
@@ -730,6 +706,7 @@ export function RankedGame({
         onLeave={onMatchResult ? undefined : handleLeave}
         onRematch={onMatchResult ? undefined : rematch}
         onNext={onMatchResult && end ? () => onMatchResult(end.winner === "a") : undefined}
+        showTimer={false}
       />
       {riposteData && (
         <RiposteOverlay

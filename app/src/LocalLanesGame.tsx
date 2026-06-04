@@ -95,18 +95,8 @@ export function LocalLanesGame({
       deadlineMs: PICK_DEADLINE_MS,
       startedAt: Date.now(),
     });
-
-    // Schedule the auto-loss when the player runs out of time.
-    if (deadlineTimerRef.current) window.clearTimeout(deadlineTimerRef.current);
-    deadlineTimerRef.current = window.setTimeout(() => {
-      // Player didn't pick — auto-submit Rock×3 (will lose the round, but
-      // mirror the server-side timeout semantics).
-      const filler: LanePlay[] = Array.from({ length: LANE_COUNT }, () => ({
-        mv: "rock" as Move,
-        mana: 0,
-      }));
-      resolveAndAdvance(filler, /*timedOut=*/ true);
-    }, PICK_DEADLINE_MS + 500);
+    // Solo vs CPU: NO countdown / auto-loss. The player picks at their own
+    // pace — the game never plays a move (e.g. Rock×3) for them.
   }
 
   function handleSubmit(picks: [Move, Move, Move]) {
@@ -259,6 +249,7 @@ export function LocalLanesGame({
       onSubmitPicks={handleSubmit}
       onLeave={onQuit}
       onRematch={rematch}
+      showTimer={false}
     />
   );
 }

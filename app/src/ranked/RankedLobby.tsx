@@ -106,7 +106,7 @@ export function RankedLobby({ onViewBracket, onManageDeck }: { onViewBracket: ()
               initial={{ width: 0 }}
               animate={{ width: `${(lpProgress * 100).toFixed(1)}%` }}
               transition={{ duration: 0.8, type: "spring", stiffness: 120, damping: 20 }}
-              className={"h-full rounded-full bg-gradient-to-r " + tier.gradient}
+              className="h-full rounded-full bg-themed"
             />
           </div>
         </div>
@@ -139,16 +139,21 @@ export function RankedLobby({ onViewBracket, onManageDeck }: { onViewBracket: ()
       <motion.button
         whileTap={{ scale: 0.98 }}
         onClick={onViewBracket}
-        className="w-full bg-gradient-to-r from-amber-500/20 to-rose-500/20 border border-amber-400/30 rounded-2xl px-4 py-4 flex items-center justify-between hover:from-amber-500/30 hover:to-rose-500/30 transition"
+        className="w-full rounded-2xl px-4 py-4 flex items-center justify-between transition hover:brightness-110"
+        style={{
+          background:
+            "linear-gradient(135deg, color-mix(in oklab, var(--theme-primary) 22%, transparent), color-mix(in oklab, var(--theme-secondary) 22%, transparent))",
+          border: "1px solid color-mix(in oklab, var(--theme-primary) 40%, transparent)",
+        }}
       >
         <div className="flex items-center gap-3">
           <span className="text-2xl">🏆</span>
           <div className="text-left">
             <div className="font-bold text-base text-zinc-100">Voir le Tournoi</div>
-            <div className="text-[10px] text-zinc-400">8 joueurs · Prochain dans {countdown}</div>
+            <div className="text-[10px] text-zinc-400">8 adversaires CPU · Prochain dans {countdown}</div>
           </div>
         </div>
-        <span className="text-amber-300 text-lg">›</span>
+        <span className="text-lg" style={{ color: "var(--theme-secondary)" }}>›</span>
       </motion.button>
 
       {/* How to play — simple toggle, no AnimatePresence */}
