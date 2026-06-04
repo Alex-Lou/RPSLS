@@ -6,14 +6,14 @@ export type ThemeId = "violet" | "neon" | "pastel" | "sunset" | "forest";
 export type PadId =
   // Fully coded, animated playmats (SVG/SMIL — no PNGs anymore).
   | "chalkboard" | "vintage" | "cosmos" | "galaxy" | "neon" | "comics"
-  | "cyberpunk" | "holy" | "quantum"
+  | "cyberpunk" | "holy" | "quantum" | "casino"
   // Player's own uploaded mat (data URL on the player).
   | "custom";
 
 export type BackgroundId =
   | "default"
   // Coded / animated WebGL backdrops (no PNG — fully procedural).
-  | "nebula" | "galaxy" | "aurora" | "holy" | "quantum" | "grid"
+  | "nebula" | "galaxy" | "aurora" | "holy" | "quantum" | "grid" | "casino"
   // Player's own uploaded image.
   | "custom";
 
@@ -107,6 +107,7 @@ export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: st
   cyberpunk:  { label: "Cyberpunk",      emoji: "🌆", tagline: "Neon hex grid, holographic HUD, scanlines." },
   holy:       { label: "Holy Game",      emoji: "✝️", tagline: "Cathedral light, gilded relics, sacred geometry." },
   quantum:    { label: "Quantum Lab",    emoji: "⚛️", tagline: "Particle traces, physics equations." },
+  casino:     { label: "Casino Royale",  emoji: "🎰", tagline: "Feutre émeraude, roulette, jetons et or Art Déco." },
   custom:     { label: "Mon image",      emoji: "🖼️", tagline: "Ton propre tapis (paysage 3:2, ex. 1500×1000)." },
 };
 

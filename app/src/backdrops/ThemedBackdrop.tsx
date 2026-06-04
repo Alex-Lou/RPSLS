@@ -18,19 +18,20 @@ import { useEffect, useRef } from "react";
  */
 
 export type BackdropScene =
-  | "nebula" | "aurora" | "grid" | "galaxy" | "holy" | "quantum";
+  | "nebula" | "aurora" | "grid" | "galaxy" | "holy" | "quantum" | "casino";
 
 export const BACKDROP_META: Record<BackdropScene, { label: string; emoji: string; accent: { from: string; to: string } }> = {
-  nebula:  { label: "Nebula",     emoji: "🌌", accent: { from: "#a855f7", to: "#22d3ee" } },
-  aurora:  { label: "Aurora",     emoji: "🌠", accent: { from: "#34d399", to: "#8b5cf6" } },
-  grid:    { label: "Neon Grid",  emoji: "🌐", accent: { from: "#06b6d4", to: "#f0abfc" } },
-  galaxy:  { label: "Galaxy",     emoji: "✨", accent: { from: "#a855f7", to: "#22d3ee" } },
-  holy:    { label: "Holy",       emoji: "✝️", accent: { from: "#fbbf24", to: "#6366f1" } },
-  quantum: { label: "Quantum",    emoji: "⚛️", accent: { from: "#22d3ee", to: "#3b82f6" } },
+  nebula:  { label: "Nebula",        emoji: "🌌", accent: { from: "#a855f7", to: "#22d3ee" } },
+  aurora:  { label: "Aurora",        emoji: "🌠", accent: { from: "#34d399", to: "#8b5cf6" } },
+  grid:    { label: "Neon Grid",     emoji: "🌐", accent: { from: "#06b6d4", to: "#f0abfc" } },
+  galaxy:  { label: "Galaxy",        emoji: "✨", accent: { from: "#a855f7", to: "#22d3ee" } },
+  holy:    { label: "Holy",          emoji: "✝️", accent: { from: "#fbbf24", to: "#6366f1" } },
+  quantum: { label: "Quantum",       emoji: "⚛️", accent: { from: "#22d3ee", to: "#3b82f6" } },
+  casino:  { label: "Casino Royale", emoji: "🎰", accent: { from: "#10b981", to: "#f5c543" } },
 };
 
 const SCENE_INDEX: Record<BackdropScene, number> = {
-  nebula: 0, aurora: 1, grid: 2, galaxy: 3, holy: 4, quantum: 5,
+  nebula: 0, aurora: 1, grid: 2, galaxy: 3, holy: 4, quantum: 5, casino: 6,
 };
 
 const VERT = `attribute vec2 a; void main(){ gl_Position = vec4(a, 0.0, 1.0); }`;
@@ -181,6 +182,37 @@ vec3 quantum(vec2 uv, float aspect){
   return col;
 }
 
+// ── 6 CASINO ROYALE — emerald felt + Art Déco gold rays + drifting bokeh ──
+vec3 casino(vec2 uv, float aspect){
+  // Deep emerald felt — radial gradient darkening toward the edges.
+  float r = distance(uv, vec2(0.5));
+  vec3 felt = mix(vec3(0.045, 0.32, 0.21), vec3(0.012, 0.075, 0.052),
+                  smoothstep(0.0, 0.9, r));
+  // Tiny felt grain — high-frequency speckle keeps the table from looking flat.
+  float grain = (hash(uv * 2400.0) - 0.5) * 0.05;
+  felt += grain;
+  // Soft warm halo from the chandeliers overhead (top-third bloom).
+  felt += vec3(1.0, 0.78, 0.32) * exp(-pow((uv.y - 0.08) * 2.2, 2.0)) * 0.18;
+  // Gold ray fan from the centre — slow sweep, Art Déco accent.
+  vec2 p = uv - 0.5; p.x *= aspect;
+  float ang = atan(p.y, p.x);
+  float rays = 0.5 + 0.5 * cos(ang * 16.0 + u_time * 0.18);
+  rays *= smoothstep(0.55, 0.0, length(p));
+  felt += vec3(0.96, 0.78, 0.36) * rays * 0.10;
+  // Drifting bokeh sparkles (chip glints + chandelier reflections).
+  vec2 sp = uv * vec2(aspect, 1.0) * 40.0;
+  vec2 c = floor(sp + vec2(0.0, u_time * 0.18));
+  float s = hash(c);
+  if (s > 0.985) {
+    vec2 j = vec2(hash(c + 1.7), hash(c + 5.3)) - 0.5;
+    float d = length(fract(sp + vec2(0.0, u_time * 0.18)) - 0.5 - j * 0.4);
+    float g = exp(-d * d * 70.0);
+    float tw = 0.6 + 0.4 * sin(u_time * 1.8 + s * 35.0);
+    felt += vec3(1.0, 0.88, 0.5) * g * tw * 0.55;
+  }
+  return felt;
+}
+
 void main(){
   vec2 uv = gl_FragCoord.xy/u_res;
   float aspect = u_res.x/u_res.y;
@@ -190,6 +222,7 @@ void main(){
   else if(u_scene==3) col = galaxy(uv, aspect);
   else if(u_scene==4) col = holy(uv, aspect);
   else if(u_scene==5) col = quantum(uv, aspect);
+  else if(u_scene==6) col = casino(uv, aspect);
   else col = nebula(uv, aspect);
   float vig = distance(uv, vec2(0.5));
   col *= mix(1.04, 0.58, smoothstep(0.2,0.95,vig));

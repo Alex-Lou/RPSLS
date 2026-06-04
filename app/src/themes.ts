@@ -117,6 +117,13 @@ export const BACKGROUNDS: BackgroundDef[] = [
     miniature: null,
     accent: { from: "#06b6d4", to: "#f0abfc" },
   },
+  {
+    id: "casino",    label: "Casino Royale",  emoji: "🎰",
+    src: null, scene: "casino",               defaultPadId: "casino",
+    skin: { fontHeadline: "cinzel",       fontBody: "cormorant",    fontMono: "jetbrains"  },
+    miniature: null,
+    accent: { from: "#10b981", to: "#f5c543" },
+  },
 
   // Player's OWN image — uploaded in Profile, stored as a data URL. The
   // recommended format is shown in the picker (portrait 9:16, cover-fit).
