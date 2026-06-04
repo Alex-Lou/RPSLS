@@ -100,6 +100,7 @@ export function RankedGame({
   const profileNickname = useStore((s) => s.player.nickname);
   const difficulty = useStore((s) => s.player.difficulty);
   const recordMatch = useStore((s) => s.recordMatch);
+  const recordAbandon = useStore((s) => s.recordAbandon);
   const savedDeck = useStore((s) => s.player.rankedDeck);
 
   const matchInfo: RankedMatchInfo = {
@@ -678,6 +679,31 @@ export function RankedGame({
     }, ROUND_PAUSE_MS);
   }
 
+  // Explicit leave. A mid-match leave (no `end` yet) is a forfeit: record the
+  // ranked loss + the escalating repeat-abandon LP penalty. Leaving AFTER the
+  // match is over (end set) — or a genuine app/network interruption that never
+  // calls this — carries no penalty. The RankedBackGuard confirms first.
+  function handleLeave() {
+    if (!end) {
+      recordMatch({
+        id: `ranked-forfeit-${Date.now()}`,
+        mode: "constellation",
+        bestOf: winTo,
+        opponent: { kind: "cpu", mood: moodRef.current },
+        scorePlayer: battle.roundWinsA,
+        scoreOpponent: winTo,
+        outcome: "loss",
+        rounds: [],
+        xpDelta: 0,
+        lpDelta: -20,
+        timestamp: Date.now(),
+        forfeit: true,
+      });
+      recordAbandon();
+    }
+    onQuit();
+  }
+
   return (
     <>
       <RankedMatchView
@@ -701,7 +727,7 @@ export function RankedGame({
         onCancelCard={handleCancelCard}
         onLock={handleLock}
         revealAugurFor={revealAugurFor}
-        onLeave={onMatchResult ? undefined : onQuit}
+        onLeave={onMatchResult ? undefined : handleLeave}
         onRematch={onMatchResult ? undefined : rematch}
         onNext={onMatchResult && end ? () => onMatchResult(end.winner === "a") : undefined}
       />
