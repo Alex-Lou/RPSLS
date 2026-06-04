@@ -89,47 +89,48 @@ export function RankedRevealPhase({
         />
       </div>
 
-      {/* Verdict line */}
-      <AnimatePresence>
-        {showAfter && (
-          <motion.div
-            key="verdict"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mt-1 px-2"
-          >
-            {youWonRound && (
-              <div className="text-emerald-300 text-lg font-bold">
-                {t("lanes.roundWon", { a: yourTotal, b: oppTotal })}
-              </div>
-            )}
-            {oppWonRound && (
-              <div className="text-rose-300 text-lg font-bold">
-                {t("lanes.roundLost", { a: yourTotal, b: oppTotal })}
-              </div>
-            )}
-            {!youWonRound && !oppWonRound && (
-              <div className="text-zinc-300 text-lg font-bold">
-                {t("lanes.roundDraw", { a: yourTotal, b: oppTotal })}
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Verdict + combo + bonus — kept in a shrink-0 block so they ALWAYS
+          have their own room and the board (flex-1, min-h-0) absorbs any
+          vertical squeeze instead of clipping the combo punch-line. */}
+      <div className="shrink-0 w-full flex flex-col items-center gap-1">
+        <AnimatePresence>
+          {showAfter && (
+            <motion.div
+              key="verdict"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center px-2"
+            >
+              {youWonRound && (
+                <div className="text-emerald-300 text-lg font-bold">
+                  {t("lanes.roundWon", { a: yourTotal, b: oppTotal })}
+                </div>
+              )}
+              {oppWonRound && (
+                <div className="text-rose-300 text-lg font-bold">
+                  {t("lanes.roundLost", { a: yourTotal, b: oppTotal })}
+                </div>
+              )}
+              {!youWonRound && !oppWonRound && (
+                <div className="text-zinc-300 text-lg font-bold">
+                  {t("lanes.roundDraw", { a: yourTotal, b: oppTotal })}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      {/* Combo banner */}
-      <AnimatePresence>
-        {showAfter && headlineCombo && (
-          <ComboBanner combo={headlineCombo} />
-        )}
-      </AnimatePresence>
+        {/* Combo banner — the custom punch-line for the hand played. */}
+        <AnimatePresence>
+          {showAfter && headlineCombo && (
+            <ComboBanner combo={headlineCombo} />
+          )}
+        </AnimatePresence>
 
-      {/* Bonus breakdown */}
-      <AnimatePresence>
-        {showAfter && (
-          <BonusBreakdown bonuses={bonuses} t={t} />
-        )}
-      </AnimatePresence>
+        <AnimatePresence>
+          {showAfter && <BonusBreakdown bonuses={bonuses} t={t} />}
+        </AnimatePresence>
+      </div>
     </motion.div>
   );
 }
