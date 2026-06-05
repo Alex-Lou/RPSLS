@@ -52,6 +52,8 @@ export function ProfilePage() {
   // The "Apparence" card holds Background (scenes) + HUD palette under two
   // tabs, so both visual settings live together without taking two big cards.
   const [appearanceTab, setAppearanceTab] = useState<"bg" | "hud">("bg");
+  // Battle pad card: animated (coded) pads vs imported images, under tabs.
+  const [padTab, setPadTab] = useState<"coded" | "img">("coded");
 
   const info = levelFromXp(player.xp);
   const theme = THEMES[player.themeId];
@@ -610,23 +612,32 @@ export function ProfilePage() {
         <p className="text-xs text-ink-faint mb-3">
           La palette de l'interface : boutons, accents, barres, focus. Les surfaces du HUD se teintent automatiquement selon le choix.
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {(Object.keys(THEMES) as ThemeId[]).map((id) => {
             const tt = THEMES[id];
             const active = player.themeId === id;
             return (
               <button
                 key={id}
-                onClick={() => updateProfile({ themeId: id })}
+                onClick={() => { hapticTap(); updateProfile({ themeId: id }); }}
                 className={
-                  "rounded-2xl p-3 border transition flex flex-col items-center gap-2 " +
-                  (active
-                    ? "border-white/40 bg-hairline"
-                    : "border-hairline bg-hairline hover:border-white/20")
+                  "group relative rounded-2xl overflow-hidden border-2 transition text-left " +
+                  (active ? "border-white/70 ring-2 ring-white/15" : "border-hairline hover:border-white/30")
                 }
               >
-                <div className="w-full h-12 rounded-xl" style={{ background: gradientFromTheme(tt) }} />
-                <span className="text-xs">{tt.emoji} {tt.label}</span>
+                {/* Large diagonal gradient preview of the palette. */}
+                <div className="h-14 w-full relative" style={{ background: gradientFromTheme(tt) }}>
+                  <div className="absolute inset-0" style={{ background: "radial-gradient(120% 80% at 0% 0%, rgba(255,255,255,0.18), transparent 60%)" }} />
+                </div>
+                {/* Dark strip: the two raw colours as dots + the label. */}
+                <div className="flex items-center gap-1.5 px-2 py-1.5 bg-surface">
+                  <span className="w-3 h-3 rounded-full ring-1 ring-white/25 shrink-0" style={{ background: tt.primary }} />
+                  <span className="w-3 h-3 rounded-full ring-1 ring-white/25 shrink-0" style={{ background: tt.secondary }} />
+                  <span className="text-[11px] font-semibold truncate">{tt.emoji} {tt.label}</span>
+                </div>
+                {active && (
+                  <span className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-emerald-500 text-white text-[11px] font-black flex items-center justify-center shadow-lg">✓</span>
+                )}
               </button>
             );
           })}
@@ -637,9 +648,27 @@ export function ProfilePage() {
 
       {/* Battle pad picker */}
       <section className="bg-surface border border-hairline rounded-3xl p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-muted mb-3">Battle pad</h2>
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-muted">Battle pad</h2>
+          <div className="ml-auto flex gap-1 p-1 rounded-xl bg-hairline border border-hairline">
+            {([["coded", "Animés"], ["img", "Images"]] as const).map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => setPadTab(id)}
+                className={
+                  "px-3 py-1 rounded-lg text-xs font-semibold transition " +
+                  (padTab === id ? "bg-themed text-zinc-900 shadow" : "text-ink-muted hover:text-ink")
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
         <p className="text-xs text-ink-faint mb-3">
-          Le tapis sur lequel se jouent tes parties — 100% codés et animés. Indépendant du background. « Mon image » importe le tien (paysage 3:2, ex. 1500×1000 — couvre tout le tapis). Tu peux en garder jusqu'à {MAX_CUSTOM_IMAGES}.
+          {padTab === "coded"
+            ? "Le tapis sur lequel se jouent tes parties — 100% codés et animés. Indépendant du background."
+            : `Importe ton image (paysage 3:2, ex. 1500×1000 — couvre tout le tapis). Tu peux en garder jusqu'à ${MAX_CUSTOM_IMAGES}.`}
         </p>
         <input
           ref={padFileRef}
@@ -649,7 +678,7 @@ export function ProfilePage() {
           onChange={onUploadPad}
         />
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {(Object.keys(PAD_META) as PadId[]).map((id) => {
+          {(Object.keys(PAD_META) as PadId[]).filter((id) => (padTab === "img" ? id === "custom" : id !== "custom")).map((id) => {
             const meta = PAD_META[id];
             const active = player.padId === id;
             const isCustom = id === "custom";
@@ -710,17 +739,19 @@ export function ProfilePage() {
           })}
         </div>
 
-        {/* Personal pad library — same UX as the bg library above. */}
-        <ImageLibraryRow
-          title="Ma bibliothèque de tapis"
-          items={player.customPads ?? []}
-          activeUrl={player.padId === "custom" ? player.customPadUrl : undefined}
-          max={MAX_CUSTOM_IMAGES}
-          aspect="aspect-[3/2]"
-          onPick={selectStoredPad}
-          onDelete={deleteStoredPad}
-          onAdd={() => padFileRef.current?.click()}
-        />
+        {/* Personal pad library — only under the Images tab. */}
+        {padTab === "img" && (
+          <ImageLibraryRow
+            title="Ma bibliothèque de tapis"
+            items={player.customPads ?? []}
+            activeUrl={player.padId === "custom" ? player.customPadUrl : undefined}
+            max={MAX_CUSTOM_IMAGES}
+            aspect="aspect-[3/2]"
+            onPick={selectStoredPad}
+            onDelete={deleteStoredPad}
+            onAdd={() => padFileRef.current?.click()}
+          />
+        )}
       </section>
 
       {/* By-move stats */}

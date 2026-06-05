@@ -15,6 +15,13 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
   pastel: { id: "pastel", label: "Pastel",  emoji: "🌸", primary: "#fda4af", secondary: "#86efac", bg: "#1a1620" },
   sunset: { id: "sunset", label: "Sunset",  emoji: "🌅", primary: "#fb923c", secondary: "#f43f5e", bg: "#1a0f12" },
   forest: { id: "forest", label: "Forest",  emoji: "🌲", primary: "#34d399", secondary: "#fbbf24", bg: "#0a1410" },
+  ocean:  { id: "ocean",  label: "Ocean",   emoji: "🌊", primary: "#38bdf8", secondary: "#22d3ee", bg: "#08111a" },
+  ember:  { id: "ember",  label: "Ember",   emoji: "🔥", primary: "#fb7185", secondary: "#f59e0b", bg: "#160a0a" },
+  aurora: { id: "aurora", label: "Aurora",  emoji: "🌌", primary: "#a78bfa", secondary: "#34d399", bg: "#0a0f16" },
+  gold:   { id: "gold",   label: "Gold",    emoji: "👑", primary: "#fcd34d", secondary: "#f97316", bg: "#14100a" },
+  cyber:  { id: "cyber",  label: "Cyber",   emoji: "🤖", primary: "#22d3ee", secondary: "#a3e635", bg: "#0a0f0d" },
+  rose:   { id: "rose",   label: "Rosé",    emoji: "🌹", primary: "#fb7185", secondary: "#c084fc", bg: "#160a12" },
+  mono:   { id: "mono",   label: "Mono",    emoji: "🪐", primary: "#e5e7eb", secondary: "#9ca3af", bg: "#0b0d12" },
 };
 
 export function applyTheme(themeId: ThemeId) {

@@ -1,7 +1,9 @@
 import type { Move } from "./game";
 import type { AiMood } from "./game";
 
-export type ThemeId = "violet" | "neon" | "pastel" | "sunset" | "forest";
+export type ThemeId =
+  | "violet" | "neon" | "pastel" | "sunset" | "forest"
+  | "ocean" | "ember" | "aurora" | "gold" | "cyber" | "rose" | "mono";
 
 export type PadId =
   // Fully coded, animated playmats (SVG/SMIL — no PNGs anymore).
