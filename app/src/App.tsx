@@ -324,6 +324,7 @@ function PageWrap({ children }: { children: React.ReactNode }) {
  * logo/title sequence still fires — graceful degradation.
  */
 function Splash({ onDone, scene }: { onDone: () => void; scene: import("./backdrops/ThemedBackdrop").BackdropScene | null }) {
+  const t = useT();
   const [phase, setPhase] = useState<"intro" | "logo" | "title" | "hint">("intro");
 
   useEffect(() => {
@@ -372,7 +373,7 @@ function Splash({ onDone, scene }: { onDone: () => void; scene: import("./backdr
         }}
       />
 
-      <div className="relative h-full flex flex-col items-center justify-center gap-5 px-6 text-center">
+      <div className="relative h-full flex flex-col items-center justify-center gap-5 [@media(max-height:560px)]:gap-2 px-6 text-center">
         {/* Logo with a glowing halo behind it. */}
         <AnimatePresence>
           {(phase === "logo" || phase === "title" || phase === "hint") && (
@@ -397,7 +398,7 @@ function Splash({ onDone, scene }: { onDone: () => void; scene: import("./backdr
               <motion.img
                 src="/Logo-RLSPS.png"
                 alt="RPSLS"
-                className="w-40 h-40 sm:w-52 sm:h-52 md:w-60 md:h-60 drop-shadow-2xl"
+                className="w-40 h-40 sm:w-52 sm:h-52 md:w-60 md:h-60 [@media(max-height:560px)]:w-24 [@media(max-height:560px)]:h-24 drop-shadow-2xl"
                 animate={{ y: [0, -6, 0] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
               />
@@ -412,7 +413,7 @@ function Splash({ onDone, scene }: { onDone: () => void; scene: import("./backdr
               initial={{ opacity: 0, y: 28, filter: "blur(14px)", scale: 0.92 }}
               animate={{ opacity: 1, y: 0,  filter: "blur(0px)",  scale: 1 }}
               transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
-              className="text-5xl sm:text-6xl font-black tracking-tight bg-gradient-to-br from-violet-300 via-fuchsia-400 to-teal-300 bg-clip-text text-transparent"
+              className="text-5xl sm:text-6xl [@media(max-height:560px)]:text-3xl font-black tracking-tight bg-gradient-to-br from-violet-300 via-fuchsia-400 to-teal-300 bg-clip-text text-transparent"
               style={{ textShadow: "0 0 28px rgba(168,85,247,0.4)" }}
             >
               RPSLS
@@ -429,7 +430,7 @@ function Splash({ onDone, scene }: { onDone: () => void; scene: import("./backdr
               transition={{ duration: 0.9, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
               className="text-ink text-xs sm:text-sm tracking-[0.3em] uppercase"
             >
-              Rock · Paper · Scissors · Lizard · Spock
+              {t("splash.tagline")}
             </motion.p>
           )}
         </AnimatePresence>
@@ -442,9 +443,9 @@ function Splash({ onDone, scene }: { onDone: () => void; scene: import("./backdr
             initial={{ opacity: 0 }}
             animate={{ opacity: 0.7 }}
             transition={{ duration: 0.5 }}
-            className="absolute bottom-10 left-0 right-0 text-center text-ink-muted text-xs tracking-[0.25em] uppercase pointer-events-none"
+            className="absolute bottom-10 [@media(max-height:560px)]:bottom-3 left-0 right-0 text-center text-ink-muted text-xs tracking-[0.25em] uppercase pointer-events-none"
           >
-            tap to continue
+            {t("splash.tap")}
           </motion.p>
         )}
       </AnimatePresence>
