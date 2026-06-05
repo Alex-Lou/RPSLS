@@ -188,10 +188,10 @@ export function MatchScoreBar({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between rounded-2xl bg-black/30 border border-white/10 px-3 sm:px-4 py-2.5 sm:py-3 min-w-0">
+      <div className="flex items-center justify-between rounded-2xl bg-surface border border-hairline px-3 sm:px-4 py-2.5 sm:py-3 min-w-0">
         <div className="flex flex-col min-w-0 flex-1">
           {youTag && (
-            <span className="text-[12px] sm:text-xs uppercase tracking-wider text-zinc-400 font-medium">{youTag}</span>
+            <span className="text-[12px] sm:text-xs uppercase tracking-wider text-ink-muted font-medium">{youTag}</span>
           )}
           <span className="text-base sm:text-lg font-bold truncate text-emerald-200 flex items-center gap-1.5">
             <span className="truncate">{youName}</span>
@@ -200,12 +200,12 @@ export function MatchScoreBar({
         </div>
         <div className="px-2 sm:px-3 flex items-center gap-1">
           <RollingScore value={youScore} color="emerald" size="lg" />
-          <span className="text-zinc-400 px-0.5 font-bold">:</span>
+          <span className="text-ink-muted px-0.5 font-bold">:</span>
           <RollingScore value={oppScore} color="rose" size="lg" />
         </div>
         <div className="flex flex-col text-right min-w-0 flex-1">
           {oppTag && (
-            <span className="text-[12px] sm:text-xs uppercase tracking-wider text-zinc-400 font-medium">{oppTag}</span>
+            <span className="text-[12px] sm:text-xs uppercase tracking-wider text-ink-muted font-medium">{oppTag}</span>
           )}
           <span className="text-base sm:text-lg font-bold truncate text-rose-200 flex items-center gap-1.5 justify-end">
             <StreakBadge streak={oppStreak} />
@@ -214,7 +214,7 @@ export function MatchScoreBar({
         </div>
       </div>
       {caption && (
-        <div className="text-center text-[13px] sm:text-sm uppercase tracking-[0.2em] text-zinc-400 font-medium">
+        <div className="text-center text-[13px] sm:text-sm uppercase tracking-[0.2em] text-ink-muted font-medium">
           {caption}
         </div>
       )}

@@ -49,7 +49,7 @@ export function UserHeader({ onNavigate }: { onNavigate: (p: Page) => void }) {
     >
       <button
         onClick={() => onNavigate("profile")}
-        className="relative w-full flex items-center gap-3 rounded-2xl border border-white/15 bg-zinc-950/85 backdrop-blur-md px-3 py-2 text-left shadow-lg shadow-black/40 overflow-hidden"
+        className="relative w-full flex items-center gap-3 rounded-2xl border border-hairline bg-surface-raised backdrop-blur-md px-3 py-2 text-left shadow-lg shadow-black/40 overflow-hidden"
       >
         {/* Avatar */}
         <div
@@ -97,7 +97,7 @@ export function UserHeader({ onNavigate }: { onNavigate: (p: Page) => void }) {
 
           {/* XP bar — the landing target for every XP gain. Taller + a slower
               fill so the progression reads clearly; the glow lingers ~3.4s. */}
-          <div className="mt-1 relative h-3 rounded-full bg-white/10 overflow-hidden">
+          <div className="mt-1 relative h-3 rounded-full bg-hairline overflow-hidden">
             <motion.div
               animate={{
                 width: `${info.progress * 100}%`,
@@ -128,11 +128,11 @@ export function UserHeader({ onNavigate }: { onNavigate: (p: Page) => void }) {
             </AnimatePresence>
           </div>
 
-          <div className="mt-0.5 flex items-center justify-between text-[10px] text-zinc-500">
+          <div className="mt-0.5 flex items-center justify-between text-[10px] text-ink-faint">
             <span>
               {t("sidebar.lvl")} {info.level} · {info.xpInLevel}/{info.xpForNext} {t("sidebar.xp")}
             </span>
-            <span className="text-zinc-400">
+            <span className="text-ink-muted">
               {player.rankLp} {t("sidebar.lp")}
             </span>
           </div>
