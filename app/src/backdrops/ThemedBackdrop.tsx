@@ -44,12 +44,30 @@ uniform int   u_scene;
 
 const float PI = 3.14159265;
 
-float hash(vec2 p){ p = fract(p*vec2(123.34,456.21)); p += dot(p,p+45.32); return fract(p.x*p.y); }
+// Hash de Hoskins (hash21) — STABLE en précision mobile (Adreno/Mali). Le
+// classique fract(p.x*p.y) perd des bits sur GPU mobile et bande en blocs ;
+// celui-ci reste en petites magnitudes (vec3 * 0.1031) -> pas de banding.
+float hash(vec2 p){
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
 float noise(vec2 p){
-  vec2 i=floor(p), f=fract(p); vec2 u=f*f*(3.0-2.0*f);
+  vec2 i=floor(p), f=fract(p);
+  // Interpolation QUINTIQUE (C2, dérivée seconde continue) au lieu du cubic
+  // smoothstep — supprime le banding de grille du value-noise.
+  vec2 u=f*f*f*(f*(f*6.0-15.0)+10.0);
   return mix(mix(hash(i),hash(i+vec2(1,0)),u.x), mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x), u.y);
 }
-float fbm(vec2 p){ float v=0.0,a=0.5; for(int i=0;i<5;i++){ v+=a*noise(p); p=p*2.0+vec2(1.7,9.2); a*=0.5;} return v; }
+// ROTATION DE DOMAINE entre octaves : sans elle, chaque octave s'aligne sur la
+// même grille d'axes et, animées, elles s'empilent en "carrés qui bougent".
+// La rotation décorrèle les grilles → rendu liquide, sans artefact de bloc.
+float fbm(vec2 p){
+  float v=0.0, a=0.5;
+  mat2 m=mat2(0.80,0.60,-0.60,0.80);
+  for(int i=0;i<5;i++){ v+=a*noise(p); p=m*p*2.0+vec2(1.7,9.2); a*=0.5; }
+  return v;
+}
 
 // Soft, sparse, TINTED star dust (no hard white pixels). Returns a colour add.
 vec3 softStars(vec2 uv, float aspect, float density, vec3 tint){
