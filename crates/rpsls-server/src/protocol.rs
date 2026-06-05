@@ -13,7 +13,13 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ClientMessage {
     /// Hello — first message client sends after connecting.
-    Hello { nickname: String },
+    /// `player_id` is the client's stable local id (used to attribute global
+    /// leaderboard entries). Optional for backwards-compat with old clients.
+    Hello {
+        nickname: String,
+        #[serde(default)]
+        player_id: String,
+    },
 
     /// Create a private lobby. Server replies with a 6-char code.
     CreateLobby { best_of: u8 },

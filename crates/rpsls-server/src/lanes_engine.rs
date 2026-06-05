@@ -427,4 +427,13 @@ fn broadcast_lanes_end(
     };
     a.send(msg.clone());
     b.send(msg);
+
+    // Record the decisive result on the global ladder (winner +LP, loser -LP).
+    if let Some(slot) = winner {
+        let (w, l) = match slot {
+            PlayerSlot::A => (a, b),
+            PlayerSlot::B => (b, a),
+        };
+        crate::leaderboard::record_result(w.player_id(), w.nickname(), l.player_id(), l.nickname());
+    }
 }

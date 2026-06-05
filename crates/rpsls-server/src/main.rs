@@ -33,6 +33,7 @@ use crate::security::{cors_layer, governor_layer, LobbyAttemptTracker, MsgRateLi
 use crate::session::Session;
 
 mod lanes_engine;
+mod leaderboard;
 mod lobby;
 mod match_engine;
 mod protocol;
@@ -92,6 +93,10 @@ async fn main() {
         .unwrap_or(8080);
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     info!("listening on {addr}");
+    info!(
+        "global leaderboard: {}",
+        if leaderboard::enabled() { "ENABLED (Upstash)" } else { "disabled (no UPSTASH_REDIS_REST_* env)" }
+    );
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     // ConnectInfo is required by tower_governor's SmartIpKeyExtractor to
@@ -208,7 +213,13 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, peer_ip: std::ne
 
 async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, msg: ClientMessage) {
     match msg {
-        ClientMessage::Hello { nickname } => {
+        ClientMessage::Hello { nickname, player_id } => {
+            // Stable client id for leaderboard attribution. Cap length; ignore
+            // anything fishy (only keep a bounded alnum/uuid-ish string).
+            let pid: String = player_id.chars().filter(|c| !c.is_control()).take(64).collect();
+            if !pid.trim().is_empty() {
+                session.set_player_id(pid.trim().to_string());
+            }
             // Sanitize: strip control chars + RTL/bidi overrides + zero-width
             // joiners. Cap at 24 chars (was 32) to leave room for the
             // streak emoji we suffix in some surfaces. Reject if empty after.

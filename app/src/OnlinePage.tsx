@@ -266,11 +266,11 @@ export function OnlinePage() {
     c.onReconnect = () => {
       // Server session reset on reconnect — re-introduce ourselves so the
       // server has our nickname for the next match.
-      c.send({ type: "hello", nickname: player.nickname || "Anonymous" });
+      c.send({ type: "hello", nickname: player.nickname || "Anonymous", player_id: player.id });
     };
     return c.connect(url).then(() => {
       // Send Hello once on connection.
-      c.send({ type: "hello", nickname: player.nickname || "Anonymous" });
+      c.send({ type: "hello", nickname: player.nickname || "Anonymous", player_id: player.id });
       return c;
     });
   }

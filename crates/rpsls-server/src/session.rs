@@ -15,6 +15,9 @@ pub type Tx = mpsc::UnboundedSender<ServerMessage>;
 pub struct Session {
     pub id: String,
     pub nickname: Mutex<String>,
+    /// Stable client-supplied id (from Hello). Used to attribute global
+    /// leaderboard entries across sessions/devices. Empty for old clients.
+    pub player_id: Mutex<String>,
     pub tx: Tx,
     /// Set to true when this session is in an active match. Used by the
     /// lobby/queue to avoid double-matching.
@@ -31,6 +34,7 @@ impl Session {
         Self {
             id,
             nickname: Mutex::new(nickname),
+            player_id: Mutex::new(String::new()),
             tx,
             in_match: AtomicBool::new(false),
             peer_ip,
@@ -47,6 +51,14 @@ impl Session {
 
     pub fn set_nickname(&self, name: String) {
         *self.nickname.lock().unwrap() = name;
+    }
+
+    pub fn player_id(&self) -> String {
+        self.player_id.lock().unwrap().clone()
+    }
+
+    pub fn set_player_id(&self, id: String) {
+        *self.player_id.lock().unwrap() = id;
     }
 
     pub fn set_in_match(&self, v: bool) {

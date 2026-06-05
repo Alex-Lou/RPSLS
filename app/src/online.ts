@@ -34,7 +34,7 @@ export interface LaneResult {
 
 /* Client → Server */
 export type ClientMessage =
-  | { type: "hello"; nickname: string }
+  | { type: "hello"; nickname: string; player_id?: string }
   | { type: "create_lobby"; best_of: number }
   | { type: "join_lobby"; code: string }
   | { type: "join_queue"; best_of: number }

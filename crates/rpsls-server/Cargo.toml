@@ -37,3 +37,7 @@ futures-util = "0.3"
 # tower_governor wraps the governor crate with axum-friendly extractors.
 tower_governor = "0.4"
 governor = "0.6"
+
+# HTTP client for the global leaderboard writes (Upstash Redis REST API).
+# rustls-tls keeps the Docker build free of any OpenSSL system dependency.
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
