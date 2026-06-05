@@ -78,21 +78,21 @@ export const BACKGROUNDS: BackgroundDef[] = [
   {
     id: "nebula",    label: "Nebula",         emoji: "🌌",
     src: null, scene: "nebula",               defaultPadId: "cosmos",
-    skin: { fontHeadline: "audiowide",    fontBody: "exo2",         fontMono: "spaceMono"  },
+    skin: { fontHeadline: "orbitron",     fontBody: "rajdhani",     fontMono: "spaceMono"  },
     miniature: null,
     accent: { from: "#a855f7", to: "#22d3ee" },
   },
   {
     id: "galaxy",    label: "Galaxy",         emoji: "✨",
     src: null, scene: "galaxy",               defaultPadId: "galaxy",
-    skin: { fontHeadline: "audiowide",    fontBody: "exo2",         fontMono: "spaceMono"  },
+    skin: { fontHeadline: "orbitron",     fontBody: "rajdhani",     fontMono: "spaceMono"  },
     miniature: null,
     accent: { from: "#a855f7", to: "#22d3ee" },
   },
   {
     id: "aurora",    label: "Aurora",         emoji: "🌠",
     src: null, scene: "aurora",               defaultPadId: "cosmos",
-    skin: { fontHeadline: "spaceGrotesk", fontBody: "exo2",         fontMono: "spaceMono"  },
+    skin: { fontHeadline: "orbitron",     fontBody: "rajdhani",     fontMono: "spaceMono"  },
     miniature: null,
     accent: { from: "#34d399", to: "#8b5cf6" },
   },
@@ -106,7 +106,7 @@ export const BACKGROUNDS: BackgroundDef[] = [
   {
     id: "quantum",   label: "Quantum",        emoji: "⚛️",
     src: null, scene: "quantum",              defaultPadId: "quantum",
-    skin: { fontHeadline: "spaceGrotesk", fontBody: "ibmPlex",      fontMono: "fira"       },
+    skin: { fontHeadline: "orbitron",     fontBody: "rajdhani",     fontMono: "fira"       },
     miniature: null,
     accent: { from: "#22d3ee", to: "#3b82f6" },
   },
