@@ -124,7 +124,7 @@ vec3 grid(vec2 uv, float aspect){
     float persp = 1.0/(depth+0.05);
     float gx = abs(fract((uv.x-0.5)*persp*2.0)-0.5);
     float gz = abs(fract((u_time*0.25 + persp*0.5))-0.5);
-    float line = smoothstep(0.46,0.5,1.0-gx) + smoothstep(0.46,0.5,1.0-gz);
+    float line = smoothstep(0.40,0.5,1.0-gx) + smoothstep(0.40,0.5,1.0-gz);
     vec3 neon = mix(vec3(0.0,0.9,1.0), vec3(0.95,0.3,0.9), uv.x);
     col += neon*line*0.45*depth*3.0;
   } else {
@@ -271,7 +271,7 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
     if (!canvas) return;
 
     const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    const MIN_DT = 1000 / 40;
+    const MIN_DT = 1000 / 60; // 60fps target — smoother, more "liquid" feel (was 40)
     let gl: WebGLRenderingContext | null = null;
     let prog: WebGLProgram | null = null;
     let buf: WebGLBuffer | null = null;
