@@ -44,6 +44,7 @@ import { vibrate, hapticWin, hapticLoss, hapticTap } from "./haptic";
 
 type View =
   | { kind: "select" }
+  | { kind: "sandbox" }
   | { kind: "game"; mode: GameMode; bestOf: number; daily?: DailyChallenge; questCtx?: { title: string; reward: number } }
   | { kind: "lanes_cpu"; winTo: number }
   | { kind: "ranked_lobby" }
@@ -97,6 +98,16 @@ export function PlayPage({
             onGoOnline={onNavigate ? () => onNavigate("online") : undefined}
             onGoConstellation={(winTo) => setView({ kind: "lanes_cpu", winTo })}
             onGoRanked={() => setView({ kind: "ranked_lobby" })}
+            onGoSandbox={() => setView({ kind: "sandbox" })}
+          />
+        )}
+        {view.kind === "sandbox" && (
+          <SandboxView
+            key="sandbox"
+            onStart={(mode, bestOf) => setView({ kind: "game", mode, bestOf })}
+            onGoConstellation={(winTo) => setView({ kind: "lanes_cpu", winTo })}
+            onGoRanked={() => setView({ kind: "ranked_lobby" })}
+            onBack={() => setView({ kind: "select" })}
           />
         )}
         {view.kind === "game" && (
@@ -222,11 +233,13 @@ function ModeSelect({
   onGoOnline,
   onGoConstellation,
   onGoRanked,
+  onGoSandbox,
 }: {
   onStart: (mode: GameMode, bestOf: number, questCtx?: { title: string; reward: number }) => void;
   onGoOnline?: () => void;
   onGoConstellation?: (winTo: number) => void;
   onGoRanked?: () => void;
+  onGoSandbox?: () => void;
 }) {
   const [mode, setMode] = useState<GameMode>("casual");
   const [bestOf, setBestOf] = useState(3);
@@ -379,7 +392,12 @@ function ModeSelect({
               transition={{ delay: 0.05 * i, duration: 0.25 }}
               whileHover={{ y: -3 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => { setMode(m); setPendingMode(m); }}
+              onClick={() => {
+                // Entraînement opens the solo sandbox (mode + difficulty +
+                // format/deck); the other modes go straight to their confirm.
+                if (m === "training") { onGoSandbox?.(); return; }
+                setMode(m); setPendingMode(m);
+              }}
               className={
                 "p-2.5 sm:p-4 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition flex flex-col gap-1.5 min-h-[124px] " +
                 // Wide tile (hot-seat) spans both columns, so left-aligning
@@ -421,6 +439,148 @@ function ModeSelect({
           />
         )}
       </AnimatePresence>
+    </motion.div>
+  );
+}
+
+/* ─────────── Entraînement — solo sandbox (mode + difficulty + format/deck) ─────────── */
+
+type SandboxMode = "classic" | "lanes" | "cards";
+
+function SandboxView({
+  onStart, onGoConstellation, onGoRanked, onBack,
+}: {
+  onStart: (mode: GameMode, bestOf: number) => void;
+  onGoConstellation: (winTo: number) => void;
+  onGoRanked: () => void;
+  onBack: () => void;
+}) {
+  const difficulty = useStore((s) => s.player.difficulty);
+  const updateProfile = useStore((s) => s.updateProfile);
+  const [mode, setMode] = useState<SandboxMode>("classic");
+  const [bestOf, setBestOf] = useState(3);
+  useAndroidBackPrompt(onBack);
+
+  const MODES: { id: SandboxMode; label: string; glyph: string; tag: string }[] = [
+    { id: "classic", label: "Classique", glyph: "✊", tag: "1 v 1 — premier à la majorité des manches" },
+    { id: "lanes",   label: "Couloirs",  glyph: "✦", tag: "3 couloirs simultanés vs IA" },
+    { id: "cards",   label: "Cartes",    glyph: "🃏", tag: "Mana, deck & cartes bonus (Constellation Ranked)" },
+  ];
+  const DIFFS = [
+    { id: "easy" as const, label: "Facile" },
+    { id: "normal" as const, label: "Normal" },
+    { id: "hard" as const, label: "Difficile" },
+  ];
+
+  function play() {
+    hapticTick();
+    if (mode === "cards") return onGoRanked();
+    if (mode === "lanes") return onGoConstellation(Math.max(2, Math.floor(bestOf / 2) + 1));
+    onStart("casual", bestOf);
+  }
+
+  const selOn = "linear-gradient(150deg, color-mix(in oklab, var(--theme-primary) 30%, transparent), color-mix(in oklab, var(--theme-secondary) 22%, transparent))";
+  const fill = "linear-gradient(to right, var(--theme-primary), var(--theme-secondary))";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -16 }}
+      transition={{ duration: 0.3 }}
+      className="flex flex-col gap-4 flex-1 py-2 px-1 max-w-lg mx-auto w-full overflow-y-auto"
+    >
+      <FloatingMatchBackButton onClick={onBack} label="Retour" />
+
+      <div className="text-center mt-8">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-themed leading-tight" style={{ fontFamily: "var(--font-headline)" }}>
+          Entraînement
+        </h1>
+        <p className="text-[11px] text-zinc-500 mt-1">Solo vs IA · choisis ton mode, ta difficulté{mode === "cards" ? " et ton deck" : ""}</p>
+      </div>
+
+      {/* Mode */}
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-2">Mode</div>
+        <div className="grid grid-cols-3 gap-2">
+          {MODES.map((m) => {
+            const on = mode === m.id;
+            return (
+              <motion.button
+                key={m.id}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => { hapticTick(); setMode(m.id); }}
+                className="rounded-2xl p-3 flex flex-col items-center gap-1 text-center transition"
+                style={{
+                  background: on ? selOn : "rgba(255,255,255,0.04)",
+                  border: on ? "1px solid color-mix(in oklab, var(--theme-primary) 60%, transparent)" : "1px solid rgba(255,255,255,0.10)",
+                }}
+              >
+                <span className="text-2xl leading-none">{m.glyph}</span>
+                <span className="text-xs font-bold">{m.label}</span>
+              </motion.button>
+            );
+          })}
+        </div>
+        <p className="text-[11px] text-zinc-400 mt-1.5 text-center leading-snug">{MODES.find((m) => m.id === mode)!.tag}</p>
+      </div>
+
+      {/* Difficulty */}
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-2">Difficulté</div>
+        <div className="grid grid-cols-3 gap-2">
+          {DIFFS.map((d) => {
+            const on = difficulty === d.id;
+            return (
+              <button
+                key={d.id}
+                onClick={() => { hapticTick(); updateProfile({ difficulty: d.id }); }}
+                className={"rounded-xl py-2.5 text-sm font-bold transition " + (on ? "text-white" : "text-zinc-300 bg-white/5 border border-white/10 hover:bg-white/10")}
+                style={on ? { background: fill } : undefined}
+              >
+                {d.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Format (classic + lanes only) */}
+      {mode !== "cards" && (
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-2">Format</div>
+          <div className="grid grid-cols-2 gap-2">
+            {[3, 5].map((n) => {
+              const on = bestOf === n;
+              return (
+                <button
+                  key={n}
+                  onClick={() => { hapticTick(); setBestOf(n); }}
+                  className={"rounded-xl py-2.5 text-sm font-bold transition " + (on ? "text-white" : "text-zinc-300 bg-white/5 border border-white/10 hover:bg-white/10")}
+                  style={on ? { background: fill } : undefined}
+                >
+                  {mode === "lanes" ? (Math.floor(n / 2) + 1) + " manches gagnantes" : "Best of " + n}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {mode === "cards" && (
+        <p className="text-[11px] text-zinc-400 text-center px-3 leading-snug">
+          Le mode Cartes ouvre le lobby Constellation Ranked : gère ton deck puis lance le tournoi (adversaires IA).
+        </p>
+      )}
+
+      <motion.button
+        whileTap={{ scale: 0.97 }}
+        onClick={play}
+        className="mt-1 w-full px-7 py-3.5 rounded-2xl font-bold text-white bg-themed shadow-lg shadow-violet-500/30 transition hover:scale-[1.01]"
+        style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
+      >
+        {mode === "cards" ? "Ouvrir le lobby Cartes →" : "Jouer →"}
+      </motion.button>
     </motion.div>
   );
 }
