@@ -33,7 +33,7 @@ import { todayDailyQuests, matchesToday, todayDateKey, type DailyChallenge, type
 import { useT } from "../i18n";
 import type { Page } from "../Sidebar";
 import { UserHeader } from "../UserHeader";
-import { LocalLanesGame } from "../LocalLanesGame";
+import { LocalLanesGame } from "../match/LocalLanesGame";
 import { QuitConfirmModal } from "../match/QuitConfirmModal";
 import { RankedGame } from "../ranked/RankedGame";
 import { RankedLobby } from "../ranked/RankedLobby";
@@ -41,7 +41,7 @@ import { initialTournament, resolvePlayerMatch, isPlayerEliminated, type Tournam
 import { BracketPage } from "../ranked/BracketPage";
 import { DeckManager } from "../ranked/DeckManager";
 import { levelFromXp } from "../engine/leveling";
-import { CinematicMatchEnd, AmbientFlavor, MatchScoreBar, FloatingMatchBackButton, hapticTick, PickShock, useAndroidBackPrompt } from "../sharedMatchUI";
+import { CinematicMatchEnd, AmbientFlavor, MatchScoreBar, FloatingMatchBackButton, hapticTick, PickShock, useAndroidBackPrompt } from "../match/sharedMatchUI";
 import { vibrate, hapticWin, hapticLoss, hapticTap } from "../haptic";
 
 type View =

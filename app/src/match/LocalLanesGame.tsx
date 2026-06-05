@@ -13,16 +13,16 @@ import {
   type LanesRoundResultData,
   type LanesEndData,
 } from "./LanesMatchView";
-import { type AiMood, type Move } from "./engine/game";
-import { useStore } from "./store/store";
+import { type AiMood, type Move } from "../engine/game";
+import { useStore } from "../store/store";
 import {
   battleStatus,
   cpuLanesPicks,
   makeLocalBattle,
   resolveLanesRound,
   type LocalBattleState,
-} from "./engine/lanesEngine";
-import type { LanePlay, PlayerSlot } from "./online";
+} from "../engine/lanesEngine";
+import type { LanePlay, PlayerSlot } from "../online";
 import {
   hapticLock,
   hapticMatchStart,
@@ -31,7 +31,7 @@ import {
   hapticTap,
   hapticWin,
   hapticLoss,
-} from "./haptic";
+} from "../haptic";
 
 const LANE_COUNT = 3;
 const PICK_DEADLINE_MS = 13_500;          // matches server PICK_DEADLINE

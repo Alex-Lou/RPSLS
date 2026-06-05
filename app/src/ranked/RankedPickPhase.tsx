@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { MOVES, type Move } from "../engine/game";
 import { MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "../icons";
 import { hapticAlert, hapticTap } from "../haptic";
-import { hapticTick, PickShock } from "../sharedMatchUI";
+import { hapticTick, PickShock } from "../match/sharedMatchUI";
 import { useT } from "../i18n";
 import { LanesBoard } from "./LanesBoard";
 import { CardHand } from "./CardHand";

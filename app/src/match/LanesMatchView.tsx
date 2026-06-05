@@ -12,21 +12,21 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Hand, MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "./icons";
-import { MOVES, type Move } from "./engine/game";
-import { hapticAlert, hapticTap } from "./haptic";
-import { useT } from "./i18n";
+import { Hand, MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "../icons";
+import { MOVES, type Move } from "../engine/game";
+import { hapticAlert, hapticTap } from "../haptic";
+import { useT } from "../i18n";
 import { MatchScoreBar, hapticTick, PickShock, CinematicMatchEnd, useAndroidBackPrompt, ScaleToFit, FloatingMatchBackButton } from "./sharedMatchUI";
-import { QuitConfirmModal } from "./match/QuitConfirmModal";
-import { useStore } from "./store/store";
-import type { LanePlay, LaneResult, PlayerSlot } from "./online";
+import { QuitConfirmModal } from "./QuitConfirmModal";
+import { useStore } from "../store/store";
+import type { LanePlay, LaneResult, PlayerSlot } from "../online";
 import {
   detectOutcomeCombo,
   detectPlayerCombo,
   LANE_IDENTITIES,
   laneFavoursMove,
   type ComboTheme,
-} from "./engine/lanesCombos";
+} from "../engine/lanesCombos";
 
 /** Map of lane index → i18n key prefix for the identity. */
 const IDENTITY_KEYS = ["lanes.identity.force", "lanes.identity.wisdom", "lanes.identity.cunning"];

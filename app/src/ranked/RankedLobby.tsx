@@ -12,7 +12,7 @@ import { CardImage } from "./CardImage";
 import { useT } from "../i18n";
 import { InfoBubble } from "../flavor/InfoBubble";
 import { avatarImgStyle } from "../theme/avatar";
-import { FloatingMatchBackButton } from "../sharedMatchUI";
+import { FloatingMatchBackButton } from "../match/sharedMatchUI";
 // Tournament state now lives in PlayPage
 
 export function RankedLobby({ onViewBracket, onManageDeck, onBack }: { onViewBracket: () => void; onManageDeck: () => void; onBack?: () => void }) {

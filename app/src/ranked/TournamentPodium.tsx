@@ -11,7 +11,7 @@ import { motion } from "motion/react";
 import { useT } from "../i18n";
 import { useStore } from "../store/store";
 import { avatarImgStyle } from "../theme/avatar";
-import { CelebrationBurst } from "../sharedMatchUI";
+import { CelebrationBurst } from "../match/sharedMatchUI";
 import { tournamentStandings, type Standing, type TournamentState } from "./TournamentBracket";
 
 const isImg = (a: string) => /^(data:|\/|https?:)/.test(a);

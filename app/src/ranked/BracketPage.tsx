@@ -19,7 +19,7 @@ import {
 } from "./TournamentBracket";
 import { BracketTree } from "./BracketUI";
 import { TournamentPodium } from "./TournamentPodium";
-import { FloatingMatchBackButton, hapticTick } from "../sharedMatchUI";
+import { FloatingMatchBackButton, hapticTick } from "../match/sharedMatchUI";
 import { LoadingTip } from "../flavor/LoadingTip";
 
 const SIZE_META: Record<TournamentSize, { title: string; sub: string; glyph: string }> = {

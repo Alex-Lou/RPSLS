@@ -11,7 +11,7 @@ import { Sidebar, MobileShell, type Page } from "./Sidebar";
 // PlayPage stays eagerly imported — it's the initial route after splash
 // so lazy-loading it would just add a flicker for no gain.
 import { PlayPage } from "./pages/PlayPage";
-import { FloatingMatchBackButton } from "./sharedMatchUI";
+import { FloatingMatchBackButton } from "./match/sharedMatchUI";
 import { UserHeader } from "./UserHeader";
 import { LevelUpWatcher } from "./fx/LevelUpOverlay";
 import { useT } from "./i18n";

@@ -19,7 +19,7 @@ import {
   useAndroidBackPrompt,
   ScaleToFit,
   type MatchBackHandle,
-} from "../sharedMatchUI";
+} from "../match/sharedMatchUI";
 import { LoadingTip } from "../flavor/LoadingTip";
 import { RankedPickPhase } from "./RankedPickPhase";
 import { RankedRevealPhase } from "./RankedRevealPhase";

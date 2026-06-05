@@ -14,12 +14,12 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { useT } from "./i18n";
-import { useStore } from "./store/store";
-import { rankFromLp } from "./engine/rank";
-import { BurstCanvas } from "./fx/LevelUpOverlay";
-import { classifyEnd, pickEndSubtitleKey } from "./flavor/endphrases";
-import { useNoMenuFx } from "./fx/menuFx";
+import { useT } from "../i18n";
+import { useStore } from "../store/store";
+import { rankFromLp } from "../engine/rank";
+import { BurstCanvas } from "../fx/LevelUpOverlay";
+import { classifyEnd, pickEndSubtitleKey } from "../flavor/endphrases";
+import { useNoMenuFx } from "../fx/menuFx";
 
 /**
  * ScaleToFit — guarantees its child ALWAYS fits the available height without
@@ -671,7 +671,7 @@ function CountUp({ to, durationMs = 700 }: { to: number; durationMs?: number }) 
  * haptic.ts helper so it inherits the user's enable/intensity settings
  * — kept as a re-export under its old name for code-call-site stability.
  */
-export { hapticTap as hapticTick } from "./haptic";
+export { hapticTap as hapticTick } from "../haptic";
 
 /**
  * Fires a brief inflate-ring "shock" overlay on the parent button, useful for

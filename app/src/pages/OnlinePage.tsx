@@ -5,7 +5,7 @@ import { useT } from "../i18n";
 import { Hand, MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "../icons";
 import { QuitConfirmModal } from "../match/QuitConfirmModal";
 import { MOVES, type Move, aiMove, rollAiMood, localResolve, type AiMood } from "../engine/game";
-import { LocalLanesGame } from "../LocalLanesGame";
+import { LocalLanesGame } from "../match/LocalLanesGame";
 import {
   OnlineClient,
   normalizeServerUrl,
@@ -18,7 +18,7 @@ import {
   type LanesRoundData,
   type LanesRoundResultData,
   type LanesEndData,
-} from "../LanesMatchView";
+} from "../match/LanesMatchView";
 import {
   hapticTap,
   hapticLock,
