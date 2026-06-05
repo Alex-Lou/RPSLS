@@ -15,6 +15,8 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useT } from "./i18n";
+import { useStore } from "./store";
+import { rankFromLp } from "./rank";
 import { classifyEnd, pickEndSubtitleKey } from "./flavor/endphrases";
 
 /**
@@ -368,17 +370,21 @@ export interface CinematicMatchEndProps {
   rematchLabel?: string;
   /** Override the back button label. */
   backLabel?: string;
+  /** Optional reward reveal — animates a +XP / ±LP counter on the end screen. */
+  reward?: { xp?: number; lp?: number };
 }
 
 const QUOTE_COUNT = 10;
 
 export function CinematicMatchEnd({
   outcome, forfeit, scoreLine, youScore, oppScore, bestOf, forfeitByYou,
-  onRematch, onBack, rematchLabel, backLabel,
+  onRematch, onBack, rematchLabel, backLabel, reward,
 }: CinematicMatchEndProps) {
   const t = useT();
   const youWon = outcome === "win";
   const draw = outcome === "draw";
+  const rankLp = useStore((s) => s.player.rankLp);
+  const tier = rankFromLp(rankLp);
   // Stable random pick per mount.
   const quoteIdx = useRef(Math.floor(Math.random() * QUOTE_COUNT)).current;
   // Classify the situation once at mount so the subtitle stays stable.
@@ -408,26 +414,39 @@ export function CinematicMatchEnd({
     <motion.div
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col items-center gap-2.5 py-2"
+      className="relative flex flex-col items-center gap-2.5 py-2"
     >
-      {/* Glyph: spring in, then idle-float forever. Tightened from 7xl/8xl
-          to 6xl so it doesn't dominate the viewport on mobile. */}
-      <motion.div
-        initial={{ scale: 0, rotate: -180 }}
-        animate={{
-          scale: 1,
-          rotate: 0,
-          y: [0, -6, 0, -3, 0],
-        }}
-        transition={{
-          scale:  { type: "spring", stiffness: 200, damping: 12, delay: 0.1 },
-          rotate: { type: "spring", stiffness: 200, damping: 12, delay: 0.1 },
-          y:      { duration: 3.2, repeat: Infinity, ease: "easeInOut", delay: 1.0 },
-        }}
-        className="text-5xl sm:text-6xl leading-none"
-      >
-        {glyph}
-      </motion.div>
+      {youWon && <Confetti />}
+
+      {/* Glyph with a breathing halo behind it (green win / grey draw / red loss). */}
+      <div className="relative flex items-center justify-center">
+        <motion.div
+          aria-hidden
+          initial={{ opacity: 0, scale: 0.4 }}
+          animate={{ opacity: youWon ? [0.45, 0.85, 0.45] : 0.3, scale: [0.9, 1.15, 0.9] }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut", delay: 0.3 }}
+          className="absolute w-28 h-28 rounded-full blur-2xl pointer-events-none"
+          style={{
+            background: youWon
+              ? "radial-gradient(circle, rgba(52,211,153,0.75), transparent 70%)"
+              : draw
+              ? "radial-gradient(circle, rgba(161,161,170,0.5), transparent 70%)"
+              : "radial-gradient(circle, rgba(244,63,94,0.55), transparent 70%)",
+          }}
+        />
+        <motion.div
+          initial={{ scale: 0, rotate: -180 }}
+          animate={{ scale: 1, rotate: 0, y: [0, -6, 0, -3, 0] }}
+          transition={{
+            scale:  { type: "spring", stiffness: 200, damping: 12, delay: 0.1 },
+            rotate: { type: "spring", stiffness: 200, damping: 12, delay: 0.1 },
+            y:      { duration: 3.2, repeat: Infinity, ease: "easeInOut", delay: 1.0 },
+          }}
+          className="relative text-5xl sm:text-6xl leading-none"
+        >
+          {glyph}
+        </motion.div>
+      </div>
 
       {/* Wordmark: enter then breathe. */}
       <motion.div
@@ -484,6 +503,39 @@ export function CinematicMatchEnd({
         <div className="text-xl font-mono text-zinc-200">{scoreLine}</div>
       )}
 
+      {/* Reward reveal — animated +XP / ±LP counter. */}
+      {(!!reward?.xp || (reward?.lp != null && reward.lp !== 0)) && (
+        <motion.div
+          initial={{ opacity: 0, y: 8, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ delay: 1.0, type: "spring", stiffness: 260, damping: 18 }}
+          className="flex items-center gap-4"
+        >
+          {!!reward?.xp && reward.xp > 0 && (
+            <span className="text-lg font-black text-emerald-300">+<CountUp to={reward.xp} /> XP</span>
+          )}
+          {reward?.lp != null && reward.lp !== 0 && (
+            <span className={"text-lg font-black " + (reward.lp > 0 ? "text-amber-300" : "text-rose-300")}>
+              {reward.lp > 0 ? "+" : ""}<CountUp to={reward.lp} /> LP
+            </span>
+          )}
+        </motion.div>
+      )}
+
+      {/* Rank standing chip — current tier + LP, springs in. */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 1.15, type: "spring", stiffness: 240, damping: 18 }}
+        className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-950/60 border border-white/12"
+      >
+        <span className="text-lg">{tier.emoji}</span>
+        <span className={"text-sm font-bold bg-gradient-to-r bg-clip-text text-transparent " + tier.gradient}>
+          {tier.label}
+        </span>
+        <span className="text-xs text-zinc-400 tabular-nums">{rankLp} LP</span>
+      </motion.div>
+
       {/* Author quote — capped to 2 lines so a chatty Sagan quote can't
           push the rest of the screen under the Android nav. */}
       <motion.div
@@ -526,6 +578,53 @@ export function CinematicMatchEnd({
       </motion.div>
     </motion.div>
   );
+}
+
+/** Falling confetti burst — celebratory shower behind the match-end trophy. */
+function Confetti() {
+  const pieces = useRef(
+    Array.from({ length: 18 }, (_, i) => ({
+      x: (i * 53) % 100,
+      hue: [150, 280, 45, 330, 190][i % 5],
+      delay: (i % 6) * 0.06,
+      dur: 1.5 + (i % 4) * 0.35,
+      rot: (i * 67) % 360,
+    })),
+  ).current;
+  return (
+    <div className="pointer-events-none absolute inset-x-0 -top-2 h-44 overflow-hidden" aria-hidden>
+      {pieces.map((p, i) => (
+        <motion.span
+          key={i}
+          initial={{ y: -24, opacity: 0, rotate: 0 }}
+          animate={{ y: 190, opacity: [0, 1, 1, 0], rotate: p.rot }}
+          transition={{ duration: p.dur, delay: 0.15 + p.delay, ease: "easeIn" }}
+          className="absolute block w-2 h-3 rounded-[1px]"
+          style={{ left: `${p.x}%`, background: `hsl(${p.hue} 90% 62%)` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Counts a number up from 0 → `to` (handles negatives) over ~0.7s. */
+function CountUp({ to, durationMs = 700 }: { to: number; durationMs?: number }) {
+  const [n, setN] = useState(0);
+  const sign = to < 0 ? -1 : 1;
+  const target = Math.abs(to);
+  useEffect(() => {
+    let raf = 0;
+    let start: number | null = null;
+    const step = (ts: number) => {
+      if (start == null) start = ts;
+      const p = Math.min(1, (ts - start) / durationMs);
+      setN(Math.round(p * target));
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [target, durationMs]);
+  return <>{sign < 0 ? -n : n}</>;
 }
 
 /* ──────────── Pick VFX (impact on tap) ──────────── */

@@ -483,6 +483,7 @@ export function RankedGame({
           roundWinsYou: nextRoundWinsA,
           roundWinsOpp: nextRoundWinsB,
           forfeit: false,
+          xpGained: youWon ? 60 : 15,
         });
       }, ROUND_PAUSE_MS);
     } else if (riposteWillFire) {

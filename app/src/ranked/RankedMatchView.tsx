@@ -66,6 +66,8 @@ export interface RankedEndData {
   roundWinsYou: number;
   roundWinsOpp: number;
   forfeit: boolean;
+  /** XP awarded for this match — shown as an animated reward on the end screen. */
+  xpGained?: number;
 }
 
 export interface RankedMatchViewProps {
@@ -236,6 +238,7 @@ export function RankedMatchView({
             onRematch={onNext ? undefined : onRematch}
             onBack={onNext ? onNext : onLeave!}
             backLabel={onNext ? "Suivant →" : undefined}
+            reward={{ xp: end.xpGained }}
           />
         )}
         </div>
