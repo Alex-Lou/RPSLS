@@ -47,7 +47,9 @@ const VERT = `attribute vec2 a; void main(){ gl_Position = vec4(a, 0.0, 1.0); }`
 const FRAG = `
 precision highp float;
 uniform vec2  u_res;
-uniform float u_t;   // 0..1 normalised life
+uniform float u_t;     // 0..1 normalised life
+uniform float u_warm;  // 0 = cool/violet palette, 1 = hot fire palette
+uniform float u_int;   // global intensity multiplier
 const float PI = 3.14159265;
 
 float hash(vec2 p){ p = fract(p*vec2(123.34,456.21)); p += dot(p,p+45.32); return fract(p.x*p.y); }
@@ -72,12 +74,16 @@ void main(){
   float radius = t * 1.1;
   float ringW = 0.025 + t*0.06;
   float ring = exp(-pow(r - radius, 2.0) / (ringW*ringW));
-  col += mix(vec3(0.7,0.9,1.0), vec3(0.9,0.5,1.0), t) * ring * env * 1.2;
+  vec3 ringCool = mix(vec3(0.7,0.9,1.0), vec3(0.9,0.5,1.0), t);
+  vec3 ringWarm = mix(vec3(1.0,0.85,0.30), vec3(1.0,0.32,0.06), t);
+  col += mix(ringCool, ringWarm, u_warm) * ring * env * 1.2;
 
   // 3) Rotating god-rays — high-frequency angular streaks, fade with radius.
   float rays = pow(0.5 + 0.5*cos(ang*16.0 + t*6.0), 6.0);
   rays *= smoothstep(0.9, 0.1, r) * exp(-r*1.5);
-  col += mix(vec3(1.0,0.8,0.4), vec3(0.6,0.4,1.0), r) * rays * env * 0.9;
+  vec3 raysCool = mix(vec3(1.0,0.8,0.4), vec3(0.6,0.4,1.0), r);
+  vec3 raysWarm = mix(vec3(1.0,0.7,0.2), vec3(1.0,0.28,0.05), r);
+  col += mix(raysCool, raysWarm, u_warm) * rays * env * 0.9;
 
   // 4) Sparkle field bursting outward — points pushed out as t grows.
   vec2 gp = p * (3.0 - t*1.5);
@@ -90,12 +96,13 @@ void main(){
     col += vec3(1.0,0.95,0.85) * spark * env * 1.1;
   }
 
+  col *= u_int;
   float a = clamp(max(max(col.r,col.g),col.b), 0.0, 1.0) * env;
   gl_FragColor = vec4(col, a);
 }
 `;
 
-export function BurstCanvas() {
+export function BurstCanvas({ warm = false, intensity = 1 }: { warm?: boolean; intensity?: number } = {}) {
   const ref = useRef<HTMLCanvasElement>(null);
   const raf = useRef<number>(0);
   useEffect(() => {
@@ -129,12 +136,16 @@ export function BurstCanvas() {
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE); // additive glow
     const uRes = gl.getUniformLocation(prog, "u_res");
     const uT = gl.getUniformLocation(prog, "u_t");
+    const uWarm = gl.getUniformLocation(prog, "u_warm");
+    const uInt = gl.getUniformLocation(prog, "u_int");
     const start = performance.now();
     const frame = (now: number) => {
       const t = (now - start) / 1000 / DURATION_S;
       gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
       gl.uniform2f(uRes, canvas.width, canvas.height);
       gl.uniform1f(uT, t);
+      gl.uniform1f(uWarm, warm ? 1 : 0);
+      gl.uniform1f(uInt, intensity);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       if (t < 1.0) raf.current = requestAnimationFrame(frame);
     };
@@ -143,7 +154,7 @@ export function BurstCanvas() {
       cancelAnimationFrame(raf.current);
       gl.deleteProgram(prog); gl.deleteBuffer(buf); gl.deleteShader(vs); gl.deleteShader(fs);
     };
-  }, []);
+  }, [warm, intensity]);
   return <canvas ref={ref} aria-hidden className="absolute inset-0 w-full h-full" />;
 }
 
@@ -157,7 +168,8 @@ export function LevelUpOverlay({ level }: { level: number }) {
       transition={{ duration: 0.3 }}
       className="fixed inset-0 z-[70] flex items-center justify-center pointer-events-none overflow-hidden"
     >
-      <BurstCanvas />
+      {/* Intensity dialled down a touch — the halo was a bit much. */}
+      <BurstCanvas intensity={0.78} />
 
       <motion.div
         initial={{ scale: 0.4, opacity: 0, y: 12 }}
@@ -165,7 +177,7 @@ export function LevelUpOverlay({ level }: { level: number }) {
         exit={{ scale: 0.9, opacity: 0 }}
         transition={{ delay: 0.12, type: "spring", stiffness: 260, damping: 15 }}
         className="relative flex flex-col items-center gap-1 px-9 py-5 rounded-3xl bg-zinc-950/70 backdrop-blur-md border border-white/15 shadow-2xl"
-        style={{ boxShadow: "0 0 60px -10px color-mix(in oklab, var(--theme-primary) 60%, transparent)" }}
+        style={{ boxShadow: "0 0 42px -14px color-mix(in oklab, var(--theme-primary) 45%, transparent)" }}
       >
         <div
           className="text-3xl font-black tracking-[0.18em] bg-clip-text text-transparent"

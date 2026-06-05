@@ -589,14 +589,19 @@ export function CinematicMatchEnd({
  * spin and glow. Auto-unmounts after ~3.2s so the GL context never lingers as
  * a persistent second layer over the animated backdrop.
  */
-export function CelebrationBurst() {
+export function CelebrationBurst({ variant = "default" }: { variant?: "default" | "fire" } = {}) {
+  const fire = variant === "fire";
   const [show, setShow] = useState(true);
   const pieces = useRef(
     Array.from({ length: 46 }, (_, i) => {
       const shape = i % 5; // 0-1 square, 2 circle, 3-4 streamer
+      // Cool multicolour for a normal win; hot reds/oranges/yellows for a
+      // tournament victory so the two celebrations feel distinct.
+      const coolHues = [150, 275, 45, 330, 190, 50, 0, 110];
+      const fireHues = [12, 26, 40, 4, 34, 50, 18, 30];
       return {
         x: (i * 37) % 100,
-        hue: [150, 275, 45, 330, 190, 50, 0, 110][i % 8],
+        hue: (fire ? fireHues : coolHues)[i % 8],
         delay: (i % 12) * 0.045,
         dur: 1.9 + (i % 6) * 0.32,
         rot: ((i * 97) % 900) - 450,
@@ -614,7 +619,7 @@ export function CelebrationBurst() {
   if (!show) return null;
   return (
     <div className="fixed inset-0 z-30 pointer-events-none overflow-hidden" aria-hidden>
-      <BurstCanvas />
+      <BurstCanvas warm={fire} intensity={fire ? 1.12 : 1} />
       {pieces.map((p, i) => (
         <motion.span
           key={i}
