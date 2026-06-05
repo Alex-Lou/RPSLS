@@ -26,6 +26,7 @@ const OnlinePage   = lazy(() => import("./OnlinePage").then(m => ({ default: m.O
 const ProfilePage  = lazy(() => import("./ProfilePage").then(m => ({ default: m.ProfilePage })));
 const HistoryPage  = lazy(() => import("./HistoryPage").then(m => ({ default: m.HistoryPage })));
 const QuestsPage   = lazy(() => import("./QuestsPage").then(m => ({ default: m.QuestsPage })));
+const LeaderboardPage = lazy(() => import("./LeaderboardPage").then(m => ({ default: m.LeaderboardPage })));
 const PacksPage    = lazy(() => import("./PacksPage").then(m => ({ default: m.PacksPage })));
 const AboutPage    = lazy(() => import("./AboutPage").then(m => ({ default: m.AboutPage })));
 const ContactPage  = lazy(() => import("./ContactPage").then(m => ({ default: m.ContactPage })));
@@ -232,6 +233,7 @@ export default function App() {
                   {page !== "play" && (
                     <Suspense key="lazy-routes" fallback={<RouteFallback />}>
                       {page === "online"  && <PageWrap key="online"><OnlinePage /></PageWrap>}
+                      {page === "leaderboard" && <PageWrap key="leaderboard"><LeaderboardPage /></PageWrap>}
                       {page === "quests"  && <PageWrap key="quests"><QuestsPage /></PageWrap>}
                       {page === "packs"   && <PageWrap key="packs"><PacksPage /></PageWrap>}
                       {page === "profile" && <PageWrap key="profile"><ProfilePage /></PageWrap>}

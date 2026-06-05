@@ -7,19 +7,22 @@ import { useT } from "./i18n";
 import { LanguagePicker } from "./LanguagePicker";
 import { avatarImgStyle } from "./avatar";
 
-export type Page = "play" | "online" | "quests" | "packs" | "profile" | "history" | "about" | "contact" | "privacy";
+export type Page = "play" | "online" | "leaderboard" | "quests" | "packs" | "profile" | "history" | "about" | "contact" | "privacy";
 
 interface NavItem {
   id: Page;
   labelKey: string;
   /** Path to the PNG badge icon under /public/Burger Icons/. */
-  iconSrc: string;
+  iconSrc?: string;
+  /** Emoji glyph used when there's no PNG badge. */
+  glyph?: string;
 }
 
 const NAV: NavItem[] = [
-  { id: "play",    labelKey: "nav.home",    iconSrc: "/Burger Icons/nav_accueil.png"    },
-  { id: "online",  labelKey: "nav.online",  iconSrc: "/Burger Icons/nav_en_ligne.png"   },
-  { id: "quests",  labelKey: "nav.quests",  iconSrc: "/Burger Icons/nav_quetes.png"     },
+  { id: "play",        labelKey: "nav.home",        iconSrc: "/Burger Icons/nav_accueil.png"    },
+  { id: "online",      labelKey: "nav.online",      iconSrc: "/Burger Icons/nav_en_ligne.png"   },
+  { id: "leaderboard", labelKey: "nav.leaderboard", glyph: "🏆"                                  },
+  { id: "quests",      labelKey: "nav.quests",      iconSrc: "/Burger Icons/nav_quetes.png"     },
   { id: "packs",   labelKey: "nav.packs",   iconSrc: "/Burger Icons/nav_variantes.png"  },
   { id: "profile", labelKey: "nav.profile", iconSrc: "/Burger Icons/nav_profil.png"     },
   { id: "history", labelKey: "nav.history", iconSrc: "/Burger Icons/nav_historique.png" },
@@ -123,12 +126,18 @@ function SidebarBody({
                 }
                 style={{ background: theme.primary }}
               />
-              <img
-                src={item.iconSrc}
-                alt=""
-                draggable={false}
-                className="w-8 h-8 shrink-0 select-none"
-              />
+              {item.iconSrc ? (
+                <img
+                  src={item.iconSrc}
+                  alt=""
+                  draggable={false}
+                  className="w-8 h-8 shrink-0 select-none"
+                />
+              ) : (
+                <span className="w-8 h-8 shrink-0 flex items-center justify-center text-2xl select-none">
+                  {item.glyph}
+                </span>
+              )}
               <span>{t(item.labelKey)}</span>
             </button>
           );
