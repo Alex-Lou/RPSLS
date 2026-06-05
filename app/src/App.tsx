@@ -422,7 +422,7 @@ function Splash({ onDone, scene }: { onDone: () => void; scene: import("./backdr
               initial={{ opacity: 0, y: 14, filter: "blur(8px)" }}
               animate={{ opacity: 0.9, y: 0, filter: "blur(0px)" }}
               transition={{ duration: 0.9, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
-              className="text-zinc-200 text-xs sm:text-sm tracking-[0.3em] uppercase"
+              className="text-ink text-xs sm:text-sm tracking-[0.3em] uppercase"
             >
               Rock · Paper · Scissors · Lizard · Spock
             </motion.p>
@@ -437,7 +437,7 @@ function Splash({ onDone, scene }: { onDone: () => void; scene: import("./backdr
             initial={{ opacity: 0 }}
             animate={{ opacity: 0.7 }}
             transition={{ duration: 0.5 }}
-            className="absolute bottom-10 left-0 right-0 text-center text-zinc-300 text-xs tracking-[0.25em] uppercase pointer-events-none"
+            className="absolute bottom-10 left-0 right-0 text-center text-ink-muted text-xs tracking-[0.25em] uppercase pointer-events-none"
           >
             tap to continue
           </motion.p>

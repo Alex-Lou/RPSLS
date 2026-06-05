@@ -37,8 +37,8 @@ export function InfoBubble({
                     "w-5 h-5 text-[11px]";
   const skin =
     variant === "minimal"
-      ? "border border-white/30 text-zinc-300 hover:border-white/60 hover:text-white"
-      : "bg-white/10 text-zinc-200 hover:bg-white/20 ring-1 ring-white/15";
+      ? "border border-white/30 text-ink-muted hover:border-white/60 hover:text-white"
+      : "bg-hairline text-ink hover:bg-white/20 ring-1 ring-white/15";
 
   return (
     <>
@@ -69,19 +69,19 @@ export function InfoBubble({
               exit={{ scale: 0.95, opacity: 0 }}
               transition={{ type: "spring", stiffness: 280, damping: 22 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-sm bg-zinc-950/95 border border-white/10 rounded-3xl p-5 sm:p-6 shadow-2xl"
+              className="w-full max-w-sm bg-surface-raised border border-hairline rounded-3xl p-5 sm:p-6 shadow-2xl"
             >
               <div className="flex items-start justify-between gap-3 mb-3">
                 <h3 className="text-base sm:text-lg font-bold text-white">{title}</h3>
                 <button
                   onClick={() => setOpen(false)}
                   aria-label="Close"
-                  className="shrink-0 w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition"
+                  className="shrink-0 w-7 h-7 rounded-full bg-hairline hover:bg-hairline flex items-center justify-center text-ink-muted hover:text-white transition"
                 >
                   ✕
                 </button>
               </div>
-              <div className="text-sm text-zinc-300 leading-relaxed">{body}</div>
+              <div className="text-sm text-ink-muted leading-relaxed">{body}</div>
               <button
                 onClick={() => setOpen(false)}
                 className="mt-5 w-full py-2.5 rounded-2xl bg-themed font-bold text-sm text-white shadow-lg shadow-violet-500/30 transition active:scale-[0.97]"

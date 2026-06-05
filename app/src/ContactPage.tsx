@@ -35,14 +35,14 @@ export function ContactPage() {
     >
       <div>
         <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">{t("contact.title")}</h1>
-        <p className="text-zinc-400 text-sm mt-2 leading-relaxed max-w-prose">
+        <p className="text-ink-muted text-sm mt-2 leading-relaxed max-w-prose">
           {t("contact.intro")}
         </p>
       </div>
 
-      <div className="bg-zinc-950/55 border border-white/12 rounded-3xl p-5 sm:p-6 flex flex-col gap-4">
+      <div className="bg-surface border border-hairline rounded-3xl p-5 sm:p-6 flex flex-col gap-4">
         <div>
-          <label className="block text-[10px] uppercase tracking-widest text-zinc-400 mb-1.5 font-semibold">
+          <label className="block text-[10px] uppercase tracking-widest text-ink-muted mb-1.5 font-semibold">
             {t("contact.subject.label")}
           </label>
           <input
@@ -50,12 +50,12 @@ export function ContactPage() {
             onChange={(e) => setSubject(e.currentTarget.value)}
             placeholder={t("contact.subject.placeholder")}
             maxLength={80}
-            className="w-full bg-white/8 border border-white/15 rounded-2xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-violet-400/50 placeholder:text-zinc-500"
+            className="w-full bg-hairline border border-hairline rounded-2xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-violet-400/50 placeholder:text-ink-faint"
           />
         </div>
 
         <div>
-          <label className="block text-[10px] uppercase tracking-widest text-zinc-400 mb-1.5 font-semibold">
+          <label className="block text-[10px] uppercase tracking-widest text-ink-muted mb-1.5 font-semibold">
             {t("contact.message.label")}
           </label>
           <textarea
@@ -64,9 +64,9 @@ export function ContactPage() {
             placeholder={t("contact.message.placeholder")}
             rows={7}
             maxLength={2000}
-            className="w-full bg-white/8 border border-white/15 rounded-2xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-violet-400/50 placeholder:text-zinc-500 resize-y min-h-[140px]"
+            className="w-full bg-hairline border border-hairline rounded-2xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-violet-400/50 placeholder:text-ink-faint resize-y min-h-[140px]"
           />
-          <div className="text-[10px] text-zinc-500 mt-1 text-right">{message.length} / 2000</div>
+          <div className="text-[10px] text-ink-faint mt-1 text-right">{message.length} / 2000</div>
         </div>
 
         <motion.button
@@ -85,7 +85,7 @@ export function ContactPage() {
         </motion.button>
 
         {!message.trim() && (
-          <p className="text-xs text-zinc-500 text-center -mt-1">{t("contact.empty")}</p>
+          <p className="text-xs text-ink-faint text-center -mt-1">{t("contact.empty")}</p>
         )}
 
         {sent && (

@@ -90,7 +90,7 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
         <h1 className="text-xl font-extrabold text-themed">
           Mon Deck
         </h1>
-        <button onClick={onClose} className="text-zinc-400 hover:text-white text-xl px-2">✕</button>
+        <button onClick={onClose} className="text-ink-muted hover:text-white text-xl px-2">✕</button>
       </div>
 
       {/* Main hand */}
@@ -121,7 +121,7 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
 
       {/* Collection */}
       <div>
-        <h2 className="text-[10px] uppercase tracking-[0.25em] font-bold text-zinc-400 mb-2">
+        <h2 className="text-[10px] uppercase tracking-[0.25em] font-bold text-ink-muted mb-2">
           Collection
         </h2>
         <div className="grid grid-cols-4 gap-2">
@@ -158,7 +158,7 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
                 </div>
                 {!unlocked && (
                   <div className="absolute inset-0 bg-black/70 flex items-center justify-center p-1 z-20">
-                    <span className="text-[8px] text-zinc-400 text-center leading-tight">
+                    <span className="text-[8px] text-ink-muted text-center leading-tight">
                       🔒 {UNLOCK_HINTS[id] ?? "Bientôt"}
                     </span>
                   </div>
@@ -202,8 +202,8 @@ function DeckSlot({
         className={
           "aspect-[3/4] rounded-xl border-2 border-dashed flex items-center justify-center transition " +
           (highlight
-            ? "border-white/40 bg-white/10 animate-pulse"
-            : "border-white/10 bg-black/20")
+            ? "border-white/40 bg-hairline animate-pulse"
+            : "border-hairline bg-black/20")
         }
       >
         <span className="text-[10px] text-zinc-600 font-bold">{slotLabel}</span>
@@ -214,7 +214,7 @@ function DeckSlot({
   return (
     <button
       onClick={onClick}
-      className="relative aspect-[3/4] rounded-xl overflow-hidden ring-1 ring-white/20 bg-zinc-950"
+      className="relative aspect-[3/4] rounded-xl overflow-hidden ring-1 ring-white/20 bg-surface-raised"
     >
       <CardImage id={cardId} glyphSize="text-2xl" />
       <div className="absolute bottom-0 left-0 right-0 bg-black/70 py-0.5 z-10">

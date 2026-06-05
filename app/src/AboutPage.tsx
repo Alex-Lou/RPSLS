@@ -46,7 +46,7 @@ export function AboutPage() {
         <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-themed">
           {t("about.title")}
         </h1>
-        <p className="text-zinc-400 text-sm sm:text-base mt-2 leading-relaxed">
+        <p className="text-ink-muted text-sm sm:text-base mt-2 leading-relaxed">
           {t("about.intro")}
         </p>
       </div>
@@ -58,20 +58,20 @@ export function AboutPage() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.04 * i, duration: 0.25 }}
-            className="bg-zinc-950/55 border border-white/12 rounded-2xl p-4"
+            className="bg-surface border border-hairline rounded-2xl p-4"
           >
             <div className="flex items-center gap-2.5 mb-2">
               <span className="text-2xl">{s.icon}</span>
               <h2 className="text-base sm:text-lg font-bold">{t(s.titleKey)}</h2>
             </div>
             {s.bodyKey && (
-              <p className="text-zinc-300 text-sm leading-relaxed">{t(s.bodyKey)}</p>
+              <p className="text-ink-muted text-sm leading-relaxed">{t(s.bodyKey)}</p>
             )}
             {s.bullets && (
               <ul className="space-y-1.5 mt-1">
                 {s.bullets.map((b) => (
-                  <li key={b} className="text-zinc-300 text-sm leading-relaxed flex gap-2">
-                    <span className="text-zinc-500 mt-0.5">•</span>
+                  <li key={b} className="text-ink-muted text-sm leading-relaxed flex gap-2">
+                    <span className="text-ink-faint mt-0.5">•</span>
                     <span>{t(b)}</span>
                   </li>
                 ))}

@@ -97,7 +97,7 @@ export function BracketPage({
         >
           <span className="text-2xl">🏆</span> Tournoi
         </h1>
-        <p className="text-[11px] text-zinc-500 mt-1">
+        <p className="text-[11px] text-ink-faint mt-1">
           {selecting
             ? "Choisis la taille du tableau · adversaires CPU (entraînement)"
             : !joined
@@ -161,12 +161,12 @@ export function BracketPage({
           transition={{ duration: 0.3 }}
           className="flex flex-col items-center gap-3 py-3"
         >
-          <div className="text-center text-sm font-semibold text-zinc-300">
+          <div className="text-center text-sm font-semibold text-ink-muted">
             Tu as été éliminé. Regarde la suite !
           </div>
           <button
             onClick={onBack}
-            className="px-6 py-2.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 text-sm font-semibold transition"
+            className="px-6 py-2.5 rounded-2xl bg-hairline hover:bg-hairline border border-hairline text-sm font-semibold transition"
           >
             Quitter
           </button>
@@ -176,7 +176,7 @@ export function BracketPage({
       {/* Waiting for CPU matches */}
       {!selecting && joined && !playerMatch && !eliminated && tournament.phase === "running" && (
         <div className="flex flex-col items-center gap-2 py-2 max-w-sm mx-auto px-4">
-          <div className="text-center text-[11px] text-zinc-500">
+          <div className="text-center text-[11px] text-ink-faint">
             Les matchs CPU se jouent… Patiente.
           </div>
           <LoadingTip rotateMs={4000} className="justify-center text-center" />

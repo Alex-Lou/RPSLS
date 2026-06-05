@@ -58,13 +58,13 @@ export function LeaderboardPage() {
         >
           🏆 {t("leaderboard.title")}
         </h1>
-        <p className="mt-1 text-zinc-400 text-xs sm:text-sm">{t("leaderboard.subtitle")}</p>
+        <p className="mt-1 text-ink-muted text-xs sm:text-sm">{t("leaderboard.subtitle")}</p>
       </div>
 
       {/* Your rank pill */}
       {enabled && (
         <div
-          className="shrink-0 rounded-2xl px-4 py-3 flex items-center justify-between bg-zinc-950/55"
+          className="shrink-0 rounded-2xl px-4 py-3 flex items-center justify-between bg-surface"
           style={{ border: "1px solid color-mix(in oklab, var(--theme-primary) 35%, transparent)" }}
         >
           <div className="flex items-center gap-3 min-w-0">
@@ -77,21 +77,21 @@ export function LeaderboardPage() {
                 : <span>{player.avatar}</span>}
             </div>
             <div className="min-w-0">
-              <div className="text-sm font-bold text-zinc-100 truncate">{player.nickname}</div>
-              <div className="text-[11px] text-zinc-400">
+              <div className="text-sm font-bold text-ink truncate">{player.nickname}</div>
+              <div className="text-[11px] text-ink-muted">
                 {mine ? t("leaderboard.yourRank", { rank: mine.rank }) : t("leaderboard.unranked")}
               </div>
             </div>
           </div>
           <div className="text-right shrink-0">
             <div className="text-lg font-black text-themed tabular-nums">{(mine?.lp ?? player.rankLp)}</div>
-            <div className="text-[10px] uppercase tracking-wider text-zinc-500">LP</div>
+            <div className="text-[10px] uppercase tracking-wider text-ink-faint">LP</div>
           </div>
         </div>
       )}
 
       {/* Body */}
-      <div className="flex-1 min-h-0 overflow-y-auto rounded-2xl bg-zinc-950/40 border border-white/10">
+      <div className="flex-1 min-h-0 overflow-y-auto rounded-2xl bg-zinc-950/40 border border-hairline">
         {!enabled ? (
           <Empty icon="🚧" text={t("leaderboard.soon")} />
         ) : entries === null ? (
@@ -122,20 +122,20 @@ function Row({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
     >
       <div className="w-8 text-center shrink-0">
         {medal ? <span className="text-xl">{medal}</span>
-               : <span className="text-sm font-bold text-zinc-500 tabular-nums">{entry.rank}</span>}
+               : <span className="text-sm font-bold text-ink-faint tabular-nums">{entry.rank}</span>}
       </div>
       <div className="flex-1 min-w-0">
-        <div className={"text-sm font-semibold truncate " + (isMe ? "text-white" : "text-zinc-200")}>
+        <div className={"text-sm font-semibold truncate " + (isMe ? "text-white" : "text-ink")}>
           {entry.nickname}{isMe ? " ·" : ""}
         </div>
         <div className="text-[10px] uppercase tracking-wider flex items-center gap-1">
           <span>{tier.emoji}</span>
-          <span className="text-zinc-500">{tier.label}</span>
+          <span className="text-ink-faint">{tier.label}</span>
         </div>
       </div>
       <div className="text-right shrink-0">
-        <span className="text-sm font-black text-zinc-100 tabular-nums">{entry.lp}</span>
-        <span className="text-[10px] text-zinc-500 ml-1">LP</span>
+        <span className="text-sm font-black text-ink tabular-nums">{entry.lp}</span>
+        <span className="text-[10px] text-ink-faint ml-1">LP</span>
       </div>
     </li>
   );
@@ -145,7 +145,7 @@ function Empty({ icon, text }: { icon: string; text: string }) {
   return (
     <div className="h-full min-h-[200px] flex flex-col items-center justify-center gap-3 text-center px-6 py-10">
       <div className="text-4xl">{icon}</div>
-      <p className="text-sm text-zinc-400 max-w-xs leading-relaxed">{text}</p>
+      <p className="text-sm text-ink-muted max-w-xs leading-relaxed">{text}</p>
     </div>
   );
 }

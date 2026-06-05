@@ -40,7 +40,7 @@ export function Welcome({ onDone }: { onDone: () => void }) {
         initial={{ opacity: 0, scale: 0.92, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ delay: 0.15, type: "spring", stiffness: 260, damping: 22 }}
-        className="relative w-full max-w-md bg-zinc-950/70 backdrop-blur-md border border-white/15 rounded-3xl p-8 shadow-2xl"
+        className="relative w-full max-w-md bg-zinc-950/70 backdrop-blur-md border border-hairline rounded-3xl p-8 shadow-2xl"
       >
         {/* Glow halo */}
         <motion.div
@@ -72,7 +72,7 @@ export function Welcome({ onDone }: { onDone: () => void }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4, duration: 0.4 }}
-          className="text-zinc-400 text-sm text-center mt-2"
+          className="text-ink-muted text-sm text-center mt-2"
         >
           {t("welcome.subtitle")}
         </motion.p>
@@ -83,7 +83,7 @@ export function Welcome({ onDone }: { onDone: () => void }) {
           transition={{ delay: 0.55, duration: 0.4 }}
           className="mt-7"
         >
-          <label className="block text-[10px] uppercase tracking-widest text-zinc-400 mb-1.5">
+          <label className="block text-[10px] uppercase tracking-widest text-ink-muted mb-1.5">
             {t("welcome.nick.label")}
           </label>
           <input
@@ -95,9 +95,9 @@ export function Welcome({ onDone }: { onDone: () => void }) {
               if (e.key === "Enter" && isValid) onContinue();
             }}
             placeholder={t("welcome.nick.placeholder")}
-            className="w-full bg-white/8 border border-white/15 rounded-2xl px-4 py-3 text-base font-semibold focus:outline-none focus:ring-2 focus:ring-violet-400/60 placeholder:text-zinc-500"
+            className="w-full bg-hairline border border-hairline rounded-2xl px-4 py-3 text-base font-semibold focus:outline-none focus:ring-2 focus:ring-violet-400/60 placeholder:text-ink-faint"
           />
-          <p className="mt-1.5 text-[10px] text-zinc-500">
+          <p className="mt-1.5 text-[10px] text-ink-faint">
             {t("welcome.charcount", { n: trimmed.length })}
           </p>
         </motion.div>
@@ -121,7 +121,7 @@ export function Welcome({ onDone }: { onDone: () => void }) {
             whileHover={{ y: -2 }}
             whileTap={{ scale: 0.97 }}
             onClick={onSkip}
-            className="flex-1 px-5 py-3 rounded-2xl font-semibold text-base bg-white/5 hover:bg-white/10 border border-white/15 hover:border-white/30 transition"
+            className="flex-1 px-5 py-3 rounded-2xl font-semibold text-base bg-hairline hover:bg-hairline border border-hairline hover:border-white/30 transition"
           >
             {t("welcome.btn.skip")}
           </motion.button>

@@ -19,7 +19,7 @@ const isImg = (a: string) => /^(data:|\/|https?:)/.test(a);
 function Avatar({ avatar, size }: { avatar: string; size: number }) {
   return (
     <span
-      className="rounded-full overflow-hidden flex items-center justify-center bg-zinc-900/70 ring-1 ring-white/15 shrink-0"
+      className="rounded-full overflow-hidden flex items-center justify-center bg-surface-2 ring-1 ring-white/15 shrink-0"
       style={{ width: size, height: size, fontSize: size * 0.55 }}
     >
       {isImg(avatar)
@@ -66,10 +66,10 @@ function PodiumBlock({ s, you }: { s: Standing; you: boolean }) {
         <span className="relative block"><Avatar avatar={s.player.avatar} size={st.av} /></span>
       </div>
       <div className="text-base leading-none">{st.medal}</div>
-      <div className={"text-xs font-bold truncate max-w-[8rem] text-center " + (you ? "text-white" : "text-zinc-200")}>
+      <div className={"text-xs font-bold truncate max-w-[8rem] text-center " + (you ? "text-white" : "text-ink")}>
         {s.player.name}{you ? " (toi)" : ""}
       </div>
-      <div className="text-[10px] text-zinc-500">Niv. {s.player.level}</div>
+      <div className="text-[10px] text-ink-faint">Niv. {s.player.level}</div>
       <div className="text-[11px] font-black text-emerald-300">+{s.reward} XP</div>
       {/* Pedestal bar */}
       <motion.div
@@ -116,7 +116,7 @@ export function TournamentPodium({
       <CelebrationBurst variant="fire" />
 
       <div className="text-center shrink-0">
-        <div className="text-[11px] uppercase tracking-[0.35em] text-zinc-500">Tournoi terminé</div>
+        <div className="text-[11px] uppercase tracking-[0.35em] text-ink-faint">Tournoi terminé</div>
         <h1 className="text-2xl sm:text-3xl font-black text-themed leading-tight" style={{ fontFamily: "var(--font-headline)" }}>
           {you?.place === 1 ? "🏆 Tu es Champion !" : `${tournament.champion?.name ?? "—"} remporte le tournoi`}
         </h1>
@@ -129,19 +129,19 @@ export function TournamentPodium({
 
       {/* Full standings */}
       {rest.length > 0 && (
-        <div className="w-full mt-1 rounded-2xl bg-zinc-950/50 border border-white/10 divide-y divide-white/5">
+        <div className="w-full mt-1 rounded-2xl bg-zinc-950/50 border border-hairline divide-y divide-white/5">
           {rest.map((s) => (
             <div
               key={s.player.id}
               className={"flex items-center gap-3 px-3 py-2 " + (s.player.isYou ? "bg-white/[0.07]" : "")}
               style={s.player.isYou ? { boxShadow: "inset 3px 0 0 var(--theme-primary)" } : undefined}
             >
-              <span className="w-6 text-center text-sm font-bold text-zinc-500 tabular-nums">{s.place}</span>
+              <span className="w-6 text-center text-sm font-bold text-ink-faint tabular-nums">{s.place}</span>
               <Avatar avatar={s.player.avatar} size={28} />
-              <span className={"flex-1 min-w-0 truncate text-sm " + (s.player.isYou ? "text-white font-semibold" : "text-zinc-300")}>
+              <span className={"flex-1 min-w-0 truncate text-sm " + (s.player.isYou ? "text-white font-semibold" : "text-ink-muted")}>
                 {s.player.name}{s.player.isYou ? " (toi)" : ""}
               </span>
-              <span className="text-[10px] text-zinc-500">Niv. {s.player.level}</span>
+              <span className="text-[10px] text-ink-faint">Niv. {s.player.level}</span>
               <span className="text-[11px] font-bold text-emerald-300/90">+{s.reward}</span>
             </div>
           ))}

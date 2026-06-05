@@ -31,7 +31,7 @@ export function HistoryPage() {
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-3xl font-extrabold tracking-tight">History</h1>
-        <span className="text-sm text-zinc-500">{history.length} match{history.length === 1 ? "" : "es"}</span>
+        <span className="text-sm text-ink-faint">{history.length} match{history.length === 1 ? "" : "es"}</span>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -42,8 +42,8 @@ export function HistoryPage() {
             className={
               "px-3 py-1.5 rounded-full text-xs font-medium border transition " +
               (filter === f.id
-                ? "bg-white/15 border-white/30 text-white"
-                : "bg-white/5 border-white/10 text-zinc-400 hover:text-white hover:border-white/30")
+                ? "bg-hairline border-white/30 text-white"
+                : "bg-hairline border-hairline text-ink-muted hover:text-white hover:border-white/30")
             }
           >
             {f.label}
@@ -52,9 +52,9 @@ export function HistoryPage() {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="bg-zinc-950/55 border border-white/12 rounded-3xl p-10 text-center">
-          <p className="text-zinc-400">No matches yet.</p>
-          <p className="text-xs text-zinc-500 mt-1">Play your first round to see it here.</p>
+        <div className="bg-surface border border-hairline rounded-3xl p-10 text-center">
+          <p className="text-ink-muted">No matches yet.</p>
+          <p className="text-xs text-ink-faint mt-1">Play your first round to see it here.</p>
         </div>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -90,10 +90,10 @@ function Row({
       : match.opponent.nickname;
 
   return (
-    <div className="bg-zinc-950/55 border border-white/12 rounded-2xl overflow-hidden">
+    <div className="bg-surface border border-hairline rounded-2xl overflow-hidden">
       <button
         onClick={onToggle}
-        className="w-full p-4 flex items-center gap-4 hover:bg-white/5 transition text-left"
+        className="w-full p-4 flex items-center gap-4 hover:bg-hairline transition text-left"
       >
         <span className={
           "w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0 " +
@@ -115,12 +115,12 @@ function Row({
                 🏳️ Forfeit
               </span>
             )}
-            <span className="text-zinc-500 text-xs">·</span>
-            <span className="text-xs text-zinc-400">{MODE_META[match.mode].label}</span>
-            <span className="text-zinc-500 text-xs">·</span>
-            <span className="text-xs text-zinc-400">vs {oppLabel}</span>
+            <span className="text-ink-faint text-xs">·</span>
+            <span className="text-xs text-ink-muted">{MODE_META[match.mode].label}</span>
+            <span className="text-ink-faint text-xs">·</span>
+            <span className="text-xs text-ink-muted">vs {oppLabel}</span>
           </div>
-          <div className="text-xs text-zinc-500 mt-0.5">
+          <div className="text-xs text-ink-faint mt-0.5">
             {match.scorePlayer} — {match.scoreOpponent} · BO{match.bestOf} · {ago(match.timestamp)}
           </div>
         </div>
@@ -129,7 +129,7 @@ function Row({
           {match.xpDelta !== 0 && (
             <span className={
               "text-xs font-semibold px-2 py-0.5 rounded-full " +
-              (match.xpDelta > 0 ? "bg-emerald-500/20 text-emerald-300" : "bg-zinc-500/20 text-zinc-400")
+              (match.xpDelta > 0 ? "bg-emerald-500/20 text-emerald-300" : "bg-zinc-500/20 text-ink-muted")
             }>
               {match.xpDelta > 0 ? "+" : ""}{match.xpDelta} XP
             </span>
@@ -144,7 +144,7 @@ function Row({
           )}
         </div>
 
-        <span className={"text-zinc-500 transition-transform " + (isOpen ? "rotate-90" : "")}>
+        <span className={"text-ink-faint transition-transform " + (isOpen ? "rotate-90" : "")}>
           ›
         </span>
       </button>
@@ -158,18 +158,18 @@ function Row({
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="border-t border-white/10 p-4 grid gap-2">
+            <div className="border-t border-hairline p-4 grid gap-2">
               {match.rounds.map((r, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-3 text-sm bg-white/5 rounded-xl px-3 py-2"
+                  className="flex items-center gap-3 text-sm bg-hairline rounded-xl px-3 py-2"
                 >
-                  <span className="text-xs text-zinc-500 w-8">R{i + 1}</span>
-                  <span className="capitalize flex-1 text-zinc-200">
+                  <span className="text-xs text-ink-faint w-8">R{i + 1}</span>
+                  <span className="capitalize flex-1 text-ink">
                     {MOVE_META[r.playerMove].label}
                   </span>
-                  <span className="text-xs text-zinc-500 italic">vs</span>
-                  <span className="capitalize flex-1 text-right text-zinc-200">
+                  <span className="text-xs text-ink-faint italic">vs</span>
+                  <span className="capitalize flex-1 text-right text-ink">
                     {MOVE_META[r.opponentMove].label}
                   </span>
                   <span className={"text-xs font-bold uppercase " + outcomeClass(r.result).text}>
@@ -190,7 +190,7 @@ function outcomeClass(o: Outcome) {
     ? { bg: "bg-emerald-500/20", text: "text-emerald-300" }
     : o === "loss"
     ? { bg: "bg-rose-500/20",    text: "text-rose-300" }
-    : { bg: "bg-zinc-500/20",    text: "text-zinc-400" };
+    : { bg: "bg-zinc-500/20",    text: "text-ink-muted" };
 }
 
 function ago(t: number): string {

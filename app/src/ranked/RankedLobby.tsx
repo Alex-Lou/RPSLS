@@ -51,14 +51,14 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack }: { onViewBra
         >
           Constellation Ranked
         </h1>
-        <p className="mt-1 text-zinc-400 text-xs sm:text-sm">3 lanes · Best of 5 · Mana & Cartes</p>
+        <p className="mt-1 text-ink-muted text-xs sm:text-sm">3 lanes · Best of 5 · Mana & Cartes</p>
       </div>
 
       {/* Profile card */}
-      <div className="bg-zinc-950/55 border border-white/12 rounded-3xl p-4 sm:p-5 flex flex-col gap-3">
+      <div className="bg-surface border border-hairline rounded-3xl p-4 sm:p-5 flex flex-col gap-3">
         <div className="flex items-center gap-3">
           <div
-            className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl border border-white/15 flex items-center justify-center text-3xl overflow-hidden"
+            className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl border border-hairline flex items-center justify-center text-3xl overflow-hidden"
             style={{
               background:
                 "linear-gradient(135deg, color-mix(in oklab, var(--theme-primary) 32%, transparent), color-mix(in oklab, var(--theme-secondary) 32%, transparent))",
@@ -84,12 +84,12 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack }: { onViewBra
               }>
                 {tier.emoji} {tier.label}
               </span>
-              <span className="text-xs text-zinc-400">Lv.{lvl.level}</span>
+              <span className="text-xs text-ink-muted">Lv.{lvl.level}</span>
             </div>
           </div>
         </div>
         <div>
-          <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-1">
+          <div className="flex items-center justify-between text-[10px] text-ink-muted mb-1">
             <div className="flex items-center gap-1.5">
               <span className="uppercase tracking-wider font-semibold">LP</span>
               <InfoBubble
@@ -106,7 +106,7 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack }: { onViewBra
             </div>
             <span className="tabular-nums">{player.rankLp} {tier.ceil !== Infinity && `/ ${tier.ceil}`}</span>
           </div>
-          <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+          <div className="h-2 rounded-full bg-hairline overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${(lpProgress * 100).toFixed(1)}%` }}
@@ -116,7 +116,7 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack }: { onViewBra
           </div>
         </div>
         <div className="grid grid-cols-3 gap-2">
-          <StatCell label={t("profile.stat.games")} value={String(totalGames)} color="text-zinc-200" />
+          <StatCell label={t("profile.stat.games")} value={String(totalGames)} color="text-ink" />
           <StatCell label={t("profile.stat.winrate")} value={`${winrate}%`} color="text-amber-300" />
           <StatCell label={t("profile.stat.lp")} value={String(player.rankLp)} color="text-violet-300" />
         </div>
@@ -127,14 +127,14 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack }: { onViewBra
       <motion.button
         whileTap={{ scale: 0.98 }}
         onClick={onManageDeck}
-        className="bg-zinc-950/55 rounded-2xl px-4 py-3 flex items-center justify-between hover:bg-white/5 transition"
+        className="bg-surface rounded-2xl px-4 py-3 flex items-center justify-between hover:bg-hairline transition"
         style={{ border: "1px solid color-mix(in oklab, var(--theme-primary) 35%, transparent)" }}
       >
         <div className="flex items-center gap-2.5">
           <span className="text-xl">🃏</span>
           <div className="text-left">
-            <div className="font-bold text-sm text-zinc-200">Gérer mon Deck</div>
-            <div className="text-[10px] text-zinc-500">3 main + 3 réserve</div>
+            <div className="font-bold text-sm text-ink">Gérer mon Deck</div>
+            <div className="text-[10px] text-ink-faint">3 main + 3 réserve</div>
           </div>
         </div>
         <span className="text-violet-300">›</span>
@@ -154,8 +154,8 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack }: { onViewBra
         <div className="flex items-center gap-3">
           <span className="text-2xl">🏆</span>
           <div className="text-left">
-            <div className="font-bold text-base text-zinc-100">Voir le Tournoi</div>
-            <div className="text-[10px] text-zinc-400">8 adversaires CPU · Prochain dans {countdown}</div>
+            <div className="font-bold text-base text-ink">Voir le Tournoi</div>
+            <div className="text-[10px] text-ink-muted">8 adversaires CPU · Prochain dans {countdown}</div>
           </div>
         </div>
         <span className="text-lg" style={{ color: "var(--theme-secondary)" }}>›</span>
@@ -164,17 +164,17 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack }: { onViewBra
       {/* How to play — simple toggle, no AnimatePresence */}
       <button
         onClick={() => setRulesOpen((o) => !o)}
-        className="bg-zinc-950/55 border border-white/12 rounded-2xl px-4 py-2.5 flex items-center justify-between text-left hover:bg-white/[0.07] transition"
+        className="bg-surface border border-hairline rounded-2xl px-4 py-2.5 flex items-center justify-between text-left hover:bg-white/[0.07] transition"
       >
         <span className="text-sm flex items-center gap-2">
           <span>💡</span>
-          <span className="font-semibold text-zinc-300">Comment ça marche ?</span>
+          <span className="font-semibold text-ink-muted">Comment ça marche ?</span>
         </span>
-        <span className={"text-zinc-500 text-sm transition-transform duration-200 " + (rulesOpen ? "rotate-180" : "")}>▾</span>
+        <span className={"text-ink-faint text-sm transition-transform duration-200 " + (rulesOpen ? "rotate-180" : "")}>▾</span>
       </button>
       {rulesOpen && (
-        <div className="bg-zinc-950/55 border border-white/12 rounded-3xl p-4 sm:p-5 -mt-1">
-          <div className="flex flex-col gap-2.5 text-[12px] text-zinc-300 leading-relaxed">
+        <div className="bg-surface border border-hairline rounded-3xl p-4 sm:p-5 -mt-1">
+          <div className="flex flex-col gap-2.5 text-[12px] text-ink-muted leading-relaxed">
             <RuleBlock emoji="🎯" title="Le principe"
               text="Pose 3 coups sur 3 lanes (FORCE / SAGESSE / RUSE). Révélation. Le plus de lanes gagnées = round gagné. Premier à 3 rounds." />
             <RuleBlock emoji="💜" title="Mana"
@@ -182,7 +182,7 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack }: { onViewBra
             <RuleBlock emoji="🃏" title="Cartes"
               text="Main de 3 cartes. Tu pioches si tu GAGNES un round. Tu perds 1 carte si tu PERDS. 0 ou 1 carte par round." />
 
-            <div className="text-[10px] uppercase tracking-wider font-bold text-zinc-500 mt-1">⚪ Communes (1 mana)</div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-ink-faint mt-1">⚪ Communes (1 mana)</div>
             <CardRule id="aegis" />
             <CardRule id="precision" />
             <CardRule id="anchor" />
@@ -210,25 +210,25 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack }: { onViewBra
       )}
 
       {/* Cards overview — all 13 */}
-      <div className="bg-zinc-950/55 border border-white/12 rounded-3xl p-4 sm:p-5">
-        <h2 className="text-xs uppercase tracking-[0.25em] font-bold text-zinc-400 mb-3">
+      <div className="bg-surface border border-hairline rounded-3xl p-4 sm:p-5">
+        <h2 className="text-xs uppercase tracking-[0.25em] font-bold text-ink-muted mb-3">
           Toutes les cartes
         </h2>
         <div className="flex flex-col gap-2">
           {ALL_CARD_IDS.map((id) => {
             const card = CARDS[id];
             return (
-              <div key={id} className="flex items-center gap-3 rounded-xl bg-white/5 border border-white/5 p-2">
-                <div className="relative shrink-0 w-10 h-14 rounded-lg overflow-hidden bg-zinc-950">
+              <div key={id} className="flex items-center gap-3 rounded-xl bg-hairline border border-hairline p-2">
+                <div className="relative shrink-0 w-10 h-14 rounded-lg overflow-hidden bg-surface-raised">
                   <CardImage id={id} glyphSize="text-xl" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="font-bold text-sm">{t(card.nameKey)}</span>
                     <span className={"text-[8px] font-bold uppercase " + RARITY_COLOR[card.rarity]}>{card.rarity}</span>
-                    <span className="text-[9px] text-zinc-500 bg-white/5 px-1 py-0.5 rounded-full">{card.cost}m</span>
+                    <span className="text-[9px] text-ink-faint bg-hairline px-1 py-0.5 rounded-full">{card.cost}m</span>
                   </div>
-                  <p className="text-[10px] text-zinc-400 mt-0.5 leading-snug">{t(card.descKey)}</p>
+                  <p className="text-[10px] text-ink-muted mt-0.5 leading-snug">{t(card.descKey)}</p>
                 </div>
               </div>
             );
@@ -271,9 +271,9 @@ function CardRule({ id }: { id: string }) {
     <div className="flex items-start gap-2">
       <span className="text-base shrink-0 mt-0.5">{card.glyph}</span>
       <div>
-        <span className="font-bold text-zinc-200">{t(card.nameKey)}</span>
-        <span className="text-zinc-500 ml-1">({card.cost}m)</span>
-        <span className="text-zinc-400"> — {t(card.descKey)}</span>
+        <span className="font-bold text-ink">{t(card.nameKey)}</span>
+        <span className="text-ink-faint ml-1">({card.cost}m)</span>
+        <span className="text-ink-muted"> — {t(card.descKey)}</span>
       </div>
     </div>
   );
@@ -281,9 +281,9 @@ function CardRule({ id }: { id: string }) {
 
 function StatCell({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div className="bg-white/5 border border-white/5 rounded-xl p-2 text-center">
+    <div className="bg-hairline border border-hairline rounded-xl p-2 text-center">
       <div className={"text-lg font-bold tabular-nums " + color}>{value}</div>
-      <div className="text-[9px] uppercase tracking-wider text-zinc-500 mt-0.5">{label}</div>
+      <div className="text-[9px] uppercase tracking-wider text-ink-faint mt-0.5">{label}</div>
     </div>
   );
 }
@@ -293,8 +293,8 @@ function RuleBlock({ emoji, title, text }: { emoji: string; title: string; text:
     <div className="flex items-start gap-2">
       <span className="text-base shrink-0 mt-0.5">{emoji}</span>
       <div>
-        <span className="font-bold text-zinc-200">{title}</span>
-        <span className="text-zinc-400"> — {text}</span>
+        <span className="font-bold text-ink">{title}</span>
+        <span className="text-ink-muted"> — {text}</span>
       </div>
     </div>
   );

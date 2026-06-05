@@ -39,7 +39,7 @@ export function QuestsPage() {
     >
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
         <h1 className="text-3xl font-extrabold tracking-tight">{t("quests.title")}</h1>
-        <div className="text-sm text-zinc-400">
+        <div className="text-sm text-ink-muted">
           <CountWithHighlight
             template={t("quests.claimed.count", { a: "{count}", b: QUESTS.length })}
             count={completedCount}
@@ -52,7 +52,7 @@ export function QuestsPage() {
         </div>
       </div>
 
-      <p className="text-zinc-400 text-sm">{t("quests.subtitle")}</p>
+      <p className="text-ink-muted text-sm">{t("quests.subtitle")}</p>
 
       <ul className="flex flex-col gap-2.5">
         <AnimatePresence initial={false}>
@@ -131,10 +131,10 @@ function QuestRow({
       className={
         "relative overflow-hidden rounded-2xl border p-4 flex items-center gap-4 transition " +
         (s.claimed
-          ? "bg-white/[0.02] border-white/5 opacity-60"
+          ? "bg-white/[0.02] border-hairline opacity-60"
           : claimable
           ? "bg-amber-500/10 border-amber-400/40"
-          : "bg-white/5 border-white/10")
+          : "bg-hairline border-hairline")
       }
       // Claimable rows breathe with an amber glow to pull the eye.
       animate={
@@ -147,7 +147,7 @@ function QuestRow({
       <motion.div
         className={
           "w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0 " +
-          (claimable ? "bg-amber-500/30 ring-2 ring-amber-400/60" : "bg-white/5")
+          (claimable ? "bg-amber-500/30 ring-2 ring-amber-400/60" : "bg-hairline")
         }
         // The icon does a little victory dance while the reward is waiting.
         animate={claimable ? { rotate: [0, -9, 9, -5, 0], scale: [1, 1.12, 1] } : { rotate: 0, scale: 1 }}
@@ -158,7 +158,7 @@ function QuestRow({
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={"font-semibold " + (dim ? "text-zinc-400" : "text-white")}>
+          <span className={"font-semibold " + (dim ? "text-ink-muted" : "text-white")}>
             {t(`quest.${q.id}.title`)}
           </span>
           <span className="text-[10px] text-emerald-300 bg-emerald-500/15 px-1.5 py-0.5 rounded-full font-bold">
@@ -170,10 +170,10 @@ function QuestRow({
             </span>
           )}
         </div>
-        <p className="text-xs text-zinc-400 mt-0.5">{t(`quest.${q.id}.desc`)}</p>
+        <p className="text-xs text-ink-muted mt-0.5">{t(`quest.${q.id}.desc`)}</p>
 
         <div className="mt-2 flex items-center gap-2">
-          <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+          <div className="flex-1 h-1.5 rounded-full bg-hairline overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${pct}%` }}
@@ -189,7 +189,7 @@ function QuestRow({
               }}
             />
           </div>
-          <span className="text-[11px] text-zinc-400 tabular-nums whitespace-nowrap">
+          <span className="text-[11px] text-ink-muted tabular-nums whitespace-nowrap">
             {s.value} / {s.target}
           </span>
         </div>

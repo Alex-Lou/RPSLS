@@ -70,7 +70,7 @@ export function BracketTree({ tournament }: { tournament: TournamentState }) {
         w-full max-h-[55vh] sm:max-h-[60vh]
         overflow-auto py-3 px-2
         rounded-2xl
-        bg-zinc-950/55 border border-white/12
+        bg-surface border border-hairline
         shadow-inner shadow-black/30
       "
     >
@@ -120,7 +120,7 @@ function ChampionCol({ champion }: { champion: BracketPlayer | null }) {
 function RoundCol({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col items-center shrink-0 h-full">
-      <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-300 font-extrabold mb-1.5 shrink-0">
+      <div className="text-[10px] uppercase tracking-[0.2em] text-ink-muted font-extrabold mb-1.5 shrink-0">
         {label}
       </div>
       <div className="flex flex-col justify-around flex-1 w-full items-center">{children}</div>
@@ -149,8 +149,8 @@ function MatchCard({ match, round, idx, primary, compact, playingRef }: {
         (playing
           ? "border-amber-300/80 bg-amber-500/15 shadow-lg shadow-amber-500/30 ring-2 ring-amber-400/40"
           : done
-          ? "border-white/12 bg-zinc-900/55"
-          : "border-white/12 bg-zinc-900/40")
+          ? "border-hairline bg-zinc-900/55"
+          : "border-hairline bg-zinc-900/40")
       }
     >
       <SlotRow
@@ -160,7 +160,7 @@ function MatchCard({ match, round, idx, primary, compact, playingRef }: {
         lost={done && match.winner?.id !== match.p1?.id}
         won={done && match.winner?.id === match.p1?.id}
       />
-      <div className="h-px bg-white/10" />
+      <div className="h-px bg-hairline" />
       <SlotRow
         player={match.p2}
         compact={compact}
@@ -195,7 +195,7 @@ function GhostChip({ player, lost, compact }: { player: BracketPlayer; lost: boo
   return (
     <div className={
       w + " h-7 rounded-md flex items-center gap-1.5 overflow-hidden px-1.5 " +
-      (lost ? "opacity-30 grayscale line-through text-zinc-400" : "opacity-50 text-zinc-300")
+      (lost ? "opacity-30 grayscale line-through text-ink-muted" : "opacity-50 text-ink-muted")
     }>
       {isPhoto ? (
         <img src={player.avatar} alt="" className="shrink-0 w-5 h-5 rounded-full object-cover" />
@@ -214,12 +214,12 @@ function PlayerChip({ player, size, dimmed = false, won = false, compact = false
   const lg = size === "lg";
   const w = compact ? "w-[5.25rem]" : "w-28 sm:w-32";
   const color = dimmed
-    ? "opacity-30 grayscale line-through text-zinc-400"
+    ? "opacity-30 grayscale line-through text-ink-muted"
     : player.isYou
     ? "bg-emerald-500/30 text-emerald-100 ring-1 ring-emerald-300/60 font-bold"
     : won
     ? "bg-amber-500/25 text-amber-100 ring-1 ring-amber-400/50"
-    : "text-zinc-100";
+    : "text-ink";
   return (
     <motion.div
       layoutId={`player-${player.id}`}

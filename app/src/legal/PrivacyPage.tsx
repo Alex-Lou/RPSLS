@@ -28,29 +28,29 @@ export function PrivacyPage({ onClose }: { onClose?: () => void }) {
             <h1 className="text-2xl font-black tracking-tight text-themed">
               {c.title}
             </h1>
-            <p className="text-[11px] text-zinc-500 mt-1">{c.lastUpdated}</p>
+            <p className="text-[11px] text-ink-faint mt-1">{c.lastUpdated}</p>
           </div>
           {onClose && (
             <button
               onClick={onClose}
               aria-label="Close"
-              className="text-zinc-400 hover:text-white px-3 py-1 rounded-lg bg-white/5 hover:bg-white/10 transition text-sm"
+              className="text-ink-muted hover:text-white px-3 py-1 rounded-lg bg-hairline hover:bg-hairline transition text-sm"
             >
               ✕
             </button>
           )}
         </header>
 
-        <p className="text-sm text-zinc-300 leading-relaxed">{c.intro}</p>
+        <p className="text-sm text-ink-muted leading-relaxed">{c.intro}</p>
 
         <div className="flex flex-col gap-4">
           {c.sections.map((s) => (
             <section
               key={s.title}
-              className="rounded-2xl bg-zinc-950/55 border border-white/12 p-4"
+              className="rounded-2xl bg-surface border border-hairline p-4"
             >
-              <h2 className="text-sm font-bold text-zinc-100 mb-1.5">{s.title}</h2>
-              <p className="text-[13px] text-zinc-300 leading-relaxed">{s.body}</p>
+              <h2 className="text-sm font-bold text-ink mb-1.5">{s.title}</h2>
+              <p className="text-[13px] text-ink-muted leading-relaxed">{s.body}</p>
             </section>
           ))}
         </div>

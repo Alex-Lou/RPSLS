@@ -43,20 +43,20 @@ function CrashScreen({ error, onReset }: { error: Error; onReset: () => void }) 
   return (
     <div
       role="alert"
-      className="h-full w-full flex flex-col items-center justify-center gap-4 px-6 text-center bg-zinc-950 text-zinc-200"
+      className="h-full w-full flex flex-col items-center justify-center gap-4 px-6 text-center bg-surface-raised text-ink"
     >
       <div className="text-5xl" aria-hidden>💥</div>
       <h1 className="text-2xl font-black tracking-tight bg-gradient-to-br from-amber-300 via-fuchsia-300 to-cyan-300 bg-clip-text text-transparent">
         Something broke
       </h1>
-      <p className="text-sm text-zinc-400 max-w-sm leading-relaxed">
+      <p className="text-sm text-ink-muted max-w-sm leading-relaxed">
         The app hit an unexpected error. Your progress is safe — it's only
         the screen that crashed. Tap below to try again, or reopen the app
         if it still misbehaves.
       </p>
-      <details className="text-[11px] text-zinc-500 max-w-sm">
+      <details className="text-[11px] text-ink-faint max-w-sm">
         <summary className="cursor-pointer mb-1">Details</summary>
-        <pre className="whitespace-pre-wrap text-left bg-white/5 p-2 rounded-md font-mono">
+        <pre className="whitespace-pre-wrap text-left bg-hairline p-2 rounded-md font-mono">
           {error.message}
         </pre>
       </details>
