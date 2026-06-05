@@ -39,6 +39,57 @@ export interface TournamentState {
   phase: "select" | "running" | "complete";
 }
 
+/* ──────────── Final standings ──────────── */
+
+export interface Standing {
+  player: BracketPlayer;
+  /** 1 = champion, 2 = finalist, 3-4 = semis, … */
+  place: number;
+  /** XP placement bonus for finishing at this place. */
+  reward: number;
+}
+
+/** XP placement bonus by finishing rank. */
+function placementReward(place: number): number {
+  if (place === 1) return 250;
+  if (place === 2) return 150;
+  if (place === 3) return 90;
+  return 40;
+}
+
+/**
+ * Final standings for a completed tournament, ranked by how far each player
+ * went (champion first, then by the round they were eliminated in, tie-broken
+ * by level). Pure — derived entirely from the bracket rounds.
+ */
+export function tournamentStandings(t: TournamentState): Standing[] {
+  const players = new Map<string, BracketPlayer>();
+  (t.rounds[0] ?? []).forEach((m) => {
+    if (m.p1) players.set(m.p1.id, m.p1);
+    if (m.p2) players.set(m.p2.id, m.p2);
+  });
+  players.set(t.you.id, t.you);
+
+  // Round index where each player lost (higher = went further).
+  const lostAt = new Map<string, number>();
+  t.rounds.forEach((round, ri) => {
+    round.forEach((m) => {
+      if (m.status === "done" && m.winner) {
+        const loser = m.p1 && m.p1.id === m.winner.id ? m.p2 : m.p1;
+        if (loser) lostAt.set(loser.id, ri);
+      }
+    });
+  });
+
+  const ranked = [...players.values()].map((p) => ({
+    player: p,
+    survived: t.champion && t.champion.id === p.id ? Infinity : lostAt.get(p.id) ?? -1,
+  }));
+  ranked.sort((a, b) => b.survived - a.survived || b.player.level - a.player.level);
+
+  return ranked.map((e, i) => ({ player: e.player, place: i + 1, reward: placementReward(i + 1) }));
+}
+
 /* ──────────── Data factory ──────────── */
 
 const CPU_POOL: Omit<BracketPlayer, "id">[] = [

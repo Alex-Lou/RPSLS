@@ -67,6 +67,8 @@ interface AppState {
 
   updateProfile: (patch: Partial<Pick<Player, "nickname" | "avatar" | "themeId" | "padId" | "difficulty" | "hapticEnabled" | "hapticIntensity" | "backgroundId" | "crashReports" | "fontScale" | "customBgUrl" | "customPadUrl" | "customBgs" | "customPads" | "padChosen">>) => void;
   recordMatch: (m: MatchRecord) => void;
+  /** Grant a flat XP bonus (e.g. tournament placement reward). */
+  grantXp: (amount: number) => void;
   /** Register a competitive forfeit. Bumps the rolling abandon counter and
    *  applies the escalating extra LP penalty for repeat offenders. Returns
    *  the extra LP removed (0 for a first offence) so the UI can surface it. */
@@ -183,6 +185,9 @@ export const useStore = create<AppState>()(
             history: newHistory,
           };
         }),
+
+      grantXp: (amount) =>
+        set((s) => ({ player: { ...s.player, xp: Math.max(0, s.player.xp + Math.round(amount)) } })),
 
       recordAbandon: () => {
         const now = Date.now();

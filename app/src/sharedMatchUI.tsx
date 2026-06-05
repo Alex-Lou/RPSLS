@@ -581,7 +581,7 @@ export function CinematicMatchEnd({
 }
 
 /** Falling confetti burst — celebratory shower behind the match-end trophy. */
-function Confetti() {
+export function Confetti() {
   const pieces = useRef(
     Array.from({ length: 18 }, (_, i) => ({
       x: (i * 53) % 100,

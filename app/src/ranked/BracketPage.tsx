@@ -18,6 +18,7 @@ import {
   simulateOneCpuMatch,
 } from "./TournamentBracket";
 import { BracketTree } from "./BracketUI";
+import { TournamentPodium } from "./TournamentPodium";
 import { FloatingMatchBackButton, hapticTick } from "../sharedMatchUI";
 import { LoadingTip } from "../flavor/LoadingTip";
 
@@ -61,6 +62,11 @@ export function BracketPage({
   const eliminated = isPlayerEliminated(tournament);
   const selecting = tournament.phase === "select" || tournament.rounds.length === 0;
 
+  // Tournament over → celebratory podium takeover.
+  if (tournament.phase === "complete") {
+    return <TournamentPodium tournament={tournament} onContinue={onBack} />;
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -87,8 +93,6 @@ export function BracketPage({
         <p className="text-[11px] text-zinc-500 mt-1">
           {selecting
             ? "Choisis la taille du tableau · adversaires CPU (entraînement)"
-            : tournament.phase === "complete"
-            ? "Tournoi terminé !"
             : "En cours… · adversaires CPU"}
         </p>
       </div>
@@ -120,27 +124,7 @@ export function BracketPage({
         />
       )}
 
-      {/* Champion */}
-      {tournament.phase === "complete" && tournament.champion && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center py-4"
-        >
-          <div className="text-4xl mb-2">🎉</div>
-          <div className="text-xl font-extrabold">
-            {tournament.champion.isYou
-              ? "Tu es CHAMPION !"
-              : `${tournament.champion.name} remporte le tournoi`}
-          </div>
-          <button
-            onClick={onBack}
-            className="mt-4 px-6 py-2.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 font-semibold transition"
-          >
-            Retour au classement
-          </button>
-        </motion.div>
-      )}
+      {/* (Tournament-complete state is handled by the TournamentPodium takeover above.) */}
 
       {/* Spectator mode after elimination */}
       {!selecting && eliminated && tournament.phase === "running" && (
