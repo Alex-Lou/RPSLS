@@ -1568,7 +1568,7 @@ function MatchFacts({
 /* ─────────── Header ─────────── */
 
 function Header({
-  labelA, labelB, scoreA, scoreB, target,
+  mode, labelA, labelB, scoreA, scoreB, target,
   streakA, streakB, onQuit,
 }: {
   mode: GameMode;
@@ -1579,9 +1579,12 @@ function Header({
   const t = useT();
   const [confirmQuit, setConfirmQuit] = useState(false);
   const isMidMatch = scoreA > 0 || scoreB > 0;
+  // Classé is competitive — always confirm a quit (even at 0-0) so a stray tap
+  // can't silently forfeit. Casual/training only confirm once a match is live.
+  const ranked = mode === "ranked";
 
   const handleQuitClick = () => {
-    if (isMidMatch) setConfirmQuit(true);
+    if (isMidMatch || ranked) setConfirmQuit(true);
     else onQuit();
   };
 

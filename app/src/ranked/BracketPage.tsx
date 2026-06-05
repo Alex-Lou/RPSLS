@@ -5,7 +5,7 @@
  * "Combattre X" CTA on the player's turn → champion / spectator states.
  */
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, LayoutGroup, AnimatePresence } from "motion/react";
 import {
   type TournamentState,
@@ -37,6 +37,12 @@ export function BracketPage({
   onBack: () => void;
 }) {
   const simRef = useRef(false);
+  // Preview-then-join: a freshly built bracket is shown as a still preview; the
+  // player taps "Intégrer" to actually enter + start the CPU matches running.
+  // A resumed in-progress bracket counts as already joined.
+  const [joined, setJoined] = useState(() =>
+    tournament.rounds.some((r) => r.some((m) => m.status === "done")),
+  );
 
   const pickSize = useCallback((size: TournamentSize) => {
     hapticTick();
@@ -45,6 +51,7 @@ export function BracketPage({
 
   // Auto-simulate one CPU match every ~1.6s while it isn't the player's turn.
   useEffect(() => {
+    if (!joined) return; // hold the bracket as a preview until the player joins
     if (tournament.phase !== "running") return;
     if (simRef.current) return;
     if (findPlayerMatch(tournament)) return; // player's turn — wait for them
@@ -56,7 +63,7 @@ export function BracketPage({
       setTournament((t) => simulateOneCpuMatch(t));
     }, 1600);
     return () => { clearTimeout(id); simRef.current = false; };
-  }, [tournament, setTournament]);
+  }, [tournament, setTournament, joined]);
 
   const playerMatch = findPlayerMatch(tournament);
   const eliminated = isPlayerEliminated(tournament);
@@ -93,6 +100,8 @@ export function BracketPage({
         <p className="text-[11px] text-zinc-500 mt-1">
           {selecting
             ? "Choisis la taille du tableau · adversaires CPU (entraînement)"
+            : !joined
+            ? "Aperçu du tableau · intègre-toi pour lancer le tournoi"
             : "En cours… · adversaires CPU"}
         </p>
       </div>
@@ -115,8 +124,26 @@ export function BracketPage({
         )}
       </AnimatePresence>
 
+      {/* Intégrer — join the previewed bracket to start playing. */}
+      {!selecting && !joined && (
+        <motion.button
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => { hapticTick(); setJoined(true); }}
+          className="mx-auto px-8 py-3.5 rounded-2xl font-bold text-white shadow-lg shadow-violet-500/30 transition hover:scale-[1.02]"
+          style={{
+            background: "linear-gradient(to right, var(--theme-primary), var(--theme-secondary))",
+            fontFamily: "var(--font-headline)",
+            letterSpacing: "0.04em",
+          }}
+        >
+          🙋 Intégrer le tournoi
+        </motion.button>
+      )}
+
       {/* Player's match CTA */}
-      {!selecting && playerMatch && (
+      {!selecting && joined && playerMatch && (
         <CombatButton
           oppName={playerMatch.opp.name}
           oppAvatar={playerMatch.opp.avatar}
@@ -127,7 +154,7 @@ export function BracketPage({
       {/* (Tournament-complete state is handled by the TournamentPodium takeover above.) */}
 
       {/* Spectator mode after elimination */}
-      {!selecting && eliminated && tournament.phase === "running" && (
+      {!selecting && joined && eliminated && tournament.phase === "running" && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -147,7 +174,7 @@ export function BracketPage({
       )}
 
       {/* Waiting for CPU matches */}
-      {!selecting && !playerMatch && !eliminated && tournament.phase === "running" && (
+      {!selecting && joined && !playerMatch && !eliminated && tournament.phase === "running" && (
         <div className="flex flex-col items-center gap-2 py-2 max-w-sm mx-auto px-4">
           <div className="text-center text-[11px] text-zinc-500">
             Les matchs CPU se jouent… Patiente.

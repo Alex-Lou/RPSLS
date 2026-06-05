@@ -102,79 +102,86 @@ function losesTo(winner: Move): Move[] {
 
 type Difficulty = "easy" | "normal" | "hard";
 
+const rand = <T,>(a: T[]): T => a[Math.floor(Math.random() * a.length)];
+
+/** Player's most-frequent move in a window (ties → most recent). */
+function mostFrequent(window: Move[]): Move {
+  const counts: Record<Move, number> = { rock: 0, paper: 0, scissors: 0, lizard: 0, spock: 0 };
+  for (const m of window) counts[m]++;
+  let target: Move = window[window.length - 1];
+  for (const m of MOVES) if (counts[m] > counts[target]) target = m;
+  return target;
+}
+
 /**
- * Decide the AI's next move.
- *
- * Easy   → ~60% intentionally picks a move that loses to the player's last move;
- *           otherwise mood-weighted random.
- * Normal → mood-weighted random.
- * Hard   → ~60% counters the player's most-frequent recent move (last 5);
- *           otherwise mood-weighted random.
+ * AI strategies. Rather than ONE fixed rule per difficulty (which becomes an
+ * exploitable pattern), each round the AI rolls one strategy from a
+ * difficulty-weighted pool — so its behaviour keeps shifting and never reads as
+ * a single identifiable habit.
+ */
+type AiStrategy = "throw" | "random" | "counterLast" | "counterFreq" | "antiStreak" | "secondGuess";
+
+const STRATEGY_WEIGHTS: Record<Difficulty, Partial<Record<AiStrategy, number>>> = {
+  // Mostly plays into you, with the odd reaction so spam isn't free.
+  easy:   { throw: 7, random: 2, counterLast: 1 },
+  // Balanced + varied: no single tell dominates.
+  normal: { random: 4, counterLast: 2, counterFreq: 2, antiStreak: 1, secondGuess: 1 },
+  // Sharp + mixed (incl. mind-games) so habits get punished but stay unreadable.
+  hard:   { counterFreq: 3, secondGuess: 3, counterLast: 2, antiStreak: 2, random: 2 },
+};
+
+function pickStrategy(difficulty: Difficulty): AiStrategy {
+  const w = STRATEGY_WEIGHTS[difficulty];
+  const entries = Object.entries(w) as [AiStrategy, number][];
+  const total = entries.reduce((s, [, n]) => s + n, 0);
+  let r = Math.random() * total;
+  for (const [k, n] of entries) { r -= n; if (r <= 0) return k; }
+  return entries[entries.length - 1][0];
+}
+
+/**
+ * Decide the AI's next move by rolling a difficulty-weighted strategy, then
+ * executing it with internal randomness (counters pick randomly between the two
+ * valid options). The mix is what prevents an easily-readable pattern.
  */
 export function aiMove(
   mood: AiMood,
   difficulty: Difficulty = "normal",
   playerRecent: Move[] = []
 ): Move {
-  if (difficulty === "easy") {
-    // Easy must FEEL easy from round 1. With no history yet, throw a move
-    // that loses to a uniformly-random move (still a genuine "bad" pick),
-    // so the player isn't facing a fair mood-random CPU on the opening
-    // rounds of a short Bo3. Once history exists, throw vs the last move.
-    // 0.8 throw-rate (was 0.6) lands easy-CPU win-rate in the intended
-    // ~35-45% band instead of the old near-coinflip.
-    // Even easy reacts a little: 20% of the time it COUNTERS your most recent
-    // move so mindless spam isn't a guaranteed win — just heavily in your
-    // favour. The rest of the time it throws into you (easy to beat).
-    if (playerRecent.length > 0 && Math.random() < 0.2) {
-      const ctr = countersOf(playerRecent[playerRecent.length - 1]);
-      return ctr[Math.floor(Math.random() * ctr.length)];
-    }
-    if (Math.random() < 0.8) {
-      const ref = playerRecent.length > 0
-        ? playerRecent[playerRecent.length - 1]
-        : MOVES[Math.floor(Math.random() * MOVES.length)];
-      const dumbPicks = losesTo(ref);
-      return dumbPicks[Math.floor(Math.random() * dumbPicks.length)];
-    }
+  // No history yet → nothing to read. Easy still throws into a random ref so
+  // it feels beatable from round 1; the rest play mood-weighted random.
+  if (playerRecent.length === 0) {
+    if (difficulty === "easy" && Math.random() < 0.8) return rand(losesTo(rand(MOVES)));
     return moodPick(mood);
   }
 
-  if (difficulty === "hard" && playerRecent.length >= 1) {
-    if (Math.random() < 0.6) {
-      // Most-used move in the last 5
-      const window = playerRecent.slice(-5);
-      const counts: Record<Move, number> = {
-        rock: 0, paper: 0, scissors: 0, lizard: 0, spock: 0,
-      };
-      for (const m of window) counts[m]++;
-      let target: Move = window[window.length - 1];
-      let max = 0;
-      for (const m of MOVES) {
-        if (counts[m] > max) { max = counts[m]; target = m; }
-      }
-      const ctr = countersOf(target);
-      return ctr[Math.floor(Math.random() * ctr.length)];
-    }
-    return moodPick(mood);
-  }
+  const last = playerRecent[playerRecent.length - 1];
+  const window = playerRecent.slice(-5);
 
-  // Normal: light pattern-reading so spamming one move isn't a free win.
-  // Reacts from the FIRST prior move at 45% — counters the player's
-  // most-frequent recent move; otherwise mood-weighted random.
-  if (difficulty === "normal" && playerRecent.length >= 1) {
-    if (Math.random() < 0.45) {
-      const window = playerRecent.slice(-5);
-      const counts: Record<Move, number> = { rock: 0, paper: 0, scissors: 0, lizard: 0, spock: 0 };
-      for (const m of window) counts[m]++;
-      let target: Move = window[window.length - 1];
-      for (const m of MOVES) if (counts[m] > counts[target]) target = m;
-      const ctr = countersOf(target);
-      return ctr[Math.floor(Math.random() * ctr.length)];
+  switch (pickStrategy(difficulty)) {
+    case "throw":
+      return rand(losesTo(last)); // hand the player the win
+    case "counterLast":
+      return rand(countersOf(last));
+    case "counterFreq":
+      return rand(countersOf(mostFrequent(window)));
+    case "antiStreak": {
+      // Punish a repeated move; otherwise read the frequency.
+      const repeated = playerRecent.length >= 2 && playerRecent[playerRecent.length - 2] === last;
+      return rand(countersOf(repeated ? last : mostFrequent(window)));
     }
+    case "secondGuess": {
+      // You expect us to counter your last move, so you'd beat that counter —
+      // we play to beat YOUR counter instead (one level deeper).
+      const ourNaive = rand(countersOf(last));
+      const yourLikely = rand(countersOf(ourNaive));
+      return rand(countersOf(yourLikely));
+    }
+    case "random":
+    default:
+      return moodPick(mood);
   }
-
-  return moodPick(mood);
 }
 
 export type MatchStatus = "in_progress" | "a_won" | "b_won";
