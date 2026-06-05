@@ -53,6 +53,9 @@ function SidebarBody({
 
   return (
     <>
+      {/* Scrollable content — so a tall menu (many items / large font) never
+          pushes the language picker off-screen or under the Android nav bar. */}
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain -mr-2 pr-2">
       {/* Profile block */}
       <button
         onClick={() => handleNav("profile")}
@@ -143,8 +146,10 @@ function SidebarBody({
           );
         })}
       </nav>
+      </div>
 
-      <div className="mt-auto flex flex-col gap-2 pt-4">
+      {/* Pinned footer — language always reachable, kept above the Android nav. */}
+      <div className="shrink-0 flex flex-col gap-2 pt-3 mt-1 border-t border-white/5">
         <LanguagePicker variant="sidebar" />
         <div className="text-[10px] text-zinc-600 text-center">RPSLS · v0.1</div>
       </div>
@@ -241,7 +246,7 @@ export function MobileShell({
               className="md:hidden fixed left-0 top-0 bottom-0 z-50 w-72 max-w-[85vw] bg-zinc-950/95 backdrop-blur-md border-r border-white/10 p-4 flex flex-col"
               style={{
                 paddingTop:    "max(env(safe-area-inset-top),    32px)",
-                paddingBottom: "max(env(safe-area-inset-bottom), 40px)",
+                paddingBottom: "max(env(safe-area-inset-bottom), 56px)",
                 paddingLeft:   "max(env(safe-area-inset-left),   16px)",
               }}
             >

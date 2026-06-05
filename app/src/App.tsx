@@ -176,6 +176,18 @@ export default function App() {
           }}
         />
       )}
+      {/* Coded scenes ship their own vignette, but the flashy ones (aurora,
+          casino, grid…) can still drown menu text. A lighter top/bottom-weighted
+          wash keeps titles + nav legible while leaving the scene visible. */}
+      {stage !== "splash" && backgroundId !== "custom" && activeScene && (
+        <div
+          className="fixed inset-0 z-0 pointer-events-none"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(0,0,0,0.36) 0%, rgba(0,0,0,0.10) 22%, rgba(0,0,0,0.10) 68%, rgba(0,0,0,0.42) 100%)",
+          }}
+        />
+      )}
       {/* mode="wait" — Alex wanted the sequence to read as "splash ONLY, then
           menu ONLY", never overlapping. The splash fully exits before the
           shell mounts so the player never sees the theme bg leaking through
