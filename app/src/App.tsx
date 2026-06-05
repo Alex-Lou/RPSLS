@@ -1,8 +1,8 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store";
-import { applyTheme } from "./theme";
-import { BACKGROUNDS_BY_ID, resolveFontFamily } from "./themes";
+import { applyTheme } from "./theme/theme";
+import { BACKGROUNDS_BY_ID, resolveFontFamily } from "./theme/themes";
 import { RTL_LOCALES } from "./i18n";
 import { SplashShader } from "./SplashShader";
 import { ThemedBackdrop } from "./backdrops/ThemedBackdrop";

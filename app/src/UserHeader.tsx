@@ -3,8 +3,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store";
 import { levelFromXp } from "./leveling";
 import { rankFromLp } from "./rank";
-import { THEMES, gradientFromTheme } from "./theme";
-import { avatarImgStyle } from "./avatar";
+import { THEMES, gradientFromTheme } from "./theme/theme";
+import { avatarImgStyle } from "./theme/avatar";
 import { useT } from "./i18n";
 import type { Page } from "./Sidebar";
 

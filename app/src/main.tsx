@@ -8,7 +8,7 @@ import "./App.css";
 // Side-effect import: registers @font-face for every theme's font family
 // (Inter, Cinzel, Orbitron, …) so they're available regardless of which
 // theme is currently selected.
-import "./fonts";
+import "./theme/fonts";
 
 // Boot Sentry as early as possible — before React renders — so it catches
 // any early errors. It is a NO-OP if the user hasn't opted in OR if no

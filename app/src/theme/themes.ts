@@ -19,9 +19,9 @@
  * BattlePad.tsx and extend PadId in types.ts + PAD_META.
  */
 
-import type { BackgroundId, PadId } from "./types";
+import type { BackgroundId, PadId } from "../types";
 import { FONT_STACK, type FontStackKey } from "./fonts";
-import type { BackdropScene } from "./backdrops/ThemedBackdrop";
+import type { BackdropScene } from "../backdrops/ThemedBackdrop";
 
 export interface ThemeSkin {
   /** Display family for big titles, headlines, banners. */

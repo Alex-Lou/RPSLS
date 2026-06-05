@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store";
 import { levelFromXp } from "./leveling";
-import { THEMES, gradientFromTheme } from "./theme";
+import { THEMES, gradientFromTheme } from "./theme/theme";
 import { useT } from "./i18n";
 import { LanguagePicker } from "./LanguagePicker";
-import { avatarImgStyle } from "./avatar";
+import { avatarImgStyle } from "./theme/avatar";
 
 export type Page = "play" | "online" | "leaderboard" | "quests" | "packs" | "profile" | "history" | "about" | "contact" | "privacy";
 

@@ -28,7 +28,7 @@ import {
   REWARDS,
   type Difficulty,
 } from "../types";
-import { THEMES, gradientFromTheme } from "../theme";
+import { THEMES, gradientFromTheme } from "../theme/theme";
 import { todayDailyQuests, matchesToday, todayDateKey, type DailyChallenge, type DailyQuestDef } from "../daily";
 import { useT } from "../i18n";
 import type { Page } from "../Sidebar";

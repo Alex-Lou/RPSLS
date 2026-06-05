@@ -11,7 +11,7 @@ import { ALL_CARD_IDS, CARDS, RARITY_COLOR } from "./cards";
 import { CardImage } from "./CardImage";
 import { useT } from "../i18n";
 import { InfoBubble } from "../flavor/InfoBubble";
-import { avatarImgStyle } from "../avatar";
+import { avatarImgStyle } from "../theme/avatar";
 import { FloatingMatchBackButton } from "../sharedMatchUI";
 // Tournament state now lives in PlayPage
 

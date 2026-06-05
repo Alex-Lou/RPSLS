@@ -11,7 +11,7 @@ import { motion } from "motion/react";
 import { useStore } from "../store";
 import { useT } from "../i18n";
 import { rankFromLp } from "../rank";
-import { avatarImgStyle } from "../avatar";
+import { avatarImgStyle } from "../theme/avatar";
 import {
   leaderboardEnabled,
   fetchTop,

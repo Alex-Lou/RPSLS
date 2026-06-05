@@ -1,12 +1,12 @@
 import { useRef, useState } from "react";
 import { motion } from "motion/react";
 import { useStore } from "../store";
-import { THEMES, gradientFromTheme } from "../theme";
+import { THEMES, gradientFromTheme } from "../theme/theme";
 import { levelFromXp } from "../leveling";
 import { DIFFICULTY_META, PAD_META } from "../types";
 import type { BackgroundId, Difficulty, PadId, ThemeId } from "../types";
-import { BACKGROUNDS } from "../themes";
-import { isAvatarImage, avatarImgStyle } from "../avatar";
+import { BACKGROUNDS } from "../theme/themes";
+import { isAvatarImage, avatarImgStyle } from "../theme/avatar";
 import { MOVES } from "../game";
 import { BattlePad } from "../BattlePad";
 import { useT } from "../i18n";

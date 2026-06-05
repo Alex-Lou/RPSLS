@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { motion } from "motion/react";
 import { useT } from "../i18n";
 import { useStore } from "../store";
-import { avatarImgStyle } from "../avatar";
+import { avatarImgStyle } from "../theme/avatar";
 import { CelebrationBurst } from "../sharedMatchUI";
 import { tournamentStandings, type Standing, type TournamentState } from "./TournamentBracket";
 
