@@ -233,27 +233,49 @@ void main(){
 export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
+  // Latest scene, readable from the frame loop and the context-restore path
+  // WITHOUT re-running the GL-setup effect (which is what caused the grey
+  // screen — see the long note below).
+  const sceneRef = useRef<BackdropScene>(scene);
+  sceneRef.current = scene;
+  // Live GL handles so the scene-change effect can poke the uniform directly.
+  const glRef = useRef<WebGLRenderingContext | null>(null);
+  const uSceneRef = useRef<WebGLUniformLocation | null>(null);
 
+  // GL setup runs ONCE per mount (deps: []). It used to depend on [scene],
+  // so every theme change tore the context down (loseContext) and then
+  // re-getContext()'d the SAME <canvas> — but a canvas whose context was
+  // explicitly lost hands back a DEAD context, so all draws silently no-op
+  // and you're left staring at a grey/white rectangle. Now the context lives
+  // for the whole mount; switching scenes only updates a uniform.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const gl =
-      (canvas.getContext("webgl", { alpha: false, antialias: false, depth: false }) as WebGLRenderingContext | null) ??
-      (canvas.getContext("experimental-webgl", { alpha: false }) as WebGLRenderingContext | null);
-    if (!gl) return;
 
     const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    const MIN_DT = 1000 / 40;
+    let gl: WebGLRenderingContext | null = null;
+    let prog: WebGLProgram | null = null;
+    let buf: WebGLBuffer | null = null;
+    let vs: WebGLShader | null = null;
+    let fs: WebGLShader | null = null;
+    let uRes: WebGLUniformLocation | null = null;
+    let uTime: WebGLUniformLocation | null = null;
+    let running = false;
+    let start = performance.now();
+    let last = 0;
+
     const resize = () => {
+      if (!gl) return;
       const w = Math.floor(window.innerWidth * dpr);
       const h = Math.floor(window.innerHeight * dpr);
       if (canvas.width !== w || canvas.height !== h) {
         canvas.width = w; canvas.height = h; gl.viewport(0, 0, w, h);
       }
     };
-    resize();
-    window.addEventListener("resize", resize);
 
     const compile = (type: number, src: string) => {
+      if (!gl) return null;
       const sh = gl.createShader(type)!;
       gl.shaderSource(sh, src); gl.compileShader(sh);
       if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
@@ -263,34 +285,48 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
       }
       return sh;
     };
-    const vs = compile(gl.VERTEX_SHADER, VERT);
-    const fs = compile(gl.FRAGMENT_SHADER, FRAG);
-    if (!vs || !fs) return;
-    const prog = gl.createProgram()!;
-    gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
-    gl.useProgram(prog);
 
-    const buf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-    const aLoc = gl.getAttribLocation(prog, "a");
-    gl.enableVertexAttribArray(aLoc);
-    gl.vertexAttribPointer(aLoc, 2, gl.FLOAT, false, 0, 0);
+    // Build (or, after a context-restore, REBUILD) every GL resource bound to
+    // the live context. Returns false on any failure → CSS fallback shows.
+    const buildGL = (): boolean => {
+      gl =
+        (canvas.getContext("webgl", { alpha: false, antialias: false, depth: false }) as WebGLRenderingContext | null) ??
+        (canvas.getContext("experimental-webgl", { alpha: false }) as WebGLRenderingContext | null);
+      if (!gl) return false;
+      glRef.current = gl;
+      resize();
+      vs = compile(gl.VERTEX_SHADER, VERT);
+      fs = compile(gl.FRAGMENT_SHADER, FRAG);
+      if (!vs || !fs) return false;
+      prog = gl.createProgram()!;
+      gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return false;
+      gl.useProgram(prog);
 
-    const uRes = gl.getUniformLocation(prog, "u_res");
-    const uTime = gl.getUniformLocation(prog, "u_time");
-    const uScene = gl.getUniformLocation(prog, "u_scene");
-    gl.uniform1i(uScene, SCENE_INDEX[scene]);
+      buf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      const aLoc = gl.getAttribLocation(prog, "a");
+      gl.enableVertexAttribArray(aLoc);
+      gl.vertexAttribPointer(aLoc, 2, gl.FLOAT, false, 0, 0);
 
-    const start = performance.now();
-    let last = 0;
-    const MIN_DT = 1000 / 40;
-    let running = true;
+      uRes = gl.getUniformLocation(prog, "u_res");
+      uTime = gl.getUniformLocation(prog, "u_time");
+      const uScene = gl.getUniformLocation(prog, "u_scene");
+      uSceneRef.current = uScene;
+      gl.uniform1i(uScene, SCENE_INDEX[sceneRef.current]);
+
+      // Paint one solid backdrop-coloured frame immediately so the canvas
+      // never flashes an uninitialised (white/grey) framebuffer before the
+      // first animated tick lands.
+      gl.clearColor(0.043, 0.051, 0.071, 1); // #0b0d12
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      return true;
+    };
 
     const frame = (now: number) => {
       if (!running) return;
-      if (now - last >= MIN_DT) {
+      if (gl && !gl.isContextLost() && now - last >= MIN_DT) {
         last = now;
         gl.uniform2f(uRes, canvas.width, canvas.height);
         gl.uniform1f(uTime, (now - start) / 1000);
@@ -298,25 +334,62 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
       }
       rafRef.current = requestAnimationFrame(frame);
     };
-    rafRef.current = requestAnimationFrame(frame);
-
-    const onVis = () => {
-      if (document.hidden) { running = false; cancelAnimationFrame(rafRef.current); }
-      else if (!running) { running = true; last = 0; rafRef.current = requestAnimationFrame(frame); }
+    const startLoop = () => {
+      if (running) return;
+      running = true; last = 0;
+      rafRef.current = requestAnimationFrame(frame);
     };
-    document.addEventListener("visibilitychange", onVis);
-
-    return () => {
+    const stopLoop = () => {
       running = false;
       cancelAnimationFrame(rafRef.current);
+    };
+
+    // Context-loss recovery. preventDefault() is MANDATORY — without it the
+    // browser refuses to fire `webglcontextrestored`, so the canvas stays a
+    // dead grey/white rectangle forever. Mobile GPUs drop contexts on memory
+    // pressure / returning from background / hitting the live-context cap.
+    const onLost = (e: Event) => { e.preventDefault(); stopLoop(); };
+    const onRestored = () => {
+      if (buildGL()) { start = performance.now(); startLoop(); }
+    };
+    canvas.addEventListener("webglcontextlost", onLost as EventListener, false);
+    canvas.addEventListener("webglcontextrestored", onRestored as EventListener, false);
+    window.addEventListener("resize", resize);
+    const onVis = () => { if (document.hidden) stopLoop(); else startLoop(); };
+    document.addEventListener("visibilitychange", onVis);
+
+    if (buildGL()) startLoop();
+
+    return () => {
+      stopLoop();
       window.removeEventListener("resize", resize);
       document.removeEventListener("visibilitychange", onVis);
-      gl.deleteProgram(prog); gl.deleteBuffer(buf);
-      gl.deleteShader(vs); gl.deleteShader(fs);
-      // Explicitly drop the GL context so it can't accumulate across theme
-      // changes / remounts (mobile caps live contexts → silent crash).
-      gl.getExtension("WEBGL_lose_context")?.loseContext();
+      canvas.removeEventListener("webglcontextlost", onLost as EventListener);
+      canvas.removeEventListener("webglcontextrestored", onRestored as EventListener);
+      if (gl) {
+        gl.deleteProgram(prog); gl.deleteBuffer(buf);
+        gl.deleteShader(vs); gl.deleteShader(fs);
+        // Drop the context only on a REAL unmount (the <canvas> leaves the
+        // DOM and is discarded), never on a scene change. This keeps the
+        // anti-accumulation guard from v0.4.33 without the grey-screen
+        // regression it introduced.
+        gl.getExtension("WEBGL_lose_context")?.loseContext();
+      }
+      glRef.current = null;
+      uSceneRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Scene switch → just re-point the uniform on the live context. No teardown,
+  // no new context. If the context is currently lost, the restore path reads
+  // sceneRef and applies the right scene when it rebuilds.
+  useEffect(() => {
+    const gl = glRef.current;
+    const uScene = uSceneRef.current;
+    if (gl && uScene && !gl.isContextLost()) {
+      gl.uniform1i(uScene, SCENE_INDEX[scene]);
+    }
   }, [scene]);
 
   return (
