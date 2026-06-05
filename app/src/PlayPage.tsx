@@ -26,7 +26,6 @@ import {
   Outcome,
   REWARDS,
 } from "./types";
-import { THEMES, gradientFromTheme } from "./theme";
 import { todayDailyQuests, matchesToday, todayDateKey, type DailyChallenge, type DailyQuestDef } from "./daily";
 import { useT } from "./i18n";
 import type { Page } from "./Sidebar";
@@ -44,6 +43,7 @@ import { vibrate, hapticWin, hapticLoss, hapticTap } from "./haptic";
 
 type View =
   | { kind: "select" }
+  | { kind: "sandbox" }
   | { kind: "game"; mode: GameMode; bestOf: number; daily?: DailyChallenge; questCtx?: { title: string; reward: number } }
   | { kind: "lanes_cpu"; winTo: number }
   | { kind: "ranked_lobby" }
@@ -96,7 +96,16 @@ export function PlayPage({
             onStart={(mode, bestOf, questCtx) => setView({ kind: "game", mode, bestOf, questCtx })}
             onGoOnline={onNavigate ? () => onNavigate("online") : undefined}
             onGoConstellation={(winTo) => setView({ kind: "lanes_cpu", winTo })}
+            onGoSandbox={() => setView({ kind: "sandbox" })}
+          />
+        )}
+        {view.kind === "sandbox" && (
+          <SandboxView
+            key="sandbox"
+            onStart={(mode, bestOf) => setView({ kind: "game", mode, bestOf })}
+            onGoConstellation={(winTo) => setView({ kind: "lanes_cpu", winTo })}
             onGoRanked={() => setView({ kind: "ranked_lobby" })}
+            onBack={() => setView({ kind: "select" })}
           />
         )}
         {view.kind === "game" && (
@@ -187,12 +196,6 @@ export function PlayPage({
 // recorded matches.
 type ModeCardId = GameMode | "online" | "constellation" | "ranked_constellation";
 
-// Order: Training, Casual, Online (live), Constellation (vs CPU),
-// Constellation Ranked (cards+mana), Ranked, Hot-seat.
-const ALL_CARDS: ModeCardId[] = [
-  "training", "casual", "online", "constellation", "ranked_constellation", "ranked", "hotseat",
-];
-
 // Hand-drawn icons that replace the emoji on each mode tile. Lives in
 // public/MenuIcons (renamed to kebab-case to dodge URL-encoding traps).
 const MODE_ICONS: Record<ModeCardId, string> = {
@@ -217,20 +220,61 @@ function ModeIcon({ mode }: { mode: ModeCardId }) {
   );
 }
 
+/** One big home tile (Entraînement / En ligne) — theme-adaptive surface. */
+function ModeTile({
+  onClick, icon, title, tag, live,
+}: {
+  onClick?: () => void;
+  icon: ModeCardId;
+  title: string;
+  tag: string;
+  live?: boolean;
+}) {
+  return (
+    <motion.button
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      whileHover={{ y: -3 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={() => onClick?.()}
+      disabled={!onClick}
+      className="text-left p-3 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-2 relative overflow-hidden min-h-[150px] disabled:opacity-50 hover:brightness-110"
+      style={{
+        background: "linear-gradient(150deg, color-mix(in oklab, var(--theme-primary) 22%, transparent), color-mix(in oklab, var(--theme-secondary) 16%, transparent))",
+        border: "1px solid color-mix(in oklab, var(--theme-primary) 38%, transparent)",
+      }}
+    >
+      <ModeIcon mode={icon} />
+      <div className="min-w-0 w-full">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="font-bold text-base sm:text-lg">{title}</span>
+          {live && (
+            <span
+              className="text-[9px] uppercase tracking-wider px-1 rounded-full"
+              style={{ color: "var(--theme-secondary)", background: "color-mix(in oklab, var(--theme-primary) 25%, transparent)" }}
+            >
+              LIVE
+            </span>
+          )}
+        </div>
+        <p className="text-[11px] sm:text-xs text-zinc-300/80 mt-0.5 line-clamp-3 leading-snug">{tag}</p>
+      </div>
+    </motion.button>
+  );
+}
+
 function ModeSelect({
   onStart,
   onGoOnline,
   onGoConstellation,
-  onGoRanked,
+  onGoSandbox,
 }: {
   onStart: (mode: GameMode, bestOf: number, questCtx?: { title: string; reward: number }) => void;
   onGoOnline?: () => void;
   onGoConstellation?: (winTo: number) => void;
-  onGoRanked?: () => void;
+  onGoSandbox?: () => void;
 }) {
-  const [mode, setMode] = useState<GameMode>("casual");
-  const [bestOf, setBestOf] = useState(3);
-  const [pendingMode, setPendingMode] = useState<GameMode | null>(null);
   const t = useT();
 
   return (
@@ -267,260 +311,165 @@ function ModeSelect({
 
       <DailyChallengesPanel onStart={onStart} onGoOnline={onGoOnline} onGoConstellation={onGoConstellation} />
 
-      {/* Mode tiles — 2 columns even on mobile so the 6 tiles fit one viewport. */}
+      {/* Two prominent paths — solo sandbox + live online. */}
       <div className="grid grid-cols-2 gap-3">
-        {ALL_CARDS.map((m, i) => {
-          if (m === "online") {
-            return (
-              <motion.button
-                key="online"
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.05 * i, duration: 0.25 }}
-                whileHover={{ y: -3 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => onGoOnline?.()}
-                disabled={!onGoOnline}
-                className={
-                  "text-left p-2.5 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1.5 relative overflow-hidden min-h-[124px] " +
-                  "border-violet-400/30 bg-gradient-to-br from-violet-500/15 via-fuchsia-500/10 to-cyan-500/15 " +
-                  "hover:from-violet-500/25 hover:via-fuchsia-500/20 hover:to-cyan-500/25 hover:border-violet-400/60 " +
-                  "shadow-lg shadow-violet-500/10"
-                }
-              >
-                <ModeIcon mode="online" />
-                <div className="min-w-0 w-full">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-semibold text-sm sm:text-base">{t("mode.online")}</span>
-                    <span className="text-[9px] uppercase tracking-wider text-violet-200 bg-violet-500/25 px-1 rounded-full">
-                      LIVE
-                    </span>
-                  </div>
-                  <p className="text-[10px] sm:text-xs text-zinc-400 mt-0.5 line-clamp-2">{t("mode.online.tag")}</p>
-                </div>
-              </motion.button>
-            );
-          }
-          if (m === "constellation") {
-            return (
-              <motion.button
-                key="constellation"
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.05 * i, duration: 0.25 }}
-                whileHover={{ y: -3 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => onGoConstellation?.(2)}
-                disabled={!onGoConstellation}
-                className={
-                  "text-left p-2.5 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1.5 relative overflow-hidden min-h-[124px] " +
-                  "border-fuchsia-400/30 bg-gradient-to-br from-fuchsia-500/15 via-violet-500/10 to-amber-500/15 " +
-                  "hover:from-fuchsia-500/25 hover:via-violet-500/20 hover:to-amber-500/25 hover:border-fuchsia-400/60 " +
-                  "shadow-lg shadow-fuchsia-500/10"
-                }
-              >
-                <ModeIcon mode="constellation" />
-                <div className="min-w-0 w-full">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-semibold text-sm sm:text-base">Constellation</span>
-                    <span className="text-[9px] uppercase tracking-wider text-fuchsia-200 bg-fuchsia-500/25 px-1 rounded-full">
-                      NEW
-                    </span>
-                  </div>
-                  <p className="text-[10px] sm:text-xs text-zinc-400 mt-0.5 line-clamp-2">
-                    3 lanes en parallèle vs IA
-                  </p>
-                </div>
-              </motion.button>
-            );
-          }
-          if (m === "ranked_constellation") {
-            return (
-              <motion.button
-                key="ranked_constellation"
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.05 * i, duration: 0.25 }}
-                whileHover={{ y: -3 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => onGoRanked?.()}
-                disabled={!onGoRanked}
-                className={
-                  "text-left p-2.5 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1.5 relative overflow-hidden min-h-[124px] " +
-                  "border-amber-400/40 bg-gradient-to-br from-amber-500/15 via-rose-500/10 to-fuchsia-500/15 " +
-                  "hover:from-amber-500/25 hover:via-rose-500/20 hover:to-fuchsia-500/25 hover:border-amber-400/70 " +
-                  "shadow-lg shadow-amber-500/10"
-                }
-              >
-                <ModeIcon mode="ranked_constellation" />
-                <div className="min-w-0 w-full">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-semibold text-sm sm:text-base">{t("mode.ranked_constellation")}</span>
-                    <span className="text-[9px] uppercase tracking-wider text-amber-200 bg-amber-500/30 px-1 rounded-full">
-                      NEW · CARDS
-                    </span>
-                  </div>
-                  <p className="text-[10px] sm:text-xs text-zinc-400 mt-0.5 line-clamp-2">
-                    {t("mode.ranked_constellation.tag")}
-                  </p>
-                </div>
-              </motion.button>
-            );
-          }
-          const rewards = REWARDS[m];
-          // Hot-seat is the 7th tile and would sit alone on its row in a 2-col
-          // grid — span it across both columns so the layout stays tight.
-          const wide = m === "hotseat";
-          return (
-            <motion.button
-              key={m}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 * i, duration: 0.25 }}
-              whileHover={{ y: -3 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => { setMode(m); setPendingMode(m); }}
-              className={
-                "p-2.5 sm:p-4 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition flex flex-col gap-1.5 min-h-[124px] " +
-                // Wide tile (hot-seat) spans both columns, so left-aligning
-                // its content leaves an ugly empty right half. Center it.
-                (wide ? "col-span-2 items-center text-center justify-center" : "text-left items-start")
-              }
-            >
-              <ModeIcon mode={m} />
-              <div className={"min-w-0 w-full" + (wide ? " flex flex-col items-center" : "")}>
-                <div className={"flex items-center gap-1.5 flex-wrap" + (wide ? " justify-center" : "")}>
-                  <span className="font-semibold text-sm sm:text-base">{t("mode." + m)}</span>
-                  {rewards.lpWin > 0 && (
-                    <span className="text-[9px] uppercase tracking-wider text-rose-300 bg-rose-500/15 px-1 rounded-full">
-                      LP
-                    </span>
-                  )}
-                  {rewards.xpWin > 0 && (
-                    <span className="text-[9px] uppercase tracking-wider text-emerald-300 bg-emerald-500/15 px-1 rounded-full">
-                      XP
-                    </span>
-                  )}
-                </div>
-                <p className="text-[10px] sm:text-xs text-zinc-400 mt-0.5 line-clamp-2">{t("mode." + m + ".tag")}</p>
-              </div>
-            </motion.button>
-          );
-        })}
+        <ModeTile
+          onClick={onGoSandbox}
+          icon="training"
+          title="Entraînement"
+          tag="Solo vs IA — Classique, Couloirs ou Cartes. Difficulté & deck au choix."
+        />
+        <ModeTile
+          onClick={onGoOnline}
+          icon="online"
+          title={t("mode.online")}
+          tag={t("mode.online.tag")}
+          live
+        />
       </div>
-
-      {/* Mode confirmation modal */}
-      <AnimatePresence>
-        {pendingMode && (
-          <ModeConfirmModal
-            mode={pendingMode}
-            bestOf={bestOf}
-            onBestOfChange={setBestOf}
-            onCancel={() => setPendingMode(null)}
-            onConfirm={() => { setPendingMode(null); onStart(mode, bestOf); }}
-          />
-        )}
-      </AnimatePresence>
     </motion.div>
   );
 }
 
-/* ─────────── Mode confirmation modal ─────────── */
+/* ─────────── Entraînement — solo sandbox (mode + difficulty + deck) ─────────── */
 
-function ModeConfirmModal({
-  mode, bestOf, onBestOfChange, onCancel, onConfirm,
+type SandboxMode = "classic" | "lanes" | "cards";
+
+function SandboxView({
+  onStart, onGoConstellation, onGoRanked, onBack,
 }: {
-  mode: GameMode;
-  bestOf: number;
-  onBestOfChange: (n: number) => void;
-  onCancel: () => void;
-  onConfirm: () => void;
+  onStart: (mode: GameMode, bestOf: number) => void;
+  onGoConstellation: (winTo: number) => void;
+  onGoRanked: () => void;
+  onBack: () => void;
 }) {
   const t = useT();
-  const themeId = useStore((s) => s.player.themeId);
-  const theme = THEMES[themeId];
-  const r = REWARDS[mode];
+  const difficulty = useStore((s) => s.player.difficulty);
+  const updateProfile = useStore((s) => s.updateProfile);
+  const [mode, setMode] = useState<SandboxMode>("classic");
+  const [bestOf, setBestOf] = useState(3);
+  useAndroidBackPrompt(onBack);
+
+  const MODES: { id: SandboxMode; label: string; glyph: string; tag: string }[] = [
+    { id: "classic", label: "Classique", glyph: "✊", tag: "1 v 1 — premier à la majorité des manches" },
+    { id: "lanes",   label: "Couloirs",  glyph: "✦", tag: "3 couloirs simultanés vs IA" },
+    { id: "cards",   label: "Cartes",    glyph: "🃏", tag: "Mana, deck & cartes bonus (Constellation Ranked)" },
+  ];
+  const DIFFS = [
+    { id: "easy" as const, label: "Facile" },
+    { id: "normal" as const, label: "Normal" },
+    { id: "hard" as const, label: "Difficile" },
+  ];
+
+  function play() {
+    hapticTick();
+    if (mode === "cards") return onGoRanked();
+    if (mode === "lanes") return onGoConstellation(Math.max(2, Math.floor(bestOf / 2) + 1));
+    onStart("casual", bestOf);
+  }
+
+  const selOn = "linear-gradient(150deg, color-mix(in oklab, var(--theme-primary) 30%, transparent), color-mix(in oklab, var(--theme-secondary) 22%, transparent))";
+  const fill = "linear-gradient(to right, var(--theme-primary), var(--theme-secondary))";
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.15 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-      onClick={onCancel}
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -16 }}
+      transition={{ duration: 0.3 }}
+      className="flex flex-col gap-4 flex-1 py-2 px-1 max-w-lg mx-auto w-full overflow-y-auto"
     >
-      <motion.div
-        initial={{ scale: 0.9, y: 10 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.95, y: 5 }}
-        transition={{ type: "spring", stiffness: 320, damping: 26 }}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm bg-zinc-950 border border-white/15 rounded-3xl p-6 shadow-2xl"
-      >
-        <div className="flex items-center gap-3 mb-3">
-          <span className="text-4xl">{MODE_META[mode].emoji}</span>
-          <div>
-            <h2 className="text-xl font-bold">{t("mode." + mode)}</h2>
-            <p className="text-xs text-zinc-400">{t("mode." + mode + ".tag")}</p>
-          </div>
-        </div>
+      <FloatingMatchBackButton onClick={onBack} label={t("nav.backToPlay")} />
 
-        <div className="my-5">
-          <div className="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold mb-2">
-            {t("play.bestOf")}
-          </div>
-          <div className="flex gap-2">
-            {[1, 3, 5, 7].map((n) => (
-              <button
-                key={n}
-                onClick={() => onBestOfChange(n)}
-                className={
-                  "flex-1 px-3 py-2 rounded-xl border text-sm font-semibold transition " +
-                  (bestOf === n
-                    ? "bg-white/15 border-white/40 text-white"
-                    : "bg-white/5 border-white/10 hover:border-white/30")
-                }
-                style={
-                  bestOf === n
-                    ? { borderColor: theme.primary, color: theme.primary, background: `${theme.primary}20` }
-                    : undefined
-                }
+      <div className="text-center mt-8">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-themed leading-tight" style={{ fontFamily: "var(--font-headline)" }}>
+          Entraînement
+        </h1>
+        <p className="text-[11px] text-zinc-500 mt-1">Solo vs IA · choisis ton mode, ta difficulté{mode === "cards" ? " et ton deck" : ""}</p>
+      </div>
+
+      {/* Mode */}
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-2">Mode</div>
+        <div className="grid grid-cols-3 gap-2">
+          {MODES.map((m) => {
+            const on = mode === m.id;
+            return (
+              <motion.button
+                key={m.id}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => { hapticTick(); setMode(m.id); }}
+                className="rounded-2xl p-3 flex flex-col items-center gap-1 text-center transition"
+                style={{
+                  background: on ? selOn : "rgba(255,255,255,0.04)",
+                  border: on ? "1px solid color-mix(in oklab, var(--theme-primary) 60%, transparent)" : "1px solid rgba(255,255,255,0.10)",
+                }}
               >
-                {n}
+                <span className="text-2xl leading-none">{m.glyph}</span>
+                <span className="text-xs font-bold">{m.label}</span>
+              </motion.button>
+            );
+          })}
+        </div>
+        <p className="text-[11px] text-zinc-400 mt-1.5 text-center leading-snug">{MODES.find((m) => m.id === mode)!.tag}</p>
+      </div>
+
+      {/* Difficulty */}
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-2">Difficulté</div>
+        <div className="grid grid-cols-3 gap-2">
+          {DIFFS.map((d) => {
+            const on = difficulty === d.id;
+            return (
+              <button
+                key={d.id}
+                onClick={() => { hapticTick(); updateProfile({ difficulty: d.id }); }}
+                className={"rounded-xl py-2.5 text-sm font-bold transition " + (on ? "text-white" : "text-zinc-300 bg-white/5 border border-white/10 hover:bg-white/10")}
+                style={on ? { background: fill } : undefined}
+              >
+                {d.label}
               </button>
-            ))}
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Best-of (classic + lanes only) */}
+      {mode !== "cards" && (
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-2">Format</div>
+          <div className="grid grid-cols-2 gap-2">
+            {[3, 5].map((n) => {
+              const on = bestOf === n;
+              return (
+                <button
+                  key={n}
+                  onClick={() => { hapticTick(); setBestOf(n); }}
+                  className={"rounded-xl py-2.5 text-sm font-bold transition " + (on ? "text-white" : "text-zinc-300 bg-white/5 border border-white/10 hover:bg-white/10")}
+                  style={on ? { background: fill } : undefined}
+                >
+                  {mode === "lanes" ? `${Math.floor(n / 2) + 1} manches gagnantes` : `Best of ${n}`}
+                </button>
+              );
+            })}
           </div>
         </div>
+      )}
 
-        {(r.xpWin > 0 || r.lpWin !== 0) && (
-          <p className="text-xs text-zinc-500 mb-5">
-            {r.xpWin > 0 && t("play.win.xp", { n: r.xpWin })}
-            {r.lpWin > 0 && ` · ${t("play.win.lp", { n: r.lpWin })}`}
-            {r.lpLoss < 0 && ` · ${t("play.loss.lp", { n: r.lpLoss })}`}
-          </p>
-        )}
+      {mode === "cards" && (
+        <p className="text-[11px] text-zinc-400 text-center px-3 leading-snug">
+          Le mode Cartes ouvre le lobby Constellation Ranked : gère ton deck puis lance le tournoi (adversaires IA).
+        </p>
+      )}
 
-        <div className="flex gap-2">
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={onCancel}
-            className="flex-1 px-4 py-3 rounded-2xl font-semibold bg-white/5 hover:bg-white/10 border border-white/10"
-          >
-            {t("lab.btn.cancel")}
-          </motion.button>
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={onConfirm}
-            className="flex-1 px-4 py-3 rounded-2xl font-semibold text-white shadow-lg"
-            style={{
-              background: gradientFromTheme(theme),
-            }}
-          >
-            {t("play.start")}
-          </motion.button>
-        </div>
-      </motion.div>
+      <motion.button
+        whileTap={{ scale: 0.97 }}
+        onClick={play}
+        className="mt-1 w-full px-7 py-3.5 rounded-2xl font-bold text-white bg-themed shadow-lg shadow-violet-500/30 transition hover:scale-[1.01]"
+        style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
+      >
+        {mode === "cards" ? "Ouvrir le lobby Cartes →" : "Jouer →"}
+      </motion.button>
     </motion.div>
   );
 }
