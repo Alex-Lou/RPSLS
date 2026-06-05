@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { ATOUTS, ATOUTS_BY_ID, MAX_ATOUTS, type AtoutId } from "./ranked/atouts";
 import {
   Move,
   MOVES,
@@ -46,7 +47,7 @@ import { vibrate, hapticWin, hapticLoss, hapticTap } from "./haptic";
 type View =
   | { kind: "select" }
   | { kind: "sandbox" }
-  | { kind: "game"; mode: GameMode; bestOf: number; daily?: DailyChallenge; questCtx?: { title: string; reward: number } }
+  | { kind: "game"; mode: GameMode; bestOf: number; daily?: DailyChallenge; questCtx?: { title: string; reward: number }; atouts?: boolean }
   | { kind: "lanes_cpu"; winTo: number }
   | { kind: "ranked_lobby" }
   | { kind: "ranked_deck" }
@@ -129,6 +130,7 @@ export function PlayPage({
             bestOf={view.bestOf}
             daily={view.daily}
             questCtx={view.questCtx}
+            withAtouts={view.atouts}
             onQuit={() => setView({ kind: "select" })}
           />
         )}
@@ -204,7 +206,7 @@ export function PlayPage({
           <ClasseLobby
             key="classe-lobby"
             onBack={() => setView({ kind: "select" })}
-            onQuickMatch={() => setView({ kind: "game", mode: "ranked", bestOf: 5 })}
+            onQuickMatch={() => setView({ kind: "game", mode: "ranked", bestOf: 5, atouts: true })}
             onViewBracket={() => {
               setClasseTournament((t) =>
                 t.phase === "complete" || isPlayerEliminated(t)
@@ -229,6 +231,7 @@ export function PlayPage({
             key={`classe-match-${view.oppName}-${Date.now()}`}
             mode="ranked"
             bestOf={5}
+            withAtouts
             onQuit={() => setView({ kind: "classe_bracket" })}
             onMatchResult={(won) => {
               setClasseTournament((t) => resolvePlayerMatch(t, won));
@@ -1021,11 +1024,12 @@ function DailyChallengesPanel({
 /* ─────────── Game ─────────── */
 
 type Phase =
+  | { kind: "atout-select" }
   | { kind: "p1-pick" }
   | { kind: "pass"; p1Move: Move }
   | { kind: "p2-pick"; p1Move: Move }
   | { kind: "countdown"; aMove: Move; bMove: Move }
-  | { kind: "reveal"; round: RoundResult; matchOver: boolean }
+  | { kind: "reveal"; round: RoundResult; matchOver: boolean; atoutNote?: string }
   | { kind: "match-end" };
 
 interface Streaks {
@@ -1044,6 +1048,7 @@ function Game({
   questCtx,
   onQuit,
   onMatchResult,
+  withAtouts,
 }: {
   mode: GameMode;
   bestOf: number;
@@ -1053,6 +1058,8 @@ function Game({
   /** When set (tournament context), the end screen shows a "Suivant →" button
    *  that reports win/loss to the bracket instead of rematch/back. */
   onMatchResult?: (won: boolean) => void;
+  /** Classé 1v1 — enable the pre-match Atout picker + in-match perks. */
+  withAtouts?: boolean;
 }) {
   const recordMatch = useStore((s) => s.recordMatch);
   const recordDailyComplete = useStore((s) => s.recordDailyComplete);
@@ -1062,8 +1069,15 @@ function Game({
   const t = useT();
 
   const [match, setMatch] = useState<MatchState>(() => newMatch(bestOf));
-  const [phase, setPhase] = useState<Phase>({ kind: "p1-pick" });
+  const [phase, setPhase] = useState<Phase>(() => withAtouts ? { kind: "atout-select" } : { kind: "p1-pick" });
   const [streaks, setStreaks] = useState<Streaks>({ a: 0, b: 0, bestA: 0, bestB: 0 });
+  // Atouts (Classé 1v1): the 2 chosen perks, which are spent, and per-round state.
+  const [chosenAtouts, setChosenAtouts] = useState<AtoutId[]>([]);
+  const [usedAtouts, setUsedAtouts] = useState<AtoutId[]>([]);
+  const [vabanqueArmed, setVabanqueArmed] = useState(false);
+  const [lectureMove, setLectureMove] = useState<Move | null>(null);
+  // Upcoming CPU move, decided at round start so Lecture reveals the REAL move.
+  const cpuNextRef = useRef<Move | null>(null);
   // For daily, the mood is forced. For free play, rolled per match.
   const [mood, setMood] = useState<AiMood>(() => daily?.mood ?? rollAiMood());
   // The daily bonus only applies to the FIRST match of this Game instance.
@@ -1078,10 +1092,33 @@ function Game({
   const labelA = isHotseat ? t("match.player1") : profileNickname || t("match.you");
   const labelB = isHotseat ? t("match.player2") : t("match.cpu");
 
+  // Freeze the CPU's upcoming move at the start of each pick so Lecture reveals
+  // the move that will actually be played, and reset the per-round Atout state.
+  useEffect(() => {
+    if (phase.kind !== "p1-pick" || isHotseat) return;
+    cpuNextRef.current = aiMove(mood, difficulty, match.history.map((r) => r.move_a));
+    setLectureMove(null);
+    setVabanqueArmed(false);
+  }, [phase.kind, isHotseat, mood, difficulty, match.history]);
+
+  const useLecture = () => {
+    if (usedAtouts.includes("lecture") || isHotseat) return;
+    if (!cpuNextRef.current) cpuNextRef.current = aiMove(mood, difficulty, match.history.map((r) => r.move_a));
+    hapticTick();
+    setLectureMove(cpuNextRef.current);
+    setUsedAtouts((u) => [...u, "lecture"]);
+  };
+  const useVabanque = () => {
+    if (usedAtouts.includes("vabanque")) return;
+    hapticTick();
+    setVabanqueArmed(true);
+    setUsedAtouts((u) => [...u, "vabanque"]);
+  };
+
   const onP1Pick = (m: Move) => {
     if (!isHotseat) {
-      const playerRecent = match.history.map((r) => r.move_a);
-      setPhase({ kind: "countdown", aMove: m, bMove: aiMove(mood, difficulty, playerRecent) });
+      const bMove = cpuNextRef.current ?? aiMove(mood, difficulty, match.history.map((r) => r.move_a));
+      setPhase({ kind: "countdown", aMove: m, bMove });
     } else {
       setPhase({ kind: "pass", p1Move: m });
     }
@@ -1120,8 +1157,31 @@ function Game({
 
   const finishCountdown = async () => {
     if (phase.kind !== "countdown") return;
-    const round = await resolveRound(phase.aMove, phase.bMove);
-    const next = applyRound(match, round);
+    let round = await resolveRound(phase.aMove, phase.bMove);
+    let atoutNote: string | undefined;
+
+    // 🔁 Contre — re-roll the opponent once on a lost round (keep your move).
+    if (round.outcome.kind === "b_wins" && chosenAtouts.includes("contre") && !usedAtouts.includes("contre")) {
+      const reroll = aiMove(mood, difficulty, match.history.map((r) => r.move_a));
+      round = await resolveRound(phase.aMove, reroll);
+      setUsedAtouts((u) => [...u, "contre"]);
+      atoutNote = "🔁 Contre — nouveau tirage adverse";
+    }
+    // 🛡️ Garde — turn a still-lost round into a draw.
+    if (round.outcome.kind === "b_wins" && chosenAtouts.includes("garde") && !usedAtouts.includes("garde")) {
+      round = { ...round, outcome: { kind: "draw" } };
+      setUsedAtouts((u) => [...u, "garde"]);
+      atoutNote = "🛡️ Garde — défaite annulée";
+    }
+
+    let next = applyRound(match, round);
+    // ⚡ Va-banque — the winner of this round scores an extra point.
+    if (vabanqueArmed) {
+      if (round.outcome.kind === "a_wins") next = { ...next, scoreA: next.scoreA + 1 };
+      else if (round.outcome.kind === "b_wins") next = { ...next, scoreB: next.scoreB + 1 };
+      if (round.outcome.kind !== "draw") atoutNote = "⚡ Va-banque — manche à 2 points";
+      setVabanqueArmed(false);
+    }
     setMatch(next);
     setStreaks((s) => {
       let { a, b, bestA, bestB } = s;
@@ -1138,6 +1198,7 @@ function Game({
       kind: "reveal",
       round,
       matchOver: status(next) !== "in_progress",
+      atoutNote,
     });
   };
 
@@ -1255,6 +1316,22 @@ function Game({
     setRecorded(true);
   }, [phase, match, mode, bestOf, isHotseat, mood, streaks.bestA, isDailyActive, daily, recordMatch, recordDailyComplete, recorded]);
 
+  // Pre-match Atout picker (Classé 1v1) — choose 2 perks before the first round.
+  if (phase.kind === "atout-select") {
+    return (
+      <AtoutPicker
+        chosen={chosenAtouts}
+        onToggle={(id) =>
+          setChosenAtouts((c) =>
+            c.includes(id) ? c.filter((x) => x !== id) : c.length < MAX_ATOUTS ? [...c, id] : c,
+          )
+        }
+        onConfirm={() => setPhase({ kind: "p1-pick" })}
+        onBack={onQuit}
+      />
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -1286,6 +1363,19 @@ function Game({
         mood={!isHotseat ? mood : null}
         onQuit={handleQuit}
       />
+
+      {/* Atout bar (Classé 1v1) — manual perks usable during your pick. */}
+      {chosenAtouts.length > 0 && (
+        <AtoutBar
+          chosen={chosenAtouts}
+          used={usedAtouts}
+          canUse={phase.kind === "p1-pick"}
+          vabanqueArmed={vabanqueArmed}
+          lectureMove={lectureMove}
+          onUseLecture={useLecture}
+          onUseVabanque={useVabanque}
+        />
+      )}
 
       {/* Board: pad as canvas, takes ALL remaining vertical space */}
       <div className="relative flex-1 min-h-0 rounded-2xl sm:rounded-3xl overflow-hidden">
@@ -1356,6 +1446,7 @@ function Game({
             streakA={streaks.a}
             streakB={streaks.b}
             matchOver={phase.matchOver}
+            atoutNote={phase.atoutNote}
             onNext={advance}
           />
         )}
@@ -1867,12 +1958,12 @@ function Countdown({
 /* ─────────── Reveal ─────────── */
 
 function RevealPanel({
-  round, labelA, labelB, streakA, streakB, matchOver, onNext,
+  round, labelA, labelB, streakA, streakB, matchOver, atoutNote, onNext,
 }: {
   round: RoundResult;
   labelA: string; labelB: string;
   streakA: number; streakB: number;
-  matchOver: boolean; onNext: () => void;
+  matchOver: boolean; atoutNote?: string; onNext: () => void;
 }) {
   const t = useT();
   const { move_a, move_b, outcome } = round;
@@ -1960,6 +2051,17 @@ function RevealPanel({
           </p>
         )}
       </motion.div>
+
+      {atoutNote && (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+          className="-mt-3 text-sm font-bold text-amber-300 text-center"
+        >
+          {atoutNote}
+        </motion.div>
+      )}
 
       <motion.button
         initial={{ opacity: 0 }}
@@ -2051,6 +2153,133 @@ function ParticleBurst({ color }: { color: string }) {
           }}
         />
       ))}
+    </div>
+  );
+}
+
+/* ─────────── Atouts (Classé 1v1) ─────────── */
+
+function AtoutPicker({
+  chosen, onToggle, onConfirm, onBack,
+}: {
+  chosen: AtoutId[];
+  onToggle: (id: AtoutId) => void;
+  onConfirm: () => void;
+  onBack: () => void;
+}) {
+  const ready = chosen.length === MAX_ATOUTS;
+  const remaining = MAX_ATOUTS - chosen.length;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -16 }}
+      transition={{ duration: 0.3 }}
+      className="flex flex-col gap-4 flex-1 py-2 px-1 max-w-lg mx-auto w-full overflow-y-auto"
+    >
+      <FloatingMatchBackButton onClick={onBack} label="Retour" />
+      <div className="text-center mt-8">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-themed leading-tight" style={{ fontFamily: "var(--font-headline)" }}>
+          Choisis tes Atouts
+        </h1>
+        <p className="text-[11px] text-zinc-400 mt-1">2 atouts · chacun utilisable une fois dans le match</p>
+      </div>
+      <div className="flex flex-col gap-2">
+        {ATOUTS.map((a) => {
+          const on = chosen.includes(a.id);
+          const full = chosen.length >= MAX_ATOUTS && !on;
+          return (
+            <motion.button
+              key={a.id}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => { hapticTick(); onToggle(a.id); }}
+              disabled={full}
+              className={"text-left rounded-2xl p-3 flex items-center gap-3 transition " + (full ? "opacity-40 pointer-events-none" : "")}
+              style={{
+                background: on
+                  ? "linear-gradient(150deg, color-mix(in oklab, var(--theme-primary) 30%, transparent), color-mix(in oklab, var(--theme-secondary) 22%, transparent))"
+                  : "rgba(255,255,255,0.04)",
+                border: on
+                  ? "1px solid color-mix(in oklab, var(--theme-primary) 65%, transparent)"
+                  : "1px solid rgba(255,255,255,0.10)",
+              }}
+            >
+              <span className="text-2xl shrink-0">{a.glyph}</span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-sm">{a.label}</span>
+                  <span className="text-[9px] uppercase tracking-wider px-1 rounded-full bg-white/10 text-zinc-400">
+                    {a.kind === "manual" ? "manuel" : "auto"}
+                  </span>
+                </div>
+                <div className="text-[11px] text-zinc-400 leading-snug">{a.desc}</div>
+              </div>
+              <span className={"shrink-0 w-5 h-5 rounded-full border flex items-center justify-center text-xs " +
+                (on ? "bg-emerald-400 border-emerald-400 text-zinc-900" : "border-white/30 text-transparent")}>✓</span>
+            </motion.button>
+          );
+        })}
+      </div>
+      <motion.button
+        whileTap={{ scale: 0.97 }}
+        onClick={() => { hapticTick(); onConfirm(); }}
+        disabled={!ready}
+        className="mt-1 w-full px-7 py-3.5 rounded-2xl font-bold text-white bg-themed shadow-lg shadow-violet-500/30 transition hover:scale-[1.01] disabled:opacity-40 disabled:pointer-events-none"
+        style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
+      >
+        {ready ? "Commencer →" : `Choisis encore ${remaining} atout${remaining > 1 ? "s" : ""}`}
+      </motion.button>
+    </motion.div>
+  );
+}
+
+function AtoutBar({
+  chosen, used, canUse, vabanqueArmed, lectureMove,
+  onUseLecture, onUseVabanque,
+}: {
+  chosen: AtoutId[];
+  used: AtoutId[];
+  canUse: boolean;
+  vabanqueArmed: boolean;
+  lectureMove: Move | null;
+  onUseLecture: () => void;
+  onUseVabanque: () => void;
+}) {
+  const t = useT();
+  return (
+    <div className="shrink-0 flex flex-col gap-1">
+      <div className="flex items-center justify-center gap-2 flex-wrap">
+        {chosen.map((id) => {
+          const a = ATOUTS_BY_ID[id];
+          const isUsed = used.includes(id);
+          const manual = a.kind === "manual";
+          const active = manual && !isUsed && canUse;
+          const onClick = id === "lecture" ? onUseLecture : id === "vabanque" ? onUseVabanque : undefined;
+          return (
+            <button
+              key={id}
+              onClick={active ? onClick : undefined}
+              disabled={!active}
+              className={"flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition " +
+                (isUsed ? "opacity-35 line-through border-white/10 bg-white/5 text-zinc-400"
+                 : active ? "border-amber-400/60 bg-amber-400/15 text-amber-200 hover:bg-amber-400/25"
+                 : "border-white/15 bg-white/5 text-zinc-300")}
+            >
+              <span>{a.glyph}</span>
+              <span>{a.label}</span>
+              {!manual && !isUsed && <span className="text-[8px] uppercase tracking-wider opacity-60">auto</span>}
+            </button>
+          );
+        })}
+      </div>
+      {lectureMove && (
+        <div className="text-center text-[11px] text-amber-300 font-bold">
+          🔮 L'adversaire va jouer : {t("element." + lectureMove)}
+        </div>
+      )}
+      {vabanqueArmed && (
+        <div className="text-center text-[11px] text-amber-300 font-bold">⚡ Va-banque armé — manche à 2 points</div>
+      )}
     </div>
   );
 }
