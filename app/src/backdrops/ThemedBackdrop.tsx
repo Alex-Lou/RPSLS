@@ -117,39 +117,76 @@ vec3 aurora(vec2 uv, float aspect){
 
 // ── 2 NEON GRID — synthwave floor + horizon sun + scanlines ──
 vec3 grid(vec2 uv, float aspect){
-  vec3 col = mix(vec3(0.05,0.01,0.10), vec3(0.10,0.02,0.18), uv.y);
-  float horizon = 0.45;
-  if(uv.y < horizon){
-    float depth = (horizon - uv.y);
-    float persp = 1.0/(depth+0.05);
-    float gx = abs(fract((uv.x-0.5)*persp*2.0)-0.5);
-    float gz = abs(fract((u_time*0.25 + persp*0.5))-0.5);
-    float line = smoothstep(0.40,0.5,1.0-gx) + smoothstep(0.40,0.5,1.0-gz);
-    vec3 neon = mix(vec3(0.0,0.9,1.0), vec3(0.95,0.3,0.9), uv.x);
-    col += neon*line*0.45*depth*3.0;
+  float horizon = 0.46;
+  // Sky: indigo at the top fading to a warm magenta band at the horizon.
+  vec3 col = mix(vec3(0.05,0.01,0.12), vec3(0.22,0.04,0.26), smoothstep(1.0, horizon, uv.y));
+
+  if(uv.y > horizon){
+    // ── Upper half: synthwave sun with horizontal scan stripes ──
+    // Aspect-correct distance so the sun is a round disc.
+    vec2 q = (uv - vec2(0.5, horizon + 0.15)) * vec2(aspect, 1.0);
+    float sd = length(q);
+    float disc = smoothstep(0.175, 0.16, sd);
+    // Vertical gradient inside the sun: gold on top → magenta at the base.
+    vec3 sunCol = mix(vec3(1.0,0.86,0.32), vec3(1.0,0.22,0.55),
+                      smoothstep(horizon + 0.02, horizon + 0.30, uv.y));
+    // Horizontal stripes carve the lower part of the disc (classic synthwave).
+    float stripe = step(0.42, fract((uv.y - horizon) * 26.0));
+    float lower  = smoothstep(horizon + 0.15, horizon + 0.01, uv.y);
+    disc *= mix(1.0, stripe, lower);
+    col += sunCol * disc * 1.35;
+    // Soft glow halo around the sun.
+    col += mix(vec3(1.0,0.55,0.30), vec3(1.0,0.30,0.62), uv.x) * smoothstep(0.42, 0.0, sd) * 0.22;
+    // Sparse stars high in the sky.
+    col += softStars(uv, aspect, 0.994, vec3(0.9,0.85,1.0)) * smoothstep(horizon + 0.18, 1.0, uv.y);
   } else {
-    float d = distance(uv, vec2(0.5,horizon+0.12));
-    col += mix(vec3(1.0,0.4,0.7), vec3(1.0,0.8,0.3), uv.y)*exp(-d*d*40.0)*0.8;
-    col *= 0.85 + 0.15*smoothstep(0.45,0.55, fract(uv.y*110.0));
+    // ── Lower half: neon perspective floor grid ──
+    float depth = (horizon - uv.y);
+    float persp = 1.0 / (depth + 0.06);
+    float gx = abs(fract((uv.x - 0.5) * persp * 1.8) - 0.5);
+    float gz = abs(fract(u_time * 0.3 + persp * 0.55) - 0.5);
+    float lx = smoothstep(0.045, 0.0, gx);
+    float lz = smoothstep(0.045, 0.0, gz);
+    float line = max(lx, lz);
+    vec3 neon = mix(vec3(0.10,0.92,1.0), vec3(1.0,0.22,0.85), uv.x);
+    col += neon * line * (0.4 + depth * 2.6);
+    col += neon * 0.04 * depth;                       // faint floor ambience
   }
+  // Bright horizon line where floor meets sky.
+  col += vec3(1.0,0.55,0.9) * smoothstep(0.014, 0.0, abs(uv.y - horizon)) * 0.7;
   return col;
 }
 
-// ── 3 GALAXY — rotating spiral arms + bright core ──
+// ── 3 GALAXY — rotating spiral arms + bright core + nova bursts ──
 vec3 galaxy(vec2 uv, float aspect){
   vec2 p = (uv - 0.5) * vec2(aspect, 1.0) * 2.2;
   float r = length(p);
   float a = atan(p.y, p.x);
-  // Spiral: twist angle by radius + slow global rotation.
+  // Rotating 2-arm spiral.
   float spiral = a + r*3.2 - u_time*0.18;
-  float arms = 0.5 + 0.5*cos(spiral*2.0);            // 2 arms
-  arms *= smoothstep(1.4, 0.1, r);                   // fade outward
-  float dust = fbm(vec2(spiral*1.5, r*3.0 - u_time*0.1));
-  vec3 col = vec3(0.02,0.02,0.07);
-  col += mix(vec3(0.35,0.15,0.6), vec3(0.15,0.7,0.95), dust) * arms * 0.9;
-  // Core bloom.
-  col += vec3(1.0,0.85,0.95) * exp(-r*r*6.0) * 0.7;
-  col += vec3(0.7,0.4,1.0) * exp(-r*r*1.4) * 0.18;
+  float arms = 0.5 + 0.5*cos(spiral*2.0);
+  arms = pow(arms, 1.9);                             // sharper, higher-contrast arms
+  arms *= smoothstep(1.5, 0.05, r);                  // fade outward
+  // Dust sampled in WARPED CARTESIAN space (not raw polar) so it no longer
+  // bands into blocky seams along the angular grid — this was the "squares".
+  vec2 warp = p*2.4 + 0.6*vec2(cos(spiral), sin(spiral));
+  float dust = fbm(warp - u_time*0.05);
+  dust = dust*dust;                                  // punchier contrast
+  vec3 col = vec3(0.012,0.012,0.045);
+  col += mix(vec3(0.32,0.12,0.66), vec3(0.16,0.78,1.05), dust) * arms * 1.2;
+  // Bright core + violet halo.
+  col += vec3(1.0,0.88,0.96) * exp(-r*r*7.5) * 0.95;
+  col += vec3(0.78,0.45,1.0) * exp(-r*r*1.6) * 0.22;
+  // Nova bursts pulsing from the galactic eye — three staggered flashes that
+  // swell and fade right at the core.
+  for(int i=0;i<3;i++){
+    float fi=float(i);
+    float ph = fract(u_time*0.13 + fi*0.37);         // 0→1 burst cycle
+    float sw = sin(ph*PI);                            // smooth swell-and-fade
+    float burst = exp(-r*r*(0.6 + ph*7.0)) * sw*sw;
+    vec3 nc = mix(vec3(1.0,0.93,0.78), vec3(0.72,0.86,1.0), fi*0.5);
+    col += nc * burst * 0.9;
+  }
   col += softStars(uv, aspect, 0.990, vec3(0.9,0.92,1.0));
   return col;
 }

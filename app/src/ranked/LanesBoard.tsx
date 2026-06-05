@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { Hand } from "../icons";
+import { Hand, MoveGlyph } from "../icons";
 import type { Move } from "../game";
 import type { LaneResult } from "../online";
 import { LANE_IDENTITIES, laneFavoursMove } from "../lanesCombos";
@@ -259,6 +259,14 @@ function LaneSlot({ index, pick, favoured, verdict, cardHere, onClick, disabled 
       <div className={"flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold " + accentText}>
         <span>{identity.glyph}</span>
         <span>{title}</span>
+      </div>
+      {/* Permanent hint: the moves this lane favours. Win the lane with one of
+          them → +1 bonus. Shown as small glyphs so the rule is readable at a
+          glance, no memorising needed. */}
+      <div className="flex items-center gap-0.5 -mt-0.5 mb-0.5 opacity-60" aria-hidden title="Coups favorisés ici">
+        {identity.favours.map((mv) => (
+          <MoveGlyph key={mv} move={mv} className="w-3 h-3" />
+        ))}
       </div>
       <button
         onClick={onClick}
