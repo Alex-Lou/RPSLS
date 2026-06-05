@@ -843,7 +843,7 @@ function RiposteOverlay({
       <div className="text-2xl sm:text-3xl font-extrabold text-white mb-1 text-center">
         Rejoue la lane {LANE_LABEL[data.lane]}
       </div>
-      <div className="text-xs sm:text-sm text-zinc-400 mb-6 max-w-xs text-center">
+      <div className="text-xs sm:text-sm text-ink-muted mb-6 max-w-xs text-center">
         Gagne ce duel pour flipper la défaite en victoire.
       </div>
       {data.phase === "pick" && (
@@ -878,7 +878,7 @@ function RiposteOverlay({
                 <MoveGlyph move={data.playerMove} className="w-9 h-9" />
               </div>
             </div>
-            <div className="text-3xl font-black text-zinc-500">vs</div>
+            <div className="text-3xl font-black text-ink-faint">vs</div>
             <div className="flex flex-col items-center gap-1">
               <span className="text-[10px] uppercase tracking-wider text-rose-300">CPU</span>
               <div className={"w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br " +
@@ -891,7 +891,7 @@ function RiposteOverlay({
           <div className={
             "text-xl sm:text-2xl font-black " +
             (verdict === "win" ? "text-emerald-300" :
-             verdict === "loss" ? "text-rose-300" : "text-zinc-300")
+             verdict === "loss" ? "text-rose-300" : "text-ink-muted")
           }>
             {verdict === "win" ? "Lane flippée — victoire !"
               : verdict === "loss" ? "Riposte perdue, défaite conservée."
@@ -939,7 +939,7 @@ function SuddenDeathOverlay({
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.35, duration: 0.25 }}
-        className="text-xs sm:text-sm text-zinc-300 mb-6 max-w-xs text-center"
+        className="text-xs sm:text-sm text-ink-muted mb-6 max-w-xs text-center"
       >
         Match point des deux côtés — un seul coup décide tout.
       </motion.div>
@@ -992,7 +992,7 @@ function SuddenDeathOverlay({
               initial={{ opacity: 0, scale: 0.5 }}
               animate={{ opacity: 1, scale: [0.5, 1.3, 1] }}
               transition={{ delay: 0.15, duration: 0.35 }}
-              className="text-3xl font-black text-zinc-500"
+              className="text-3xl font-black text-ink-faint"
             >
               vs
             </motion.div>
@@ -1026,7 +1026,7 @@ function SuddenDeathOverlay({
                 ? "text-emerald-200 bg-emerald-500/15 ring-1 ring-emerald-400/40"
                 : verdict === "loss"
                 ? "text-rose-200 bg-rose-500/15 ring-1 ring-rose-400/40"
-                : "text-zinc-300")
+                : "text-ink-muted")
             }
             style={
               verdict === "win"

@@ -208,7 +208,7 @@ export function LanesMatchView({
       <button
         onClick={() => setHelpOpen(true)}
         title={t("lanes.help.button")}
-        className="absolute -top-9 right-0 z-20 w-9 h-9 rounded-full bg-black/50 backdrop-blur hover:bg-white/10 border border-white/15 text-zinc-200 hover:text-white text-sm font-bold transition flex items-center justify-center"
+        className="absolute -top-9 right-0 z-20 w-9 h-9 rounded-full bg-black/50 backdrop-blur hover:bg-hairline border border-hairline text-zinc-200 hover:text-white text-sm font-bold transition flex items-center justify-center"
       >
         ?
       </button>
@@ -234,7 +234,7 @@ export function LanesMatchView({
       <ScaleToFit className="relative">
         <div className="w-full flex flex-col items-center py-1">
         {phase === "matched" && !showSplash && (
-          <div className="text-sm text-zinc-400">{t("lanes.preparingFirstRound")}</div>
+          <div className="text-sm text-ink-muted">{t("lanes.preparingFirstRound")}</div>
         )}
         {phase === "picking" && round && (
           <PickStage
@@ -274,7 +274,7 @@ export function LanesMatchView({
       {phase !== "match_end" && (
         <button
           onClick={() => setQuitConfirmOpen(true)}
-          className="self-center px-4 py-2 rounded-xl bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-500/40 text-zinc-400 hover:text-rose-200 text-xs transition"
+          className="self-center px-4 py-2 rounded-xl bg-hairline hover:bg-rose-500/20 border border-hairline hover:border-rose-500/40 text-ink-muted hover:text-rose-200 text-xs transition"
         >
           {t("lanes.forfeitMatch")}
         </button>
@@ -362,7 +362,7 @@ function MatchFoundSplash({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.9 }}
-        className="mt-8 text-sm uppercase tracking-[0.3em] text-zinc-400 text-center px-4"
+        className="mt-8 text-sm uppercase tracking-[0.3em] text-ink-muted text-center px-4"
       >
         {t("lanes.matchFoundSub", { lanes, winTo })}
       </motion.div>
@@ -377,7 +377,7 @@ function NameTag({
   const grad = accent === "emerald" ? "from-emerald-300 to-teal-400" : "from-rose-300 to-fuchsia-400";
   return (
     <div className={"flex flex-col " + (align === "right" ? "items-end" : "items-start")}>
-      <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">
+      <div className="text-[10px] uppercase tracking-[0.3em] text-ink-faint">
         {accent === "emerald" ? t("lanes.you") : t("lanes.opponent")}
       </div>
       <div
@@ -423,7 +423,7 @@ function GameTable({
           ✦ {opponentName}
         </span>
         {oppStatus && (
-          <span className="text-[10px] uppercase tracking-wider text-zinc-500 shrink-0 ml-2">{oppStatus}</span>
+          <span className="text-[10px] uppercase tracking-wider text-ink-faint shrink-0 ml-2">{oppStatus}</span>
         )}
       </div>
 
@@ -442,7 +442,7 @@ function GameTable({
           ✦ {youName}
         </span>
         {youStatus && (
-          <span className="text-[10px] uppercase tracking-wider text-zinc-500 shrink-0 ml-2">{youStatus}</span>
+          <span className="text-[10px] uppercase tracking-wider text-ink-faint shrink-0 ml-2">{youStatus}</span>
         )}
       </div>
     </div>
@@ -458,7 +458,7 @@ function GameTable({
 function FaceDownLaneCard({ index: _index, pulsing: _pulsing = false }: { index: number; pulsing?: boolean }) {
   return (
     <div
-      className="aspect-square w-full rounded-xl border-2 border-dashed border-white/15 bg-zinc-900/80
+      className="aspect-square w-full rounded-xl border-2 border-dashed border-hairline bg-surface-2
                  flex items-center justify-center"
     >
       <span className="text-xl sm:text-2xl text-zinc-600 font-black">?</span>
@@ -517,7 +517,7 @@ function PickStage({
       />
       </div>
 
-      <div className="shrink-0 text-[10px] uppercase tracking-[0.25em] text-zinc-500 text-center px-4">
+      <div className="shrink-0 text-[10px] uppercase tracking-[0.25em] text-ink-faint text-center px-4">
         {t("lanes.pickInstruction")}
       </div>
 
@@ -534,7 +534,7 @@ function PickStage({
             transition={{ type: "spring", stiffness: 280, damping: 20 }}
             className="flex flex-col items-center gap-0.5"
           >
-            <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">
+            <div className="text-[10px] uppercase tracking-[0.3em] text-ink-faint">
               {t("lanes.potentialCombo")}
             </div>
             <div className="flex items-center gap-2">
@@ -561,7 +561,7 @@ function PickStage({
           "shrink-0 mt-1 px-7 py-3 rounded-2xl font-bold text-white transition " +
           (allFilled
             ? "bg-themed shadow-lg shadow-violet-500/30 hover:scale-[1.02]"
-            : "bg-white/5 text-zinc-500 cursor-not-allowed")
+            : "bg-hairline text-ink-faint cursor-not-allowed")
         }
       >
         {allFilled ? t("lanes.lockButton") : t("lanes.pickRemaining", { n: remaining })}
@@ -614,7 +614,7 @@ function LaneSlot({
           (favoured ? ringFav : ringIdle) + " " +
           (pick
             ? "border-emerald-400/50 bg-emerald-600/25 hover:bg-rose-500/20 hover:border-rose-400/50"
-            : "border-dashed border-white/15 bg-zinc-900/70")
+            : "border-dashed border-hairline bg-surface-2")
         }
         title={pick ? t("lanes.clearLane", { move: pick }) : hint}
       >
@@ -654,7 +654,7 @@ function LaneSlot({
           <span className="text-2xl text-zinc-700 font-black">?</span>
         )}
       </button>
-      <span className="text-[9px] text-zinc-500 text-center leading-tight hidden sm:block">
+      <span className="text-[9px] text-ink-faint text-center leading-tight hidden sm:block">
         {hint}
       </span>
     </div>
@@ -744,12 +744,12 @@ function TimerBar({ startedAt, durationMs }: { startedAt: number; durationMs: nu
           transition={{ duration: 0.25 }}
           className={
             "text-sm font-mono tabular-nums w-10 text-right font-bold " +
-            (critical || expired ? "text-rose-300" : urgent ? "text-amber-300" : "text-zinc-300")
+            (critical || expired ? "text-rose-300" : urgent ? "text-amber-300" : "text-ink-muted")
           }
         >
           {num}s
         </motion.span>
-        <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
+        <div className="flex-1 h-2 rounded-full bg-hairline overflow-hidden">
           <motion.div
             className={"h-full " + color}
             animate={{
@@ -841,7 +841,7 @@ function LockedStage({
         }
       />
       </div>
-      <div className="shrink-0 text-sm text-zinc-300 font-medium">{t("lanes.waitingOpponent")}</div>
+      <div className="shrink-0 text-sm text-ink-muted font-medium">{t("lanes.waitingOpponent")}</div>
     </motion.div>
   );
 }
@@ -854,7 +854,7 @@ function RevealCountdown() {
       animate={{ opacity: 1 }}
       className="flex flex-col items-center justify-center gap-3 px-4 text-center"
     >
-      <div className="text-[10px] uppercase tracking-[0.4em] text-zinc-500">{tCount("lanes.reveal")}</div>
+      <div className="text-[10px] uppercase tracking-[0.4em] text-ink-faint">{tCount("lanes.reveal")}</div>
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xl sm:text-3xl font-black leading-tight">
         {[tCount("online.reveal.rock"), tCount("online.reveal.paper"), tCount("online.reveal.scissors"), tCount("online.reveal.lizard"), tCount("online.reveal.spock")].map((w, i) => (
           <motion.span
@@ -1004,7 +1004,7 @@ function RevealStage({
               </div>
             )}
             {result.yourPoints === result.oppPoints && (
-              <div className="text-zinc-300 text-lg font-bold">
+              <div className="text-ink-muted text-lg font-bold">
                 {t("lanes.roundDraw", { a: result.yourPoints, b: result.oppPoints })}
               </div>
             )}
@@ -1030,7 +1030,7 @@ function RevealStage({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ delay: 0.4, duration: 0.3 }}
-            className="text-[11px] text-zinc-400 mt-1 text-center px-3"
+            className="text-[11px] text-ink-muted mt-1 text-center px-3"
           >
             {t("lanes.opponentCombo", {
               combo: `${oppCombo.glyph} ${t(`combo.${oppCombo.id}.name`)}`,
@@ -1096,7 +1096,7 @@ function ComboBanner({ combo }: { combo: ComboTheme }) {
         </motion.span>
       </div>
       <div className={"text-[11px] sm:text-xs uppercase tracking-[0.25em] text-center px-3 " +
-        (epic ? "text-amber-300/90" : rare ? "text-fuchsia-300/80" : "text-zinc-400")}>
+        (epic ? "text-amber-300/90" : rare ? "text-fuchsia-300/80" : "text-ink-muted")}>
         {tag}
       </div>
       {combo.bonus != null && combo.bonus > 0 && (
@@ -1137,7 +1137,7 @@ function SideLaneCard({
   const bg =
     isWin  ? "bg-emerald-600/25" :
     isLoss ? "bg-rose-600/25"    :
-             "bg-zinc-900/75";
+             "bg-surface-2";
 
   return (
     <motion.div
@@ -1167,7 +1167,7 @@ function SideLaneCard({
       </div>
       <span className={
         "text-[9px] uppercase tracking-wider font-bold leading-none " +
-        (isWin ? "text-emerald-300" : isLoss ? "text-rose-300" : "text-zinc-500")
+        (isWin ? "text-emerald-300" : isLoss ? "text-rose-300" : "text-ink-faint")
       }>
         {isWin
           ? (side === "you" ? t("lanes.win") : t("lanes.loss"))
@@ -1256,7 +1256,7 @@ function HelpModal({ target, onClose }: { target: number; onClose: () => void })
         exit={{ scale: 0.95, y: 6 }}
         transition={{ type: "spring", stiffness: 320, damping: 26 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md max-h-[85vh] overflow-y-auto bg-zinc-950 border border-white/15 rounded-3xl p-6 shadow-2xl"
+        className="w-full max-w-md max-h-[85vh] overflow-y-auto bg-surface-raised border border-hairline rounded-3xl p-6 shadow-2xl"
       >
         <div className="flex items-baseline justify-between mb-4">
           <h2 className="text-xl font-black tracking-tight text-themed">
@@ -1307,7 +1307,7 @@ function HelpModal({ target, onClose }: { target: number; onClose: () => void })
                       <span className="text-rose-300 font-semibold">
                         ✗ {t("lanes.help.rps.losesTo")}
                       </span>
-                      <span className="text-zinc-400 break-words">
+                      <span className="text-ink-muted break-words">
                         {t(`lanes.help.rps.${id}.losesTo`)}
                       </span>
                     </div>
@@ -1337,7 +1337,7 @@ function HelpModal({ target, onClose }: { target: number; onClose: () => void })
                   }>
                     {t(`${IDENTITY_KEYS[i]}.title`)}
                   </div>
-                  <div className="text-[10px] text-zinc-400 mt-1 leading-tight">
+                  <div className="text-[10px] text-ink-muted mt-1 leading-tight">
                     {t(`${IDENTITY_KEYS[i]}.hint`)}
                   </div>
                 </div>
@@ -1360,7 +1360,7 @@ function HelpModal({ target, onClose }: { target: number; onClose: () => void })
                     <span className="text-sm font-black uppercase tracking-wider text-zinc-50 leading-tight">
                       {t(`combo.${id}.name`)}
                     </span>
-                    <span className="text-xs text-zinc-400 leading-snug break-words">
+                    <span className="text-xs text-ink-muted leading-snug break-words">
                       {t(`combo.${id}.tag`)}
                     </span>
                   </div>
@@ -1428,7 +1428,7 @@ function Section({
       <h3 className={"text-xs uppercase tracking-[0.25em] font-bold mb-1.5 " + colour}>
         {title}
       </h3>
-      <p className="text-zinc-300 leading-relaxed text-[13px]">{body}</p>
+      <p className="text-ink-muted leading-relaxed text-[13px]">{body}</p>
       {children}
     </div>
   );

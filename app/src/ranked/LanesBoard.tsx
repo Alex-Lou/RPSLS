@@ -205,7 +205,7 @@ function FaceDownCard({ index: _index, pulsing: _pulsing, clickable = false, onC
     "aspect-[5/4] w-full rounded-xl border-2 flex items-center justify-center " +
     (clickable
       ? "border-violet-400/60 bg-violet-500/25 cursor-pointer hover:bg-violet-500/35 ring-2 ring-violet-400/40"
-      : "border-dashed border-white/15 bg-zinc-900/80");
+      : "border-dashed border-hairline bg-surface-2");
   const inner = (
     <div className={cls}>
       <span className={"text-3xl sm:text-4xl font-black " + (clickable ? "text-violet-300" : "text-zinc-600")}>
@@ -230,7 +230,7 @@ function FaceUpOppCard({ move, verdict, revealed, preReveal }: {
       initial={{ opacity: 0, scale: 0.7, rotateY: 90 }}
       animate={revealed ? { opacity: 1, scale: 1, rotateY: 0 } : { opacity: 0.3, scale: 0.85, rotateY: 90 }}
       transition={{ type: "spring", stiffness: 280, damping: 22 }}
-      className={"aspect-[5/4] w-full rounded-xl ring-2 flex items-center justify-center " + ring + " " + (preReveal ? "bg-violet-500/20" : "bg-zinc-900/75")}
+      className={"aspect-[5/4] w-full rounded-xl ring-2 flex items-center justify-center " + ring + " " + (preReveal ? "bg-violet-500/20" : "bg-surface-2")}
       style={{ transformPerspective: 800 }}
     >
       <Hand move={move} size="md" emphasis={verdict === "win" ? "winner" : verdict === "loss" ? "loser" : "default"} />
@@ -266,7 +266,7 @@ function LaneSlot({ index, pick, favoured, verdict, cardHere, onClick, disabled 
         className={
           "aspect-[5/4] w-full rounded-xl border-2 transition flex items-center justify-center relative ring-2 " +
           (verdictRing ?? (favoured ? ringFav : ringIdle)) + " " +
-          (pick ? "border-emerald-400/50 bg-emerald-600/25" : "border-dashed border-white/15 bg-zinc-900/70")
+          (pick ? "border-emerald-400/50 bg-emerald-600/25" : "border-dashed border-hairline bg-surface-2")
         }
       >
         {pick ? (

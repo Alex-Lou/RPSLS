@@ -133,7 +133,7 @@ export function RankedPickPhase({
               {targetingHint}
               <button
                 onClick={() => setSelectedCard(null)}
-                className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/15 text-[11px] font-bold"
+                className="px-2 py-0.5 rounded-full bg-hairline hover:bg-hairline text-[11px] font-bold"
               >
                 {t("ranked.cta.cancelCard")}
               </button>
@@ -189,7 +189,7 @@ export function RankedPickPhase({
           "shrink-0 mt-1 sm:mt-2 px-7 py-2.5 rounded-2xl font-bold text-white text-sm transition " +
           (allFilled
             ? "shadow-lg hover:scale-[1.02]"
-            : "bg-white/5 text-zinc-500 cursor-not-allowed")
+            : "bg-hairline text-ink-faint cursor-not-allowed")
         }
         // Theme-driven gradient: reads the active theme's CSS vars instead
         // of hardcoded violet/fuchsia/teal so the Lock button blends with
@@ -289,7 +289,7 @@ function TimerBar({ startedAt, durationMs }: { startedAt: number; durationMs: nu
         className={"text-lg sm:text-xl font-mono tabular-nums w-14 text-right font-extrabold " +
           (critical ? "text-rose-300" : urgent ? "text-amber-300" : "text-zinc-200")}
       >{num}s</motion.span>
-      <div className="flex-1 h-2.5 rounded-full bg-white/10 overflow-hidden">
+      <div className="flex-1 h-2.5 rounded-full bg-hairline overflow-hidden">
         <motion.div
           className={"h-full " + color}
           animate={{ width: `${(progress * 100).toFixed(1)}%`, opacity: critical ? [0.5, 1, 0.5] : 1 }}

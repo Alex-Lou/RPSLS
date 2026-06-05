@@ -133,7 +133,7 @@ export function RollingScore({
     rose:    "text-rose-300",
     violet:  "text-violet-300",
     amber:   "text-amber-300",
-    zinc:    "text-zinc-300",
+    zinc:    "text-ink-muted",
   };
   const sizeCls = size === "xl" ? "text-4xl sm:text-5xl"
                 : size === "lg" ? "text-3xl sm:text-4xl"
@@ -263,7 +263,7 @@ export const FloatingMatchBackButton = forwardRef<
         aria-label={label}
         title={label}
         className="
-          fixed z-30 w-11 h-11 rounded-2xl bg-black/55 backdrop-blur border border-white/15
+          fixed z-30 w-11 h-11 rounded-2xl bg-black/55 backdrop-blur border border-hairline
           flex items-center justify-center text-zinc-100 active:scale-95 transition shadow-lg
           hover:bg-black/70
           top-[max(env(safe-area-inset-top),32px)]
@@ -291,14 +291,14 @@ export const FloatingMatchBackButton = forwardRef<
               exit={{ scale: 0.95, opacity: 0 }}
               transition={{ type: "spring", stiffness: 280, damping: 22 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-sm bg-zinc-950/95 border border-white/10 rounded-3xl p-5 sm:p-6 shadow-2xl"
+              className="w-full max-w-sm bg-surface-raised border border-hairline rounded-3xl p-5 sm:p-6 shadow-2xl"
             >
               <h3 className="text-base sm:text-lg font-bold text-white mb-1.5">{confirm.title}</h3>
-              <p className="text-sm text-zinc-400 leading-relaxed mb-5">{confirm.body}</p>
+              <p className="text-sm text-ink-muted leading-relaxed mb-5">{confirm.body}</p>
               <div className="flex gap-2.5">
                 <button
                   onClick={() => setOpen(false)}
-                  className="flex-1 py-2.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 font-semibold text-sm text-zinc-200 transition active:scale-[0.97]"
+                  className="flex-1 py-2.5 rounded-2xl bg-hairline hover:bg-hairline border border-hairline font-semibold text-sm text-zinc-200 transition active:scale-[0.97]"
                 >
                   {confirm.cancelLabel ?? "Annuler"}
                 </button>
@@ -493,7 +493,7 @@ export function CinematicMatchEnd({
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.95, duration: 0.4 }}
-            className="max-w-xs sm:max-w-sm px-4 text-center text-sm text-zinc-300 leading-snug"
+            className="max-w-xs sm:max-w-sm px-4 text-center text-sm text-ink-muted leading-snug"
           >
             {phrase}
           </motion.div>
@@ -528,13 +528,13 @@ export function CinematicMatchEnd({
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 1.15, type: "spring", stiffness: 240, damping: 18 }}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-950/60 border border-white/12"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface border border-white/12"
       >
         <span className="text-lg">{tier.emoji}</span>
         <span className={"text-sm font-bold bg-gradient-to-r bg-clip-text text-transparent " + tier.gradient}>
           {tier.label}
         </span>
-        <span className="text-xs text-zinc-400 tabular-nums">{rankLp} LP</span>
+        <span className="text-xs text-ink-muted tabular-nums">{rankLp} LP</span>
       </motion.div>
 
       {/* Author quote — capped to 2 lines so a chatty Sagan quote can't
@@ -546,12 +546,12 @@ export function CinematicMatchEnd({
         className="max-w-md mx-auto px-4 text-center"
       >
         <div
-          className="text-[13px] italic text-zinc-300 leading-snug overflow-hidden"
+          className="text-[13px] italic text-ink-muted leading-snug overflow-hidden"
           style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}
         >
           « {t(`lanes.endQuote.${quoteIdx}.text`)} »
         </div>
-        <div className="text-[11px] text-zinc-500 mt-0.5 tracking-wide">
+        <div className="text-[11px] text-ink-faint mt-0.5 tracking-wide">
           {t(`lanes.endQuote.${quoteIdx}.author`)}
         </div>
       </motion.div>
@@ -572,7 +572,7 @@ export function CinematicMatchEnd({
         )}
         <button
           onClick={onBack}
-          className="flex-1 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 font-semibold text-zinc-200 transition text-sm"
+          className="flex-1 px-4 py-2.5 rounded-xl bg-hairline hover:bg-white/20 border border-hairline font-semibold text-zinc-200 transition text-sm"
         >
           {backLabel ?? t("lanes.backToMenu")}
         </button>
@@ -726,7 +726,7 @@ export function AmbientFlavor() {
           animate={{ opacity: 0.55, y: 0 }}
           exit={{ opacity: 0, y: -4 }}
           transition={{ duration: 0.4 }}
-          className="text-[10px] italic text-zinc-500 font-light tracking-wide"
+          className="text-[10px] italic text-ink-faint font-light tracking-wide"
         >
           {t(`lanes.flavor.${idx}`)}
         </motion.span>

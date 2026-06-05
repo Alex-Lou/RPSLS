@@ -138,7 +138,7 @@ export function RankedRevealPhase({
                 </div>
               )}
               {!youWonRound && !oppWonRound && (
-                <div className="text-zinc-300 text-lg font-bold">
+                <div className="text-ink-muted text-lg font-bold">
                   {t("lanes.roundDraw", { a: yourTotal, b: oppTotal })}
                 </div>
               )}
@@ -277,7 +277,7 @@ function BonusBreakdown({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
       transition={{ delay: 0.3 }}
-      className="flex flex-col items-center gap-0.5 text-[11px] text-zinc-300 mt-1"
+      className="flex flex-col items-center gap-0.5 text-[11px] text-ink-muted mt-1"
     >
       <Row
         label={t("ranked.bonus.combo")}
@@ -336,7 +336,7 @@ function Row({
         <span className={"font-mono w-6 text-right " + (you > 0 ? "text-emerald-300" : "text-zinc-600")}>
           {you > 0 ? `+${you}` : "·"}
         </span>
-        <span className="uppercase tracking-[0.2em] text-[9px] text-zinc-500 min-w-[5rem] text-center">
+        <span className="uppercase tracking-[0.2em] text-[9px] text-ink-faint min-w-[5rem] text-center">
           {label}
         </span>
         <span className={"font-mono w-6 " + (opp > 0 ? "text-rose-300" : "text-zinc-600")}>
@@ -344,7 +344,7 @@ function Row({
         </span>
       </div>
       {((you > 0 && youHint) || (opp > 0 && oppHint)) && (
-        <div className="flex items-center gap-2 text-[9px] text-zinc-500 leading-tight max-w-[22rem] text-center">
+        <div className="flex items-center gap-2 text-[9px] text-ink-faint leading-tight max-w-[22rem] text-center">
           {you > 0 && youHint && (
             <span className="text-emerald-400/80">{youHint}</span>
           )}
@@ -388,7 +388,7 @@ function CardLine({
       <span className="text-sm shrink-0 self-center">🃏</span>
       <span className="text-xs leading-snug">
         <b className={"font-bold " + (isYou ? "text-emerald-200" : "text-rose-200")}>{t(meta.nameKey)}</b>
-        <span className="text-zinc-400"> — {t(meta.descKey)}</span>
+        <span className="text-ink-muted"> — {t(meta.descKey)}</span>
       </span>
     </div>
   );
@@ -415,7 +415,7 @@ function ComboBanner({
     ? "bg-emerald-500/15 text-emerald-300 ring-emerald-400/30"
     : attribution === "opp"
     ? "bg-rose-500/15 text-rose-300 ring-rose-400/30"
-    : "bg-zinc-700/30 text-zinc-300 ring-zinc-500/30";
+    : "bg-surface-2 text-ink-muted ring-zinc-500/30";
   return (
     <motion.div
       key={combo.id + ":" + (attribution ?? "x")}
@@ -452,7 +452,7 @@ function ComboBanner({
       </div>
       <div className={
         "text-[11px] tracking-wide text-center leading-tight " +
-        (epic ? "text-amber-300/90" : rare ? "text-fuchsia-300/80" : "text-zinc-400")
+        (epic ? "text-amber-300/90" : rare ? "text-fuchsia-300/80" : "text-ink-muted")
       }>
         {tag}
       </div>

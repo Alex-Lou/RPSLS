@@ -39,13 +39,13 @@ export function QuitConfirmModal({
         exit={{ scale: 0.9, opacity: 0 }}
         transition={{ type: "spring", stiffness: 280, damping: 22 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-3xl bg-zinc-950/90 border border-white/12 p-6 shadow-2xl"
+        className="w-full max-w-sm rounded-3xl bg-surface-raised border border-white/12 p-6 shadow-2xl"
       >
         <div className="text-4xl mb-2 text-center" aria-hidden>🏳️</div>
         <h3 className="text-lg sm:text-xl font-bold text-white text-center mb-1.5">
           Quitter le match ?
         </h3>
-        <p className="text-sm text-zinc-400 leading-relaxed text-center mb-2">
+        <p className="text-sm text-ink-muted leading-relaxed text-center mb-2">
           Tu vas perdre la manche en cours. Ce sera compté comme une défaite.
         </p>
 
@@ -60,7 +60,7 @@ export function QuitConfirmModal({
         <div className="flex gap-2.5">
           <button
             onClick={onCancel}
-            className="flex-1 py-2.5 rounded-xl font-bold text-sm text-zinc-200 bg-white/8 hover:bg-white/14 border border-white/10 transition"
+            className="flex-1 py-2.5 rounded-xl font-bold text-sm text-zinc-200 bg-hairline hover:bg-hairline border border-hairline transition"
           >
             Continuer
           </button>

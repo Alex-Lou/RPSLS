@@ -176,7 +176,7 @@ export function RankedMatchView({
         <div className="w-full flex flex-col items-center py-1">
         {phase === "matched" && !showSplash && (
           <div className="flex flex-col items-center gap-3 max-w-sm px-4">
-            <div className="text-sm text-zinc-400">{t("lanes.preparingFirstRound")}</div>
+            <div className="text-sm text-ink-muted">{t("lanes.preparingFirstRound")}</div>
             <LoadingTip category="strategy" rotateMs={4000} className="justify-center text-center" />
           </div>
         )}
@@ -309,7 +309,7 @@ function MatchFoundSplash({ you, opp }: { you: string; opp: string }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.9 }}
-        className="mt-8 text-sm uppercase tracking-[0.3em] text-zinc-400 text-center px-4"
+        className="mt-8 text-sm uppercase tracking-[0.3em] text-ink-muted text-center px-4"
       >
         Best of 5 · Mana & Cartes
       </motion.div>
@@ -334,7 +334,7 @@ function NameTag({
     : "from-rose-300 to-fuchsia-400";
   return (
     <div className={"flex flex-col " + (align === "right" ? "items-end" : "items-start")}>
-      <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">
+      <div className="text-[10px] uppercase tracking-[0.3em] text-ink-faint">
         {accent === "emerald" ? t("lanes.you") : t("lanes.opponent")}
       </div>
       <div className={
@@ -355,7 +355,7 @@ function RevealCountdown() {
       animate={{ opacity: 1 }}
       className="flex flex-col items-center justify-center gap-3 px-4 text-center"
     >
-      <div className="text-[10px] uppercase tracking-[0.4em] text-zinc-500">{t("lanes.reveal")}</div>
+      <div className="text-[10px] uppercase tracking-[0.4em] text-ink-faint">{t("lanes.reveal")}</div>
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xl sm:text-3xl font-black leading-tight">
         {[t("online.reveal.rock"), t("online.reveal.paper"), t("online.reveal.scissors"), t("online.reveal.lizard"), t("online.reveal.spock")].map((w, i) => (
           <motion.span

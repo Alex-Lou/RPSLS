@@ -74,7 +74,7 @@ export function CardHand({
   const compact = useShortViewport();
   if (hand.length === 0) {
     return (
-      <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 text-center py-1">
+      <div className="text-[10px] uppercase tracking-[0.25em] text-ink-faint text-center py-1">
         {t("ranked.hand.empty")}
       </div>
     );
@@ -184,7 +184,7 @@ function CardThumb({
         transformOrigin: "bottom center",
       }}
       className={
-        "relative rounded-xl overflow-hidden transition bg-zinc-950 " +
+        "relative rounded-xl overflow-hidden transition bg-surface-raised " +
         (compact
           ? "w-[44px] h-[60px] "
           : "w-[56px] h-[76px] sm:w-[68px] sm:h-[92px] ") +
