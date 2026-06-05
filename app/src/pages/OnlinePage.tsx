@@ -1,24 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { useStore } from "./store";
-import { useT } from "./i18n";
-import { Hand, MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "./icons";
-import { QuitConfirmModal } from "./match/QuitConfirmModal";
-import { MOVES, type Move, aiMove, rollAiMood, localResolve, type AiMood } from "./game";
-import { LocalLanesGame } from "./LocalLanesGame";
+import { useStore } from "../store";
+import { useT } from "../i18n";
+import { Hand, MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "../icons";
+import { QuitConfirmModal } from "../match/QuitConfirmModal";
+import { MOVES, type Move, aiMove, rollAiMood, localResolve, type AiMood } from "../game";
+import { LocalLanesGame } from "../LocalLanesGame";
 import {
   OnlineClient,
   normalizeServerUrl,
   type ServerMessage,
   type PlayerSlot,
-} from "./online";
+} from "../online";
 import {
   LanesMatchView,
   type LanesMatchInfo,
   type LanesRoundData,
   type LanesRoundResultData,
   type LanesEndData,
-} from "./LanesMatchView";
+} from "../LanesMatchView";
 import {
   hapticTap,
   hapticLock,
@@ -28,7 +28,7 @@ import {
   hapticMatchWin,
   hapticMatchLoss,
   hapticAlert,
-} from "./haptic";
+} from "../haptic";
 
 type Phase =
   | "menu"

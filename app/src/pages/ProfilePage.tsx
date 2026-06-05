@@ -1,16 +1,16 @@
 import { useRef, useState } from "react";
 import { motion } from "motion/react";
-import { useStore } from "./store";
-import { THEMES, gradientFromTheme } from "./theme";
-import { levelFromXp } from "./leveling";
-import { DIFFICULTY_META, PAD_META } from "./types";
-import type { BackgroundId, Difficulty, PadId, ThemeId } from "./types";
-import { BACKGROUNDS } from "./themes";
-import { isAvatarImage, avatarImgStyle } from "./avatar";
-import { MOVES } from "./game";
-import { BattlePad } from "./BattlePad";
-import { useT } from "./i18n";
-import { hapticTap, hapticMatchStart } from "./haptic";
+import { useStore } from "../store";
+import { THEMES, gradientFromTheme } from "../theme";
+import { levelFromXp } from "../leveling";
+import { DIFFICULTY_META, PAD_META } from "../types";
+import type { BackgroundId, Difficulty, PadId, ThemeId } from "../types";
+import { BACKGROUNDS } from "../themes";
+import { isAvatarImage, avatarImgStyle } from "../avatar";
+import { MOVES } from "../game";
+import { BattlePad } from "../BattlePad";
+import { useT } from "../i18n";
+import { hapticTap, hapticMatchStart } from "../haptic";
 
 /** 17 themed PNG avatars under /public/Profile miniatures/.
  *  Mix of 8 dark-fantasy badge sigils and 9 cute kawaii chibis (one per

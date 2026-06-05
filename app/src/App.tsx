@@ -10,7 +10,7 @@ import { ThemeTouchFX } from "./ThemeTouchFX";
 import { Sidebar, MobileShell, type Page } from "./Sidebar";
 // PlayPage stays eagerly imported — it's the initial route after splash
 // so lazy-loading it would just add a flicker for no gain.
-import { PlayPage } from "./PlayPage";
+import { PlayPage } from "./pages/PlayPage";
 import { FloatingMatchBackButton } from "./sharedMatchUI";
 import { UserHeader } from "./UserHeader";
 import { LevelUpWatcher } from "./LevelUpOverlay";
@@ -23,16 +23,16 @@ import { initSentry, shutdownSentry } from "./monitoring/sentry";
 // bundle from ~770 kB to ~250 kB, which is what the splash actually
 // blocks on. Vite picks chunk names from the import path so the network
 // tab shows "OnlinePage-<hash>.js" rather than an anonymous blob.
-const OnlinePage   = lazy(() => import("./OnlinePage").then(m => ({ default: m.OnlinePage })));
-const ProfilePage  = lazy(() => import("./ProfilePage").then(m => ({ default: m.ProfilePage })));
-const HistoryPage  = lazy(() => import("./HistoryPage").then(m => ({ default: m.HistoryPage })));
-const QuestsPage   = lazy(() => import("./QuestsPage").then(m => ({ default: m.QuestsPage })));
-const LeaderboardPage = lazy(() => import("./LeaderboardPage").then(m => ({ default: m.LeaderboardPage })));
-const PacksPage    = lazy(() => import("./PacksPage").then(m => ({ default: m.PacksPage })));
-const AboutPage    = lazy(() => import("./AboutPage").then(m => ({ default: m.AboutPage })));
-const ContactPage  = lazy(() => import("./ContactPage").then(m => ({ default: m.ContactPage })));
+const OnlinePage   = lazy(() => import("./pages/OnlinePage").then(m => ({ default: m.OnlinePage })));
+const ProfilePage  = lazy(() => import("./pages/ProfilePage").then(m => ({ default: m.ProfilePage })));
+const HistoryPage  = lazy(() => import("./pages/HistoryPage").then(m => ({ default: m.HistoryPage })));
+const QuestsPage   = lazy(() => import("./pages/QuestsPage").then(m => ({ default: m.QuestsPage })));
+const LeaderboardPage = lazy(() => import("./pages/LeaderboardPage").then(m => ({ default: m.LeaderboardPage })));
+const PacksPage    = lazy(() => import("./pages/PacksPage").then(m => ({ default: m.PacksPage })));
+const AboutPage    = lazy(() => import("./pages/AboutPage").then(m => ({ default: m.AboutPage })));
+const ContactPage  = lazy(() => import("./pages/ContactPage").then(m => ({ default: m.ContactPage })));
 const PrivacyPage  = lazy(() => import("./legal/PrivacyPage").then(m => ({ default: m.PrivacyPage })));
-const Welcome      = lazy(() => import("./Welcome").then(m => ({ default: m.Welcome })));
+const Welcome      = lazy(() => import("./pages/Welcome").then(m => ({ default: m.Welcome })));
 
 type Stage = "splash" | "welcome" | "shell";
 

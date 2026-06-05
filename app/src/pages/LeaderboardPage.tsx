@@ -8,16 +8,16 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { useStore } from "./store";
-import { useT } from "./i18n";
-import { rankFromLp } from "./rank";
-import { avatarImgStyle } from "./avatar";
+import { useStore } from "../store";
+import { useT } from "../i18n";
+import { rankFromLp } from "../rank";
+import { avatarImgStyle } from "../avatar";
 import {
   leaderboardEnabled,
   fetchTop,
   fetchMyRank,
   type LeaderboardEntry,
-} from "./leaderboard";
+} from "../leaderboard";
 
 export function LeaderboardPage() {
   const t = useT();

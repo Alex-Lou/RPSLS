@@ -1,5 +1,5 @@
 import { motion } from "motion/react";
-import { useT } from "./i18n";
+import { useT } from "../i18n";
 
 interface Section {
   icon: string;

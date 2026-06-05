@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { useStore } from "./store";
-import { MODE_META } from "./types";
-import type { MatchRecord, RecordMode, Outcome } from "./types";
-import { MOVE_META, AI_MOOD_META } from "./game";
-import { useT } from "./i18n";
+import { useStore } from "../store";
+import { MODE_META } from "../types";
+import type { MatchRecord, RecordMode, Outcome } from "../types";
+import { MOVE_META, AI_MOOD_META } from "../game";
+import { useT } from "../i18n";
 
 const FILTERS: Array<{ id: "all" | RecordMode; label: string }> = [
   { id: "all",           label: "All" },

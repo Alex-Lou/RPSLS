@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { motion } from "motion/react";
-import { randomNickname, useStore } from "./store";
-import { useT } from "./i18n";
-import { LanguagePicker } from "./LanguagePicker";
+import { randomNickname, useStore } from "../store";
+import { useT } from "../i18n";
+import { LanguagePicker } from "../LanguagePicker";
 
 export function Welcome({ onDone }: { onDone: () => void }) {
   const updateProfile = useStore((s) => s.updateProfile);

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ATOUTS, ATOUTS_BY_ID, MAX_ATOUTS, type AtoutId } from "./ranked/atouts";
+import { ATOUTS, ATOUTS_BY_ID, MAX_ATOUTS, type AtoutId } from "../ranked/atouts";
 import {
   Move,
   MOVES,
@@ -15,10 +15,10 @@ import {
   AI_MOOD_META,
   aiMove,
   rollAiMood,
-} from "./game";
-import { Hand, MysteryHand, MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "./icons";
-import { BattlePad } from "./BattlePad";
-import { useStore } from "./store";
+} from "../game";
+import { Hand, MysteryHand, MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "../icons";
+import { BattlePad } from "../BattlePad";
+import { useStore } from "../store";
 import {
   GameMode,
   MatchRecord,
@@ -27,22 +27,22 @@ import {
   Outcome,
   REWARDS,
   type Difficulty,
-} from "./types";
-import { THEMES, gradientFromTheme } from "./theme";
-import { todayDailyQuests, matchesToday, todayDateKey, type DailyChallenge, type DailyQuestDef } from "./daily";
-import { useT } from "./i18n";
-import type { Page } from "./Sidebar";
-import { UserHeader } from "./UserHeader";
-import { LocalLanesGame } from "./LocalLanesGame";
-import { QuitConfirmModal } from "./match/QuitConfirmModal";
-import { RankedGame } from "./ranked/RankedGame";
-import { RankedLobby } from "./ranked/RankedLobby";
-import { initialTournament, resolvePlayerMatch, isPlayerEliminated, type TournamentState } from "./ranked/TournamentBracket";
-import { BracketPage } from "./ranked/BracketPage";
-import { DeckManager } from "./ranked/DeckManager";
-import { levelFromXp } from "./leveling";
-import { CinematicMatchEnd, AmbientFlavor, MatchScoreBar, FloatingMatchBackButton, hapticTick, PickShock, useAndroidBackPrompt } from "./sharedMatchUI";
-import { vibrate, hapticWin, hapticLoss, hapticTap } from "./haptic";
+} from "../types";
+import { THEMES, gradientFromTheme } from "../theme";
+import { todayDailyQuests, matchesToday, todayDateKey, type DailyChallenge, type DailyQuestDef } from "../daily";
+import { useT } from "../i18n";
+import type { Page } from "../Sidebar";
+import { UserHeader } from "../UserHeader";
+import { LocalLanesGame } from "../LocalLanesGame";
+import { QuitConfirmModal } from "../match/QuitConfirmModal";
+import { RankedGame } from "../ranked/RankedGame";
+import { RankedLobby } from "../ranked/RankedLobby";
+import { initialTournament, resolvePlayerMatch, isPlayerEliminated, type TournamentState } from "../ranked/TournamentBracket";
+import { BracketPage } from "../ranked/BracketPage";
+import { DeckManager } from "../ranked/DeckManager";
+import { levelFromXp } from "../leveling";
+import { CinematicMatchEnd, AmbientFlavor, MatchScoreBar, FloatingMatchBackButton, hapticTick, PickShock, useAndroidBackPrompt } from "../sharedMatchUI";
+import { vibrate, hapticWin, hapticLoss, hapticTap } from "../haptic";
 
 type View =
   | { kind: "select" }

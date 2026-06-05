@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { useStore } from "./store";
-import { useT } from "./i18n";
-import { THEMES, gradientFromTheme } from "./theme";
+import { useStore } from "../store";
+import { useT } from "../i18n";
+import { THEMES, gradientFromTheme } from "../theme";
 import {
   PACKS,
   Pack,
@@ -10,7 +10,7 @@ import {
   randomMoveInPack,
   resolveInPack,
   verbKeyForPair,
-} from "./packs";
+} from "../packs";
 
 type View = { kind: "list" } | { kind: "play"; pack: Pack };
 
