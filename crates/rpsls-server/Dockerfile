@@ -3,6 +3,15 @@ FROM rust:1.85-bookworm AS builder
 
 WORKDIR /app
 
+# Build tools for reqwest's TLS backend. Cargo.lock resolves rustls → *ring*,
+# whose build needs a C compiler + perl to assemble its crypto; cmake/clang/
+# pkg-config are harmless insurance for any other crypto path. The C compiler
+# ships with the rust image; the rest we add here. (Builder image is discarded,
+# so this doesn't bloat the runtime.) Without these the release build exits 1.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends perl make pkg-config cmake clang libclang-dev \
+ && rm -rf /var/lib/apt/lists/*
+
 # Build only the server + its core dependency. We create a minimal workspace
 # Cargo.toml on the fly to avoid pulling in the Tauri app crate (which has
 # OS-specific native deps that won't build on a Linux server image).
