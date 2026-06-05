@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { useStore } from "../store";
+import { useStore } from "../store/store";
 import { rankFromLp } from "../rank";
 import { levelFromXp } from "../leveling";
 import { ALL_CARD_IDS, CARDS, RARITY_COLOR } from "./cards";

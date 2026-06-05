@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import { motion } from "motion/react";
-import { useStore } from "../store";
+import { useStore } from "../store/store";
 import { ALL_CARD_IDS, CARDS, RARITY_COLOR } from "./cards";
 import { CardImage } from "./CardImage";
 import type { CardId } from "./rankedTypes";

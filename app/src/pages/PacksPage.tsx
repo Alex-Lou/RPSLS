@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { useStore } from "../store";
+import { useStore } from "../store/store";
 import { useT } from "../i18n";
 import { THEMES, gradientFromTheme } from "../theme/theme";
 import {

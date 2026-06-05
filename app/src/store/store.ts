@@ -1,12 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Move } from "./game";
-import type { MatchRecord, PadId, Player, ThemeId } from "./types";
-import type { Locale } from "./i18n";
-import { todayDateKey } from "./daily";
+import type { Move } from "../game";
+import type { MatchRecord, PadId, Player, ThemeId } from "../types";
+import type { Locale } from "../i18n";
+import { todayDateKey } from "../daily";
 import { sanitisePersisted } from "./storeMigrationGuard";
-import { abandonPenaltyLp, activeAbandonCount, nextAbandon } from "./match/forfeit";
-import { nextStreak, streakBonusXp } from "./match/streak";
+import { abandonPenaltyLp, activeAbandonCount, nextAbandon } from "../match/forfeit";
+import { nextStreak, streakBonusXp } from "../match/streak";
 
 const emptyByMove = () => ({
   rock:     { picked: 0, won: 0 },

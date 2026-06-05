@@ -18,7 +18,7 @@ import { hapticAlert, hapticTap } from "./haptic";
 import { useT } from "./i18n";
 import { MatchScoreBar, hapticTick, PickShock, CinematicMatchEnd, useAndroidBackPrompt, ScaleToFit, FloatingMatchBackButton } from "./sharedMatchUI";
 import { QuitConfirmModal } from "./match/QuitConfirmModal";
-import { useStore } from "./store";
+import { useStore } from "./store/store";
 import type { LanePlay, LaneResult, PlayerSlot } from "./online";
 import {
   detectOutcomeCombo,

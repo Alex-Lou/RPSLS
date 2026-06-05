@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { useStore } from "./store";
+import { useStore } from "./store/store";
 import { LOCALES, LOCALE_LIST, type Locale } from "./i18n";
 
 interface Props {

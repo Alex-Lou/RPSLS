@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { useStore } from "../store";
+import { useStore } from "../store/store";
 import { useT } from "../i18n";
 import { Hand, MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "../icons";
 import { QuitConfirmModal } from "../match/QuitConfirmModal";

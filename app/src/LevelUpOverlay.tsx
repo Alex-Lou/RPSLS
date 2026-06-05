@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { useStore } from "./store";
+import { useStore } from "./store/store";
 import { levelFromXp } from "./leveling";
 import { useT } from "./i18n";
 import { hapticMatchWin } from "./haptic";

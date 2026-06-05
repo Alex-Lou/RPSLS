@@ -3,7 +3,7 @@
  * Toutes les chaînes traduisibles passent par t(key).
  */
 
-import { useStore } from "../store";
+import { useStore } from "../store/store";
 
 export type Locale =
   | "en" | "fr" | "es" | "de" | "it"

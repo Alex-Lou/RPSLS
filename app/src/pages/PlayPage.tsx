@@ -18,7 +18,7 @@ import {
 } from "../game";
 import { Hand, MysteryHand, MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "../icons";
 import { BattlePad } from "../BattlePad";
-import { useStore } from "../store";
+import { useStore } from "../store/store";
 import {
   GameMode,
   MatchRecord,

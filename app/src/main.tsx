@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { AppErrorBoundary } from "./monitoring/ErrorBoundary";
 import { initSentry } from "./monitoring/sentry";
-import { useStore } from "./store";
+import { useStore } from "./store/store";
 import "./App.css";
 // Side-effect import: registers @font-face for every theme's font family
 // (Inter, Cinzel, Orbitron, …) so they're available regardless of which

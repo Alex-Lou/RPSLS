@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { useStore } from "./store";
+import { useStore } from "./store/store";
 import { applyTheme } from "./theme/theme";
 import { BACKGROUNDS_BY_ID, resolveFontFamily } from "./theme/themes";
 import { RTL_LOCALES } from "./i18n";

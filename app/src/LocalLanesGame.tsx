@@ -14,7 +14,7 @@ import {
   type LanesEndData,
 } from "./LanesMatchView";
 import { type AiMood, type Move } from "./game";
-import { useStore } from "./store";
+import { useStore } from "./store/store";
 import {
   battleStatus,
   cpuLanesPicks,

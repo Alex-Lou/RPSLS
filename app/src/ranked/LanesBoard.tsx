@@ -13,7 +13,7 @@ import { CardSlot } from "./CardSlot";
 import { OppHandIndicator } from "./OppHandIndicator";
 import type { LaneTarget, PlayedCard } from "./rankedTypes";
 import { useT } from "../i18n";
-import { useStore } from "../store";
+import { useStore } from "../store/store";
 import { BattlePad } from "../BattlePad";
 
 const IDENTITY_KEYS = [

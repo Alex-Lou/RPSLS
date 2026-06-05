@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { useT } from "../i18n";
-import { useStore } from "../store";
+import { useStore } from "../store/store";
 import { THEMES, gradientFromTheme } from "../theme/theme";
 
 const RECIPIENT = "alex.guennad@gmail.com";

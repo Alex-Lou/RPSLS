@@ -13,7 +13,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import type { AiMood, Move } from "../game";
-import { useStore } from "../store";
+import { useStore } from "../store/store";
 import {
   resolveLanesRound,
   rpslsBeats,

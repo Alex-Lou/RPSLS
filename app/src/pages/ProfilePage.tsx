@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { motion } from "motion/react";
-import { useStore } from "../store";
+import { useStore } from "../store/store";
 import { THEMES, gradientFromTheme } from "../theme/theme";
 import { levelFromXp } from "../leveling";
 import { DIFFICULTY_META, PAD_META } from "../types";

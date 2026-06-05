@@ -1,5 +1,5 @@
 import { motion } from "motion/react";
-import { useStore } from "../store";
+import { useStore } from "../store/store";
 import { activeAbandonCount, abandonPenaltyLp } from "./forfeit";
 
 /**

@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { PadId } from "./types";
-import { useStore } from "./store";
+import { useStore } from "./store/store";
 import { W, H } from "./battlepads/dims";
 import { ChalkboardPad } from "./battlepads/ChalkboardPad";
 import { VintagePad } from "./battlepads/VintagePad";

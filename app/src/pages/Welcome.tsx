@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "motion/react";
-import { randomNickname, useStore } from "../store";
+import { randomNickname, useStore } from "../store/store";
 import { useT } from "../i18n";
 import { LanguagePicker } from "../LanguagePicker";
 
