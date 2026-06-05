@@ -25,6 +25,7 @@ import {
   Opponent,
   Outcome,
   REWARDS,
+  type Difficulty,
 } from "./types";
 import { THEMES, gradientFromTheme } from "./theme";
 import { todayDailyQuests, matchesToday, todayDateKey, type DailyChallenge, type DailyQuestDef } from "./daily";
@@ -447,6 +448,21 @@ function ModeSelect({
 
 type SandboxMode = "classic" | "lanes" | "cards";
 
+// Same icons + names as the main menu tiles, so the sandbox feels consistent.
+const SANDBOX_MODES: { id: SandboxMode; icon: ModeCardId; label: string; tag: string }[] = [
+  { id: "classic", icon: "ranked",               label: "Classique",            tag: "Duel 1 v 1 — premier à la majorité des manches." },
+  { id: "lanes",   icon: "constellation",        label: "Constellation",        tag: "3 couloirs joués en parallèle contre l'IA." },
+  { id: "cards",   icon: "ranked_constellation", label: "Constellation Ranked", tag: "Mana, deck & cartes bonus. Ouvre le lobby + tournoi." },
+];
+
+const DIFFS_META: { id: Difficulty; label: string; hint: string }[] = [
+  { id: "easy",   label: "Facile",    hint: "L'IA joue souvent dans ton jeu — pour s'échauffer." },
+  { id: "normal", label: "Normal",    hint: "Aléatoire pondéré selon l'humeur — combat équitable." },
+  { id: "hard",   label: "Difficile", hint: "L'IA lit tes derniers coups et contre tes habitudes." },
+];
+
+const MAX_WIN_TO = 9;
+
 function SandboxView({
   onStart, onGoConstellation, onGoRanked, onBack,
 }: {
@@ -458,28 +474,32 @@ function SandboxView({
   const difficulty = useStore((s) => s.player.difficulty);
   const updateProfile = useStore((s) => s.updateProfile);
   const [mode, setMode] = useState<SandboxMode>("classic");
-  const [bestOf, setBestOf] = useState(3);
+  const [winTo, setWinTo] = useState(2); // rounds to win
   useAndroidBackPrompt(onBack);
-
-  const MODES: { id: SandboxMode; label: string; glyph: string; tag: string }[] = [
-    { id: "classic", label: "Classique", glyph: "✊", tag: "1 v 1 — premier à la majorité des manches" },
-    { id: "lanes",   label: "Couloirs",  glyph: "✦", tag: "3 couloirs simultanés vs IA" },
-    { id: "cards",   label: "Cartes",    glyph: "🃏", tag: "Mana, deck & cartes bonus (Constellation Ranked)" },
-  ];
-  const DIFFS = [
-    { id: "easy" as const, label: "Facile" },
-    { id: "normal" as const, label: "Normal" },
-    { id: "hard" as const, label: "Difficile" },
-  ];
 
   function play() {
     hapticTick();
     if (mode === "cards") return onGoRanked();
-    if (mode === "lanes") return onGoConstellation(Math.max(2, Math.floor(bestOf / 2) + 1));
-    onStart("casual", bestOf);
+    if (mode === "lanes") return onGoConstellation(winTo);
+    onStart("casual", winTo * 2 - 1);
+  }
+  function surprise() {
+    hapticTick();
+    const ms: SandboxMode[] = ["classic", "lanes", "cards"];
+    const ds: Difficulty[] = ["easy", "normal", "hard"];
+    setMode(ms[Math.floor(Math.random() * ms.length)]);
+    updateProfile({ difficulty: ds[Math.floor(Math.random() * ds.length)] });
+    setWinTo(1 + Math.floor(Math.random() * 6));
   }
 
-  const selOn = "linear-gradient(150deg, color-mix(in oklab, var(--theme-primary) 30%, transparent), color-mix(in oklab, var(--theme-secondary) 22%, transparent))";
+  const cur = SANDBOX_MODES.find((m) => m.id === mode)!;
+  const curDiff = DIFFS_META.find((d) => d.id === difficulty) ?? DIFFS_META[1];
+  const recap =
+    mode === "cards"
+      ? cur.label + " · " + curDiff.label + " · tournoi"
+      : cur.label + " · " + curDiff.label + " · premier à " + winTo;
+
+  const selOn = "linear-gradient(150deg, color-mix(in oklab, var(--theme-primary) 32%, transparent), color-mix(in oklab, var(--theme-secondary) 24%, transparent))";
   const fill = "linear-gradient(to right, var(--theme-primary), var(--theme-secondary))";
 
   return (
@@ -488,48 +508,55 @@ function SandboxView({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -16 }}
       transition={{ duration: 0.3 }}
-      className="flex flex-col gap-4 flex-1 py-2 px-1 max-w-lg mx-auto w-full overflow-y-auto"
+      className="flex flex-col gap-5 flex-1 py-2 px-1 max-w-lg mx-auto w-full overflow-y-auto"
     >
       <FloatingMatchBackButton onClick={onBack} label="Retour" />
 
-      <div className="text-center mt-8">
+      <div className="text-center mt-8 relative">
         <h1 className="text-2xl sm:text-3xl font-extrabold text-themed leading-tight" style={{ fontFamily: "var(--font-headline)" }}>
           Entraînement
         </h1>
-        <p className="text-[11px] text-zinc-500 mt-1">Solo vs IA · choisis ton mode, ta difficulté{mode === "cards" ? " et ton deck" : ""}</p>
+        <p className="text-[11px] text-zinc-500 mt-1">Solo vs IA — règle ta partie comme tu veux</p>
+        <button
+          onClick={surprise}
+          className="absolute right-0 top-0 text-xs font-semibold px-2.5 py-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition"
+          title="Config aléatoire"
+        >
+          🎲 Aléatoire
+        </button>
       </div>
 
-      {/* Mode */}
+      {/* Mode — same icons/names as the home menu */}
       <div>
-        <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-2">Mode</div>
+        <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-400 font-bold mb-2">Type de jeu</div>
         <div className="grid grid-cols-3 gap-2">
-          {MODES.map((m) => {
+          {SANDBOX_MODES.map((m) => {
             const on = mode === m.id;
             return (
               <motion.button
                 key={m.id}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => { hapticTick(); setMode(m.id); }}
-                className="rounded-2xl p-3 flex flex-col items-center gap-1 text-center transition"
+                className="rounded-2xl p-3 flex flex-col items-center gap-1.5 text-center transition min-h-[104px] justify-center"
                 style={{
                   background: on ? selOn : "rgba(255,255,255,0.04)",
-                  border: on ? "1px solid color-mix(in oklab, var(--theme-primary) 60%, transparent)" : "1px solid rgba(255,255,255,0.10)",
+                  border: on ? "1px solid color-mix(in oklab, var(--theme-primary) 65%, transparent)" : "1px solid rgba(255,255,255,0.10)",
                 }}
               >
-                <span className="text-2xl leading-none">{m.glyph}</span>
-                <span className="text-xs font-bold">{m.label}</span>
+                <ModeIcon mode={m.icon} />
+                <span className={"text-[11px] font-bold leading-tight " + (on ? "text-white" : "text-zinc-300")}>{m.label}</span>
               </motion.button>
             );
           })}
         </div>
-        <p className="text-[11px] text-zinc-400 mt-1.5 text-center leading-snug">{MODES.find((m) => m.id === mode)!.tag}</p>
+        <p className="text-[11px] text-zinc-400 mt-2 text-center leading-snug min-h-[2.2em]">{cur.tag}</p>
       </div>
 
-      {/* Difficulty */}
+      {/* Difficulty + live hint */}
       <div>
-        <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-2">Difficulté</div>
+        <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-400 font-bold mb-2">Difficulté</div>
         <div className="grid grid-cols-3 gap-2">
-          {DIFFS.map((d) => {
+          {DIFFS_META.map((d) => {
             const on = difficulty === d.id;
             return (
               <button
@@ -543,44 +570,50 @@ function SandboxView({
             );
           })}
         </div>
+        <p className="text-[11px] text-zinc-400 mt-2 text-center leading-snug min-h-[2.2em]">{curDiff.hint}</p>
       </div>
 
-      {/* Format (classic + lanes only) */}
+      {/* Rounds — pick as many as you want (stepper) */}
       {mode !== "cards" && (
         <div>
-          <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-2">Format</div>
-          <div className="grid grid-cols-2 gap-2">
-            {[3, 5].map((n) => {
-              const on = bestOf === n;
-              return (
-                <button
-                  key={n}
-                  onClick={() => { hapticTick(); setBestOf(n); }}
-                  className={"rounded-xl py-2.5 text-sm font-bold transition " + (on ? "text-white" : "text-zinc-300 bg-white/5 border border-white/10 hover:bg-white/10")}
-                  style={on ? { background: fill } : undefined}
-                >
-                  {mode === "lanes" ? (Math.floor(n / 2) + 1) + " manches gagnantes" : "Best of " + n}
-                </button>
-              );
-            })}
+          <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-400 font-bold mb-2">Manches</div>
+          <div className="flex items-center justify-center gap-5">
+            <button
+              onClick={() => { hapticTick(); setWinTo((w) => Math.max(1, w - 1)); }}
+              disabled={winTo <= 1}
+              className="w-12 h-12 rounded-full text-2xl font-black bg-white/8 border border-white/15 hover:bg-white/15 transition disabled:opacity-30 disabled:pointer-events-none"
+            >−</button>
+            <div className="text-center min-w-[6rem]">
+              <div className="text-4xl font-black text-themed tabular-nums leading-none">{winTo}</div>
+              <div className="text-[10px] text-zinc-500 mt-1">{mode === "lanes" ? "couloirs à gagner" : "manches à gagner"}</div>
+            </div>
+            <button
+              onClick={() => { hapticTick(); setWinTo((w) => Math.min(MAX_WIN_TO, w + 1)); }}
+              disabled={winTo >= MAX_WIN_TO}
+              className="w-12 h-12 rounded-full text-2xl font-black bg-white/8 border border-white/15 hover:bg-white/15 transition disabled:opacity-30 disabled:pointer-events-none"
+            >+</button>
           </div>
+          <p className="text-[11px] text-zinc-400 text-center mt-2">
+            Premier à <b className="text-zinc-200">{winTo}</b> {winTo > 1 ? "victoires" : "victoire"} l'emporte
+            {mode !== "lanes" ? " · Best of " + (winTo * 2 - 1) : ""}
+          </p>
         </div>
       )}
 
-      {mode === "cards" && (
-        <p className="text-[11px] text-zinc-400 text-center px-3 leading-snug">
-          Le mode Cartes ouvre le lobby Constellation Ranked : gère ton deck puis lance le tournoi (adversaires IA).
-        </p>
-      )}
-
-      <motion.button
-        whileTap={{ scale: 0.97 }}
-        onClick={play}
-        className="mt-1 w-full px-7 py-3.5 rounded-2xl font-bold text-white bg-themed shadow-lg shadow-violet-500/30 transition hover:scale-[1.01]"
-        style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
-      >
-        {mode === "cards" ? "Ouvrir le lobby Cartes →" : "Jouer →"}
-      </motion.button>
+      {/* Recap + Play */}
+      <div className="mt-auto pt-1">
+        <div className="text-center text-[11px] text-zinc-400 mb-2">
+          <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10">{recap}</span>
+        </div>
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={play}
+          className="w-full px-7 py-3.5 rounded-2xl font-bold text-white bg-themed shadow-lg shadow-violet-500/30 transition hover:scale-[1.01]"
+          style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
+        >
+          {mode === "cards" ? "Ouvrir le lobby Cartes →" : "Jouer →"}
+        </motion.button>
+      </div>
     </motion.div>
   );
 }
