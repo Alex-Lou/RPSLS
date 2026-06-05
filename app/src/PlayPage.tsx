@@ -329,7 +329,7 @@ function ModeSelect({
           {t("play.title")}
         </h1>
         <p
-          className="mt-1.5 sm:mt-2.5 text-zinc-200 text-xs sm:text-sm leading-snug tracking-[0.18em] uppercase"
+          className="mt-1.5 sm:mt-2.5 text-ink text-xs sm:text-sm leading-snug tracking-[0.18em] uppercase"
           style={{ fontFamily: "var(--font-body)", textShadow: "0 1px 6px rgba(0,0,0,0.7)" }}
         >
           {t("splash.tagline")}
@@ -367,7 +367,7 @@ function ModeSelect({
                       LIVE
                     </span>
                   </div>
-                  <p className="text-[10px] sm:text-xs text-zinc-400 mt-0.5 line-clamp-2">{t("mode.online.tag")}</p>
+                  <p className="text-[10px] sm:text-xs text-ink-muted mt-0.5 line-clamp-2">{t("mode.online.tag")}</p>
                 </div>
               </motion.button>
             );
@@ -398,7 +398,7 @@ function ModeSelect({
                       NEW
                     </span>
                   </div>
-                  <p className="text-[10px] sm:text-xs text-zinc-400 mt-0.5 line-clamp-2">
+                  <p className="text-[10px] sm:text-xs text-ink-muted mt-0.5 line-clamp-2">
                     3 lanes en parallèle vs IA
                   </p>
                 </div>
@@ -431,7 +431,7 @@ function ModeSelect({
                       NEW · CARDS
                     </span>
                   </div>
-                  <p className="text-[10px] sm:text-xs text-zinc-400 mt-0.5 line-clamp-2">
+                  <p className="text-[10px] sm:text-xs text-ink-muted mt-0.5 line-clamp-2">
                     {t("mode.ranked_constellation.tag")}
                   </p>
                 </div>
@@ -458,7 +458,7 @@ function ModeSelect({
                 setMode(m); setPendingMode(m);
               }}
               className={
-                "p-2.5 sm:p-4 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition flex flex-col gap-1.5 min-h-[124px] " +
+                "p-2.5 sm:p-4 rounded-2xl border border-hairline bg-hairline hover:bg-hairline hover:border-white/20 transition flex flex-col gap-1.5 min-h-[124px] " +
                 // Wide tile (hot-seat) spans both columns, so left-aligning
                 // its content leaves an ugly empty right half. Center it.
                 (wide ? "col-span-2 items-center text-center justify-center" : "text-left items-start")
@@ -479,7 +479,7 @@ function ModeSelect({
                     </span>
                   )}
                 </div>
-                <p className="text-[10px] sm:text-xs text-zinc-400 mt-0.5 line-clamp-2">{t("mode." + m + ".tag")}</p>
+                <p className="text-[10px] sm:text-xs text-ink-muted mt-0.5 line-clamp-2">{t("mode." + m + ".tag")}</p>
               </div>
             </motion.button>
           );
@@ -574,7 +574,7 @@ function SandboxView({
       <div className="flex justify-end mt-8 -mb-2">
         <button
           onClick={surprise}
-          className="text-xs font-semibold px-2.5 py-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition"
+          className="text-xs font-semibold px-2.5 py-1.5 rounded-full bg-hairline border border-hairline hover:bg-hairline transition"
           title="Config aléatoire"
         >
           🎲 Aléatoire
@@ -584,12 +584,12 @@ function SandboxView({
         <h1 className="text-2xl sm:text-3xl font-extrabold text-themed leading-tight" style={{ fontFamily: "var(--font-headline)" }}>
           Entraînement
         </h1>
-        <p className="text-[11px] text-zinc-500 mt-1">Solo vs IA — règle ta partie comme tu veux</p>
+        <p className="text-[11px] text-ink-faint mt-1">Solo vs IA — règle ta partie comme tu veux</p>
       </div>
 
       {/* Mode — same icons/names as the home menu */}
       <div>
-        <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-400 font-bold mb-2">Type de jeu</div>
+        <div className="text-[10px] uppercase tracking-[0.2em] text-ink-muted font-bold mb-2">Type de jeu</div>
         <div className="grid grid-cols-3 gap-2">
           {SANDBOX_MODES.map((m) => {
             const on = mode === m.id;
@@ -605,17 +605,17 @@ function SandboxView({
                 }}
               >
                 <ModeIcon mode={m.icon} />
-                <span className={"text-[11px] font-bold leading-tight " + (on ? "text-white" : "text-zinc-300")}>{m.label}</span>
+                <span className={"text-[11px] font-bold leading-tight " + (on ? "text-white" : "text-ink-muted")}>{m.label}</span>
               </motion.button>
             );
           })}
         </div>
-        <p className="text-[11px] text-zinc-400 mt-2 text-center leading-snug min-h-[2.2em]">{cur.tag}</p>
+        <p className="text-[11px] text-ink-muted mt-2 text-center leading-snug min-h-[2.2em]">{cur.tag}</p>
       </div>
 
       {/* Difficulty + live hint */}
       <div>
-        <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-400 font-bold mb-2">Difficulté</div>
+        <div className="text-[10px] uppercase tracking-[0.2em] text-ink-muted font-bold mb-2">Difficulté</div>
         <div className="grid grid-cols-3 gap-2">
           {DIFFS_META.map((d) => {
             const on = difficulty === d.id;
@@ -623,7 +623,7 @@ function SandboxView({
               <button
                 key={d.id}
                 onClick={() => { hapticTick(); updateProfile({ difficulty: d.id }); }}
-                className={"rounded-xl py-2.5 text-sm font-bold transition " + (on ? "text-white" : "text-zinc-300 bg-white/5 border border-white/10 hover:bg-white/10")}
+                className={"rounded-xl py-2.5 text-sm font-bold transition " + (on ? "text-white" : "text-ink-muted bg-hairline border border-hairline hover:bg-hairline")}
                 style={on ? { background: fill } : undefined}
               >
                 {d.label}
@@ -631,31 +631,31 @@ function SandboxView({
             );
           })}
         </div>
-        <p className="text-[11px] text-zinc-400 mt-2 text-center leading-snug min-h-[2.2em]">{curDiff.hint}</p>
+        <p className="text-[11px] text-ink-muted mt-2 text-center leading-snug min-h-[2.2em]">{curDiff.hint}</p>
       </div>
 
       {/* Rounds — pick as many as you want (stepper) */}
       {mode !== "cards" && (
         <div>
-          <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-400 font-bold mb-2">Manches</div>
+          <div className="text-[10px] uppercase tracking-[0.2em] text-ink-muted font-bold mb-2">Manches</div>
           <div className="flex items-center justify-center gap-5">
             <button
               onClick={() => { hapticTick(); setWinTo((w) => Math.max(1, w - 1)); }}
               disabled={winTo <= 1}
-              className="w-12 h-12 rounded-full text-2xl font-black bg-white/8 border border-white/15 hover:bg-white/15 transition disabled:opacity-30 disabled:pointer-events-none"
+              className="w-12 h-12 rounded-full text-2xl font-black bg-hairline border border-hairline hover:bg-hairline transition disabled:opacity-30 disabled:pointer-events-none"
             >−</button>
             <div className="text-center min-w-[6rem]">
               <div className="text-4xl font-black text-themed tabular-nums leading-none">{winTo}</div>
-              <div className="text-[10px] text-zinc-500 mt-1">{mode === "lanes" ? "couloirs à gagner" : "manches à gagner"}</div>
+              <div className="text-[10px] text-ink-faint mt-1">{mode === "lanes" ? "couloirs à gagner" : "manches à gagner"}</div>
             </div>
             <button
               onClick={() => { hapticTick(); setWinTo((w) => Math.min(MAX_WIN_TO, w + 1)); }}
               disabled={winTo >= MAX_WIN_TO}
-              className="w-12 h-12 rounded-full text-2xl font-black bg-white/8 border border-white/15 hover:bg-white/15 transition disabled:opacity-30 disabled:pointer-events-none"
+              className="w-12 h-12 rounded-full text-2xl font-black bg-hairline border border-hairline hover:bg-hairline transition disabled:opacity-30 disabled:pointer-events-none"
             >+</button>
           </div>
-          <p className="text-[11px] text-zinc-400 text-center mt-2">
-            Premier à <b className="text-zinc-200">{winTo}</b> {winTo > 1 ? "victoires" : "victoire"} l'emporte
+          <p className="text-[11px] text-ink-muted text-center mt-2">
+            Premier à <b className="text-ink">{winTo}</b> {winTo > 1 ? "victoires" : "victoire"} l'emporte
             {mode !== "lanes" ? " · Best of " + (winTo * 2 - 1) : ""}
           </p>
         </div>
@@ -663,8 +663,8 @@ function SandboxView({
 
       {/* Recap + Play */}
       <div className="mt-auto pt-1">
-        <div className="text-center text-[11px] text-zinc-400 mb-2">
-          <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10">{recap}</span>
+        <div className="text-center text-[11px] text-ink-muted mb-2">
+          <span className="px-3 py-1 rounded-full bg-hairline border border-hairline">{recap}</span>
         </div>
         <motion.button
           whileTap={{ scale: 0.97 }}
@@ -704,7 +704,7 @@ function ClasseLobby({
         <h1 className="text-2xl sm:text-3xl font-extrabold text-themed leading-tight" style={{ fontFamily: "var(--font-headline)" }}>
           Classé
         </h1>
-        <p className="text-[11px] text-zinc-500 mt-1">Duel 1 v 1 classique vs IA · gagne de l'XP</p>
+        <p className="text-[11px] text-ink-faint mt-1">Duel 1 v 1 classique vs IA · gagne de l'XP</p>
       </div>
 
       <motion.button
@@ -722,7 +722,7 @@ function ClasseLobby({
             <div className="font-bold text-base">Match rapide</div>
             <div className="text-[11px] text-zinc-300/80">Un duel immédiat contre l'IA (Best of 5).</div>
           </div>
-          <span className="ml-auto text-xl text-zinc-300">→</span>
+          <span className="ml-auto text-xl text-ink-muted">→</span>
         </div>
       </motion.button>
 
@@ -744,7 +744,7 @@ function ClasseLobby({
             </div>
             <div className="text-[11px] text-zinc-300/80">Gravis un tableau d'adversaires IA jusqu'au podium.</div>
           </div>
-          <span className="ml-auto text-xl text-zinc-300">→</span>
+          <span className="ml-auto text-xl text-ink-muted">→</span>
         </div>
       </motion.button>
     </motion.div>
@@ -782,18 +782,18 @@ function ModeConfirmModal({
         exit={{ scale: 0.95, y: 5 }}
         transition={{ type: "spring", stiffness: 320, damping: 26 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm bg-zinc-950 border border-white/15 rounded-3xl p-6 shadow-2xl"
+        className="w-full max-w-sm bg-surface-raised border border-hairline rounded-3xl p-6 shadow-2xl"
       >
         <div className="flex items-center gap-3 mb-3">
           <span className="text-4xl">{MODE_META[mode].emoji}</span>
           <div>
             <h2 className="text-xl font-bold">{t("mode." + mode)}</h2>
-            <p className="text-xs text-zinc-400">{t("mode." + mode + ".tag")}</p>
+            <p className="text-xs text-ink-muted">{t("mode." + mode + ".tag")}</p>
           </div>
         </div>
 
         <div className="my-5">
-          <div className="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold mb-2">
+          <div className="text-[10px] uppercase tracking-wider text-ink-muted font-semibold mb-2">
             {t("play.bestOf")}
           </div>
           <div className="flex gap-2">
@@ -804,8 +804,8 @@ function ModeConfirmModal({
                 className={
                   "flex-1 px-3 py-2 rounded-xl border text-sm font-semibold transition " +
                   (bestOf === n
-                    ? "bg-white/15 border-white/40 text-white"
-                    : "bg-white/5 border-white/10 hover:border-white/30")
+                    ? "bg-hairline border-white/40 text-white"
+                    : "bg-hairline border-hairline hover:border-white/30")
                 }
                 style={
                   bestOf === n
@@ -820,7 +820,7 @@ function ModeConfirmModal({
         </div>
 
         {(r.xpWin > 0 || r.lpWin !== 0) && (
-          <p className="text-xs text-zinc-500 mb-5">
+          <p className="text-xs text-ink-faint mb-5">
             {r.xpWin > 0 && t("play.win.xp", { n: r.xpWin })}
             {r.lpWin > 0 && ` · ${t("play.win.lp", { n: r.lpWin })}`}
             {r.lpLoss < 0 && ` · ${t("play.loss.lp", { n: r.lpLoss })}`}
@@ -831,7 +831,7 @@ function ModeConfirmModal({
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={onCancel}
-            className="flex-1 px-4 py-3 rounded-2xl font-semibold bg-white/5 hover:bg-white/10 border border-white/10"
+            className="flex-1 px-4 py-3 rounded-2xl font-semibold bg-hairline hover:bg-hairline border border-hairline"
           >
             {t("lab.btn.cancel")}
           </motion.button>
@@ -941,13 +941,13 @@ function DailyChallengesPanel({
               exit={{ scale: 0.95, y: 6 }}
               transition={{ type: "spring", stiffness: 320, damping: 26 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md max-h-[85vh] overflow-y-auto bg-zinc-950 border border-white/15 rounded-3xl p-5 shadow-2xl flex flex-col gap-3"
+              className="w-full max-w-md max-h-[85vh] overflow-y-auto bg-surface-raised border border-hairline rounded-3xl p-5 shadow-2xl flex flex-col gap-3"
             >
               <div className="flex items-baseline justify-between">
                 <h2 className="text-xl font-black tracking-tight bg-gradient-to-br from-amber-300 to-orange-400 bg-clip-text text-transparent">
                   🎯 {t("play.daily.title")}
                 </h2>
-                <button onClick={() => setOpen(false)} className="text-zinc-400 hover:text-white text-xl leading-none px-1">✕</button>
+                <button onClick={() => setOpen(false)} className="text-ink-muted hover:text-white text-xl leading-none px-1">✕</button>
               </div>
 
               {states.map(({ q, value, complete, claimed }) => {
@@ -958,10 +958,10 @@ function DailyChallengesPanel({
                     className={
                       "rounded-2xl border p-3 flex items-center gap-3 " +
                       (claimed
-                        ? "bg-white/[0.02] border-white/5 opacity-60"
+                        ? "bg-white/[0.02] border-hairline opacity-60"
                         : complete
                         ? "bg-amber-500/10 border-amber-400/40"
-                        : "bg-white/5 border-white/10")
+                        : "bg-hairline border-hairline")
                     }
                   >
                     <div className="text-2xl shrink-0">{q.emoji}</div>
@@ -977,15 +977,15 @@ function DailyChallengesPanel({
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-zinc-400 mt-0.5">{t(`daily.${q.id}.desc`)}</p>
+                      <p className="text-xs text-ink-muted mt-0.5">{t(`daily.${q.id}.desc`)}</p>
                       <div className="mt-1.5 flex items-center gap-2">
-                        <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                        <div className="flex-1 h-1.5 rounded-full bg-hairline overflow-hidden">
                           <div
                             className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500"
                             style={{ width: `${pct}%` }}
                           />
                         </div>
-                        <span className="text-[11px] text-zinc-400 tabular-nums whitespace-nowrap">
+                        <span className="text-[11px] text-ink-muted tabular-nums whitespace-nowrap">
                           {value}/{q.target}
                         </span>
                       </div>
@@ -1004,7 +1004,7 @@ function DailyChallengesPanel({
                       ) : (
                         <button
                           onClick={() => play(q)}
-                          className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-white font-bold text-xs transition"
+                          className="px-3 py-2 rounded-xl bg-hairline hover:bg-hairline border border-hairline text-white font-bold text-xs transition"
                         >
                           {t("play.daily.start")}
                         </button>
@@ -1498,10 +1498,10 @@ function MatchFacts({
   const [open, setOpen] = useState(false);
   const r = REWARDS[mode];
   return (
-    <div className="bg-zinc-950/55 border border-white/12 rounded-xl sm:rounded-2xl overflow-hidden">
+    <div className="bg-surface border border-hairline rounded-xl sm:rounded-2xl overflow-hidden">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full px-3 py-2 flex items-center justify-between gap-3 text-left hover:bg-white/5 transition"
+        className="w-full px-3 py-2 flex items-center justify-between gap-3 text-left hover:bg-hairline transition"
       >
         <div className="flex items-center gap-2 text-sm min-w-0">
           <span className="text-base">{MODE_META[mode].emoji}</span>
@@ -1509,13 +1509,13 @@ function MatchFacts({
           {mood && (
             <>
               <span className="text-zinc-600">·</span>
-              <span className="text-xs text-zinc-300 truncate">
+              <span className="text-xs text-ink-muted truncate">
                 {AI_MOOD_META[mood].emoji} {t("mood." + mood)}
               </span>
             </>
           )}
         </div>
-        <span className={"text-zinc-500 text-xs transition " + (open ? "rotate-180" : "")}>▾</span>
+        <span className={"text-ink-faint text-xs transition " + (open ? "rotate-180" : "")}>▾</span>
       </button>
       <AnimatePresence initial={false}>
         {open && (
@@ -1528,13 +1528,13 @@ function MatchFacts({
           >
             <div className="px-4 pb-4 grid gap-3 text-xs">
               {/* Mode info */}
-              <div className="border-t border-white/5 pt-3">
-                <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-1">
+              <div className="border-t border-hairline pt-3">
+                <div className="text-[10px] uppercase tracking-wider text-ink-faint font-semibold mb-1">
                   {t("mode." + mode)}
                 </div>
-                <p className="text-zinc-300 leading-relaxed">{t("mode." + mode + ".tag")}</p>
+                <p className="text-ink-muted leading-relaxed">{t("mode." + mode + ".tag")}</p>
                 {r.xpWin > 0 && (
-                  <p className="text-[11px] text-zinc-400 mt-1.5">
+                  <p className="text-[11px] text-ink-muted mt-1.5">
                     {t("play.win.xp", { n: r.xpWin })}
                     {r.lpWin > 0 && ` · ${t("play.win.lp", { n: r.lpWin })}`}
                     {r.lpLoss < 0 && ` · ${t("play.loss.lp", { n: r.lpLoss })}`}
@@ -1543,19 +1543,19 @@ function MatchFacts({
               </div>
               {/* Mood info */}
               {mood && (
-                <div className="border-t border-white/5 pt-3">
-                  <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-1">
+                <div className="border-t border-hairline pt-3">
+                  <div className="text-[10px] uppercase tracking-wider text-ink-faint font-semibold mb-1">
                     {AI_MOOD_META[mood].emoji} {t("mood." + mood)}
                   </div>
-                  <p className="text-zinc-300 leading-relaxed">{t("mood." + mood + ".desc")}</p>
+                  <p className="text-ink-muted leading-relaxed">{t("mood." + mood + ".desc")}</p>
                 </div>
               )}
               {/* Difficulty info */}
-              <div className="border-t border-white/5 pt-3">
-                <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-1">
+              <div className="border-t border-hairline pt-3">
+                <div className="text-[10px] uppercase tracking-wider text-ink-faint font-semibold mb-1">
                   {t("profile.diff.title")} · {t("diff." + difficulty)}
                 </div>
-                <p className="text-zinc-300 leading-relaxed">{t("diff." + difficulty + ".desc")}</p>
+                <p className="text-ink-muted leading-relaxed">{t("diff." + difficulty + ".desc")}</p>
               </div>
             </div>
           </motion.div>
@@ -1684,10 +1684,10 @@ function PickPanel({
         : { duration: 0.25 }
       }
       className={
-        "relative bg-zinc-950/30 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl ring-1 px-3 py-3 sm:p-12 border flex flex-col items-center gap-2 sm:gap-6 w-full transition-colors " +
+        "relative bg-surface backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl ring-1 px-3 py-3 sm:p-12 border flex flex-col items-center gap-2 sm:gap-6 w-full transition-colors " +
         (urgent
           ? "ring-rose-500/50 border-rose-500/40"
-          : "ring-white/10 border-white/10")
+          : "ring-white/10 border-hairline")
       }
     >
       {/* Critical red flash overlay covering the whole panel */}
@@ -1704,12 +1704,12 @@ function PickPanel({
       </AnimatePresence>
       <div className="text-center">
         <h2 className="text-lg sm:text-3xl font-bold leading-tight">{title}</h2>
-        <p className="text-zinc-400 text-xs sm:text-base mt-1">{subtitle}</p>
+        <p className="text-ink-muted text-xs sm:text-base mt-1">{subtitle}</p>
       </div>
 
       {recentOppMoves && recentOppMoves.length > 0 && (
-        <div className="flex items-center gap-2 bg-zinc-950/55 border border-white/12 rounded-xl px-3 py-1.5">
-          <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-zinc-400 font-medium">
+        <div className="flex items-center gap-2 bg-surface border border-hairline rounded-xl px-3 py-1.5">
+          <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-ink-muted font-medium">
             {t("match.cpu.last")}
           </span>
           <div className="flex gap-1">
@@ -1729,7 +1729,7 @@ function PickPanel({
 
       {withTimer && (
         <div className="w-full max-w-md relative">
-          <div className="flex items-center justify-between text-[10px] sm:text-xs text-zinc-400 mb-1">
+          <div className="flex items-center justify-between text-[10px] sm:text-xs text-ink-muted mb-1">
             <span className={"uppercase tracking-wider " + (urgent ? "text-rose-300 font-bold" : "")}>
               {t("match.timeleft")}
             </span>
@@ -1744,7 +1744,7 @@ function PickPanel({
               {seconds}s
             </motion.span>
           </div>
-          <div className="h-1.5 sm:h-2 rounded-full bg-white/10 overflow-hidden">
+          <div className="h-1.5 sm:h-2 rounded-full bg-hairline overflow-hidden">
             <motion.div
               className={
                 "h-full rounded-full " +
@@ -1859,7 +1859,7 @@ function PassPanel({
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
       transition={{ duration: 0.25 }}
-      className="bg-zinc-950/30 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 p-5 sm:p-10 border border-white/10 flex flex-col items-center gap-6 text-center"
+      className="bg-surface backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 p-5 sm:p-10 border border-hairline flex flex-col items-center gap-6 text-center"
     >
       <motion.span
         animate={{ rotate: [0, -10, 10, -10, 0] }}
@@ -1869,7 +1869,7 @@ function PassPanel({
         📱
       </motion.span>
       <h2 className="text-xl font-semibold">{t("match.pass.title", { name: labelB })}</h2>
-      <p className="text-zinc-400 text-sm max-w-sm">{t("match.pass.subtitle")}</p>
+      <p className="text-ink-muted text-sm max-w-sm">{t("match.pass.subtitle")}</p>
       <motion.button
         whileHover={{ y: -2 }}
         whileTap={{ scale: 0.97 }}
@@ -1924,11 +1924,11 @@ function Countdown({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      className="bg-zinc-950/30 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 p-4 sm:p-6 border border-white/10 flex flex-col items-center gap-6"
+      className="bg-surface backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 p-4 sm:p-6 border border-hairline flex flex-col items-center gap-6"
     >
       <div className="grid grid-cols-3 items-center w-full">
         <div className="flex flex-col items-center gap-2">
-          <span className="text-xs uppercase tracking-wider text-zinc-400">{labelA}</span>
+          <span className="text-xs uppercase tracking-wider text-ink-muted">{labelA}</span>
           <motion.div key={`a-${Math.min(beat, COUNTDOWN_IDS.length - 1)}`} variants={shakeVariant} animate="animate">
             <MysteryHand size="lg" />
           </motion.div>
@@ -1948,7 +1948,7 @@ function Countdown({
         </motion.div>
 
         <div className="flex flex-col items-center gap-2">
-          <span className="text-xs uppercase tracking-wider text-zinc-400">{labelB}</span>
+          <span className="text-xs uppercase tracking-wider text-ink-muted">{labelB}</span>
           <motion.div key={`b-${Math.min(beat, COUNTDOWN_IDS.length - 1)}`} variants={shakeVariant} animate="animate">
             <MysteryHand size="lg" />
           </motion.div>
@@ -2002,7 +2002,7 @@ function RevealPanel({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -16 }}
       transition={{ duration: 0.3 }}
-      className="relative bg-zinc-950/30 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 px-3 py-5 sm:p-12 border border-white/10 flex flex-col items-center gap-6 sm:gap-8 max-w-full"
+      className="relative bg-surface backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 px-3 py-5 sm:p-12 border border-hairline flex flex-col items-center gap-6 sm:gap-8 max-w-full"
     >
       {!draw && (
         <motion.div
@@ -2024,7 +2024,7 @@ function RevealPanel({
             transition={{ delay: 0.2, type: "spring", stiffness: 350, damping: 16 }}
             className="flex flex-col items-center"
           >
-            <span className="text-zinc-300 uppercase tracking-[0.4em] text-sm sm:text-base font-bold">
+            <span className="text-ink-muted uppercase tracking-[0.4em] text-sm sm:text-base font-bold">
               vs
             </span>
             <span className="block w-8 h-px bg-zinc-500 mt-1.5" />
@@ -2041,14 +2041,14 @@ function RevealPanel({
         transition={{ delay: 0.6, type: "spring", stiffness: 260, damping: 18 }}
         className="text-center min-h-[3rem] relative"
       >
-        {draw && <p className="text-3xl font-bold text-zinc-300">{t("match.draw")}</p>}
+        {draw && <p className="text-3xl font-bold text-ink-muted">{t("match.draw")}</p>}
         {!draw && verb && (
           <p className="text-xl sm:text-3xl font-bold">
             <span className={aWon ? "text-violet-300" : "text-teal-300"}>
               {t("element." + (aWon ? move_a : move_b))}
             </span>{" "}
-            <span className="text-zinc-400 font-normal italic">{verb}</span>{" "}
-            <span className="text-zinc-200">
+            <span className="text-ink-muted font-normal italic">{verb}</span>{" "}
+            <span className="text-ink">
               {t("element." + (aWon ? move_b : move_a))}
             </span>
           </p>
@@ -2073,7 +2073,7 @@ function RevealPanel({
         whileHover={{ y: -2 }}
         whileTap={{ scale: 0.97 }}
         onClick={onNext}
-        className="mt-2 px-7 py-3.5 rounded-2xl font-semibold text-base bg-white/10 hover:bg-white/20 border border-white/15 hover:border-white/30 transition relative z-10"
+        className="mt-2 px-7 py-3.5 rounded-2xl font-semibold text-base bg-hairline hover:bg-white/20 border border-hairline hover:border-white/30 transition relative z-10"
       >
         {matchOver ? t("match.seeResults") : t("match.next")}
       </motion.button>
@@ -2095,7 +2095,7 @@ function RevealHand({
 
   return (
     <div className="flex flex-col items-center gap-2 sm:gap-3 min-w-0">
-      <span className="text-xs sm:text-sm uppercase tracking-wider text-zinc-400 font-semibold truncate max-w-full">{label}</span>
+      <span className="text-xs sm:text-sm uppercase tracking-wider text-ink-muted font-semibold truncate max-w-full">{label}</span>
       <motion.div
         initial={{ scale: 0.4, rotate: -15, opacity: 0, x: 0 }}
         animate={{
@@ -2118,7 +2118,7 @@ function RevealHand({
             matches the contained feel of the Constellation reveal. */}
         <Hand move={move} size="lg" emphasis={winner ? "winner" : loser ? "loser" : "default"} />
       </motion.div>
-      <span className="text-sm sm:text-lg text-zinc-200 font-medium truncate max-w-full">{t("element." + move)}</span>
+      <span className="text-sm sm:text-lg text-ink font-medium truncate max-w-full">{t("element." + move)}</span>
     </div>
   );
 }
@@ -2185,7 +2185,7 @@ function AtoutPicker({
         <h1 className="text-2xl sm:text-3xl font-extrabold text-themed leading-tight" style={{ fontFamily: "var(--font-headline)" }}>
           Choisis tes Atouts
         </h1>
-        <p className="text-[11px] text-zinc-400 mt-1">2 atouts · chacun utilisable une fois dans le match</p>
+        <p className="text-[11px] text-ink-muted mt-1">2 atouts · chacun utilisable une fois dans le match</p>
       </div>
       <div className="flex flex-col gap-2">
         {ATOUTS.map((a) => {
@@ -2211,11 +2211,11 @@ function AtoutPicker({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
                   <span className="font-bold text-sm">{a.label}</span>
-                  <span className="text-[9px] uppercase tracking-wider px-1 rounded-full bg-white/10 text-zinc-400">
+                  <span className="text-[9px] uppercase tracking-wider px-1 rounded-full bg-hairline text-ink-muted">
                     {a.kind === "manual" ? "manuel" : "auto"}
                   </span>
                 </div>
-                <div className="text-[11px] text-zinc-400 leading-snug">{a.desc}</div>
+                <div className="text-[11px] text-ink-muted leading-snug">{a.desc}</div>
               </div>
               <span className={"shrink-0 w-5 h-5 rounded-full border flex items-center justify-center text-xs " +
                 (on ? "bg-emerald-400 border-emerald-400 text-zinc-900" : "border-white/30 text-transparent")}>✓</span>
@@ -2264,9 +2264,9 @@ function AtoutBar({
               onClick={active ? onClick : undefined}
               disabled={!active}
               className={"flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition " +
-                (isUsed ? "opacity-35 line-through border-white/10 bg-white/5 text-zinc-400"
+                (isUsed ? "opacity-35 line-through border-hairline bg-hairline text-ink-muted"
                  : active ? "border-amber-400/60 bg-amber-400/15 text-amber-200 hover:bg-amber-400/25"
-                 : "border-white/15 bg-white/5 text-zinc-300")}
+                 : "border-hairline bg-hairline text-ink-muted")}
             >
               <span>{a.glyph}</span>
               <span>{a.label}</span>
@@ -2328,7 +2328,7 @@ function EndPanel({
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
       transition={{ type: "spring", stiffness: 220, damping: 18 }}
-      className="bg-zinc-950/30 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 p-3 sm:p-8 border border-white/10 flex flex-col items-center text-center"
+      className="bg-surface backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 p-3 sm:p-8 border border-hairline flex flex-col items-center text-center"
     >
       {/* Cinematic match-end shared with Constellation Lanes — same trophy
           breath / wordmark pulse / quote / rematch buttons feel everywhere. */}
@@ -2346,8 +2346,8 @@ function EndPanel({
 
       {/* Local single-player extras — compacted to one wrap line so the
           card stays in one viewport without scroll on typical phones. */}
-      <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-[11px] text-zinc-500">
-        <span className="text-zinc-300 font-semibold">
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-[11px] text-ink-faint">
+        <span className="text-ink-muted font-semibold">
           {t("match.win.title", { name: winnerLabel })}
         </span>
         <span className="opacity-50">·</span>
@@ -2377,7 +2377,7 @@ function EndPanel({
             {xpDelta !== 0 && (
               <span className={
                 "px-2.5 py-0.5 rounded-full font-semibold " +
-                (xpDelta > 0 ? "bg-emerald-500/20 text-emerald-300" : "bg-zinc-500/20 text-zinc-400")
+                (xpDelta > 0 ? "bg-emerald-500/20 text-emerald-300" : "bg-zinc-500/20 text-ink-muted")
               }>
                 {xpDelta > 0 ? "+" : ""}{xpDelta} XP
               </span>

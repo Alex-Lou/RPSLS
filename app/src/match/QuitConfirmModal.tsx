@@ -39,7 +39,7 @@ export function QuitConfirmModal({
         exit={{ scale: 0.9, opacity: 0 }}
         transition={{ type: "spring", stiffness: 280, damping: 22 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-3xl bg-surface-raised border border-white/12 p-6 shadow-2xl"
+        className="w-full max-w-sm rounded-3xl bg-surface-raised border border-hairline p-6 shadow-2xl"
       >
         <div className="text-4xl mb-2 text-center" aria-hidden>🏳️</div>
         <h3 className="text-lg sm:text-xl font-bold text-white text-center mb-1.5">
@@ -60,7 +60,7 @@ export function QuitConfirmModal({
         <div className="flex gap-2.5">
           <button
             onClick={onCancel}
-            className="flex-1 py-2.5 rounded-xl font-bold text-sm text-zinc-200 bg-hairline hover:bg-hairline border border-hairline transition"
+            className="flex-1 py-2.5 rounded-xl font-bold text-sm text-ink bg-hairline hover:bg-hairline border border-hairline transition"
           >
             Continuer
           </button>

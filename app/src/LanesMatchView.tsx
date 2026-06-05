@@ -208,7 +208,7 @@ export function LanesMatchView({
       <button
         onClick={() => setHelpOpen(true)}
         title={t("lanes.help.button")}
-        className="absolute -top-9 right-0 z-20 w-9 h-9 rounded-full bg-black/50 backdrop-blur hover:bg-hairline border border-hairline text-zinc-200 hover:text-white text-sm font-bold transition flex items-center justify-center"
+        className="absolute -top-9 right-0 z-20 w-9 h-9 rounded-full bg-black/50 backdrop-blur hover:bg-hairline border border-hairline text-ink hover:text-white text-sm font-bold transition flex items-center justify-center"
       >
         ?
       </button>
@@ -1281,7 +1281,7 @@ function HelpModal({ target, onClose }: { target: number; onClose: () => void })
               {RPSLS_MOVES_HELP.map(({ id, glyph, color }) => (
                 <div
                   key={id}
-                  className="rounded-xl bg-zinc-950/55 border border-white/12 p-3 flex items-center gap-3"
+                  className="rounded-xl bg-surface border border-hairline p-3 flex items-center gap-3"
                 >
                   <div
                     className={
@@ -1299,7 +1299,7 @@ function HelpModal({ target, onClose }: { target: number; onClose: () => void })
                       <span className="text-emerald-300 font-semibold">
                         ✓ {t("lanes.help.rps.beats")}
                       </span>
-                      <span className="text-zinc-200 break-words">
+                      <span className="text-ink break-words">
                         {t(`lanes.help.rps.${id}.beats`)}
                       </span>
                     </div>
@@ -1326,7 +1326,7 @@ function HelpModal({ target, onClose }: { target: number; onClose: () => void })
               {LANE_IDENTITIES.map((id, i) => (
                 <div
                   key={i}
-                  className="rounded-xl bg-zinc-950/55 border border-white/12 p-2 text-center"
+                  className="rounded-xl bg-surface border border-hairline p-2 text-center"
                 >
                   <div className="text-lg">{id.glyph}</div>
                   <div className={
@@ -1353,7 +1353,7 @@ function HelpModal({ target, onClose }: { target: number; onClose: () => void })
               {COMBO_LEXICON.map(({ id, glyph }) => (
                 <div
                   key={id}
-                  className="rounded-xl bg-zinc-950/55 border border-white/12 p-3 flex items-center gap-3"
+                  className="rounded-xl bg-surface border border-hairline p-3 flex items-center gap-3"
                 >
                   <span className="text-2xl shrink-0">{glyph}</span>
                   <div className="flex-1 min-w-0 flex flex-col gap-0.5">

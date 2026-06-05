@@ -287,7 +287,7 @@ function TimerBar({ startedAt, durationMs }: { startedAt: number; durationMs: nu
         initial={{ scale: critical ? 1.4 : 1 }}
         animate={{ scale: 1 }}
         className={"text-lg sm:text-xl font-mono tabular-nums w-14 text-right font-extrabold " +
-          (critical ? "text-rose-300" : urgent ? "text-amber-300" : "text-zinc-200")}
+          (critical ? "text-rose-300" : urgent ? "text-amber-300" : "text-ink")}
       >{num}s</motion.span>
       <div className="flex-1 h-2.5 rounded-full bg-hairline overflow-hidden">
         <motion.div

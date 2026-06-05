@@ -59,7 +59,7 @@ function SidebarBody({
       {/* Profile block */}
       <button
         onClick={() => handleNav("profile")}
-        className="flex items-center gap-3 p-2 -mx-2 rounded-2xl hover:bg-white/5 transition text-left"
+        className="flex items-center gap-3 p-2 -mx-2 rounded-2xl hover:bg-hairline transition text-left"
       >
         <div
           className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0 ring-2 shadow-lg overflow-hidden"
@@ -80,7 +80,7 @@ function SidebarBody({
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-base font-bold truncate" style={{ fontFamily: "var(--font-headline)" }}>{player.nickname}</div>
-          <div className="text-[12px] text-zinc-300 uppercase tracking-wider font-bold">
+          <div className="text-[12px] text-ink-muted uppercase tracking-wider font-bold">
             {t("sidebar.lvl")} {info.level}
           </div>
         </div>
@@ -88,7 +88,7 @@ function SidebarBody({
 
       {/* XP bar */}
       <div className="mt-3">
-        <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+        <div className="h-2 rounded-full bg-hairline overflow-hidden">
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${info.progress * 100}%` }}
@@ -100,9 +100,9 @@ function SidebarBody({
             }}
           />
         </div>
-        <div className="mt-1.5 flex justify-between text-[12px] text-zinc-400 font-medium">
+        <div className="mt-1.5 flex justify-between text-[12px] text-ink-muted font-medium">
           <span>{info.xpInLevel} / {info.xpForNext} {t("sidebar.xp")}</span>
-          <span className="text-zinc-300 font-bold">{player.rankLp} {t("sidebar.lp")}</span>
+          <span className="text-ink-muted font-bold">{player.rankLp} {t("sidebar.lp")}</span>
         </div>
       </div>
 
@@ -117,8 +117,8 @@ function SidebarBody({
               className={
                 "flex items-center gap-3 px-3 py-3 rounded-xl text-base font-semibold tracking-wide transition " +
                 (active
-                  ? "bg-white/10 text-white"
-                  : "text-zinc-300 hover:text-white hover:bg-white/5")
+                  ? "bg-hairline text-white"
+                  : "text-ink-muted hover:text-white hover:bg-hairline")
               }
               style={{ fontFamily: "var(--font-body)" }}
             >
@@ -149,7 +149,7 @@ function SidebarBody({
       </div>
 
       {/* Pinned footer — language always reachable, kept above the Android nav. */}
-      <div className="shrink-0 flex flex-col gap-2 pt-3 mt-1 border-t border-white/5">
+      <div className="shrink-0 flex flex-col gap-2 pt-3 mt-1 border-t border-hairline">
         <LanguagePicker variant="sidebar" />
         <div className="text-[10px] text-zinc-600 text-center">RPSLS · v0.1</div>
       </div>
@@ -167,7 +167,7 @@ export function Sidebar({
   onNavigate: (p: Page) => void;
 }) {
   return (
-    <aside className="w-60 shrink-0 hidden md:flex [@media(max-height:600px)]:!hidden flex-col h-screen sticky top-0 p-4 bg-black/30 backdrop-blur border-r border-white/10">
+    <aside className="w-60 shrink-0 hidden md:flex [@media(max-height:600px)]:!hidden flex-col h-screen sticky top-0 p-4 bg-surface backdrop-blur border-r border-hairline">
       <SidebarBody page={page} onNavigate={onNavigate} />
     </aside>
   );
@@ -213,7 +213,7 @@ export function MobileShell({
         // Position via Tailwind (not inline) so the short-viewport overrides
         // actually apply. Smaller + tighter to the corner on landscape so it
         // stops eating the play area; full size in portrait.
-        className="md:hidden [@media(max-height:600px)]:!flex fixed z-30 w-11 h-11 rounded-2xl bg-black/55 backdrop-blur border border-white/15 flex items-center justify-center text-zinc-100 active:scale-95 transition shadow-lg top-[max(env(safe-area-inset-top),32px)] left-[max(env(safe-area-inset-left),12px)] [@media(max-height:540px)]:w-8 [@media(max-height:540px)]:h-8 [@media(max-height:540px)]:top-1 [@media(max-height:540px)]:left-1"
+        className="md:hidden [@media(max-height:600px)]:!flex fixed z-30 w-11 h-11 rounded-2xl bg-black/55 backdrop-blur border border-hairline flex items-center justify-center text-ink active:scale-95 transition shadow-lg top-[max(env(safe-area-inset-top),32px)] left-[max(env(safe-area-inset-left),12px)] [@media(max-height:540px)]:w-8 [@media(max-height:540px)]:h-8 [@media(max-height:540px)]:top-1 [@media(max-height:540px)]:left-1"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
           <line x1="4" y1="7" x2="20" y2="7" />
@@ -243,7 +243,7 @@ export function MobileShell({
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", stiffness: 320, damping: 32 }}
-              className="md:hidden fixed left-0 top-0 bottom-0 z-50 w-72 max-w-[85vw] bg-zinc-950/95 backdrop-blur-md border-r border-white/10 p-4 flex flex-col"
+              className="md:hidden fixed left-0 top-0 bottom-0 z-50 w-72 max-w-[85vw] bg-surface-raised backdrop-blur-md border-r border-hairline p-4 flex flex-col"
               style={{
                 paddingTop:    "max(env(safe-area-inset-top),    32px)",
                 paddingBottom: "max(env(safe-area-inset-bottom), 56px)",
@@ -254,7 +254,7 @@ export function MobileShell({
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Close menu"
-                className="absolute right-3 w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-zinc-300"
+                className="absolute right-3 w-9 h-9 rounded-xl bg-hairline hover:bg-hairline border border-hairline flex items-center justify-center text-ink-muted"
                 style={{ top: "max(env(safe-area-inset-top), 32px)" }}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">

@@ -264,7 +264,7 @@ export const FloatingMatchBackButton = forwardRef<
         title={label}
         className="
           fixed z-30 w-11 h-11 rounded-2xl bg-black/55 backdrop-blur border border-hairline
-          flex items-center justify-center text-zinc-100 active:scale-95 transition shadow-lg
+          flex items-center justify-center text-ink active:scale-95 transition shadow-lg
           hover:bg-black/70
           top-[max(env(safe-area-inset-top),32px)]
           left-[calc(max(env(safe-area-inset-left),12px)+44px+8px)]
@@ -298,7 +298,7 @@ export const FloatingMatchBackButton = forwardRef<
               <div className="flex gap-2.5">
                 <button
                   onClick={() => setOpen(false)}
-                  className="flex-1 py-2.5 rounded-2xl bg-hairline hover:bg-hairline border border-hairline font-semibold text-sm text-zinc-200 transition active:scale-[0.97]"
+                  className="flex-1 py-2.5 rounded-2xl bg-hairline hover:bg-hairline border border-hairline font-semibold text-sm text-ink transition active:scale-[0.97]"
                 >
                   {confirm.cancelLabel ?? "Annuler"}
                 </button>
@@ -501,7 +501,7 @@ export function CinematicMatchEnd({
       })()}
 
       {scoreLine && (
-        <div className="text-xl font-mono text-zinc-200">{scoreLine}</div>
+        <div className="text-xl font-mono text-ink">{scoreLine}</div>
       )}
 
       {/* Reward reveal — animated +XP / ±LP counter. */}
@@ -528,7 +528,7 @@ export function CinematicMatchEnd({
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 1.15, type: "spring", stiffness: 240, damping: 18 }}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface border border-white/12"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface border border-hairline"
       >
         <span className="text-lg">{tier.emoji}</span>
         <span className={"text-sm font-bold bg-gradient-to-r bg-clip-text text-transparent " + tier.gradient}>
@@ -572,7 +572,7 @@ export function CinematicMatchEnd({
         )}
         <button
           onClick={onBack}
-          className="flex-1 px-4 py-2.5 rounded-xl bg-hairline hover:bg-white/20 border border-hairline font-semibold text-zinc-200 transition text-sm"
+          className="flex-1 px-4 py-2.5 rounded-xl bg-hairline hover:bg-white/20 border border-hairline font-semibold text-ink transition text-sm"
         >
           {backLabel ?? t("lanes.backToMenu")}
         </button>
