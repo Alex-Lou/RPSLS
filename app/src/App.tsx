@@ -6,6 +6,7 @@ import { BACKGROUNDS_BY_ID, resolveFontFamily } from "./themes";
 import { RTL_LOCALES } from "./i18n";
 import { SplashShader } from "./SplashShader";
 import { ThemedBackdrop } from "./backdrops/ThemedBackdrop";
+import { ThemeTouchFX } from "./ThemeTouchFX";
 import { Sidebar, MobileShell, type Page } from "./Sidebar";
 // PlayPage stays eagerly imported — it's the initial route after splash
 // so lazy-loading it would just add a flicker for no gain.
@@ -213,6 +214,10 @@ export default function App() {
           >
             <Sidebar page={page} onNavigate={navigateTo} />
             <MobileShell page={page} onNavigate={navigateTo} />
+            {/* Theme-coloured touch particles across the menu. Quiet on Contact,
+                and inside any game/deck screen (useNoMenuFx) or the open drawer
+                ([data-no-touchfx]). */}
+            <ThemeTouchFX enabled={page !== "contact" && page !== "online"} />
             {/* Global LEVEL UP celebration — catches an XP gain from any surface. */}
             <LevelUpWatcher />
             {/* Global "back to Play" arrow, parked right next to the burger

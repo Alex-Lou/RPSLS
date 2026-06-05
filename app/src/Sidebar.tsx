@@ -209,6 +209,7 @@ export function MobileShell({
       {/* Hamburger trigger (mobile only) */}
       <button
         aria-label="Open menu"
+        data-no-touchfx
         onClick={() => setOpen(true)}
         // Position via Tailwind (not inline) so the short-viewport overrides
         // actually apply. Smaller + tighter to the corner on landscape so it
@@ -234,11 +235,13 @@ export function MobileShell({
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               onClick={() => setOpen(false)}
+              data-no-touchfx
               className="md:hidden fixed inset-0 bg-black/60 z-40"
             />
             {/* Panel */}
             <motion.aside
               key="drawer"
+              data-no-touchfx
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}

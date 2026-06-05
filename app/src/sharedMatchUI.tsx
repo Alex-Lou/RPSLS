@@ -19,6 +19,7 @@ import { useStore } from "./store";
 import { rankFromLp } from "./rank";
 import { BurstCanvas } from "./LevelUpOverlay";
 import { classifyEnd, pickEndSubtitleKey } from "./flavor/endphrases";
+import { useNoMenuFx } from "./menuFx";
 
 /**
  * ScaleToFit — guarantees its child ALWAYS fits the available height without
@@ -94,6 +95,8 @@ export function ScaleToFit({
  * render doesn't re-register the listener.
  */
 export function useAndroidBackPrompt(onBack: () => void) {
+  // A match/game surface is mounted → silence the playful menu touch particles.
+  useNoMenuFx();
   const cbRef = useRef(onBack);
   useEffect(() => { cbRef.current = onBack; }, [onBack]);
   useEffect(() => {
