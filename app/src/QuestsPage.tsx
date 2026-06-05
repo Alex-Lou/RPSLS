@@ -38,7 +38,7 @@ export function QuestsPage() {
       className="w-full max-w-3xl mx-auto px-5 pt-2 pb-6 md:p-6 flex flex-col gap-3"
     >
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
-        <h1 className="text-3xl font-extrabold tracking-tight">{t("quests.title")}</h1>
+        <h1 className="font-headline text-3xl font-extrabold tracking-tight">{t("quests.title")}</h1>
         <div className="text-sm text-ink-muted">
           <CountWithHighlight
             template={t("quests.claimed.count", { a: "{count}", b: QUESTS.length })}

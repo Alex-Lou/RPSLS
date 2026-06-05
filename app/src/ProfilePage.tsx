@@ -222,7 +222,7 @@ export function ProfilePage() {
       transition={{ duration: 0.3 }}
       className="w-full max-w-3xl mx-auto px-5 pt-2 pb-6 md:p-6 flex flex-col gap-5"
     >
-      <h1 className="text-3xl font-extrabold tracking-tight">Profile</h1>
+      <h1 className="font-headline text-3xl font-extrabold tracking-tight">{t("nav.profile")}</h1>
 
       {/* Hero card */}
       <div className="bg-surface border border-hairline rounded-3xl p-6 flex flex-col sm:flex-row gap-6 items-center sm:items-start">

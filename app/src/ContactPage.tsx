@@ -34,7 +34,7 @@ export function ContactPage() {
       className="w-full max-w-2xl mx-auto p-4 sm:p-6 flex flex-col gap-5"
     >
       <div>
-        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">{t("contact.title")}</h1>
+        <h1 className="font-headline text-3xl sm:text-4xl font-extrabold tracking-tight text-themed">{t("contact.title")}</h1>
         <p className="text-ink-muted text-sm mt-2 leading-relaxed max-w-prose">
           {t("contact.intro")}
         </p>

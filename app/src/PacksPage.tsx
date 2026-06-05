@@ -33,7 +33,7 @@ export function PacksPage() {
             className="flex flex-col gap-6"
           >
             <div>
-              <h1 className="text-3xl font-extrabold tracking-tight">{t("packs.title")}</h1>
+              <h1 className="font-headline text-3xl font-extrabold tracking-tight">{t("packs.title")}</h1>
               <p className="text-ink-muted text-sm mt-1 max-w-2xl">{t("packs.subtitle")}</p>
             </div>
 

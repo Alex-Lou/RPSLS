@@ -4,6 +4,7 @@ import { useStore } from "./store";
 import { MODE_META } from "./types";
 import type { MatchRecord, RecordMode, Outcome } from "./types";
 import { MOVE_META, AI_MOOD_META } from "./game";
+import { useT } from "./i18n";
 
 const FILTERS: Array<{ id: "all" | RecordMode; label: string }> = [
   { id: "all",           label: "All" },
@@ -16,6 +17,7 @@ const FILTERS: Array<{ id: "all" | RecordMode; label: string }> = [
 ];
 
 export function HistoryPage() {
+  const t = useT();
   const history = useStore((s) => s.history);
   const [filter, setFilter] = useState<"all" | RecordMode>("all");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -30,7 +32,7 @@ export function HistoryPage() {
       className="w-full max-w-3xl mx-auto px-5 pt-2 pb-6 md:p-6 flex flex-col gap-3"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-3xl font-extrabold tracking-tight">History</h1>
+        <h1 className="font-headline text-3xl font-extrabold tracking-tight">{t("nav.history")}</h1>
         <span className="text-sm text-ink-faint">{history.length} match{history.length === 1 ? "" : "es"}</span>
       </div>
 

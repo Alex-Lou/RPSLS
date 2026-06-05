@@ -833,7 +833,7 @@ export function OnlinePage() {
 
       <div className="flex items-baseline justify-between gap-3 mb-3">
         <div className="flex items-baseline gap-3">
-          <h1 className="text-3xl font-black tracking-tight">🌐 {t("nav.online")}</h1>
+          <h1 className="font-headline text-3xl font-black tracking-tight">🌐 {t("nav.online")}</h1>
           <span className="text-xs text-zinc-500">Beta · {player.nickname}</span>
         </div>
       </div>

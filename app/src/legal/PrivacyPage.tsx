@@ -25,7 +25,7 @@ export function PrivacyPage({ onClose }: { onClose?: () => void }) {
       <article className="max-w-2xl mx-auto w-full px-5 py-6 flex flex-col gap-5">
         <header className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-black tracking-tight text-themed">
+            <h1 className="font-headline text-2xl font-black tracking-tight text-themed">
               {c.title}
             </h1>
             <p className="text-[11px] text-ink-faint mt-1">{c.lastUpdated}</p>

@@ -16,7 +16,7 @@ import { Hand, MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "./icons";
 import { MOVES, type Move } from "./game";
 import { hapticAlert, hapticTap } from "./haptic";
 import { useT } from "./i18n";
-import { MatchScoreBar, hapticTick, PickShock, CinematicMatchEnd, useAndroidBackPrompt, ScaleToFit } from "./sharedMatchUI";
+import { MatchScoreBar, hapticTick, PickShock, CinematicMatchEnd, useAndroidBackPrompt, ScaleToFit, FloatingMatchBackButton } from "./sharedMatchUI";
 import { QuitConfirmModal } from "./match/QuitConfirmModal";
 import { useStore } from "./store";
 import type { LanePlay, LaneResult, PlayerSlot } from "./online";
@@ -269,6 +269,12 @@ export function LanesMatchView({
         )}
         </div>
       </ScaleToFit>
+
+      {/* Back arrow docked next to the burger (like every other match screen) —
+          opens the same quit confirmation as the forfeit button below. */}
+      {phase !== "match_end" && (
+        <FloatingMatchBackButton onClick={() => setQuitConfirmOpen(true)} label={t("lanes.forfeitMatch")} />
+      )}
 
       {/* Forfeit button — shown anytime but match-end. */}
       {phase !== "match_end" && (
