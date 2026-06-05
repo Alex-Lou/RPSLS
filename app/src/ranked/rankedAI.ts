@@ -3,8 +3,8 @@
  */
 
 import type { LanePlay } from "../online";
-import { cpuLanesPicks, type LanesAiContext } from "../lanesEngine";
-import { laneFavoursMove } from "../lanesCombos";
+import { cpuLanesPicks, type LanesAiContext } from "../engine/lanesEngine";
+import { laneFavoursMove } from "../engine/lanesCombos";
 import { CARDS } from "./cards";
 import type { CardId, LaneTarget, PlayedCard } from "./rankedTypes";
 

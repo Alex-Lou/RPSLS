@@ -1,5 +1,5 @@
 import type { AiMood } from "./game";
-import type { GameMode, MatchRecord, Player } from "./types";
+import type { GameMode, MatchRecord, Player } from "../types";
 
 export interface DailyChallenge {
   date: string; // 'YYYY-MM-DD'

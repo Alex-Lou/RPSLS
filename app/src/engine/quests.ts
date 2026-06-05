@@ -1,5 +1,5 @@
 import type { Move, AiMood } from "./game";
-import type { GameMode, MatchRecord, Player } from "./types";
+import type { GameMode, MatchRecord, Player } from "../types";
 import { levelFromXp } from "./leveling";
 
 export interface QuestDef {

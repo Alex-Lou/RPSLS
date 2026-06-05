@@ -12,14 +12,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
-import type { AiMood, Move } from "../game";
+import type { AiMood, Move } from "../engine/game";
 import { useStore } from "../store/store";
 import {
   resolveLanesRound,
   rpslsBeats,
   type RoundOutcome,
-} from "../lanesEngine";
-import { detectPlayerCombo } from "../lanesCombos";
+} from "../engine/lanesEngine";
+import { detectPlayerCombo } from "../engine/lanesCombos";
 import {
   hapticLock, hapticMatchStart, hapticMatchWin, hapticMatchLoss,
   hapticTap, hapticWin, hapticLoss,

@@ -9,7 +9,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import type { Move } from "../game";
+import type { Move } from "../engine/game";
 import type { LaneResult, PlayerSlot } from "../online";
 import { useT } from "../i18n";
 import {

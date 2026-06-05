@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
-import { QUESTS, questState, type QuestDef } from "../quests";
+import { QUESTS, questState, type QuestDef } from "../engine/quests";
 import { THEMES } from "../theme/theme";
 import { useT } from "../i18n";
 import { hapticMatchWin } from "../haptic";

@@ -10,7 +10,7 @@ import {
   randomMoveInPack,
   resolveInPack,
   verbKeyForPair,
-} from "../packs";
+} from "../engine/packs";
 
 type View = { kind: "list" } | { kind: "play"; pack: Pack };
 

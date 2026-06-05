@@ -8,14 +8,14 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import type { Move } from "../game";
+import type { Move } from "../engine/game";
 import type { LaneResult } from "../online";
 import {
   detectPlayerCombo,
   detectOutcomeCombo,
   laneFavoursMove,
   type ComboTheme,
-} from "../lanesCombos";
+} from "../engine/lanesCombos";
 import { LanesBoard } from "./LanesBoard";
 import { CARDS } from "./cards";
 import type { LaneTarget, PlayedCard, RoundBonusBreakdown } from "./rankedTypes";

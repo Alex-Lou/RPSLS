@@ -3,7 +3,7 @@
  * 12 cards across 4 rarities. Deck of 8, hand of 3.
  */
 
-import type { Move } from "../game";
+import type { Move } from "../engine/game";
 import type { LanePlay } from "../online";
 
 /* ──────────── Cards ──────────── */

@@ -13,7 +13,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Hand, MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "./icons";
-import { MOVES, type Move } from "./game";
+import { MOVES, type Move } from "./engine/game";
 import { hapticAlert, hapticTap } from "./haptic";
 import { useT } from "./i18n";
 import { MatchScoreBar, hapticTick, PickShock, CinematicMatchEnd, useAndroidBackPrompt, ScaleToFit, FloatingMatchBackButton } from "./sharedMatchUI";
@@ -26,7 +26,7 @@ import {
   LANE_IDENTITIES,
   laneFavoursMove,
   type ComboTheme,
-} from "./lanesCombos";
+} from "./engine/lanesCombos";
 
 /** Map of lane index → i18n key prefix for the identity. */
 const IDENTITY_KEYS = ["lanes.identity.force", "lanes.identity.wisdom", "lanes.identity.cunning"];

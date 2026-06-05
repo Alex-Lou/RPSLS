@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { MOVES, type Move } from "../game";
+import { MOVES, type Move } from "../engine/game";
 import { MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "../icons";
 import { hapticAlert, hapticTap } from "../haptic";
 import { hapticTick, PickShock } from "../sharedMatchUI";

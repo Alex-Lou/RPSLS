@@ -16,7 +16,7 @@ import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, us
 import { motion, AnimatePresence } from "motion/react";
 import { useT } from "./i18n";
 import { useStore } from "./store/store";
-import { rankFromLp } from "./rank";
+import { rankFromLp } from "./engine/rank";
 import { BurstCanvas } from "./LevelUpOverlay";
 import { classifyEnd, pickEndSubtitleKey } from "./flavor/endphrases";
 import { useNoMenuFx } from "./menuFx";

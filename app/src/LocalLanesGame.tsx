@@ -13,7 +13,7 @@ import {
   type LanesRoundResultData,
   type LanesEndData,
 } from "./LanesMatchView";
-import { type AiMood, type Move } from "./game";
+import { type AiMood, type Move } from "./engine/game";
 import { useStore } from "./store/store";
 import {
   battleStatus,
@@ -21,7 +21,7 @@ import {
   makeLocalBattle,
   resolveLanesRound,
   type LocalBattleState,
-} from "./lanesEngine";
+} from "./engine/lanesEngine";
 import type { LanePlay, PlayerSlot } from "./online";
 import {
   hapticLock,

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store/store";
-import { levelFromXp } from "./leveling";
-import { rankFromLp } from "./rank";
+import { levelFromXp } from "./engine/leveling";
+import { rankFromLp } from "./engine/rank";
 import { THEMES, gradientFromTheme } from "./theme/theme";
 import { avatarImgStyle } from "./theme/avatar";
 import { useT } from "./i18n";

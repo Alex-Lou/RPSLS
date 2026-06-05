@@ -10,9 +10,9 @@
  */
 
 import type { LanePlay, LaneResult } from "../online";
-import type { RoundOutcome } from "../lanesEngine";
-import { laneFavoursMove, type ComboTheme } from "../lanesCombos";
-import type { Move } from "../game";
+import type { RoundOutcome } from "../engine/lanesEngine";
+import { laneFavoursMove, type ComboTheme } from "../engine/lanesCombos";
+import type { Move } from "../engine/game";
 import type {
   LaneTarget,
   PlayedCard,

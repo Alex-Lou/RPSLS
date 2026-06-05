@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { useStore } from "../store/store";
 import { useT } from "../i18n";
-import { rankFromLp } from "../rank";
+import { rankFromLp } from "../engine/rank";
 import { avatarImgStyle } from "../theme/avatar";
 import {
   leaderboardEnabled,

@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
 import { MODE_META } from "../types";
 import type { MatchRecord, RecordMode, Outcome } from "../types";
-import { MOVE_META, AI_MOOD_META } from "../game";
+import { MOVE_META, AI_MOOD_META } from "../engine/game";
 import { useT } from "../i18n";
 
 const FILTERS: Array<{ id: "all" | RecordMode; label: string }> = [

@@ -15,7 +15,7 @@ import {
   AI_MOOD_META,
   aiMove,
   rollAiMood,
-} from "../game";
+} from "../engine/game";
 import { Hand, MysteryHand, MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "../icons";
 import { BattlePad } from "../BattlePad";
 import { useStore } from "../store/store";
@@ -29,7 +29,7 @@ import {
   type Difficulty,
 } from "../types";
 import { THEMES, gradientFromTheme } from "../theme/theme";
-import { todayDailyQuests, matchesToday, todayDateKey, type DailyChallenge, type DailyQuestDef } from "../daily";
+import { todayDailyQuests, matchesToday, todayDateKey, type DailyChallenge, type DailyQuestDef } from "../engine/daily";
 import { useT } from "../i18n";
 import type { Page } from "../Sidebar";
 import { UserHeader } from "../UserHeader";
@@ -40,7 +40,7 @@ import { RankedLobby } from "../ranked/RankedLobby";
 import { initialTournament, resolvePlayerMatch, isPlayerEliminated, type TournamentState } from "../ranked/TournamentBracket";
 import { BracketPage } from "../ranked/BracketPage";
 import { DeckManager } from "../ranked/DeckManager";
-import { levelFromXp } from "../leveling";
+import { levelFromXp } from "../engine/leveling";
 import { CinematicMatchEnd, AmbientFlavor, MatchScoreBar, FloatingMatchBackButton, hapticTick, PickShock, useAndroidBackPrompt } from "../sharedMatchUI";
 import { vibrate, hapticWin, hapticLoss, hapticTap } from "../haptic";
 

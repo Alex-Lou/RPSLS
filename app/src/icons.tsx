@@ -1,4 +1,4 @@
-import type { Move } from "./game";
+import type { Move } from "./engine/game";
 
 /** Per-move accent palette — used for halos, gradients, button focus. */
 export const MOVE_PALETTE: Record<

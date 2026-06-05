@@ -1,5 +1,5 @@
-import type { Move } from "./game";
-import type { AiMood } from "./game";
+import type { Move } from "./engine/game";
+import type { AiMood } from "./engine/game";
 
 export type ThemeId =
   | "violet" | "neon" | "pastel" | "sunset" | "forest"

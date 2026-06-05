@@ -11,7 +11,7 @@
  * strings; locales without a variant fall back to the canonical.
  */
 
-import type { Move } from "../game";
+import type { Move } from "../engine/game";
 
 /** Number of variants per canonical verb (canonical itself + .alt1..alt3). */
 const VARIANT_COUNT = 4;
