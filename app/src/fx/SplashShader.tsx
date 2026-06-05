@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { ThemedBackdrop, type BackdropScene } from "./backdrops/ThemedBackdrop";
+import { ThemedBackdrop, type BackdropScene } from "../backdrops/ThemedBackdrop";
 
 /**
  * SplashShader — WebGL fluid cosmic backdrop for the splash screen.

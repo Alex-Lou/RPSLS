@@ -17,9 +17,9 @@ import { motion, AnimatePresence } from "motion/react";
 import { useT } from "./i18n";
 import { useStore } from "./store/store";
 import { rankFromLp } from "./engine/rank";
-import { BurstCanvas } from "./LevelUpOverlay";
+import { BurstCanvas } from "./fx/LevelUpOverlay";
 import { classifyEnd, pickEndSubtitleKey } from "./flavor/endphrases";
-import { useNoMenuFx } from "./menuFx";
+import { useNoMenuFx } from "./fx/menuFx";
 
 /**
  * ScaleToFit — guarantees its child ALWAYS fits the available height without

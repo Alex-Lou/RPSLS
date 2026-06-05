@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { useStore } from "./store/store";
-import { levelFromXp } from "./engine/leveling";
-import { useT } from "./i18n";
-import { hapticMatchWin } from "./haptic";
+import { useStore } from "../store/store";
+import { levelFromXp } from "../engine/leveling";
+import { useT } from "../i18n";
+import { hapticMatchWin } from "../haptic";
 
 /**
  * Level-up celebration — a FULLY CODED WebGL burst (no PNG sprites). A single

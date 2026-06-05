@@ -13,7 +13,7 @@ import { ALL_CARD_IDS, CARDS, RARITY_COLOR } from "./cards";
 import { CardImage } from "./CardImage";
 import type { CardId } from "./rankedTypes";
 import { useT } from "../i18n";
-import { useNoMenuFx } from "../menuFx";
+import { useNoMenuFx } from "../fx/menuFx";
 
 const MAIN_SLOTS = 3;
 const RESERVE_SLOTS = 3;

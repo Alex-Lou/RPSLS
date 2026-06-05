@@ -4,16 +4,16 @@ import { useStore } from "./store/store";
 import { applyTheme } from "./theme/theme";
 import { BACKGROUNDS_BY_ID, resolveFontFamily } from "./theme/themes";
 import { RTL_LOCALES } from "./i18n";
-import { SplashShader } from "./SplashShader";
+import { SplashShader } from "./fx/SplashShader";
 import { ThemedBackdrop } from "./backdrops/ThemedBackdrop";
-import { ThemeTouchFX } from "./ThemeTouchFX";
+import { ThemeTouchFX } from "./fx/ThemeTouchFX";
 import { Sidebar, MobileShell, type Page } from "./Sidebar";
 // PlayPage stays eagerly imported — it's the initial route after splash
 // so lazy-loading it would just add a flicker for no gain.
 import { PlayPage } from "./pages/PlayPage";
 import { FloatingMatchBackButton } from "./sharedMatchUI";
 import { UserHeader } from "./UserHeader";
-import { LevelUpWatcher } from "./LevelUpOverlay";
+import { LevelUpWatcher } from "./fx/LevelUpOverlay";
 import { useT } from "./i18n";
 import { setHapticSettings } from "./haptic";
 import { initSentry, shutdownSentry } from "./monitoring/sentry";
