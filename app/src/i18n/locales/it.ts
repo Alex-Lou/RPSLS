@@ -91,6 +91,7 @@ const it: Record<string, string> = {
   "ranked.bonus.combo": "Combo",
   "ranked.bonus.favoured": "Favorita",
   "ranked.bonus.surge": "Surge",
+  "ranked.bonus.tide": "Marea",
   "ranked.bonus.aegisSaved": "Egida ha salvato una lane",
   "ranked.cta.playCard": "Tocca una lane per giocare questa carta.",
   "ranked.cta.cancelCard": "Annulla",

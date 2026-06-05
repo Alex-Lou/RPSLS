@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
 import type { AiMood, Move } from "../game";
 import { useStore } from "../store";
 import {
@@ -49,6 +50,13 @@ const ROUND_PAUSE_MS = 7_500;
 const REVEAL_SUSPENSE_MS = 1_400;
 const MATCH_FOUND_SPLASH_MS = 2_500;
 const MAX_MANA = 4;
+/** Sudden Death cadence — kept tight so the duel feels punchy, not laggy.
+ *  PRE  = how long the reveal sits before the overlay slides in.
+ *  POST = how long the verdict banner sits before applySuddenDeath fires.
+ *  DUEL_TIE = how long a tied duel sits before re-picking. */
+const SUDDEN_DEATH_PRE_MS = 1_500;
+const SUDDEN_DEATH_POST_MS = 2_200;
+const SUDDEN_DEATH_DUEL_TIE_MS = 1_700;
 
 /** CPU's notional hand pool — the cards the AI may consider each round. The
  *  CPU doesn't track a real deck/hand, but we filter one-shots out across the
@@ -301,10 +309,14 @@ export function RankedGame({
     // Mirror: copy the opponent's move on the targeted lane → that lane
     // becomes identical moves → a guaranteed draw, neutralising a coup the
     // player can't otherwise beat. Applied before resolution so the engine
-    // scores it naturally.
+    // scores it naturally. We also patch `displayPlayerPicks` so the reveal
+    // shows the post-mirror move (else the lane shows e.g. Rock vs Paper and
+    // the player reads it as a wrong resolution).
+    const displayPlayerPicks: [Move, Move, Move] = [...playerPicks] as [Move, Move, Move];
     if (!timedOut && cardPlayed?.id === "mirror") {
       const ml = (cardPlayed as { lane: LaneTarget }).lane;
       playerPlays[ml] = { mv: cpuPlays[ml].mv, mana: 0 };
+      displayPlayerPicks[ml] = cpuPlays[ml].mv;
     }
 
     let base: RoundOutcome;
@@ -327,7 +339,10 @@ export function RankedGame({
     const oppCard = cpu.card;
 
     const fx = applyCardEffects(base, myCard, oppCard);
-    const yourCombo = detectPlayerCombo(playerPicks);
+    // Combo detection uses post-Mirror picks so bonus history stays aligned
+    // with what the reveal banner shows. AI history (playerHistoryRef) still
+    // tracks the player's INTENT (original picks) — that's about reads.
+    const yourCombo = detectPlayerCombo(displayPlayerPicks);
     const oppCombo = detectPlayerCombo(cpuPicks);
     const bonuses = computeRoundBonuses(
       fx.outcome,
@@ -441,7 +456,7 @@ export function RankedGame({
     // Hand to reveal phase.
     setRound(null);
     setLastResult({
-      yourPicks: playerPicks,
+      yourPicks: displayPlayerPicks,
       oppPicks: cpuPicks,
       myCard, oppCard,
       augurRevealed,
@@ -501,11 +516,17 @@ export function RankedGame({
       window.setTimeout(() => {
         setRiposteData({ lane: myRiposteLane as LaneTarget, phase: "pick" });
       }, ROUND_PAUSE_MS);
-    } else if (finalWinner === "draw" && !timedOut) {
-      // Perfectly tied round → Sudden Death duel to break the tie.
+    } else if (
+      finalWinner === "draw" && !timedOut &&
+      nextRoundWinsA === winTo - 1 && nextRoundWinsB === winTo - 1
+    ) {
+      // Sudden Death only fires at match point on both sides — a perfectly
+      // tied round there would otherwise leave the match unable to finish.
+      // Every other draw just continues to the next round, which keeps SD
+      // feeling rare and decisive instead of laggy noise on every tie.
       window.setTimeout(() => {
         setSuddenDeathData({ phase: "pick", round: roundNoRef.current });
-      }, ROUND_PAUSE_MS);
+      }, SUDDEN_DEATH_PRE_MS);
     } else {
       window.setTimeout(() => startNextRound(), ROUND_PAUSE_MS);
     }
@@ -658,16 +679,17 @@ export function RankedGame({
     const playerWins = rpslsBeats(move, cpuMove);
     const cpuWins = rpslsBeats(cpuMove, move);
     if (!playerWins && !cpuWins) {
-      // Duel tied → flash it, then re-pick.
+      // Duel tied → flash it, then re-pick — short delay, the player is
+      // already locked in.
       setSuddenDeathData({ phase: "reveal", round: suddenDeathData.round, playerMove: move, cpuMove, winner: null });
-      window.setTimeout(() => hapticTap(), REVEAL_SUSPENSE_MS);
-      window.setTimeout(() => setSuddenDeathData({ phase: "pick", round: roundNoRef.current }), ROUND_PAUSE_MS);
+      window.setTimeout(() => hapticTap(), 350);
+      window.setTimeout(() => setSuddenDeathData({ phase: "pick", round: roundNoRef.current }), SUDDEN_DEATH_DUEL_TIE_MS);
       return;
     }
     const winner: "a" | "b" = playerWins ? "a" : "b";
     setSuddenDeathData({ phase: "reveal", round: suddenDeathData.round, playerMove: move, cpuMove, winner });
-    window.setTimeout(() => { if (winner === "a") hapticWin(); else hapticLoss(); }, REVEAL_SUSPENSE_MS);
-    window.setTimeout(() => applySuddenDeath(winner), ROUND_PAUSE_MS);
+    window.setTimeout(() => { if (winner === "a") hapticWin(); else hapticLoss(); }, 300);
+    window.setTimeout(() => applySuddenDeath(winner), SUDDEN_DEATH_POST_MS);
   }
 
   /** Award the broken-tie round point to the duel winner, then continue/finish. */
@@ -725,10 +747,12 @@ export function RankedGame({
   // ranked loss + the escalating repeat-abandon LP penalty. Leaving AFTER the
   // match is over (end set) — or a genuine app/network interruption that never
   // calls this — carries no penalty. The RankedBackGuard confirms first.
+  //
+  // Tournament context: when onMatchResult is set, route the forfeit into the
+  // bracket as a loss instead of unmounting back to the lobby — that keeps the
+  // bracket consistent (no orphan slot) and respects the confirm dialog.
   function handleLeave() {
     if (!end) {
-      // Forfeit vs CPU: recorded as a loss for history, but NO LP change and
-      // NO abandon penalty — competitive LP comes only from real online play.
       recordMatch({
         id: `ranked-forfeit-${Date.now()}`,
         mode: "constellation",
@@ -744,7 +768,8 @@ export function RankedGame({
         forfeit: true,
       });
     }
-    onQuit();
+    if (onMatchResult) onMatchResult(false);
+    else onQuit();
   }
 
   return (
@@ -770,7 +795,7 @@ export function RankedGame({
         onCancelCard={handleCancelCard}
         onLock={handleLock}
         revealAugurFor={revealAugurFor}
-        onLeave={onMatchResult ? undefined : handleLeave}
+        onLeave={handleLeave}
         onRematch={onMatchResult ? undefined : rematch}
         onNext={onMatchResult && end ? () => onMatchResult(end.winner === "a") : undefined}
         showTimer={false}
@@ -891,23 +916,48 @@ function SuddenDeathOverlay({
     ? data.winner === "a" ? "win" : data.winner === "b" ? "loss" : "draw"
     : null;
   return (
-    <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md px-4">
-      <div
-        className="text-3xl sm:text-5xl font-black tracking-[0.12em] mb-1.5 text-center bg-gradient-to-br from-amber-300 via-rose-400 to-fuchsia-400 bg-clip-text text-transparent animate-pulse"
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.18 }}
+      className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md px-4"
+    >
+      <motion.div
+        initial={{ scale: 0.4, opacity: 0, rotate: -6 }}
+        animate={{
+          scale: [0.4, 1.18, 1],
+          opacity: 1,
+          rotate: [-6, 4, 0],
+        }}
+        transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        className="text-3xl sm:text-5xl font-black tracking-[0.12em] mb-1.5 text-center bg-gradient-to-br from-amber-300 via-rose-400 to-fuchsia-400 bg-clip-text text-transparent"
         style={{ filter: "drop-shadow(0 2px 16px rgba(244,63,94,0.55))" }}
       >
         MORT SUBITE
-      </div>
-      <div className="text-xs sm:text-sm text-zinc-300 mb-6 max-w-xs text-center">
-        Manche à égalité parfaite — un seul coup décide tout.
-      </div>
+      </motion.div>
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.35, duration: 0.25 }}
+        className="text-xs sm:text-sm text-zinc-300 mb-6 max-w-xs text-center"
+      >
+        Match point des deux côtés — un seul coup décide tout.
+      </motion.div>
       {data.phase === "pick" && (
-        <div className="grid grid-cols-5 gap-2 w-full max-w-md">
-          {RANKED_MOVES.map((mv) => {
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5, duration: 0.25 }}
+          className="grid grid-cols-5 gap-2 w-full max-w-md"
+        >
+          {RANKED_MOVES.map((mv, i) => {
             const pal = MOVE_PALETTE[mv];
             return (
-              <button
+              <motion.button
                 key={mv}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.55 + i * 0.05, duration: 0.2 }}
                 onClick={() => onPick(mv)}
                 className={
                   "aspect-[4/5] rounded-xl flex flex-col items-center justify-center gap-1 py-1.5 transition active:scale-92 " +
@@ -917,43 +967,81 @@ function SuddenDeathOverlay({
               >
                 <MoveGlyph move={mv} className="w-7 h-7" />
                 <span className="text-[8px] uppercase tracking-wider font-bold leading-none">{mv}</span>
-              </button>
+              </motion.button>
             );
           })}
-        </div>
+        </motion.div>
       )}
       {data.phase === "reveal" && data.playerMove && data.cpuMove && (
         <div className="flex flex-col items-center gap-4">
           <div className="flex items-center gap-6">
-            <div className="flex flex-col items-center gap-1">
+            <motion.div
+              initial={{ opacity: 0, x: -20, scale: 0.7 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              transition={{ duration: 0.25 }}
+              className="flex flex-col items-center gap-1"
+            >
               <span className="text-[10px] uppercase tracking-wider text-emerald-300">Toi</span>
               <div className={"w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br " +
                 MOVE_PALETTE[data.playerMove].from + " " + MOVE_PALETTE[data.playerMove].to +
                 " ring-2 " + MOVE_PALETTE[data.playerMove].ring}>
                 <MoveGlyph move={data.playerMove} className="w-9 h-9" />
               </div>
-            </div>
-            <div className="text-3xl font-black text-zinc-500">vs</div>
-            <div className="flex flex-col items-center gap-1">
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: [0.5, 1.3, 1] }}
+              transition={{ delay: 0.15, duration: 0.35 }}
+              className="text-3xl font-black text-zinc-500"
+            >
+              vs
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, x: 20, scale: 0.7 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              transition={{ duration: 0.25 }}
+              className="flex flex-col items-center gap-1"
+            >
               <span className="text-[10px] uppercase tracking-wider text-rose-300">CPU</span>
               <div className={"w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br " +
                 MOVE_PALETTE[data.cpuMove].from + " " + MOVE_PALETTE[data.cpuMove].to +
                 " ring-2 " + MOVE_PALETTE[data.cpuMove].ring}>
                 <MoveGlyph move={data.cpuMove} className="w-9 h-9" />
               </div>
-            </div>
+            </motion.div>
           </div>
-          <div className={
-            "text-xl sm:text-2xl font-black " +
-            (verdict === "win" ? "text-emerald-300" :
-             verdict === "loss" ? "text-rose-300" : "text-zinc-300")
-          }>
+          <motion.div
+            key={verdict ?? "none"}
+            initial={{ opacity: 0, scale: 0.6, y: 8 }}
+            animate={{
+              opacity: 1,
+              scale: verdict === "draw" ? 1 : [0.6, 1.25, 1],
+              y: 0,
+              x: verdict === "win" ? [0, -3, 3, -2, 2, 0] : verdict === "loss" ? [0, 2, -2, 1, -1, 0] : 0,
+            }}
+            transition={{ delay: 0.35, duration: verdict === "draw" ? 0.25 : 0.5, type: "spring", stiffness: 240, damping: 14 }}
+            className={
+              "text-xl sm:text-3xl font-black tracking-wide text-center px-3 py-1 rounded-lg " +
+              (verdict === "win"
+                ? "text-emerald-200 bg-emerald-500/15 ring-1 ring-emerald-400/40"
+                : verdict === "loss"
+                ? "text-rose-200 bg-rose-500/15 ring-1 ring-rose-400/40"
+                : "text-zinc-300")
+            }
+            style={
+              verdict === "win"
+                ? { filter: "drop-shadow(0 0 18px rgba(52,211,153,0.55))" }
+                : verdict === "loss"
+                ? { filter: "drop-shadow(0 0 14px rgba(244,63,94,0.45))" }
+                : undefined
+            }
+          >
             {verdict === "win" ? "Tu remportes la manche !"
               : verdict === "loss" ? "Manche perdue en mort subite."
               : "Encore égalité — on rejoue !"}
-          </div>
+          </motion.div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

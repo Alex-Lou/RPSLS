@@ -149,6 +149,7 @@ const fr: Record<string, string> = {
   "ranked.bonus.combo": "Combo",
   "ranked.bonus.favoured": "Favorisée",
   "ranked.bonus.surge": "Surcharge",
+  "ranked.bonus.tide": "Marée",
   "ranked.bonus.aegisSaved": "Égide a sauvé une lane",
   "ranked.cta.playCard": "Touche une lane pour jouer cette carte.",
   "ranked.cta.cancelCard": "Annuler",
