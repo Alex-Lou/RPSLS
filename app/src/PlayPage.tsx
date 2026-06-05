@@ -51,7 +51,11 @@ type View =
   | { kind: "ranked_lobby" }
   | { kind: "ranked_deck" }
   | { kind: "ranked_bracket" }
-  | { kind: "ranked_match"; oppName: string; oppAvatar: string };
+  | { kind: "ranked_match"; oppName: string; oppAvatar: string }
+  // Classé (classic 1v1) hub — its own lobby + tournament + match.
+  | { kind: "classe_lobby" }
+  | { kind: "classe_bracket" }
+  | { kind: "classe_match"; oppName: string; oppAvatar: string };
 
 export function PlayPage({
   onNavigate, homeNonce,
@@ -64,6 +68,12 @@ export function PlayPage({
 }) {
   const [view, setView] = useState<View>({ kind: "select" });
   const [tournament, setTournament] = useState<TournamentState>(() => {
+    const p = useStore.getState().player;
+    const l = levelFromXp(p.xp);
+    return initialTournament(p.nickname, p.avatar, l.level);
+  });
+  // Separate tournament state for the Classé (classic 1v1) bracket.
+  const [classeTournament, setClasseTournament] = useState<TournamentState>(() => {
     const p = useStore.getState().player;
     const l = levelFromXp(p.xp);
     return initialTournament(p.nickname, p.avatar, l.level);
@@ -100,6 +110,7 @@ export function PlayPage({
             onGoConstellation={(winTo) => setView({ kind: "lanes_cpu", winTo })}
             onGoRanked={() => setView({ kind: "ranked_lobby" })}
             onGoSandbox={() => setView({ kind: "sandbox" })}
+            onGoClasse={() => setView({ kind: "classe_lobby" })}
           />
         )}
         {view.kind === "sandbox" && (
@@ -187,6 +198,44 @@ export function PlayPage({
             />
           </motion.div>
         )}
+
+        {/* ─── Classé (classic 1v1) hub ─── */}
+        {view.kind === "classe_lobby" && (
+          <ClasseLobby
+            key="classe-lobby"
+            onBack={() => setView({ kind: "select" })}
+            onQuickMatch={() => setView({ kind: "game", mode: "ranked", bestOf: 5 })}
+            onViewBracket={() => {
+              setClasseTournament((t) =>
+                t.phase === "complete" || isPlayerEliminated(t)
+                  ? initialTournament(t.you.name, t.you.avatar, t.you.level)
+                  : t,
+              );
+              setView({ kind: "classe_bracket" });
+            }}
+          />
+        )}
+        {view.kind === "classe_bracket" && (
+          <BracketPage
+            key="classe-bracket"
+            tournament={classeTournament}
+            setTournament={setClasseTournament}
+            onStartMatch={(name, avatar) => setView({ kind: "classe_match", oppName: name, oppAvatar: avatar })}
+            onBack={() => setView({ kind: "classe_lobby" })}
+          />
+        )}
+        {view.kind === "classe_match" && (
+          <Game
+            key={`classe-match-${view.oppName}-${Date.now()}`}
+            mode="ranked"
+            bestOf={5}
+            onQuit={() => setView({ kind: "classe_bracket" })}
+            onMatchResult={(won) => {
+              setClasseTournament((t) => resolvePlayerMatch(t, won));
+              setView({ kind: "classe_bracket" });
+            }}
+          />
+        )}
       </AnimatePresence>
     </div>
   );
@@ -235,12 +284,14 @@ function ModeSelect({
   onGoConstellation,
   onGoRanked,
   onGoSandbox,
+  onGoClasse,
 }: {
   onStart: (mode: GameMode, bestOf: number, questCtx?: { title: string; reward: number }) => void;
   onGoOnline?: () => void;
   onGoConstellation?: (winTo: number) => void;
   onGoRanked?: () => void;
   onGoSandbox?: () => void;
+  onGoClasse?: () => void;
 }) {
   const [mode, setMode] = useState<GameMode>("casual");
   const [bestOf, setBestOf] = useState(3);
@@ -394,9 +445,10 @@ function ModeSelect({
               whileHover={{ y: -3 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => {
-                // Entraînement opens the solo sandbox (mode + difficulty +
-                // format/deck); the other modes go straight to their confirm.
+                // Entraînement → solo sandbox; Classé → its own lobby/tournament
+                // hub; everything else goes straight to the best-of confirm.
                 if (m === "training") { onGoSandbox?.(); return; }
+                if (m === "ranked") { onGoClasse?.(); return; }
                 setMode(m); setPendingMode(m);
               }}
               className={
@@ -614,6 +666,78 @@ function SandboxView({
           {mode === "cards" ? "Ouvrir le lobby Cartes →" : "Jouer →"}
         </motion.button>
       </div>
+    </motion.div>
+  );
+}
+
+/* ─────────── Classé — classic 1v1 hub (quick match + tournament) ─────────── */
+
+function ClasseLobby({
+  onBack, onQuickMatch, onViewBracket,
+}: {
+  onBack: () => void;
+  onQuickMatch: () => void;
+  onViewBracket: () => void;
+}) {
+  useAndroidBackPrompt(onBack);
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -16 }}
+      transition={{ duration: 0.3 }}
+      className="flex flex-col gap-5 flex-1 py-2 px-1 max-w-lg mx-auto w-full overflow-y-auto"
+    >
+      <FloatingMatchBackButton onClick={onBack} label="Retour" />
+
+      <div className="text-center mt-8">
+        <div className="text-5xl mb-1">🏆</div>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-themed leading-tight" style={{ fontFamily: "var(--font-headline)" }}>
+          Classé
+        </h1>
+        <p className="text-[11px] text-zinc-500 mt-1">Duel 1 v 1 classique vs IA · gagne de l'XP</p>
+      </div>
+
+      <motion.button
+        whileTap={{ scale: 0.98 }}
+        onClick={() => { hapticTick(); onQuickMatch(); }}
+        className="rounded-2xl p-4 text-left transition hover:brightness-110"
+        style={{
+          background: "linear-gradient(150deg, color-mix(in oklab, var(--theme-primary) 24%, transparent), color-mix(in oklab, var(--theme-secondary) 16%, transparent))",
+          border: "1px solid color-mix(in oklab, var(--theme-primary) 42%, transparent)",
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-3xl">⚔️</span>
+          <div className="min-w-0">
+            <div className="font-bold text-base">Match rapide</div>
+            <div className="text-[11px] text-zinc-300/80">Un duel immédiat contre l'IA (Best of 5).</div>
+          </div>
+          <span className="ml-auto text-xl text-zinc-300">→</span>
+        </div>
+      </motion.button>
+
+      <motion.button
+        whileTap={{ scale: 0.98 }}
+        onClick={() => { hapticTick(); onViewBracket(); }}
+        className="rounded-2xl p-4 text-left transition hover:brightness-110"
+        style={{
+          background: "linear-gradient(150deg, color-mix(in oklab, var(--theme-secondary) 24%, transparent), color-mix(in oklab, var(--theme-primary) 16%, transparent))",
+          border: "1px solid color-mix(in oklab, var(--theme-secondary) 42%, transparent)",
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-3xl">🗂️</span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-bold text-base">Tournoi</span>
+              <span className="text-[9px] uppercase tracking-wider px-1 rounded-full" style={{ color: "var(--theme-secondary)", background: "color-mix(in oklab, var(--theme-primary) 25%, transparent)" }}>Bracket</span>
+            </div>
+            <div className="text-[11px] text-zinc-300/80">Gravis un tableau d'adversaires IA jusqu'au podium.</div>
+          </div>
+          <span className="ml-auto text-xl text-zinc-300">→</span>
+        </div>
+      </motion.button>
     </motion.div>
   );
 }
@@ -913,12 +1037,16 @@ function Game({
   daily,
   questCtx,
   onQuit,
+  onMatchResult,
 }: {
   mode: GameMode;
   bestOf: number;
   daily?: DailyChallenge;
   questCtx?: { title: string; reward: number };
   onQuit: () => void;
+  /** When set (tournament context), the end screen shows a "Suivant →" button
+   *  that reports win/loss to the bracket instead of rematch/back. */
+  onMatchResult?: (won: boolean) => void;
 }) {
   const recordMatch = useStore((s) => s.recordMatch);
   const recordDailyComplete = useStore((s) => s.recordDailyComplete);
@@ -1247,6 +1375,7 @@ function Game({
               setPhase({ kind: "p1-pick" });
             }}
             onQuit={onQuit}
+            onMatchResult={onMatchResult}
           />
         )}
           </AnimatePresence>
@@ -1923,12 +2052,13 @@ function ParticleBurst({ color }: { color: string }) {
 /* ─────────── End ─────────── */
 
 function EndPanel({
-  labelA, labelB, match, streaks, mood, mode, isDaily, dailyBonus, onAgain, onQuit,
+  labelA, labelB, match, streaks, mood, mode, isDaily, dailyBonus, onAgain, onQuit, onMatchResult,
 }: {
   labelA: string; labelB: string; match: MatchState;
   streaks: Streaks; mood: AiMood | null; mode: GameMode;
   isDaily: boolean; dailyBonus: number;
   onAgain: () => void; onQuit: () => void;
+  onMatchResult?: (won: boolean) => void;
 }) {
   const t = useT();
   const s = status(match);
@@ -1970,10 +2100,10 @@ function EndPanel({
         youScore={match.scoreA}
         oppScore={match.scoreB}
         bestOf={match.bestOf}
-        onRematch={onAgain}
-        onBack={onQuit}
+        onRematch={onMatchResult ? undefined : onAgain}
+        onBack={onMatchResult ? () => onMatchResult(outcome === "win") : onQuit}
         rematchLabel={t("match.playAgain")}
-        backLabel={t("match.back")}
+        backLabel={onMatchResult ? "Suivant →" : t("match.back")}
       />
 
       {/* Local single-player extras — compacted to one wrap line so the
