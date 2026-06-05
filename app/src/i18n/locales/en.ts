@@ -117,7 +117,7 @@ const en: Record<string, string> = {
   "ranked.cards.anchor.desc": "This lane is immune to opponent card effects.",
   "ranked.cards.anchor.targetHint": "Tap a lane to protect.",
   "ranked.cards.second-wind.name": "Second Wind",
-  "ranked.cards.second-wind.desc": "If you lost last round, draw 1 bonus card.",
+  "ranked.cards.second-wind.desc": "Comeback: automatically turns one of your lost lanes into a draw.",
   "ranked.cards.second-wind.targetHint": "Plays automatically.",
   "ranked.cards.riposte.name": "Riposte",
   "ranked.cards.riposte.desc": "If you lose this lane, replay it solo: pick one move, opponent picks too — winning the rematch flips the lane from loss to win.",

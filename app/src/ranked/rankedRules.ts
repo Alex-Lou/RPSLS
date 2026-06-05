@@ -91,6 +91,23 @@ export function applyCardEffects(
     }
   }
 
+  // 1b. Second Wind (comeback): auto-rescue your FIRST lost lane (loss → draw).
+  //     No targeting — it just refuses to let you go down on a lane this round.
+  if (myCard?.id === "second-wind") {
+    const i = lanes.findIndex((l) => l.winner === "b");
+    if (i >= 0) {
+      lanes[i] = { ...lanes[i], winner: "draw", points: 0 };
+      bPoints -= 1;
+    }
+  }
+  if (oppCard?.id === "second-wind") {
+    const i = lanes.findIndex((l) => l.winner === "a");
+    if (i >= 0) {
+      lanes[i] = { ...lanes[i], winner: "draw", points: 0 };
+      aPoints -= 1;
+    }
+  }
+
   // 2. Precision: lane treated as favoured → handled in computeRoundBonuses
 
   // 3. Surge: win = +1, lose = opponent +1. Blocked by opponent Aegis.

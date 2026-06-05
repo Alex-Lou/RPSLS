@@ -117,7 +117,7 @@ const fr: Record<string, string> = {
   "ranked.cards.anchor.desc": "Cette lane est immunisée aux cartes adverses.",
   "ranked.cards.anchor.targetHint": "Touche une lane à protéger.",
   "ranked.cards.second-wind.name": "Second souffle",
-  "ranked.cards.second-wind.desc": "Si tu as perdu le dernier round, pioche 1 carte bonus.",
+  "ranked.cards.second-wind.desc": "Comeback : transforme automatiquement un de tes couloirs perdus en égalité.",
   "ranked.cards.second-wind.targetHint": "Se joue automatiquement.",
   "ranked.cards.riposte.name": "Riposte",
   "ranked.cards.riposte.desc": "Si tu perds cette lane, tu la rejoues en solo : tu choisis un coup, l'adversaire aussi — gagner la revanche flippe la lane de défaite à victoire.",
