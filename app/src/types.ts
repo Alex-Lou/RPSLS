@@ -152,7 +152,10 @@ export const REWARDS: Record<
 > = {
   training: { xpWin: 0,  xpLoss: 0,  xpDraw: 0,  lpWin: 0,  lpLoss: 0,   lpDraw: 0 },
   casual:   { xpWin: 50, xpLoss: 10, xpDraw: 20, lpWin: 0,  lpLoss: 0,   lpDraw: 0 },
-  ranked:   { xpWin: 30, xpLoss: 5,  xpDraw: 10, lpWin: 25, lpLoss: -20, lpDraw: 0 },
+  // vs-CPU "ranked" gives XP only — competitive LP / rank comes ONLY from
+  // real online matches (server-authoritative ladder). Keeps the global
+  // ranking un-farmable.
+  ranked:   { xpWin: 30, xpLoss: 5,  xpDraw: 10, lpWin: 0,  lpLoss: 0,   lpDraw: 0 },
   hotseat:  { xpWin: 0,  xpLoss: 0,  xpDraw: 0,  lpWin: 0,  lpLoss: 0,   lpDraw: 0 },
 };
 

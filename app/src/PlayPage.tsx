@@ -728,7 +728,6 @@ function Game({
   onQuit: () => void;
 }) {
   const recordMatch = useStore((s) => s.recordMatch);
-  const recordAbandon = useStore((s) => s.recordAbandon);
   const recordDailyComplete = useStore((s) => s.recordDailyComplete);
   const profileNickname = useStore((s) => s.player.nickname);
   const padId = useStore((s) => s.player.padId);
@@ -864,9 +863,6 @@ function Game({
       forfeit: true,
     };
     recordMatch(rec);
-    // Ranked forfeit also triggers the escalating repeat-abandon LP penalty
-    // (a one-off bail is "free" beyond the normal loss; repeat quitters pay).
-    if (mode === "ranked") recordAbandon();
     setRecorded(true);
     onQuit();
   };
@@ -1153,7 +1149,6 @@ function MatchFacts({
 /* ─────────── Header ─────────── */
 
 function Header({
-  mode,
   labelA, labelB, scoreA, scoreB, target,
   streakA, streakB, onQuit,
 }: {
@@ -1202,7 +1197,6 @@ function Header({
       <AnimatePresence>
         {confirmQuit && (
           <QuitConfirmModal
-            competitive={mode === "ranked"}
             onCancel={() => setConfirmQuit(false)}
             onConfirm={() => { setConfirmQuit(false); onQuit(); }}
           />

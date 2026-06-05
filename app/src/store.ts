@@ -251,7 +251,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "rpsls-app-state",
-      version: 15,
+      version: 16,
       migrate: (persisted: unknown, version: number): AppState => {
         const state = persisted as {
           player?: Partial<Player> & { customVariants?: unknown };
@@ -325,6 +325,12 @@ export const useStore = create<AppState>()(
           if (!("customPads" in state.player)) {
             state.player.customPads = state.player.customPadUrl ? [state.player.customPadUrl] : [];
           }
+        }
+        // v16: competitive LP is now ONLINE-only (vs-CPU gives XP, not LP).
+        // Reset the local rank LP to the fresh start so it matches the global
+        // ladder instead of reflecting old vs-CPU results.
+        if (version < 16 && state?.player) {
+          state.player.rankLp = 1000;
         }
         // Final pass — sanitise the persisted shape so a tampered
         // localStorage can never inject a payload that would crash the

@@ -100,7 +100,6 @@ export function RankedGame({
   const profileNickname = useStore((s) => s.player.nickname);
   const difficulty = useStore((s) => s.player.difficulty);
   const recordMatch = useStore((s) => s.recordMatch);
-  const recordAbandon = useStore((s) => s.recordAbandon);
   const savedDeck = useStore((s) => s.player.rankedDeck);
 
   const matchInfo: RankedMatchInfo = {
@@ -661,6 +660,8 @@ export function RankedGame({
   // calls this — carries no penalty. The RankedBackGuard confirms first.
   function handleLeave() {
     if (!end) {
+      // Forfeit vs CPU: recorded as a loss for history, but NO LP change and
+      // NO abandon penalty — competitive LP comes only from real online play.
       recordMatch({
         id: `ranked-forfeit-${Date.now()}`,
         mode: "constellation",
@@ -671,11 +672,10 @@ export function RankedGame({
         outcome: "loss",
         rounds: [],
         xpDelta: 0,
-        lpDelta: -20,
+        lpDelta: 0,
         timestamp: Date.now(),
         forfeit: true,
       });
-      recordAbandon();
     }
     onQuit();
   }
