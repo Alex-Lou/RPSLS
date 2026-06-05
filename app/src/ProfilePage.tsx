@@ -49,6 +49,9 @@ export function ProfilePage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const bgFileRef = useRef<HTMLInputElement>(null);
   const padFileRef = useRef<HTMLInputElement>(null);
+  // The "Apparence" card holds Background (scenes) + HUD palette under two
+  // tabs, so both visual settings live together without taking two big cards.
+  const [appearanceTab, setAppearanceTab] = useState<"bg" | "hud">("bg");
 
   const info = levelFromXp(player.xp);
   const theme = THEMES[player.themeId];
@@ -353,36 +356,7 @@ export function ProfilePage() {
         </div>
       </section>
 
-      {/* Theme picker */}
-      <section className="bg-surface border border-hairline rounded-3xl p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-muted mb-3">HUD Theme</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {(Object.keys(THEMES) as ThemeId[]).map((id) => {
-            const t = THEMES[id];
-            const active = player.themeId === id;
-            return (
-              <button
-                key={id}
-                onClick={() => updateProfile({ themeId: id })}
-                className={
-                  "rounded-2xl p-3 border transition flex flex-col items-center gap-2 " +
-                  (active
-                    ? "border-white/40 bg-hairline"
-                    : "border-hairline bg-hairline hover:bg-hairline")
-                }
-              >
-                <div
-                  className="w-full h-12 rounded-xl"
-                  style={{ background: gradientFromTheme(t) }}
-                />
-                <span className="text-xs">
-                  {t.emoji} {t.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+      {/* HUD palette moved into the "Apparence" tabs (Background card) below. */}
 
       {/* CPU difficulty */}
       <section className="bg-surface border border-hairline rounded-3xl p-4 sm:p-5">
@@ -486,9 +460,29 @@ export function ProfilePage() {
         </button>
       </section>
 
-      {/* Background picker — fully coded animated scenes (+ your own image). */}
+      {/* Apparence — Arrière-plan (scènes animées) + Couleurs (palette HUD) sous
+          deux onglets, pour gérer tout le visuel dans une seule card. */}
       <section className="bg-surface border border-hairline rounded-3xl p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-muted mb-3">Background</h2>
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-muted">Apparence</h2>
+          <div className="ml-auto flex gap-1 p-1 rounded-xl bg-hairline border border-hairline">
+            {([["bg", "Arrière-plan"], ["hud", "Couleurs"]] as const).map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => setAppearanceTab(id)}
+                className={
+                  "px-3 py-1 rounded-lg text-xs font-semibold transition " +
+                  (appearanceTab === id ? "bg-themed text-zinc-900 shadow" : "text-ink-muted hover:text-ink")
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {appearanceTab === "bg" && (
+        <>
         <p className="text-xs text-ink-faint mb-3">
           Des thèmes 100% animés et codés. « Mon image » importe la tienne (portrait 9:16, ex. 1080×1920 — affichée plein écran). Tu peux en garder jusqu'à {MAX_CUSTOM_IMAGES} dans ta bibliothèque.
         </p>
@@ -605,6 +599,37 @@ export function ProfilePage() {
           onDelete={deleteStoredBg}
           onAdd={() => bgFileRef.current?.click()}
         />
+        </>
+        )}
+
+        {appearanceTab === "hud" && (
+        <>
+        <p className="text-xs text-ink-faint mb-3">
+          La palette de l'interface : boutons, accents, barres, focus. Les surfaces du HUD se teintent automatiquement selon le choix.
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          {(Object.keys(THEMES) as ThemeId[]).map((id) => {
+            const tt = THEMES[id];
+            const active = player.themeId === id;
+            return (
+              <button
+                key={id}
+                onClick={() => updateProfile({ themeId: id })}
+                className={
+                  "rounded-2xl p-3 border transition flex flex-col items-center gap-2 " +
+                  (active
+                    ? "border-white/40 bg-hairline"
+                    : "border-hairline bg-hairline hover:border-white/20")
+                }
+              >
+                <div className="w-full h-12 rounded-xl" style={{ background: gradientFromTheme(tt) }} />
+                <span className="text-xs">{tt.emoji} {tt.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        </>
+        )}
       </section>
 
       {/* Battle pad picker */}
