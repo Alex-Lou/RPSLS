@@ -41,6 +41,9 @@ precision highp float;
 uniform vec2  u_res;
 uniform float u_time;
 uniform int   u_scene;
+uniform vec2  u_touch;     // last touch position, GL coords (y up), in px
+uniform float u_touchAge;  // seconds since the last tap → fades the ripple
+uniform float u_hold;      // eased press duration 0..~1.2 (0 = released)
 
 const float PI = 3.14159265;
 
@@ -168,25 +171,18 @@ vec3 galaxy(vec2 uv, float aspect){
   arms = pow(arms, 1.9);                             // sharper, higher-contrast arms
   arms *= smoothstep(1.5, 0.05, r);                  // fade outward
   // Dust sampled in WARPED CARTESIAN space (not raw polar) so it no longer
-  // bands into blocky seams along the angular grid — this was the "squares".
-  vec2 warp = p*2.4 + 0.6*vec2(cos(spiral), sin(spiral));
-  float dust = fbm(warp - u_time*0.05);
-  dust = dust*dust;                                  // punchier contrast
-  vec3 col = vec3(0.012,0.012,0.045);
-  col += mix(vec3(0.32,0.12,0.66), vec3(0.16,0.78,1.05), dust) * arms * 1.2;
-  // Bright core + violet halo.
-  col += vec3(1.0,0.88,0.96) * exp(-r*r*7.5) * 0.95;
-  col += vec3(0.78,0.45,1.0) * exp(-r*r*1.6) * 0.22;
-  // Nova bursts pulsing from the galactic eye — three staggered flashes that
-  // swell and fade right at the core.
-  for(int i=0;i<3;i++){
-    float fi=float(i);
-    float ph = fract(u_time*0.13 + fi*0.37);         // 0→1 burst cycle
-    float sw = sin(ph*PI);                            // smooth swell-and-fade
-    float burst = exp(-r*r*(0.6 + ph*7.0)) * sw*sw;
-    vec3 nc = mix(vec3(1.0,0.93,0.78), vec3(0.72,0.86,1.0), fi*0.5);
-    col += nc * burst * 0.9;
-  }
+  // bands into blocky seams along the angular grid — liquid swirl.
+  vec2 warp = p*2.6 + 0.5*vec2(cos(spiral), sin(spiral));
+  float dust = fbm(warp - u_time*0.06);
+  vec3 col = vec3(0.012,0.013,0.045);
+  col += mix(vec3(0.26,0.11,0.55), vec3(0.16,0.55,0.92), dust) * arms * 0.8;
+  // Discreet core — a soft glow, NOT a flashy ball, kept dim so the menu cards
+  // on top stay readable.
+  col += vec3(0.65,0.55,0.92) * exp(-r*r*6.0) * 0.30;
+  col += vec3(0.45,0.30,0.80) * exp(-r*r*1.8) * 0.10;
+  // Gentle breathing twinkle right at the eye — subtle, never a strobe.
+  float tw = 0.5 + 0.5*sin(u_time*0.9);
+  col += vec3(0.85,0.80,1.0) * exp(-r*r*48.0) * (0.18 + 0.16*tw);
   col += softStars(uv, aspect, 0.990, vec3(0.9,0.92,1.0));
   return col;
 }
@@ -279,6 +275,35 @@ void main(){
   else if(u_scene==5) col = quantum(uv, aspect);
   else if(u_scene==6) col = casino(uv, aspect);
   else col = nebula(uv, aspect);
+
+  // ── Per-scene touch interaction ──────────────────────────────────────
+  // The backdrop reacts to the finger differently per scene. Skipped once
+  // the tap is old and nothing is held (cheap early-out via the multipliers).
+  {
+    vec2 tuv = u_touch / u_res;
+    float age = u_touchAge;
+    float td = length((uv - tuv) * vec2(aspect, 1.0));   // aspect-correct distance
+    if (u_scene == 2) {
+      // Neon Grid → the touched spot lights up pink and fades like a piano key.
+      col += vec3(1.0,0.30,0.72) * exp(-td*td*55.0) * exp(-age*3.2) * 1.6;
+    } else if (u_scene == 5) {
+      // Quantum → a liquid ripple radiating from the fingertip.
+      col += vec3(0.45,0.92,1.0) * sin(td*42.0 - age*9.0) * exp(-td*5.5) * exp(-age*2.2) * 0.7;
+    } else if (u_scene == 4) {
+      // Holy → a golden glitch square that materialises while held and slowly
+      // undoes itself on release (u_hold eases up, then down).
+      float h = clamp(u_hold, 0.0, 1.0);
+      float sz = 0.03 + h*0.11;
+      vec2 d2 = abs(uv - tuv) * vec2(aspect, 1.0);
+      float sq = smoothstep(sz, sz*0.78, max(d2.x, d2.y));
+      float glitch = step(0.5, fract(uv.y*70.0 + u_time*4.0));
+      col += vec3(1.0,0.82,0.36) * sq * (0.45 + 0.55*glitch) * smoothstep(0.0,0.04,h);
+    } else {
+      // Galaxy / Nebula / Aurora / Casino → a soft universal ripple.
+      col += vec3(0.80,0.85,1.0) * sin(td*26.0 - age*7.0) * exp(-td*4.8) * exp(-age*2.6) * 0.35;
+    }
+  }
+
   float vig = distance(uv, vec2(0.5));
   col *= mix(1.04, 0.58, smoothstep(0.2,0.95,vig));
   gl_FragColor = vec4(pow(max(col, 0.0), vec3(0.92)), 1.0);
@@ -316,9 +341,15 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
     let fs: WebGLShader | null = null;
     let uRes: WebGLUniformLocation | null = null;
     let uTime: WebGLUniformLocation | null = null;
+    let uTouch: WebGLUniformLocation | null = null;
+    let uTouchAge: WebGLUniformLocation | null = null;
+    let uHold: WebGLUniformLocation | null = null;
     let running = false;
     let start = performance.now();
     let last = 0;
+    // Touch state for the per-scene backdrop interaction.
+    let touchX = -1e6, touchY = -1e6, touchDownAt = -1e6, hold = 0;
+    let pressing = false;
 
     const resize = () => {
       if (!gl) return;
@@ -367,6 +398,9 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
 
       uRes = gl.getUniformLocation(prog, "u_res");
       uTime = gl.getUniformLocation(prog, "u_time");
+      uTouch = gl.getUniformLocation(prog, "u_touch");
+      uTouchAge = gl.getUniformLocation(prog, "u_touchAge");
+      uHold = gl.getUniformLocation(prog, "u_hold");
       const uScene = gl.getUniformLocation(prog, "u_scene");
       uSceneRef.current = uScene;
       gl.uniform1i(uScene, SCENE_INDEX[sceneRef.current]);
@@ -382,9 +416,16 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
     const frame = (now: number) => {
       if (!running) return;
       if (gl && !gl.isContextLost() && now - last >= MIN_DT) {
+        const dt = (now - last) / 1000;
         last = now;
+        // Ease the press value up while held, down on release (Holy square etc.).
+        if (pressing) hold = Math.min(1.2, hold + dt / 0.8);
+        else hold = Math.max(0, hold - dt / 1.1);
         gl.uniform2f(uRes, canvas.width, canvas.height);
         gl.uniform1f(uTime, (now - start) / 1000);
+        gl.uniform2f(uTouch, touchX, touchY);
+        gl.uniform1f(uTouchAge, (now - touchDownAt) / 1000);
+        gl.uniform1f(uHold, hold);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
       }
       rafRef.current = requestAnimationFrame(frame);
@@ -410,6 +451,21 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
     canvas.addEventListener("webglcontextlost", onLost as EventListener, false);
     canvas.addEventListener("webglcontextrestored", onRestored as EventListener, false);
     window.addEventListener("resize", resize);
+
+    // Touch interaction → feed finger position (GL y-up) + press state to the
+    // shader. Listened on window since the canvas is pointer-events:none.
+    const setTouch = (e: PointerEvent) => {
+      touchX = e.clientX * dpr;
+      touchY = canvas.height - e.clientY * dpr;
+    };
+    const onTDown = (e: PointerEvent) => { setTouch(e); touchDownAt = performance.now(); pressing = true; startLoop(); };
+    const onTMove = (e: PointerEvent) => { if (pressing) setTouch(e); };
+    const onTUp = () => { pressing = false; };
+    window.addEventListener("pointerdown", onTDown, { passive: true });
+    window.addEventListener("pointermove", onTMove, { passive: true });
+    window.addEventListener("pointerup", onTUp, { passive: true });
+    window.addEventListener("pointercancel", onTUp, { passive: true });
+
     const onVis = () => { if (document.hidden) stopLoop(); else startLoop(); };
     document.addEventListener("visibilitychange", onVis);
 
@@ -418,6 +474,10 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
     return () => {
       stopLoop();
       window.removeEventListener("resize", resize);
+      window.removeEventListener("pointerdown", onTDown);
+      window.removeEventListener("pointermove", onTMove);
+      window.removeEventListener("pointerup", onTUp);
+      window.removeEventListener("pointercancel", onTUp);
       document.removeEventListener("visibilitychange", onVis);
       canvas.removeEventListener("webglcontextlost", onLost as EventListener);
       canvas.removeEventListener("webglcontextrestored", onRestored as EventListener);
