@@ -79,7 +79,7 @@ const pt: Record<string, string> = {
   "mode.online.tag": "Vs humanos · nuvem ou LAN, em tempo real",
   "mode.online.cta": "Abrir lobby online",
   "mode.ranked_constellation": "Constellation Ranqueada",
-  "mode.ranked_constellation.tag": "Cartas + mana · vs IA",
+  "mode.ranked_constellation.tag": "Cartas + mana · torneio",
   "ranked.match.foundKicker": "Constellation Ranqueada",
   "ranked.match.foundSub": "Primeiro a {{winTo}} rodadas ganhas · Mana & Cartas",
   "ranked.match.bo5": "Melhor de 5",

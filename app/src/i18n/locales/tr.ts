@@ -79,7 +79,7 @@ const tr: Record<string, string> = {
   "mode.online.tag": "İnsanlara karşı · bulut veya LAN, gerçek zamanlı",
   "mode.online.cta": "Çevrimiçi lobiyi aç",
   "mode.ranked_constellation": "Konstellasyon Sıralı",
-  "mode.ranked_constellation.tag": "Kartlar + mana · CPU'ya karşı",
+  "mode.ranked_constellation.tag": "Kartlar + mana · turnuva",
   "ranked.match.foundKicker": "Sıralı Konstellasyon",
   "ranked.match.foundSub": "{{winTo}} raund kazanışına kadar · Mana & Kartlar",
   "ranked.match.bo5": "En İyi 5",

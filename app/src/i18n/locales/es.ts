@@ -70,7 +70,7 @@ const es: Record<string, string> = {
 
   // ── Constellation Clasificada (Phase A) ──
   "mode.ranked_constellation": "Constellation Clasificada",
-  "mode.ranked_constellation.tag": "Cartas + maná · vs IA",
+  "mode.ranked_constellation.tag": "Cartas + maná · torneo",
   "ranked.match.foundKicker": "Constellation Clasificada",
   "ranked.match.foundSub": "Primero a {{winTo}} rondas ganadas · Maná y Cartas",
   "ranked.match.bo5": "Best of 5",

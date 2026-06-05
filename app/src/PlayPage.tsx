@@ -269,6 +269,19 @@ const MODE_ICONS: Record<ModeCardId, string> = {
   ranked_constellation: "/MenuIcons/constellation.png", // Phase A: reuse art with a distinct tint.
 };
 
+/** Per-mode accent for the two tiles that otherwise fell through to the plain
+ *  generic style (Entraînement, Classé) — every menu card now has its own
+ *  coloured identity. Fixed hues (not theme tokens) on purpose: each mode must
+ *  be recognisable at a glance, like online/constellation already are. */
+const TILE_ACCENT: Partial<Record<ModeCardId, string>> = {
+  training:
+    "border-emerald-400/30 bg-gradient-to-br from-emerald-500/15 via-teal-500/10 to-cyan-500/15 " +
+    "hover:from-emerald-500/25 hover:via-teal-500/20 hover:to-cyan-500/25 hover:border-emerald-400/60 shadow-lg shadow-emerald-500/10",
+  ranked:
+    "border-sky-400/30 bg-gradient-to-br from-sky-500/15 via-indigo-500/10 to-blue-500/15 " +
+    "hover:from-sky-500/25 hover:via-indigo-500/20 hover:to-blue-500/25 hover:border-sky-400/60 shadow-lg shadow-sky-500/10",
+};
+
 /** Renders the mode tile icon — a PNG from /MenuIcons, sized to match the
  *  emoji it replaced (~36px, with breathing margins for the tile). */
 function ModeIcon({ mode }: { mode: ModeCardId }) {
@@ -458,7 +471,8 @@ function ModeSelect({
                 setMode(m); setPendingMode(m);
               }}
               className={
-                "p-2.5 sm:p-4 rounded-2xl border border-hairline bg-hairline hover:bg-hairline hover:border-white/20 transition flex flex-col gap-1.5 min-h-[124px] " +
+                "p-2.5 sm:p-4 rounded-2xl border transition flex flex-col gap-1.5 min-h-[124px] " +
+                (TILE_ACCENT[m] ?? "border-hairline bg-hairline hover:border-white/20") + " " +
                 // Wide tile (hot-seat) spans both columns, so left-aligning
                 // its content leaves an ugly empty right half. Center it.
                 (wide ? "col-span-2 items-center text-center justify-center" : "text-left items-start")

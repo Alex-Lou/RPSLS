@@ -70,7 +70,7 @@ const de: Record<string, string> = {
 
   // ── Constellation Rangliste (Phase A) ──
   "mode.ranked_constellation": "Constellation Rangliste",
-  "mode.ranked_constellation.tag": "Karten + Mana · gegen KI",
+  "mode.ranked_constellation.tag": "Karten + Mana · Turnier",
   "ranked.match.foundKicker": "Constellation Rangliste",
   "ranked.match.foundSub": "Erster zu {{winTo}} Runden-Siegen · Mana & Karten",
   "ranked.match.bo5": "Best of 5",

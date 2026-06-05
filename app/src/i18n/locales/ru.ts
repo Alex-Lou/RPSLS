@@ -89,7 +89,7 @@ const ru: Record<string, string> = {
   "play.daily.done": "Уже завершено сегодня. Приходите завтра.",
   "play.daily.start": "Начать вызов →",
   "mode.ranked_constellation": "Рейтинговое Созвездие",
-  "mode.ranked_constellation.tag": "Карты + мана · против ИИ",
+  "mode.ranked_constellation.tag": "Карты + мана · турнир",
   "ranked.match.foundKicker": "Рейтинговое Созвездие",
   "ranked.match.foundSub": "Первый до {{winTo}} выигранных раундов · Мана и Карты",
   "ranked.match.bo5": "Лучшее из 5",

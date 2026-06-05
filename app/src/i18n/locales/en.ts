@@ -92,7 +92,7 @@ const en: Record<string, string> = {
 
   // ── Constellation Ranked (Phase A) ──
   "mode.ranked_constellation": "Constellation Ranked",
-  "mode.ranked_constellation.tag": "Cards + mana · vs CPU",
+  "mode.ranked_constellation.tag": "Cards + mana · tournament",
   "ranked.match.foundKicker": "Ranked Constellation",
   "ranked.match.foundSub": "First to {{winTo}} round-wins · Mana & Cards",
   "ranked.match.bo5": "Best of 5",
