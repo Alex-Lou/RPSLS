@@ -689,7 +689,7 @@ function SandboxView({
 
       {/* Recap + Play */}
       <div className="mt-auto pt-1">
-        <div className="text-center text-[11px] text-ink-muted mb-2">
+        <div className="text-center text-[11px] text-ink-muted mb-4">
           <span className="px-3 py-1 rounded-full bg-hairline border border-hairline">{recap}</span>
         </div>
         <motion.button
@@ -757,7 +757,7 @@ function ConstellationLobby({
           ))}
         </div>
         <p className="text-[11px] text-ink-muted mt-2 text-center leading-snug">
-          Chaque couloir favorise certains coups : jouer le bon coup au bon endroit rapporte un bonus.
+          <b className="text-ink">Astuce :</b> gagne un couloir en y jouant l'un de ses coups favoris (listés ci-dessus) → <b className="text-emerald-300">+1 point bonus</b>. Ex : Pierre ou Ciseaux dans FORCE.
         </p>
       </div>
 

@@ -104,25 +104,28 @@ export function ThemeTouchFX({ enabled }: { enabled: boolean }) {
       return true;
     };
 
-    let lastTrail = 0;
+    // Burst on a genuine TAP only — a press that stays put and lifts quickly.
+    // A scroll/drag is a long, moving press → no particles (a trail smeared
+    // along a scroll looked bad). The colour is read at tap time so it always
+    // matches the live theme/background accent.
+    let down: { x: number; y: number; t: number } | null = null;
     const onDown = (e: PointerEvent) => {
+      down = allowed(e) ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;
+    };
+    const onUp = (e: PointerEvent) => {
+      const d = down; down = null;
+      if (!d) return;
+      const dist = Math.hypot(e.clientX - d.x, e.clientY - d.y);
+      if (performance.now() - d.t > 350 || dist > 12) return; // held/moved → scroll
       if (!allowed(e)) return;
       refreshSprites();
-      spawn(e.clientX, e.clientY, 12, 1.6);
+      spawn(e.clientX, e.clientY, 16, 1.8);
       ensureRunning();
     };
-    const onMove = (e: PointerEvent) => {
-      // Trail only while a pointer is down (dragging across the menu).
-      if (e.pressure === 0 && e.buttons === 0 && e.pointerType === "mouse") return;
-      if (!allowed(e)) return;
-      const now = performance.now();
-      if (now - lastTrail < 22) return; // throttle the trail
-      lastTrail = now;
-      spawn(e.clientX, e.clientY, 2, 0.9);
-      ensureRunning();
-    };
+    const onCancel = () => { down = null; };
     window.addEventListener("pointerdown", onDown, { passive: true });
-    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("pointerup", onUp, { passive: true });
+    window.addEventListener("pointercancel", onCancel, { passive: true });
 
     let raf = 0;
     let running = false;
@@ -160,7 +163,8 @@ export function ThemeTouchFX({ enabled }: { enabled: boolean }) {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
       window.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
       document.removeEventListener("visibilitychange", onVis);
     };
   }, [enabled]);

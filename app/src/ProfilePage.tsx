@@ -354,6 +354,9 @@ export function ProfilePage() {
             onChange={onUpload}
           />
         </div>
+        <p className="text-[11px] text-ink-faint mt-3 leading-snug">
+          Upload : image <b className="text-ink-muted">carrée</b> (1:1), PNG ou JPG — <b className="text-ink-muted">512×512</b> recommandé. Elle est recadrée en cercle et compressée automatiquement.
+        </p>
       </section>
 
       {/* HUD palette moved into the "Apparence" tabs (Background card) below. */}
