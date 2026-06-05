@@ -16,6 +16,7 @@ import {
   type ComboTheme,
 } from "../lanesCombos";
 import { LanesBoard } from "./LanesBoard";
+import { CARDS } from "./cards";
 import type { LaneTarget, PlayedCard, RoundBonusBreakdown } from "./rankedTypes";
 import { totalBonusForSide } from "./rankedRules";
 import { useT } from "../i18n";
@@ -120,6 +121,23 @@ export function RankedRevealPhase({
           )}
         </AnimatePresence>
 
+        {/* Cards played this round — a plain-language line per side so the
+            player understands what each card did and why the result changed. */}
+        <AnimatePresence>
+          {showAfter && (myCard || oppCard) && (
+            <motion.div
+              key="cards-recap"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="flex flex-col items-center gap-1 mt-1 w-full px-2"
+            >
+              {myCard && <CardLine side="you" card={myCard} t={t} />}
+              {oppCard && <CardLine side="opp" card={oppCard} t={t} />}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Combo banner — the custom punch-line for the hand played. */}
         <AnimatePresence>
           {showAfter && headlineCombo && (
@@ -187,6 +205,33 @@ function Row({ label, you, opp }: { label: string; you: number; opp: number }) {
       </span>
       <span className={"font-mono w-6 " + (opp > 0 ? "text-rose-300" : "text-zinc-600")}>
         {opp > 0 ? `+${opp}` : "·"}
+      </span>
+    </div>
+  );
+}
+
+/* ──────────── Card-played recap line ──────────── */
+
+/** One plain-language line: which card a side played + what it does. */
+function CardLine({
+  side, card, t,
+}: {
+  side: "you" | "opp";
+  card: PlayedCard;
+  t: (k: string, vars?: Record<string, string | number>) => string;
+}) {
+  const meta = CARDS[card.id];
+  if (!meta) return null;
+  const isYou = side === "you";
+  return (
+    <div className="flex items-start gap-2 max-w-sm text-left">
+      <span className={"text-[9px] uppercase tracking-wider font-bold mt-1 w-9 shrink-0 " + (isYou ? "text-emerald-400/80" : "text-rose-400/80")}>
+        {isYou ? "Toi" : "Adv."}
+      </span>
+      <span className="text-sm shrink-0 mt-0.5">🃏</span>
+      <span className="text-[11px] leading-snug">
+        <b className={"font-bold " + (isYou ? "text-emerald-200" : "text-rose-200")}>{t(meta.nameKey)}</b>
+        <span className="text-zinc-400"> — {t(meta.descKey)}</span>
       </span>
     </div>
   );

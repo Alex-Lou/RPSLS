@@ -318,13 +318,16 @@ function ModeSelect({
               "linear-gradient(135deg, color-mix(in oklab, var(--theme-primary) 85%, #fff) 0%, color-mix(in oklab, var(--theme-secondary) 85%, #fff) 100%)",
             fontFamily: "var(--font-headline)",
             letterSpacing: "0.01em",
+            // drop-shadow (not text-shadow) works on bg-clip-text gradients —
+            // keeps the title readable over bright/flashy backdrops.
+            filter: "drop-shadow(0 2px 10px rgba(0,0,0,0.6))",
           }}
         >
           {t("play.title")}
         </h1>
         <p
-          className="mt-1.5 sm:mt-2.5 text-zinc-400 text-xs sm:text-sm leading-snug tracking-[0.18em] uppercase"
-          style={{ fontFamily: "var(--font-body)" }}
+          className="mt-1.5 sm:mt-2.5 text-zinc-200 text-xs sm:text-sm leading-snug tracking-[0.18em] uppercase"
+          style={{ fontFamily: "var(--font-body)", textShadow: "0 1px 6px rgba(0,0,0,0.7)" }}
         >
           {t("splash.tagline")}
         </p>
@@ -564,18 +567,21 @@ function SandboxView({
     >
       <FloatingMatchBackButton onClick={onBack} label="Retour" />
 
-      <div className="text-center mt-8 relative">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-themed leading-tight" style={{ fontFamily: "var(--font-headline)" }}>
-          Entraînement
-        </h1>
-        <p className="text-[11px] text-zinc-500 mt-1">Solo vs IA — règle ta partie comme tu veux</p>
+      {/* Dice on its own right-aligned row so it never overlaps the title. */}
+      <div className="flex justify-end mt-8 -mb-2">
         <button
           onClick={surprise}
-          className="absolute right-0 top-0 text-xs font-semibold px-2.5 py-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition"
+          className="text-xs font-semibold px-2.5 py-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition"
           title="Config aléatoire"
         >
           🎲 Aléatoire
         </button>
+      </div>
+      <div className="text-center">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-themed leading-tight" style={{ fontFamily: "var(--font-headline)" }}>
+          Entraînement
+        </h1>
+        <p className="text-[11px] text-zinc-500 mt-1">Solo vs IA — règle ta partie comme tu veux</p>
       </div>
 
       {/* Mode — same icons/names as the home menu */}

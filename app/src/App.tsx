@@ -184,7 +184,7 @@ export default function App() {
           className="fixed inset-0 z-0 pointer-events-none"
           style={{
             background:
-              "linear-gradient(180deg, rgba(0,0,0,0.36) 0%, rgba(0,0,0,0.10) 22%, rgba(0,0,0,0.10) 68%, rgba(0,0,0,0.42) 100%)",
+              "linear-gradient(180deg, rgba(0,0,0,0.46) 0%, rgba(0,0,0,0.22) 24%, rgba(0,0,0,0.22) 68%, rgba(0,0,0,0.48) 100%)",
           }}
         />
       )}
