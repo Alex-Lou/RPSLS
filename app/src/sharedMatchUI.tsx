@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { useT } from "./i18n";
 import { useStore } from "./store";
 import { rankFromLp } from "./rank";
+import { BurstCanvas } from "./LevelUpOverlay";
 import { classifyEnd, pickEndSubtitleKey } from "./flavor/endphrases";
 
 /**
@@ -416,7 +417,7 @@ export function CinematicMatchEnd({
       animate={{ opacity: 1, y: 0 }}
       className="relative flex flex-col items-center gap-2.5 py-2"
     >
-      {youWon && <Confetti />}
+      {youWon && <CelebrationBurst />}
 
       {/* Glyph with a breathing halo behind it (green win / grey draw / red loss). */}
       <div className="relative flex items-center justify-center">
@@ -580,27 +581,55 @@ export function CinematicMatchEnd({
   );
 }
 
-/** Falling confetti burst — celebratory shower behind the match-end trophy. */
-export function Confetti() {
+/**
+ * CelebrationBurst — the real celebration. A one-shot, full-screen WebGL
+ * shockwave/god-ray/sparkle burst (the very shader that powers the level-up,
+ * reused here) PLUS a rich falling-confetti shower layered on top: ~46 pieces
+ * with mixed shapes (squares, circles, streamers), per-piece colour, drift,
+ * spin and glow. Auto-unmounts after ~3.2s so the GL context never lingers as
+ * a persistent second layer over the animated backdrop.
+ */
+export function CelebrationBurst() {
+  const [show, setShow] = useState(true);
   const pieces = useRef(
-    Array.from({ length: 18 }, (_, i) => ({
-      x: (i * 53) % 100,
-      hue: [150, 280, 45, 330, 190][i % 5],
-      delay: (i % 6) * 0.06,
-      dur: 1.5 + (i % 4) * 0.35,
-      rot: (i * 67) % 360,
-    })),
+    Array.from({ length: 46 }, (_, i) => {
+      const shape = i % 5; // 0-1 square, 2 circle, 3-4 streamer
+      return {
+        x: (i * 37) % 100,
+        hue: [150, 275, 45, 330, 190, 50, 0, 110][i % 8],
+        delay: (i % 12) * 0.045,
+        dur: 1.9 + (i % 6) * 0.32,
+        rot: ((i * 97) % 900) - 450,
+        drift: ((i * 53) % 60) - 30,
+        w: shape >= 3 ? 4 : 7 + (i % 3) * 2,
+        h: shape >= 3 ? 16 + (i % 3) * 4 : 7 + (i % 3) * 2,
+        round: shape === 2,
+      };
+    }),
   ).current;
+  useEffect(() => {
+    const id = window.setTimeout(() => setShow(false), 3200);
+    return () => window.clearTimeout(id);
+  }, []);
+  if (!show) return null;
   return (
-    <div className="pointer-events-none absolute inset-x-0 -top-2 h-44 overflow-hidden" aria-hidden>
+    <div className="fixed inset-0 z-30 pointer-events-none overflow-hidden" aria-hidden>
+      <BurstCanvas />
       {pieces.map((p, i) => (
         <motion.span
           key={i}
-          initial={{ y: -24, opacity: 0, rotate: 0 }}
-          animate={{ y: 190, opacity: [0, 1, 1, 0], rotate: p.rot }}
-          transition={{ duration: p.dur, delay: 0.15 + p.delay, ease: "easeIn" }}
-          className="absolute block w-2 h-3 rounded-[1px]"
-          style={{ left: `${p.x}%`, background: `hsl(${p.hue} 90% 62%)` }}
+          initial={{ top: "-8%", opacity: 0, rotate: 0 }}
+          animate={{ top: "110%", x: p.drift, opacity: [0, 1, 1, 0.9, 0], rotate: p.rot }}
+          transition={{ duration: p.dur, delay: 0.12 + p.delay, ease: [0.25, 0.1, 0.5, 1] }}
+          className="absolute block"
+          style={{
+            left: `${p.x}%`,
+            width: p.w,
+            height: p.h,
+            borderRadius: p.round ? "50%" : 2,
+            background: `hsl(${p.hue} 92% 62%)`,
+            boxShadow: `0 0 7px hsl(${p.hue} 92% 60% / 0.65)`,
+          }}
         />
       ))}
     </div>

@@ -95,7 +95,7 @@ void main(){
 }
 `;
 
-function BurstCanvas() {
+export function BurstCanvas() {
   const ref = useRef<HTMLCanvasElement>(null);
   const raf = useRef<number>(0);
   useEffect(() => {

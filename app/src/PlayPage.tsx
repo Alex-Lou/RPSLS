@@ -368,9 +368,9 @@ function ModeSelect({
             );
           }
           const rewards = REWARDS[m];
-          // Hot-seat is the 7th tile and would sit alone on its row in a 2-col
-          // grid — span it across both columns so the layout stays tight.
-          const wide = m === "hotseat";
+          // An odd last tile would sit alone in a 2-col grid — span it across
+          // both columns so the menu stays balanced.
+          const wide = i === ALL_CARDS.length - 1 && ALL_CARDS.length % 2 === 1;
           return (
             <motion.button
               key={m}
