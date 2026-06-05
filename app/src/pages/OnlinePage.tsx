@@ -11,7 +11,7 @@ import {
   normalizeServerUrl,
   type ServerMessage,
   type PlayerSlot,
-} from "../online";
+} from "../online/online";
 import {
   LanesMatchView,
   type LanesMatchInfo,

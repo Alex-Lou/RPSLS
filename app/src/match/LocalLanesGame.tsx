@@ -22,7 +22,7 @@ import {
   resolveLanesRound,
   type LocalBattleState,
 } from "../engine/lanesEngine";
-import type { LanePlay, PlayerSlot } from "../online";
+import type { LanePlay, PlayerSlot } from "../online/online";
 import {
   hapticLock,
   hapticMatchStart,

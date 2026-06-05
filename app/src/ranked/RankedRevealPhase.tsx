@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import type { Move } from "../engine/game";
-import type { LaneResult } from "../online";
+import type { LaneResult } from "../online/online";
 import {
   detectPlayerCombo,
   detectOutcomeCombo,

@@ -19,7 +19,7 @@ import { useT } from "../i18n";
 import { MatchScoreBar, hapticTick, PickShock, CinematicMatchEnd, useAndroidBackPrompt, ScaleToFit, FloatingMatchBackButton } from "./sharedMatchUI";
 import { QuitConfirmModal } from "./QuitConfirmModal";
 import { useStore } from "../store/store";
-import type { LanePlay, LaneResult, PlayerSlot } from "../online";
+import type { LanePlay, LaneResult, PlayerSlot } from "../online/online";
 import {
   detectOutcomeCombo,
   detectPlayerCombo,

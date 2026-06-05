@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { Hand, MoveGlyph } from "../icons";
 import type { Move } from "../engine/game";
-import type { LaneResult } from "../online";
+import type { LaneResult } from "../online/online";
 import { LANE_IDENTITIES, laneFavoursMove } from "../engine/lanesCombos";
 import { CardSlot } from "./CardSlot";
 import { OppHandIndicator } from "./OppHandIndicator";

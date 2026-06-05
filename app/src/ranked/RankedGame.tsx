@@ -24,7 +24,7 @@ import {
   hapticLock, hapticMatchStart, hapticMatchWin, hapticMatchLoss,
   hapticTap, hapticWin, hapticLoss,
 } from "../haptic";
-import type { LanePlay, PlayerSlot } from "../online";
+import type { LanePlay, PlayerSlot } from "../online/online";
 import {
   RankedMatchView,
   type RankedMatchInfo,

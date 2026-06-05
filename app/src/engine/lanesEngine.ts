@@ -9,7 +9,7 @@
  */
 
 import { MOVES, type Move, type AiMood } from "./game";
-import type { LanePlay, LaneResult, LaneWinner, PlayerSlot } from "../online";
+import type { LanePlay, LaneResult, LaneWinner, PlayerSlot } from "../online/online";
 
 /* ──────────── Pure RPSLS rules (mirrored from rpsls-core) ──────────── */
 

@@ -2,7 +2,7 @@
  * CPU brain — 12 cards. Easy/normal = no cards. Hard = picks from hand.
  */
 
-import type { LanePlay } from "../online";
+import type { LanePlay } from "../online/online";
 import { cpuLanesPicks, type LanesAiContext } from "../engine/lanesEngine";
 import { laneFavoursMove } from "../engine/lanesCombos";
 import { CARDS } from "./cards";

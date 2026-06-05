@@ -17,7 +17,7 @@ import {
   fetchTop,
   fetchMyRank,
   type LeaderboardEntry,
-} from "../leaderboard";
+} from "../online/leaderboard";
 
 export function LeaderboardPage() {
   const t = useT();

@@ -9,7 +9,7 @@
  *    Anchor (immune to opp cards), Second-wind (draw on loss)
  */
 
-import type { LanePlay, LaneResult } from "../online";
+import type { LanePlay, LaneResult } from "../online/online";
 import type { RoundOutcome } from "../engine/lanesEngine";
 import { laneFavoursMove, type ComboTheme } from "../engine/lanesCombos";
 import type { Move } from "../engine/game";

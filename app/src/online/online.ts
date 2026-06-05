@@ -1,7 +1,7 @@
 //! TypeScript mirror of `crates/rpsls-server/src/protocol.rs`.
 //! Keep both in sync.
 
-import type { Move, Outcome } from "./engine/game";
+import type { Move, Outcome } from "../engine/game";
 
 /* ──────────── Wire types ──────────── */
 

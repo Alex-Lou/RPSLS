@@ -4,7 +4,7 @@
  */
 
 import type { Move } from "../engine/game";
-import type { LanePlay } from "../online";
+import type { LanePlay } from "../online/online";
 
 /* ──────────── Cards ──────────── */
 
