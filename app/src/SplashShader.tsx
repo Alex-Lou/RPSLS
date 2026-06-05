@@ -213,6 +213,7 @@ function DefaultCosmicShader() {
       gl.deleteBuffer(buf);
       gl.deleteShader(vs);
       gl.deleteShader(fs);
+      gl.getExtension("WEBGL_lose_context")?.loseContext();
     };
   }, []);
 

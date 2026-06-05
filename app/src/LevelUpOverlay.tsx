@@ -153,6 +153,9 @@ export function BurstCanvas({ warm = false, intensity = 1 }: { warm?: boolean; i
     return () => {
       cancelAnimationFrame(raf.current);
       gl.deleteProgram(prog); gl.deleteBuffer(buf); gl.deleteShader(vs); gl.deleteShader(fs);
+      // Release the GL context immediately — celebration bursts mount/unmount
+      // often (every win + podium), so leaked contexts would pile up fast.
+      gl.getExtension("WEBGL_lose_context")?.loseContext();
     };
   }, [warm, intensity]);
   return <canvas ref={ref} aria-hidden className="absolute inset-0 w-full h-full" />;

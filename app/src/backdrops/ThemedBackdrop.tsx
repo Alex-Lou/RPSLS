@@ -313,6 +313,9 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
       document.removeEventListener("visibilitychange", onVis);
       gl.deleteProgram(prog); gl.deleteBuffer(buf);
       gl.deleteShader(vs); gl.deleteShader(fs);
+      // Explicitly drop the GL context so it can't accumulate across theme
+      // changes / remounts (mobile caps live contexts → silent crash).
+      gl.getExtension("WEBGL_lose_context")?.loseContext();
     };
   }, [scene]);
 
