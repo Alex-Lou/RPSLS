@@ -133,6 +133,17 @@ export function RankedGame({
     flipped?: boolean;
   } | null>(null);
 
+  /** Sudden-death sub-phase: a perfectly tied round (equal totals) triggers a
+   *  single-move duel to break the tie — the winner takes the round point.
+   *  `winner` null in reveal = the duel itself tied → it re-picks. */
+  const [suddenDeathData, setSuddenDeathData] = useState<{
+    phase: "pick" | "reveal";
+    round: number;
+    playerMove?: Move;
+    cpuMove?: Move;
+    winner?: "a" | "b" | null;
+  } | null>(null);
+
   /* ──────────── Refs (never leaked to children) ──────────── */
   const cpuDecisionRef = useRef<CpuRoundDecision | null>(null);
   const playerHistoryRef = useRef<Move[]>([]);
@@ -490,6 +501,11 @@ export function RankedGame({
       window.setTimeout(() => {
         setRiposteData({ lane: myRiposteLane as LaneTarget, phase: "pick" });
       }, ROUND_PAUSE_MS);
+    } else if (finalWinner === "draw" && !timedOut) {
+      // Perfectly tied round → Sudden Death duel to break the tie.
+      window.setTimeout(() => {
+        setSuddenDeathData({ phase: "pick", round: roundNoRef.current });
+      }, ROUND_PAUSE_MS);
     } else {
       window.setTimeout(() => startNextRound(), ROUND_PAUSE_MS);
     }
@@ -504,6 +520,7 @@ export function RankedGame({
     setAugurRevealed(null);
     setOracleRevealed(null);
     setRiposteData(null);
+    setSuddenDeathData(null);
     setAugurCooldown(0);
     setMana(1);
     setBattle(makeBattle(savedDeck));
@@ -626,6 +643,55 @@ export function RankedGame({
     }
   }
 
+  /* ──────────── Sudden-death sub-phase ──────────── */
+
+  /** Player picks one move; CPU answers. A clean win takes the round point; a
+   *  duel-tie re-picks until decided. */
+  function handleSuddenDeathPick(move: Move) {
+    if (!suddenDeathData || suddenDeathData.phase !== "pick") return;
+    hapticLock();
+    const cpuPlay = cpuRankedDecision(
+      { mood: moodRef.current, difficulty, playerHistory: playerHistoryRef.current, mana: 1, hand: [] },
+      1,
+    );
+    const cpuMove = cpuPlay.plays[0].mv;
+    const playerWins = rpslsBeats(move, cpuMove);
+    const cpuWins = rpslsBeats(cpuMove, move);
+    if (!playerWins && !cpuWins) {
+      // Duel tied → flash it, then re-pick.
+      setSuddenDeathData({ phase: "reveal", round: suddenDeathData.round, playerMove: move, cpuMove, winner: null });
+      window.setTimeout(() => hapticTap(), REVEAL_SUSPENSE_MS);
+      window.setTimeout(() => setSuddenDeathData({ phase: "pick", round: roundNoRef.current }), ROUND_PAUSE_MS);
+      return;
+    }
+    const winner: "a" | "b" = playerWins ? "a" : "b";
+    setSuddenDeathData({ phase: "reveal", round: suddenDeathData.round, playerMove: move, cpuMove, winner });
+    window.setTimeout(() => { if (winner === "a") hapticWin(); else hapticLoss(); }, REVEAL_SUSPENSE_MS);
+    window.setTimeout(() => applySuddenDeath(winner), ROUND_PAUSE_MS);
+  }
+
+  /** Award the broken-tie round point to the duel winner, then continue/finish. */
+  function applySuddenDeath(winner: "a" | "b") {
+    if (!lastResult) {
+      setSuddenDeathData(null);
+      window.setTimeout(() => startNextRound(), 200);
+      return;
+    }
+    const deltaA = winner === "a" ? 1 : 0;
+    const deltaB = winner === "b" ? 1 : 0;
+    const nextWinsA = lastResult.roundWinsYou + deltaA;
+    const nextWinsB = lastResult.roundWinsOpp + deltaB;
+    setBattle((b) => ({ ...b, roundWinsA: b.roundWinsA + deltaA, roundWinsB: b.roundWinsB + deltaB }));
+    setLastResult((prev) => prev ? { ...prev, roundWinner: winner, roundWinsYou: nextWinsA, roundWinsOpp: nextWinsB } : prev);
+    wonLastRoundRef.current = winner === "a";
+    setSuddenDeathData(null);
+    if (nextWinsA >= winTo || nextWinsB >= winTo) {
+      finalizeMatch(nextWinsA, nextWinsB);
+    } else {
+      window.setTimeout(() => startNextRound(), ROUND_PAUSE_MS / 2);
+    }
+  }
+
   /** Helper shared by the normal end-of-match path and the post-Riposte
    *  path: record the result + show the cinematic end screen. */
   function finalizeMatch(winsA: number, winsB: number) {
@@ -715,6 +781,12 @@ export function RankedGame({
           onPick={handleRipostePick}
         />
       )}
+      {suddenDeathData && (
+        <SuddenDeathOverlay
+          data={suddenDeathData}
+          onPick={handleSuddenDeathPick}
+        />
+      )}
     </>
   );
 }
@@ -799,6 +871,86 @@ function RiposteOverlay({
             {verdict === "win" ? "Lane flippée — victoire !"
               : verdict === "loss" ? "Riposte perdue, défaite conservée."
               : "Égalité — la défaite reste."}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ──────────── Sudden-death sub-phase UI ──────────── */
+
+function SuddenDeathOverlay({
+  data,
+  onPick,
+}: {
+  data: { phase: "pick" | "reveal"; round: number; playerMove?: Move; cpuMove?: Move; winner?: "a" | "b" | null };
+  onPick: (mv: Move) => void;
+}) {
+  const verdict = data.phase === "reveal"
+    ? data.winner === "a" ? "win" : data.winner === "b" ? "loss" : "draw"
+    : null;
+  return (
+    <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md px-4">
+      <div
+        className="text-3xl sm:text-5xl font-black tracking-[0.12em] mb-1.5 text-center bg-gradient-to-br from-amber-300 via-rose-400 to-fuchsia-400 bg-clip-text text-transparent animate-pulse"
+        style={{ filter: "drop-shadow(0 2px 16px rgba(244,63,94,0.55))" }}
+      >
+        MORT SUBITE
+      </div>
+      <div className="text-xs sm:text-sm text-zinc-300 mb-6 max-w-xs text-center">
+        Manche à égalité parfaite — un seul coup décide tout.
+      </div>
+      {data.phase === "pick" && (
+        <div className="grid grid-cols-5 gap-2 w-full max-w-md">
+          {RANKED_MOVES.map((mv) => {
+            const pal = MOVE_PALETTE[mv];
+            return (
+              <button
+                key={mv}
+                onClick={() => onPick(mv)}
+                className={
+                  "aspect-[4/5] rounded-xl flex flex-col items-center justify-center gap-1 py-1.5 transition active:scale-92 " +
+                  "bg-gradient-to-br " + pal.from + " " + pal.to + " ring-2 " + pal.ring + " " + pal.glow +
+                  " text-zinc-900 shadow-md"
+                }
+              >
+                <MoveGlyph move={mv} className="w-7 h-7" />
+                <span className="text-[8px] uppercase tracking-wider font-bold leading-none">{mv}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {data.phase === "reveal" && data.playerMove && data.cpuMove && (
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex items-center gap-6">
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wider text-emerald-300">Toi</span>
+              <div className={"w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br " +
+                MOVE_PALETTE[data.playerMove].from + " " + MOVE_PALETTE[data.playerMove].to +
+                " ring-2 " + MOVE_PALETTE[data.playerMove].ring}>
+                <MoveGlyph move={data.playerMove} className="w-9 h-9" />
+              </div>
+            </div>
+            <div className="text-3xl font-black text-zinc-500">vs</div>
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wider text-rose-300">CPU</span>
+              <div className={"w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br " +
+                MOVE_PALETTE[data.cpuMove].from + " " + MOVE_PALETTE[data.cpuMove].to +
+                " ring-2 " + MOVE_PALETTE[data.cpuMove].ring}>
+                <MoveGlyph move={data.cpuMove} className="w-9 h-9" />
+              </div>
+            </div>
+          </div>
+          <div className={
+            "text-xl sm:text-2xl font-black " +
+            (verdict === "win" ? "text-emerald-300" :
+             verdict === "loss" ? "text-rose-300" : "text-zinc-300")
+          }>
+            {verdict === "win" ? "Tu remportes la manche !"
+              : verdict === "loss" ? "Manche perdue en mort subite."
+              : "Encore égalité — on rejoue !"}
           </div>
         </div>
       )}
