@@ -141,24 +141,30 @@ export interface Player {
   padChosen?: boolean;
 }
 
-export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: string }> = {
-  chalkboard: { label: "Blackboard",     emoji: "🧪", tagline: "Hand-drawn chalk, formulas, lab vibes." },
-  vintage:    { label: "Vintage Hall",   emoji: "🎲", tagline: "Felt mat, gold trim, retro lounge." },
-  cosmos:     { label: "Cosmos",         emoji: "🌌", tagline: "Dark sky, orbits, particle trails." },
-  galaxy:     { label: "Galaxy",         emoji: "🌀", tagline: "Spiral arms turning around a bright core." },
-  neon:       { label: "Neon Arcade",    emoji: "🕹️", tagline: "Synthwave grid, neon lines, 80s arcade." },
-  comics:     { label: "Comics",         emoji: "💥", tagline: "Halftone dots, BAM-POW, pop-art comic page." },
-  cyberpunk:  { label: "Cyberpunk",      emoji: "🌆", tagline: "Neon hex grid, holographic HUD, scanlines." },
-  holy:       { label: "Holy Game",      emoji: "✝️", tagline: "Cathedral light, gilded relics, sacred geometry." },
-  quantum:    { label: "Quantum Lab",    emoji: "⚛️", tagline: "Particle traces, physics equations." },
-  nebula:     { label: "Nebula",         emoji: "🌌", tagline: "Nuages de gaz violet et cyan, étoiles, pulsations." },
-  aurora_borealis: { label: "Aurore Boréale", emoji: "🌌", tagline: "Ciel polaire, rideaux de lumière verte et violette." },
-  casino:     { label: "Casino Royale",  emoji: "🎰", tagline: "Feutre émeraude, roulette, jetons et or Art Déco." },
-  casino_noir:{ label: "Casino Noir",   emoji: "🃏", tagline: "Monte-Carlo minuit : noir, or, médaillon Art Déco." },
-  aura:       { label: "Aura",           emoji: "🎨", tagline: "S'accorde à ton thème : couleurs et lueurs vivantes." },
-  volcanic:   { label: "Volcanic",      emoji: "🌋", tagline: "Obsidienne craquelée, veines de lave, braises montantes." },
-  abyss:      { label: "Abyss",         emoji: "🐙", tagline: "Abysses océaniques, méduses bioluminescentes, profondeurs." },
-  custom:     { label: "Mon image",      emoji: "🖼️", tagline: "Ton propre tapis (paysage 3:2, ex. 1500×1000)." },
+/** Where a pad shows up in the Profile pad picker's 3-way sub-filter.
+ *  - "styled" = animated, themed (matches a coded background)
+ *  - "svg"    = plain illustrated, no theme tie
+ *  - "img"    = the player's uploaded image */
+export type PadCategory = "styled" | "svg" | "img";
+
+export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: string; category: PadCategory }> = {
+  chalkboard: { label: "Blackboard",     emoji: "🧪", tagline: "Hand-drawn chalk, formulas, lab vibes.",            category: "svg" },
+  vintage:    { label: "Vintage Hall",   emoji: "🎲", tagline: "Felt mat, gold trim, retro lounge.",                 category: "svg" },
+  cosmos:     { label: "Cosmos",         emoji: "🌌", tagline: "Dark sky, orbits, particle trails.",                 category: "styled" },
+  galaxy:     { label: "Galaxy",         emoji: "🌀", tagline: "Spiral arms turning around a bright core.",          category: "styled" },
+  neon:       { label: "Neon Arcade",    emoji: "🕹️", tagline: "Synthwave grid, neon lines, 80s arcade.",            category: "styled" },
+  comics:     { label: "Comics",         emoji: "💥", tagline: "Halftone dots, BAM-POW, pop-art comic page.",        category: "svg" },
+  cyberpunk:  { label: "Cyberpunk",      emoji: "🌆", tagline: "Neon hex grid, holographic HUD, scanlines.",          category: "styled" },
+  holy:       { label: "Holy Game",      emoji: "✝️", tagline: "Cathedral light, gilded relics, sacred geometry.",   category: "styled" },
+  quantum:    { label: "Quantum Lab",    emoji: "⚛️", tagline: "Particle traces, physics equations.",                category: "styled" },
+  nebula:     { label: "Nebula",         emoji: "🌌", tagline: "Nuages de gaz violet et cyan, étoiles, pulsations.", category: "styled" },
+  aurora_borealis: { label: "Aurore Boréale", emoji: "🌌", tagline: "Ciel polaire, rideaux de lumière verte et violette.", category: "styled" },
+  casino:     { label: "Casino Royale",  emoji: "🎰", tagline: "Feutre émeraude, roulette, jetons et or Art Déco.",  category: "styled" },
+  casino_noir:{ label: "Casino Noir",   emoji: "🃏", tagline: "Monte-Carlo minuit : noir, or, médaillon Art Déco.",  category: "styled" },
+  aura:       { label: "Aura",           emoji: "🎨", tagline: "S'accorde à ton thème : couleurs et lueurs vivantes.", category: "styled" },
+  volcanic:   { label: "Volcanic",      emoji: "🌋", tagline: "Obsidienne craquelée, veines de lave, braises montantes.", category: "styled" },
+  abyss:      { label: "Abyss",         emoji: "🐙", tagline: "Abysses océaniques, méduses bioluminescentes, profondeurs.", category: "styled" },
+  custom:     { label: "Mon image",      emoji: "🖼️", tagline: "Ton propre tapis (paysage 3:2, ex. 1500×1000).",     category: "img" },
 };
 
 export type Opponent =

@@ -10,6 +10,9 @@ import { BACKGROUNDS, BG_DEFAULT_THEME } from "../theme/themes";
 import { isAvatarImage, avatarImgStyle } from "../theme/avatar";
 import { MOVES } from "../engine/game";
 import { BattlePad } from "../BattlePad";
+import { LazyMount } from "../fx/LazyMount";
+import { resizeImageToDataUrl, ResizeImageError } from "../util/resizeImage";
+import { TabPicker } from "../ui/TabPicker";
 import { useT } from "../i18n";
 import { hapticTap, hapticMatchStart } from "../haptic";
 import { useBackdropPeek } from "../backdrops/previewScene";
@@ -52,11 +55,6 @@ const AVATAR_PRESETS: string[] = [
   "/Profile miniatures/chibi_dragon_blue.png",
   "/Profile miniatures/chibi_crown.png",
 ];
-
-/** Plain, flat-illustration pads (chalk / felt / comic) — visually a world
- *  apart from the flashy animated cosmic pads, so the Pads tab sorts them into
- *  their own "Simples" bucket. Add an id here to move a pad into that bucket. */
-const PLAIN_PADS = new Set<PadId>(["chalkboard", "vintage", "comics"]);
 
 
 export function ProfilePage() {
@@ -114,35 +112,11 @@ export function ProfilePage() {
       alert(t("profile.avatar.tooBig"));
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      const img = new Image();
-      img.onload = () => {
-        const MAX = 512;
-        const ratio = Math.min(1, MAX / Math.max(img.width, img.height));
-        const w = Math.round(img.width * ratio);
-        const h = Math.round(img.height * ratio);
-        const canvas = document.createElement("canvas");
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          // Canvas unavailable — fall back to the original (could be big).
-          updateProfile({ avatar: dataUrl });
-          return;
-        }
-        ctx.drawImage(img, 0, 0, w, h);
-        // Pick JPEG for photos (small); keep PNG if the source is already
-        // a small lossless image (avatars often are).
-        const isPng = f.type === "image/png" && f.size < 100 * 1024;
-        const resized = canvas.toDataURL(isPng ? "image/png" : "image/jpeg", 0.82);
-        updateProfile({ avatar: resized });
-      };
-      img.onerror = () => alert(t("profile.avatar.invalid"));
-      img.src = dataUrl;
-    };
-    reader.readAsDataURL(f);
+    resizeImageToDataUrl(f, { maxDim: 512, mime: "auto" })
+      .then((resized) => updateProfile({ avatar: resized }))
+      .catch((err: ResizeImageError) => {
+        if (err.kind === "decode") alert(t("profile.avatar.invalid"));
+      });
   };
 
   /** Personal image library cap. JPEG-encoded at quality 0.82 at MAX×MAX
@@ -157,29 +131,15 @@ export function ProfilePage() {
     const f = e.target.files?.[0];
     if (!f) return;
     if (f.size > 12 * 1024 * 1024) { alert(t("profile.avatar.tooBig")); return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const MAX = 1080;
-        const ratio = Math.min(1, MAX / Math.max(img.width, img.height));
-        const w = Math.round(img.width * ratio);
-        const h = Math.round(img.height * ratio);
-        const canvas = document.createElement("canvas");
-        canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        const fallback = reader.result as string;
-        const dataUrl = ctx
-          ? (ctx.drawImage(img, 0, 0, w, h), canvas.toDataURL("image/jpeg", 0.82))
-          : fallback;
+    resizeImageToDataUrl(f, { maxDim: 1080 })
+      .then((dataUrl) => {
         const prev = (useStore.getState().player.customBgs ?? []).filter((u) => u !== dataUrl);
         const next = [dataUrl, ...prev].slice(0, MAX_CUSTOM_IMAGES);
         updateProfile({ customBgUrl: dataUrl, customBgs: next, backgroundId: "custom" });
-      };
-      img.onerror = () => alert(t("profile.avatar.invalid"));
-      img.src = reader.result as string;
-    };
-    reader.readAsDataURL(f);
+      })
+      .catch((err: ResizeImageError) => {
+        if (err.kind === "decode") alert(t("profile.avatar.invalid"));
+      });
     // Allow re-uploading the same file (browsers ignore identical-value selects).
     e.target.value = "";
   };
@@ -190,29 +150,15 @@ export function ProfilePage() {
     const f = e.target.files?.[0];
     if (!f) return;
     if (f.size > 12 * 1024 * 1024) { alert(t("profile.avatar.tooBig")); return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const MAX = 1500;
-        const ratio = Math.min(1, MAX / Math.max(img.width, img.height));
-        const w = Math.round(img.width * ratio);
-        const h = Math.round(img.height * ratio);
-        const canvas = document.createElement("canvas");
-        canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        const fallback = reader.result as string;
-        const dataUrl = ctx
-          ? (ctx.drawImage(img, 0, 0, w, h), canvas.toDataURL("image/jpeg", 0.82))
-          : fallback;
+    resizeImageToDataUrl(f, { maxDim: 1500 })
+      .then((dataUrl) => {
         const prev = (useStore.getState().player.customPads ?? []).filter((u) => u !== dataUrl);
         const next = [dataUrl, ...prev].slice(0, MAX_CUSTOM_IMAGES);
         updateProfile({ customPadUrl: dataUrl, customPads: next, padId: "custom", padChosen: true });
-      };
-      img.onerror = () => alert(t("profile.avatar.invalid"));
-      img.src = reader.result as string;
-    };
-    reader.readAsDataURL(f);
+      })
+      .catch((err: ResizeImageError) => {
+        if (err.kind === "decode") alert(t("profile.avatar.invalid"));
+      });
     e.target.value = "";
   };
 
@@ -507,20 +453,15 @@ export function ProfilePage() {
       <section className="bg-surface border border-hairline rounded-3xl p-5">
         <div className="flex items-center gap-2 mb-4 flex-wrap">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-muted">Style</h2>
-          <div className="ml-auto flex gap-1 p-1 rounded-xl bg-hairline border border-hairline">
-            {([["appearance", "Apparences"], ["pads", "Pads"]] as const).map(([id, label]) => (
-              <button
-                key={id}
-                onClick={() => setCosmeticTab(id)}
-                className={
-                  "px-3 py-1 rounded-lg text-xs font-semibold transition " +
-                  (cosmeticTab === id ? "bg-themed text-zinc-900 shadow" : "text-ink-muted hover:text-ink")
-                }
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <TabPicker
+            className="ml-auto"
+            value={cosmeticTab}
+            onChange={setCosmeticTab}
+            options={[
+              { id: "appearance", label: "Apparences" },
+              { id: "pads", label: "Pads" },
+            ]}
+          />
         </div>
 
         {cosmeticTab === "appearance" && (
@@ -655,20 +596,17 @@ export function ProfilePage() {
               ? "Tapis sobres et illustrés — un style à part, plus épuré."
               : `Importe ton image (paysage 3:2, ex. 1500×1000). Jusqu'à ${MAX_CUSTOM_IMAGES} en bibliothèque.`}
           </p>
-          <div className="ml-auto flex gap-1 p-1 rounded-xl bg-hairline border border-hairline shrink-0">
-            {([["styled", "Stylés"], ["svg", "Simples"], ["img", "Images"]] as const).map(([id, label]) => (
-              <button
-                key={id}
-                onClick={() => setPadTab(id)}
-                className={
-                  "px-2.5 py-1 rounded-lg text-xs font-semibold transition " +
-                  (padTab === id ? "bg-themed text-zinc-900 shadow" : "text-ink-muted hover:text-ink")
-                }
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <TabPicker
+            className="ml-auto shrink-0"
+            size="sm"
+            value={padTab}
+            onChange={setPadTab}
+            options={[
+              { id: "styled", label: "Stylés" },
+              { id: "svg", label: "Simples" },
+              { id: "img", label: "Images" },
+            ]}
+          />
         </div>
         <input
           ref={padFileRef}
@@ -678,11 +616,7 @@ export function ProfilePage() {
           onChange={onUploadPad}
         />
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {(Object.keys(PAD_META) as PadId[]).filter((id) => {
-            if (padTab === "img") return id === "custom";
-            if (padTab === "svg") return PLAIN_PADS.has(id);
-            return id !== "custom" && !PLAIN_PADS.has(id);
-          }).map((id) => {
+          {(Object.keys(PAD_META) as PadId[]).filter((id) => PAD_META[id].category === padTab).map((id) => {
             const meta = PAD_META[id];
             const active = player.padId === id;
             const isCustom = id === "custom";
@@ -730,9 +664,13 @@ export function ProfilePage() {
                 >
                   {/* Real pad, frozen on a settled frame — a representative
                       still that entices, with zero animation cost (the full
-                      animation plays when the preview is opened). */}
+                      animation plays when the preview is opened). Deferred
+                      via LazyMount so opening the Pads tab doesn't synchronously
+                      paint all 13 SVG pads at once: they fade in as you scroll. */}
                   {!needsImport && (
-                    <BattlePad padId={id} frozen compact className="absolute inset-0 w-full h-full" />
+                    <LazyMount className="absolute inset-0 w-full h-full">
+                      <BattlePad padId={id} frozen compact className="w-full h-full" />
+                    </LazyMount>
                   )}
                   {active && (
                     <div className="absolute top-2 right-2 bg-emerald-500/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
