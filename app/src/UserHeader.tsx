@@ -8,6 +8,7 @@ import { avatarImgStyle } from "./theme/avatar";
 import { useT } from "./i18n";
 import type { Page } from "./Sidebar";
 import { CurrencyBadges } from "./ranked/CurrencyBadges";
+import { ThemedXpBar } from "./ui/ThemedXpBar";
 
 /**
  * Persistent player header, shown at the top of every menu page (never during a
@@ -87,38 +88,15 @@ export function UserHeader({ onNavigate }: { onNavigate: (p: Page) => void }) {
             </span>
           </div>
 
-          {/* XP bar — the landing target for every XP gain. Taller + a slower
-              fill so the progression reads clearly; the glow lingers ~3.4s. */}
-          <div className="mt-1 relative h-3 rounded-full bg-hairline overflow-hidden">
-            <motion.div
-              animate={{
-                width: `${info.progress * 100}%`,
-                boxShadow: gain > 0
-                  ? ["0 0 0px var(--theme-primary)", "0 0 16px var(--theme-primary)", "0 0 6px var(--theme-primary)"]
-                  : "0 0 0px transparent",
-              }}
-              transition={{
-                width: { duration: 0.9, ease: [0.22, 1, 0.36, 1] },
-                boxShadow: { duration: 1.4, ease: "easeOut" },
-              }}
-              className="h-full rounded-full"
-              // Follow the chosen background's accent (App.tsx maps it onto
-              // --theme-primary/secondary) so the XP bar matches the theme/bg.
-              style={{ background: "linear-gradient(90deg, var(--theme-primary), var(--theme-secondary))" }}
-            />
-            <AnimatePresence>
-              {gain > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, x: "-30%" }}
-                  animate={{ opacity: [0, 0.9, 0], x: "130%" }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 1.1, ease: "easeOut" }}
-                  className="absolute inset-y-0 w-1/3"
-                  style={{ background: "linear-gradient(90deg, transparent, var(--theme-secondary), transparent)" }}
-                />
-              )}
-            </AnimatePresence>
-          </div>
+          {/* XP bar — themed, with idle gloss + gain flash + milestone ticks.
+              Reused for the LP bar elsewhere so the two surfaces match. */}
+          <ThemedXpBar
+            current={info.xpInLevel}
+            total={info.xpForNext}
+            gainPulse={gain}
+            variant="xp"
+            className="mt-1"
+          />
 
           <div className="mt-0.5 flex items-center gap-2 text-[10px] text-ink-faint">
             <span className="truncate">
