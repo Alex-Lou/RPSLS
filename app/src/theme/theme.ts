@@ -31,6 +31,8 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
   cyber:  { id: "cyber",  label: "Cyber",   emoji: "🤖", primary: "#22d3ee", secondary: "#a3e635", bg: "#0a0f0d", fontHeadline: "orbitron",     fontBody: "rajdhani", fontMono: "shareTech" },
   rose:   { id: "rose",   label: "Rosé",    emoji: "🌹", primary: "#fb7185", secondary: "#c084fc", bg: "#160a12", fontHeadline: "playfair",     fontBody: "cormorant", fontMono: "jetbrains" },
   mono:   { id: "mono",   label: "Mono",    emoji: "🪐", primary: "#e5e7eb", secondary: "#9ca3af", bg: "#0b0d12", fontHeadline: "ibmPlex",      fontBody: "inter",   fontMono: "jetbrains" },
+  // ── Premium palettes ──
+  quartz: { id: "quartz", label: "Quartz",  emoji: "💠", primary: "#c8aef0", secondary: "#f6a5b8", bg: "#1a142a", fontHeadline: "cinzel",       fontBody: "cormorant", fontMono: "spaceMono" },
 };
 
 export function applyTheme(themeId: ThemeId) {

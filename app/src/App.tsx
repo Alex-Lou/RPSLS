@@ -6,6 +6,7 @@ import { BACKGROUNDS_BY_ID, resolveFontFamily } from "./theme/themes";
 import { RTL_LOCALES } from "./i18n";
 import { SplashShader } from "./fx/SplashShader";
 import { ThemedBackdrop } from "./backdrops/ThemedBackdrop";
+import { QuartzBackdrop } from "./backdrops/QuartzBackdrop";
 import { useBackdropPeek } from "./backdrops/previewScene";
 import { ThemeTouchFX } from "./fx/ThemeTouchFX";
 import { Sidebar, MobileShell, type Page } from "./Sidebar";
@@ -186,11 +187,18 @@ export default function App() {
   // Full-screen backdrop peek: when on, the menu shell hides so the live,
   // already-applied animated backdrop fills the screen (real preview).
   const peek = useBackdropPeek((s) => s.peek);
-  const activeScene = BACKGROUNDS_BY_ID[backgroundId]?.scene;
+  const activeBg = BACKGROUNDS_BY_ID[backgroundId];
+  const activeScene = activeBg?.scene;
+  const premiumScene = activeBg?.premiumScene;
 
   return (
     <div className="h-full w-full select-none overflow-hidden">
       {activeScene && stage !== "splash" && <ThemedBackdrop scene={activeScene} />}
+      {premiumScene === "quartz" && stage !== "splash" && (
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          <QuartzBackdrop />
+        </div>
+      )}
       {/* Readability scrim over a player's OWN uploaded image — coded scenes
           already ship their own vignette, but a raw photo can be bright/busy
           enough to drown menu text. A very light dark wash keeps every page

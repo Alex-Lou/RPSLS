@@ -42,6 +42,14 @@ export interface BackgroundDef {
   /** When set, this background is a live CODED WebGL scene (no PNG). App.tsx
    *  renders <ThemedBackdrop scene=…> instead of painting an image. */
   scene?: BackdropScene;
+  /** When set, this background is a premium SVG/SMIL scene that App.tsx
+   *  dispatches to a hand-coded component (no shared WebGL context). The
+   *  string is matched against the premium-scene registry in App.tsx. */
+  premiumScene?: "quartz";
+  /** When set, the player must own this set in `ownedPremiumSets` before the
+   *  background is usable. Picker still shows it (with a Premium ribbon)
+   *  but tapping opens the purchase modal until owned. */
+  premiumSetId?: string;
   /** When true, this entry is the player's OWN uploaded image (stored as a
    *  data URL on the player). App.tsx paints player.customBgUrl. */
   custom?: boolean;
@@ -140,6 +148,19 @@ export const BACKGROUNDS: BackgroundDef[] = [
     accent: { from: "#00e5c8", to: "#6040c0" },
   },
 
+  // ── Premium sets ──
+  // Quartz: crystalline shards refracting prismatic light. SVG/SMIL only —
+  // no WebGL context (the splash already owns it). Behaviour-gated: appears
+  // in the picker but tapping it opens the purchase modal until owned.
+  {
+    id: "quartz",    label: "Quartz",         emoji: "💠",
+    src: null,       premiumScene: "quartz",  premiumSetId: "quartz",
+    defaultPadId: "quartz",
+    skin: { fontHeadline: "cinzel",       fontBody: "cormorant",    fontMono: "spaceMono" },
+    miniature: null,
+    accent: { from: "#c8aef0", to: "#f6a5b8" },
+  },
+
   // Player's OWN image — uploaded in Profile, stored as a data URL. The
   // recommended format is shown in the picker (portrait 9:16, cover-fit).
   {
@@ -182,4 +203,5 @@ export const BG_DEFAULT_THEME: Partial<Record<BackgroundId, ThemeId>> = {
   casino:   "forest",
   volcanic: "sunset",
   abyss:    "ocean",
+  quartz:   "quartz",
 };
