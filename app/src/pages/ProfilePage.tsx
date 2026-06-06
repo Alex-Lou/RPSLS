@@ -13,6 +13,9 @@ import { BattlePad } from "../BattlePad";
 import { LazyMount } from "../fx/LazyMount";
 import { resizeImageToDataUrl, ResizeImageError } from "../util/resizeImage";
 import { TabPicker } from "../ui/TabPicker";
+import { PremiumPurchaseModal, type PremiumSet } from "../ui/PremiumPurchaseModal";
+import { PremiumBadge } from "../ui/PremiumBadge";
+import { QuartzBackdrop } from "../backdrops/QuartzBackdrop";
 import { useT } from "../i18n";
 import { hapticTap, hapticMatchStart } from "../haptic";
 import { useBackdropPeek } from "../backdrops/previewScene";
@@ -73,6 +76,8 @@ export function ProfilePage() {
   // colours + fonts + matched pad, applied together) and Pads (override just
   // the playmat). Picking an appearance links the whole look by default.
   const [cosmeticTab, setCosmeticTab] = useState<"appearance" | "pads">("appearance");
+  /** When non-null, the premium purchase modal is open for this set id. */
+  const [premiumModalSetId, setPremiumModalSetId] = useState<string | null>(null);
   // Inside the Pads tab, three buckets: flashy themed pads / plain illustrative
   // SVG pads / imported images — kept apart because the plain SVGs looked off
   // mixed in with the flashy ones.
@@ -492,6 +497,12 @@ export function ProfilePage() {
                     openPeek();
                     return;
                   }
+                  // Premium gate: if the bg belongs to a premium set the player
+                  // doesn't yet own, open the purchase modal instead of applying.
+                  if (bg.premiumSetId && !(player.ownedPremiumSets ?? []).includes(bg.premiumSetId)) {
+                    setPremiumModalSetId(bg.premiumSetId);
+                    return;
+                  }
                   // Apply instantly (selection can never fail), then open a
                   // full-screen peek of the now-live animated backdrop. Picking
                   // a background auto-applies its matched pad + HUD palette so
@@ -542,6 +553,13 @@ export function ProfilePage() {
                     <div className="absolute top-2 left-2 bg-cyan-500/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                       ✦ LIVE
                     </div>
+                  )}
+                  {bg.premiumSetId && (
+                    <PremiumBadge
+                      variant="ribbon"
+                      label={(player.ownedPremiumSets ?? []).includes(bg.premiumSetId) ? "✓ OWNED" : "PREMIUM"}
+                      className="top-2 left-2"
+                    />
                   )}
                   {bg.custom && (player.customBgs?.length ?? 0) === 0 && (
                     <div className="absolute inset-0 flex items-center justify-center text-ink-muted text-xs font-bold">
@@ -918,9 +936,27 @@ export function ProfilePage() {
         </AnimatePresence>,
         document.body
       )}
+      <PremiumPurchaseModal
+        set={premiumModalSetId ? PREMIUM_SETS[premiumModalSetId] ?? null : null}
+        onClose={() => setPremiumModalSetId(null)}
+      />
     </motion.div>
   );
 }
+
+/** Premium catalogue — single source of truth for the boutique. Each entry's
+ *  preview is a real component (not a static image) so the player sees the
+ *  scene live before paying. Add a new set: drop an entry here + register the
+ *  background id with `premiumSetId: "<id>"` in themes.ts. */
+const PREMIUM_SETS: Record<string, PremiumSet> = {
+  quartz: {
+    id: "quartz",
+    name: "Quartz",
+    tagline: "Éclats cristallins prismatiques, un monde glaciaire et doux.",
+    cost: 800,
+    previewArt: <QuartzBackdrop />,
+  },
+};
 
 function Stat({ label, value, accent }: { label: string; value: number | string; accent?: string }) {
   return (
