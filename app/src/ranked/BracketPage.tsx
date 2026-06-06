@@ -97,11 +97,11 @@ export function BracketPage({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -16 }}
       transition={{ duration: 0.3 }}
-      className="flex flex-col gap-4 flex-1 py-2 px-1 max-w-2xl mx-auto w-full overflow-y-auto"
+      className="flex flex-col gap-3 flex-1 min-h-0 py-2 px-1 max-w-2xl mx-auto w-full"
     >
       <FloatingMatchBackButton onClick={onBack} label="Retour" />
 
-      <div className="text-center mt-8">
+      <div className="shrink-0 text-center mt-6">
         <h1
           className="text-2xl sm:text-3xl font-extrabold flex items-center justify-center gap-2"
           style={{
@@ -133,6 +133,7 @@ export function BracketPage({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            className="flex-1 min-h-0 flex flex-col"
           >
             <LayoutGroup>
               <BracketTree tournament={tournament} />

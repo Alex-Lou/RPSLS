@@ -67,14 +67,15 @@ export function BracketTree({ tournament }: { tournament: TournamentState }) {
     // max-h: leaves room above for the page header and below for the CTA.
     <div
       className="
-        w-full max-h-[68vh] sm:max-h-[72vh]
+        w-full flex-1 min-h-0
         overflow-auto py-3 px-2
         rounded-2xl
         bg-surface border border-hairline
         shadow-inner shadow-black/30
+        flex flex-col
       "
     >
-      <div className="flex items-stretch gap-2 min-w-max" style={{ height }}>
+      <div className="flex items-stretch gap-2 min-w-max m-auto" style={{ height }}>
         {t.rounds.map((round, ri) => (
           <div key={`round-${ri}`} className="flex items-stretch gap-1.5 shrink-0">
             <RoundCol label={roundLabel(ri, total)}>
