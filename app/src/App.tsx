@@ -6,7 +6,7 @@ import { BACKGROUNDS_BY_ID, resolveFontFamily } from "./theme/themes";
 import { RTL_LOCALES } from "./i18n";
 import { SplashShader } from "./fx/SplashShader";
 import { ThemedBackdrop } from "./backdrops/ThemedBackdrop";
-import { QuartzBackdrop } from "./backdrops/QuartzBackdrop";
+import { QuartzBackdropWithLayer } from "./backdrops/QuartzBackdrop";
 import { useBackdropPeek } from "./backdrops/previewScene";
 import { ThemeTouchFX } from "./fx/ThemeTouchFX";
 import { Sidebar, MobileShell, type Page } from "./Sidebar";
@@ -190,13 +190,25 @@ export default function App() {
   const activeBg = BACKGROUNDS_BY_ID[backgroundId];
   const activeScene = activeBg?.scene;
   const premiumScene = activeBg?.premiumScene;
+  const isLightBg = activeBg?.light === true;
+
+  // Toggle the global `theme-light` class on <html> so App.css can darken
+  // text + thicken surfaces when a pastel backdrop (Quartz) is active.
+  // Pure CSS swap — no React re-render on every menu page.
+  useEffect(() => {
+    document.documentElement.classList.toggle("theme-light", isLightBg);
+  }, [isLightBg]);
 
   return (
     <div className="h-full w-full select-none overflow-hidden">
       {activeScene && stage !== "splash" && <ThemedBackdrop scene={activeScene} />}
       {premiumScene === "quartz" && stage !== "splash" && (
-        <div className="fixed inset-0 z-0 pointer-events-none">
-          <QuartzBackdrop />
+        // Interactive layer is wired ONLY during peek (full-screen preview):
+        // outside peek the regular UI taps must keep reaching their buttons.
+        // The wrapper switches `pointerEvents` inline so the same component
+        // serves both passive and active modes without duplication.
+        <div className={"fixed inset-0 z-0 " + (peek ? "" : "pointer-events-none")}>
+          <QuartzBackdropWithLayer interactive={peek} />
         </div>
       )}
       {/* Readability scrim over a player's OWN uploaded image — coded scenes

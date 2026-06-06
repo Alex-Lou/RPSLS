@@ -16,6 +16,7 @@
  */
 
 import { useEffect, useRef } from "react";
+import { QuartzInteractiveLayer } from "./QuartzInteractiveLayer";
 
 /** Prismatic palette + warm gold accents so the canvas reads as luxurious
  *  matter, not a frozen synthetic grid. The cool stops carry the depth; the
@@ -246,5 +247,17 @@ export function QuartzBackdrop() {
       </radialGradient>
       <rect width="100" height="100" fill="url(#qz-vignette)" />
     </svg>
+  );
+}
+
+/** Self-positioning wrapper: renders the SVG fill + the optional interactive
+ *  layer in a relative container. Used by App.tsx to keep the layer pinned
+ *  to the backdrop region (not the whole window). */
+export function QuartzBackdropWithLayer({ interactive = false }: { interactive?: boolean }) {
+  return (
+    <div className="absolute inset-0">
+      <QuartzBackdrop />
+      <QuartzInteractiveLayer enabled={interactive} />
+    </div>
   );
 }
