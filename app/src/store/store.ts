@@ -7,6 +7,15 @@ import { todayDateKey } from "../engine/daily";
 import { sanitisePersisted } from "./storeMigrationGuard";
 import { abandonPenaltyLp, activeAbandonCount, nextAbandon } from "../match/forfeit";
 import { nextStreak, streakBonusXp } from "../match/streak";
+import {
+  PACK_COST,
+  type PackResult,
+  craftCost,
+  dustForDuplicate,
+  eclatsReward,
+  rollPack,
+} from "../engine/economy";
+import type { CardId } from "../ranked/rankedTypes";
 
 const emptyByMove = () => ({
   rock:     { picked: 0, won: 0 },
@@ -42,6 +51,8 @@ export function defaultPlayer(): Player {
     hapticIntensity: "med",
     cardCollection: ["aegis", "precision", "anchor", "second-wind", "surge", "augur"],
     rankedDeck: ["aegis", "precision", "surge", "augur", "anchor", "second-wind"],
+    eclats: 0,
+    dust: 0,
     backgroundId: "default",
     customBgs: [],
     customPads: [],
@@ -83,6 +94,14 @@ interface AppState {
   /** Ranked card collection */
   unlockCard: (id: string) => void;
   setRankedDeck: (deck: string[]) => void;
+  /** Spend {@link PACK_COST} éclats to open a pack of 3 cards. Duplicates
+   *  are auto-converted to poussière. Returns the result, or `null` when
+   *  the player cannot afford the pack. */
+  openPack: () => PackResult | null;
+  /** Spend poussière to add the locked card to the collection. Returns
+   *  `true` on success, `false` if the player can't afford it or already
+   *  owns the card. */
+  craftCard: (id: CardId) => boolean;
 }
 
 function detectLocale(): Locale {
@@ -170,6 +189,10 @@ export const useStore = create<AppState>()(
           const bonusXp = m.outcome === "win" ? streakBonusXp(m.xpDelta, streak) : 0;
           p.xp = Math.max(0, p.xp + m.xpDelta + bonusXp);
           p.rankLp = Math.max(0, p.rankLp + m.lpDelta);
+          // Soft-currency éclats earned every finished match (no forfeit).
+          if (!m.forfeit) {
+            p.eclats = (p.eclats ?? 0) + eclatsReward(m.mode, m.outcome);
+          }
           if (m.outcome === "win") p.stats.wins++;
           else if (m.outcome === "loss") p.stats.losses++;
           else p.stats.draws++;
@@ -253,10 +276,51 @@ export const useStore = create<AppState>()(
       setRankedDeck: (deck) => set((s) => ({
         player: { ...s.player, rankedDeck: deck },
       })),
+
+      openPack: () => {
+        const player = get().player;
+        if ((player.eclats ?? 0) < PACK_COST) return null;
+        const owned = new Set(player.cardCollection ?? []);
+        const cards = rollPack();
+        const isNew = cards.map((id) => {
+          if (owned.has(id)) return false;
+          owned.add(id);
+          return true;
+        });
+        const dustGained = cards.reduce(
+          (sum, id, i) => (isNew[i] ? sum : sum + dustForDuplicate(id)),
+          0,
+        );
+        set((s) => ({
+          player: {
+            ...s.player,
+            eclats: (s.player.eclats ?? 0) - PACK_COST,
+            dust: (s.player.dust ?? 0) + dustGained,
+            cardCollection: Array.from(owned),
+          },
+        }));
+        return { cards, isNew, dustGained };
+      },
+
+      craftCard: (id) => {
+        const player = get().player;
+        const owned = new Set(player.cardCollection ?? []);
+        if (owned.has(id)) return false;
+        const cost = craftCost(id);
+        if ((player.dust ?? 0) < cost) return false;
+        set((s) => ({
+          player: {
+            ...s.player,
+            dust: (s.player.dust ?? 0) - cost,
+            cardCollection: [...(s.player.cardCollection ?? []), id],
+          },
+        }));
+        return true;
+      },
     }),
     {
       name: "rpsls-app-state",
-      version: 16,
+      version: 17,
       migrate: (persisted: unknown, version: number): AppState => {
         const state = persisted as {
           player?: Partial<Player> & { customVariants?: unknown };
@@ -336,6 +400,13 @@ export const useStore = create<AppState>()(
         // ladder instead of reflecting old vs-CPU results.
         if (version < 16 && state?.player) {
           state.player.rankLp = 1000;
+        }
+        // v17: soft-currency éclats + craft poussière. Seed both at 0 so
+        // upgrading players just start their economy fresh — no retroactive
+        // gift for old wins (avoids over-stuffing the boutique on day 1).
+        if (version < 17 && state?.player) {
+          if (state.player.eclats === undefined) state.player.eclats = 0;
+          if (state.player.dust === undefined) state.player.dust = 0;
         }
         // Final pass — sanitise the persisted shape so a tampered
         // localStorage can never inject a payload that would crash the

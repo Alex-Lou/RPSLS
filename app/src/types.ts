@@ -71,6 +71,12 @@ export interface Player {
   cardCollection?: string[];
   /** Ranked deck — ordered list of 6 card IDs (3 main + 3 reserve). */
   rankedDeck?: string[];
+  /** Soft currency earned on every finished match. Spent at the boutique
+   *  to buy a pack. */
+  eclats?: number;
+  /** Craft resource. Granted from duplicate pulls in packs (more on rare
+   *  cards), spent to forge a specific locked card. */
+  dust?: number;
   /** Cosmetic background image painted behind every page. Defaults to the
    *  original radial-gradient. */
   backgroundId?: BackgroundId;
