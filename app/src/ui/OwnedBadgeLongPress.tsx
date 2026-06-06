@@ -1,24 +1,31 @@
 /**
- * OwnedBadgeLongPress — interactive wrapper around <PremiumBadge> for premium
- * sets the player owns.
+ * OwnedBadgeLongPress — hold the "✓ OWNED" badge for 3 s to revoke a premium
+ * set so the purchase flow can be re-tested.
  *
- * Long-press (~800ms) the badge → revoke the set so the purchase flow can be
- * re-tested. A subtle "release to revoke" hint fades in once the press passes
- * the half-way mark — tells the tester something is going to happen, prevents
- * a normal-tap user from doing it by accident.
+ * Why 3 s + a visible ring: the previous 800 ms version "ne marchait pas du
+ * tout" because (a) the click on the parent picker button kept firing
+ * regardless of the long-press timer, and (b) 800 ms left no time for the
+ * tester to feel a confirmation beat. This rewrite:
  *
- * The wrapper renders a transparent overlay over the badge that stops the
- * pointer-down from bubbling to the parent picker button — otherwise the
- * picker would interpret the long-press as a normal tap and apply the bg
- * before the long-press timer fired.
+ *   - stops EVERY pointer/click event on the wrapper so the surrounding
+ *     <button> in ProfilePage can't re-apply the bg mid-press
+ *   - draws an SVG progress ring around the badge that fills 0 → 100 % over
+ *     the 3 000 ms hold, giving the user a clear "yes, keep holding" signal
+ *   - fires a soft haptic tick at 1 500 ms (halfway) so the player feels the
+ *     gesture is registered before commitment
+ *   - fires a strong haptic + revoke at 3 000 ms
+ *   - cancels cleanly on release / drift / leave (no orphan timers)
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { useLongPress } from "../fx/useLongPress";
 import { PremiumBadge } from "./PremiumBadge";
 import { useStore } from "../store/store";
-import { hapticMatchWin } from "../haptic";
+import { hapticAlert, hapticMatchWin, hapticTap } from "../haptic";
+
+const HOLD_MS = 3000;
+const HALFWAY_MS = 1500;
+const DRIFT_CANCEL_PX = 10;
 
 export function OwnedBadgeLongPress({
   setId,
@@ -28,47 +35,123 @@ export function OwnedBadgeLongPress({
   className?: string;
 }) {
   const revoke = useStore((s) => s.revokePremiumSet);
+  const [progress, setProgress] = useState(0);
   const [pressing, setPressing] = useState(false);
 
-  const handlers = useLongPress({
-    delayMs: 800,
-    onLongPress: () => {
+  const startAt = useRef<number | null>(null);
+  const startPos = useRef<{ x: number; y: number } | null>(null);
+  const rafId = useRef<number | null>(null);
+  const halfwayFired = useRef(false);
+  const progressRef = useRef(0);
+
+  const cleanup = () => {
+    if (rafId.current !== null) cancelAnimationFrame(rafId.current);
+    rafId.current = null;
+    startAt.current = null;
+    startPos.current = null;
+    halfwayFired.current = false;
+    progressRef.current = 0;
+    setPressing(false);
+    setProgress(0);
+  };
+
+  useEffect(() => () => cleanup(), []);
+
+  const tick = () => {
+    if (startAt.current === null) return;
+    const elapsed = performance.now() - startAt.current;
+    const p = Math.min(1, elapsed / HOLD_MS);
+    progressRef.current = p;
+    setProgress(p);
+    if (!halfwayFired.current && elapsed >= HALFWAY_MS) {
+      halfwayFired.current = true;
+      hapticTap();
+    }
+    if (p >= 1) {
       hapticMatchWin();
       revoke(setId);
-      setPressing(false);
-    },
-  });
+      cleanup();
+      return;
+    }
+    rafId.current = requestAnimationFrame(tick);
+  };
+
+  // Stops every variant of "the parent picker will think this was a tap to
+  // re-apply the bg" — pointer events, the synthesized click, and the
+  // long-press-triggered context menu on mobile.
+  const stopAll = (e: React.SyntheticEvent) => {
+    e.stopPropagation();
+    e.nativeEvent.stopImmediatePropagation();
+  };
 
   return (
     <div
-      {...handlers}
       onPointerDown={(e) => {
-        // Stop the picker'\''s "tap to apply" from also firing — the long-press
-        // is a dedicated affordance, not an alternate-tap.
-        e.stopPropagation();
-        handlers.onPointerDown(e);
+        stopAll(e);
+        startAt.current = performance.now();
+        startPos.current = { x: e.clientX, y: e.clientY };
         setPressing(true);
+        halfwayFired.current = false;
+        hapticTap();
+        rafId.current = requestAnimationFrame(tick);
+      }}
+      onPointerMove={(e) => {
+        if (!startPos.current) return;
+        const dx = e.clientX - startPos.current.x;
+        const dy = e.clientY - startPos.current.y;
+        if (Math.hypot(dx, dy) > DRIFT_CANCEL_PX) {
+          // Slid out → user is scrolling / panning, not committing.
+          if (progressRef.current > 0.3) hapticAlert();
+          cleanup();
+        }
       }}
       onPointerUp={(e) => {
-        handlers.onPointerUp();
-        setPressing(false);
-        // Block the click so the picker button doesn'\''t re-apply on release.
-        e.stopPropagation();
+        stopAll(e);
+        cleanup();
       }}
-      onPointerCancel={() => { handlers.onPointerCancel(); setPressing(false); }}
-      onPointerLeave={() => { handlers.onPointerLeave(); setPressing(false); }}
-      className={"absolute z-10 " + className}
+      onPointerCancel={() => cleanup()}
+      onPointerLeave={() => cleanup()}
+      // Block click + ctx menu too so the surrounding <button> never fires.
+      onClick={(e) => stopAll(e)}
+      onContextMenu={(e) => { stopAll(e); e.preventDefault(); }}
+      className={"absolute z-20 " + className}
+      style={{ touchAction: "none" }}
     >
       <PremiumBadge variant="ribbon" label="✓ OWNED" />
+
+      {/* Progress ring: circular SVG that fills as the hold accumulates.
+          strokeDashoffset drives the 0 → 100 % sweep with a 50 ms linear
+          tween so each rAF frame interpolates smoothly without jitter. */}
       {pressing && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.6 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="absolute -top-1.5 -bottom-1.5 -left-1.5 -right-1.5 rounded-full border-2 border-amber-300/70 pointer-events-none"
-          style={{
-            background: "radial-gradient(circle, rgba(251,191,36,0.18), transparent 70%)",
-          }}
-        />
+        <motion.svg
+          aria-hidden
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.18 }}
+          viewBox="0 0 120 120"
+          className="absolute pointer-events-none"
+          style={{ inset: -12, width: "calc(100% + 24px)", height: "calc(100% + 24px)" }}
+        >
+          {/* Track */}
+          <circle cx={60} cy={60} r={52} stroke="rgba(0,0,0,0.4)" strokeWidth={6} fill="none" />
+          {/* Fill — gold sweep, starts at 12 o'\''clock. */}
+          <circle
+            cx={60}
+            cy={60}
+            r={52}
+            stroke="#fbbf24"
+            strokeWidth={6}
+            strokeLinecap="round"
+            fill="none"
+            transform="rotate(-90 60 60)"
+            strokeDasharray={2 * Math.PI * 52}
+            strokeDashoffset={(1 - progress) * 2 * Math.PI * 52}
+            style={{
+              transition: "stroke-dashoffset 0.05s linear",
+              filter: "drop-shadow(0 0 8px rgba(251,191,36,0.9))",
+            }}
+          />
+        </motion.svg>
       )}
     </div>
   );
