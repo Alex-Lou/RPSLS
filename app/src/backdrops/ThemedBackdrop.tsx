@@ -21,18 +21,6 @@ export type BackdropScene =
   | "nebula" | "aurora" | "grid" | "galaxy" | "holy" | "quantum" | "casino"
   | "volcanic" | "abyss";
 
-export const BACKDROP_META: Record<BackdropScene, { label: string; emoji: string; accent: { from: string; to: string } }> = {
-  nebula:   { label: "Nebula",        emoji: "🌌", accent: { from: "#a855f7", to: "#22d3ee" } },
-  aurora:   { label: "Aurora",        emoji: "🌠", accent: { from: "#34d399", to: "#8b5cf6" } },
-  grid:     { label: "Neon Grid",     emoji: "🌐", accent: { from: "#06b6d4", to: "#f0abfc" } },
-  galaxy:   { label: "Galaxy",        emoji: "✨", accent: { from: "#a855f7", to: "#22d3ee" } },
-  holy:     { label: "Holy",          emoji: "✝️", accent: { from: "#fbbf24", to: "#6366f1" } },
-  quantum:  { label: "Quantum",       emoji: "⚛️", accent: { from: "#22d3ee", to: "#3b82f6" } },
-  casino:   { label: "Casino Royale", emoji: "🎰", accent: { from: "#10b981", to: "#f5c543" } },
-  volcanic: { label: "Volcanic",      emoji: "🌋", accent: { from: "#ff4500", to: "#ff8c00" } },
-  abyss:    { label: "Abyss",         emoji: "🐙", accent: { from: "#00e5c8", to: "#6040c0" } },
-};
-
 const SCENE_INDEX: Record<BackdropScene, number> = {
   nebula: 0, aurora: 1, grid: 2, galaxy: 3, holy: 4, quantum: 5, casino: 6,
   volcanic: 7, abyss: 8,

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Move } from "../engine/game";
-import type { MatchRecord, PadId, Player, ThemeId } from "../types";
+import type { MatchRecord, Player } from "../types";
 import type { Locale } from "../i18n";
 import { todayDateKey } from "../engine/daily";
 import { sanitisePersisted } from "./storeMigrationGuard";
@@ -538,11 +538,3 @@ export function randomNickname(): string {
   return `${a}${n}${num}`;
 }
 
-/** Convenience selectors */
-export function setTheme(themeId: ThemeId) {
-  useStore.getState().updateProfile({ themeId });
-}
-
-export function setPad(padId: PadId) {
-  useStore.getState().updateProfile({ padId });
-}

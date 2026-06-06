@@ -51,10 +51,6 @@ import "@fontsource/space-grotesk/700.css";
 import "@fontsource/ibm-plex-sans/400.css";
 import "@fontsource/fira-code/400.css";
 
-// Steampunk
-import "@fontsource/medievalsharp/400.css";
-import "@fontsource/bevan/400.css";
-
 /** CSS font-family strings ready to drop into `style.fontFamily` or a CSS
  *  variable. Each value includes a robust fallback chain. */
 export const FONT_STACK = {
@@ -75,8 +71,6 @@ export const FONT_STACK = {
   ibmPlex:     `"IBM Plex Sans", "Inter", system-ui, sans-serif`,
   jetbrains:   `"JetBrains Mono", "Consolas", "Courier New", monospace`,
   fira:        `"Fira Code", "Consolas", "Courier New", monospace`,
-  medieval:    `"MedievalSharp", "Cinzel", Georgia, serif`,
-  bevan:       `"Bevan", Impact, Georgia, serif`,
 } as const;
 
 export type FontStackKey = keyof typeof FONT_STACK;
