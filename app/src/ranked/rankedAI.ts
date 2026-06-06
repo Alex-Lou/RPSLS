@@ -1,5 +1,6 @@
 /**
- * CPU brain — 12 cards. Easy/normal = no cards. Hard = picks from hand.
+ * CPU brain — Easy = no cards. Normal/Hard pick from a notional pool
+ * (active cards only; passives are player-deck-building rewards).
  */
 
 import type { LanePlay } from "../online/online";
@@ -48,13 +49,16 @@ function chooseCpuCard(ctx: RankedCpuContext, picks: LanePlay[]): PlayedCard | n
   // cards whose PlayedCard shape we can construct without extra reveal data
   // (so Augur/Oracle are skipped for the CPU).
   if (has("supernova")) return { id: "supernova" };
+  if (has("trou-noir")) return { id: "trou-noir" };
   if (has("surge"))     return { id: "surge", lane: favLane };
   if (has("tide"))      return { id: "tide", lane: 0 as LaneTarget };
   if (has("heist"))     return { id: "heist", lane: favLane };
+  if (has("sangsue"))   return { id: "sangsue", lane: favLane };
   if (has("curse"))     return { id: "curse", lane: randLane() };
   if (has("vortex"))    return { id: "vortex" };
   if (has("gambit"))    return { id: "gambit" };
   if (has("precision")) return { id: "precision", lane: favLane };
+  if (has("rempart"))   return { id: "rempart" };
   if (has("aegis"))     return { id: "aegis", lane: randLane() };
   if (has("anchor"))    return { id: "anchor", lane: randLane() };
   if (has("riposte"))   return { id: "riposte", lane: randLane() };

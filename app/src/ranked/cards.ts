@@ -1,5 +1,6 @@
 /**
- * 12 cards — 4 rarities. Deck of 8, hand of 3.
+ * 26 cards — 4 rarities (15 base + 11 bonus). Deck of 8, hand of 3.
+ * Passive cards (kind: "passive") are equipped but never drawn.
  */
 
 import type { CardId, CardRarity, RankedCard } from "./rankedTypes";
@@ -33,6 +34,34 @@ export const CARDS: Record<CardId, RankedCard> = {
     nameKey: "ranked.cards.second-wind.name", descKey: "ranked.cards.second-wind.desc",
     targetHintKey: "ranked.cards.second-wind.targetHint",
     art: "/Cards Bonus/second-wind.png",
+  },
+  prescience: {
+    id: "prescience", cost: 1, rarity: "common",
+    target: "none", palette: "cyan", glyph: "🔮",
+    nameKey: "ranked.cards.prescience.name", descKey: "ranked.cards.prescience.desc",
+    targetHintKey: "ranked.cards.prescience.targetHint",
+    art: "/Cards Bonus/prescience.png",
+  },
+  cadence: {
+    id: "cadence", cost: 1, rarity: "common", kind: "passive",
+    target: "none", palette: "teal", glyph: "⏳",
+    nameKey: "ranked.cards.cadence.name", descKey: "ranked.cards.cadence.desc",
+    targetHintKey: "ranked.cards.cadence.targetHint",
+    art: "/Cards Bonus/cadence.png",
+  },
+  mascarade: {
+    id: "mascarade", cost: 1, rarity: "common",
+    target: "none", palette: "indigo", glyph: "🎭",
+    nameKey: "ranked.cards.mascarade.name", descKey: "ranked.cards.mascarade.desc",
+    targetHintKey: "ranked.cards.mascarade.targetHint",
+    art: "/Cards Bonus/mascarade.png",
+  },
+  boussole: {
+    id: "boussole", cost: 1, rarity: "common",
+    target: "none", palette: "sky", glyph: "🧭",
+    nameKey: "ranked.cards.boussole.name", descKey: "ranked.cards.boussole.desc",
+    targetHintKey: "ranked.cards.boussole.targetHint",
+    art: "/Cards Bonus/boussole.png",
   },
 
   /* 🔵 RARES — 2 mana */
@@ -71,6 +100,27 @@ export const CARDS: Record<CardId, RankedCard> = {
     targetHintKey: "ranked.cards.mirror.targetHint",
     art: "/Cards Bonus/mirror.png",
   },
+  sangsue: {
+    id: "sangsue", cost: 2, rarity: "rare",
+    target: "lane", palette: "rose", glyph: "🩸",
+    nameKey: "ranked.cards.sangsue.name", descKey: "ranked.cards.sangsue.desc",
+    targetHintKey: "ranked.cards.sangsue.targetHint",
+    art: "/Cards Bonus/sangsue.png",
+  },
+  rempart: {
+    id: "rempart", cost: 2, rarity: "rare",
+    target: "none", palette: "zinc", glyph: "🏰",
+    nameKey: "ranked.cards.rempart.name", descKey: "ranked.cards.rempart.desc",
+    targetHintKey: "ranked.cards.rempart.targetHint",
+    art: "/Cards Bonus/rempart.png",
+  },
+  pillage: {
+    id: "pillage", cost: 2, rarity: "rare", kind: "passive",
+    target: "none", palette: "orange", glyph: "🧤",
+    nameKey: "ranked.cards.pillage.name", descKey: "ranked.cards.pillage.desc",
+    targetHintKey: "ranked.cards.pillage.targetHint",
+    art: "/Cards Bonus/pillage.png",
+  },
 
   /* 🟣 EPICS — 3 mana */
   heist: {
@@ -108,6 +158,27 @@ export const CARDS: Record<CardId, RankedCard> = {
     targetHintKey: "ranked.cards.gambit.targetHint",
     art: "/Cards Bonus/gambit.png",
   },
+  "trou-noir": {
+    id: "trou-noir", cost: 3, rarity: "epic",
+    target: "none", palette: "violet", glyph: "🕳️",
+    nameKey: "ranked.cards.trou-noir.name", descKey: "ranked.cards.trou-noir.desc",
+    targetHintKey: "ranked.cards.trou-noir.targetHint",
+    art: "/Cards Bonus/trou-noir.png",
+  },
+  prophetie: {
+    id: "prophetie", cost: 3, rarity: "epic", kind: "passive",
+    target: "none", palette: "fuchsia", glyph: "📜",
+    nameKey: "ranked.cards.prophetie.name", descKey: "ranked.cards.prophetie.desc",
+    targetHintKey: "ranked.cards.prophetie.targetHint",
+    art: "/Cards Bonus/prophetie.png",
+  },
+  conduit: {
+    id: "conduit", cost: 3, rarity: "epic", kind: "passive",
+    target: "none", palette: "cyan", glyph: "🔗",
+    nameKey: "ranked.cards.conduit.name", descKey: "ranked.cards.conduit.desc",
+    targetHintKey: "ranked.cards.conduit.targetHint",
+    art: "/Cards Bonus/conduit.png",
+  },
 
   /* 🟡 LEGENDARY — 4 mana */
   supernova: {
@@ -117,9 +188,22 @@ export const CARDS: Record<CardId, RankedCard> = {
     targetHintKey: "ranked.cards.supernova.targetHint",
     art: "/Cards Bonus/supernova.png",
   },
+  trinite: {
+    id: "trinite", cost: 4, rarity: "legendary",
+    target: "none", palette: "amber", glyph: "🔱",
+    nameKey: "ranked.cards.trinite.name", descKey: "ranked.cards.trinite.desc",
+    targetHintKey: "ranked.cards.trinite.targetHint",
+    art: "/Cards Bonus/trinite.png",
+  },
 };
 
 export const ALL_CARD_IDS: CardId[] = Object.keys(CARDS) as CardId[];
+
+/** True for cards whose effect is permanently active while equipped — they are
+ *  never drawn into the hand (see makeBattle / RankedBattleState.passives). */
+export function isPassiveCard(id: CardId): boolean {
+  return CARDS[id].kind === "passive";
+}
 
 export const RARITY_ORDER: CardRarity[] = ["common", "rare", "epic", "legendary"];
 

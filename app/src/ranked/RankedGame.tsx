@@ -38,6 +38,7 @@ import {
 } from "./rankedRules";
 import {
   starterDeck, shuffle, drawN, HAND_CAP, STARTING_HAND, CARDS, discardRandom,
+  isPassiveCard,
 } from "./cards";
 import { cpuRankedDecision } from "./rankedAI";
 import type {
@@ -65,6 +66,8 @@ const SUDDEN_DEATH_DUEL_TIE_MS = 1_700;
 const BASE_CPU_HAND_POOL: CardId[] = [
   "aegis", "surge", "augur", "curse", "precision", "riposte",
   "heist", "tide", "vortex",
+  // Bonus actives the CPU can throw (passives are player-only).
+  "sangsue", "rempart", "trou-noir",
 ];
 
 /** Pool the player draws from when a successful Heist nets them a card. Heist
@@ -79,11 +82,16 @@ function makeBattle(savedDeck?: string[]): RankedBattleState {
     (id): id is CardId => Object.prototype.hasOwnProperty.call(CARDS, id),
   );
   const source = cleaned.length > 0 ? cleaned : starterDeck();
+  // Passives are pulled OUT of the draw pile — they're always-on for the whole
+  // match and never enter the hand. Everything else is the shuffled draw deck.
+  const passives = source.filter(isPassiveCard);
+  const drawSource = source.filter((id) => !isPassiveCard(id));
   return {
-    deck: shuffle(source),
+    deck: shuffle(drawSource),
     hand: [],
     discard: [],
     usedOneShotCards: [],
+    passives,
     oppHandSize: STARTING_HAND,
     roundWinsA: 0,
     roundWinsB: 0,
@@ -138,6 +146,9 @@ export function RankedGame({
   const [augurRevealed, setAugurRevealed] = useState<{ lane: LaneTarget; move: Move } | null>(null);
   const [oracleRevealed, setOracleRevealed] = useState<[Move, Move, Move] | null>(null);
   void oracleRevealed; // consumed later by RankedMatchView
+  /** Boussole (Surveyor): which lane the opponent's card targets this round.
+   *  `{ lane: null }` = the opponent's card has no lane target (or no card). */
+  const [compassRevealed, setCompassRevealed] = useState<{ lane: LaneTarget | null } | null>(null);
   const [mana, setMana] = useState(1);
   const [battle, setBattle] = useState<RankedBattleState>(() => makeBattle(savedDeck));
   const [lastResult, setLastResult] = useState<RankedRoundResultData | null>(null);
@@ -180,6 +191,10 @@ export function RankedGame({
   const compensationDrawNextRef = useRef(false);
   /** CPU one-shots burned this match — filtered out of BASE_CPU_HAND_POOL. */
   const cpuOneShotsRef = useRef<CardId[]>([]);
+  /** Mascarade (Bluff): when set, the NEXT round's CPU decision is computed
+   *  from an empty history so the hard AI can't read the player's habits —
+   *  the player's disinformation lands one round later (consumed at draw). */
+  const mascaradePoisonRef = useRef(false);
 
   /* ──────────── Lifecycle ──────────── */
   useEffect(() => {
@@ -204,27 +219,35 @@ export function RankedGame({
     // +1 base mana so the curve is round1:2 → round3:4. The old `nextNo`
     // curve locked the 4-cost Supernova until round 4, by which point most
     // Bo3 matches are already over — it was effectively a dead card.
-    const newMana = Math.min(MAX_MANA, nextNo + 1);
+    // Cadence (passive) lifts the cap from 4 to 5 so 4-cost cards arc earlier.
+    const manaCap = battle.passives.includes("cadence") ? 5 : MAX_MANA;
+    const newMana = Math.min(manaCap, nextNo + 1);
     setAugurCooldown((c) => Math.max(0, c - 1));
 
     const shouldDraw = nextNo === 1 || wonLastRoundRef.current;
     const compensationDraw = compensationDrawNextRef.current;
     compensationDrawNextRef.current = false;
+    // Pillage (passive): each round you WON, draw 1 extra card next round.
+    const pillageDraw = wonLastRoundRef.current && battle.passives.includes("pillage") ? 1 : 0;
     const baseDrawCount = nextNo === 1 ? STARTING_HAND : shouldDraw ? 1 : 0;
-    const drawCount = baseDrawCount + (compensationDraw ? 1 : 0);
-    // Bump the cap by 1 for this draw cycle when compensating so the free card
-    // is honored even if the victim happened to also win the previous round.
-    const drawCap = compensationDraw ? HAND_CAP + 1 : HAND_CAP;
+    const drawCount = baseDrawCount + (compensationDraw ? 1 : 0) + pillageDraw;
+    // Bump the cap for this draw cycle so the compensation / Pillage cards are
+    // honored even if the player also hit the normal cap this round.
+    const drawCap = HAND_CAP + (compensationDraw ? 1 : 0) + pillageDraw;
     const drawn = drawN(battle.deck, battle.hand, battle.discard, drawCount, drawCap);
 
     // CPU decision now, stored in ref so Augur can read without races.
+    // Mascarade (Bluff): a poisoned read makes the hard AI plan from an empty
+    // history this round — it can't counter the player's habits.
+    const mascaradePoison = mascaradePoisonRef.current;
+    mascaradePoisonRef.current = false;
     const usedOneShots = new Set(cpuOneShotsRef.current);
     const cpuHand = BASE_CPU_HAND_POOL.filter((id) => !usedOneShots.has(id));
     const cpuDecision = cpuRankedDecision(
       {
         mood: moodRef.current,
         difficulty,
-        playerHistory: playerHistoryRef.current,
+        playerHistory: mascaradePoison ? [] : playerHistoryRef.current,
         mana: newMana,
         hand: cpuHand,
       },
@@ -235,10 +258,18 @@ export function RankedGame({
     // Reset round-time state.
     setPicks([null, null, null]);
     setCardPlayed(null);
-    setAugurRevealed(null);
     setOracleRevealed(null);
+    setCompassRevealed(null);
     setLastResult(null);
     setMana(newMana);
+    // Prophétie (passive): a free Augur every round — reveal one random
+    // opponent pick. Otherwise clear last round's reveal.
+    if (battle.passives.includes("prophetie")) {
+      const lane = Math.floor(Math.random() * LANE_COUNT) as LaneTarget;
+      setAugurRevealed({ lane, move: cpuDecision.plays[lane].mv });
+    } else {
+      setAugurRevealed(null);
+    }
     setBattle((b) => ({ ...b, deck: drawn.deck, hand: drawn.hand, discard: drawn.discard }));
     setRound({
       no: nextNo,
@@ -279,14 +310,24 @@ export function RankedGame({
       setAugurRevealed(null); // Clear single augur, we use oracle state
       setOracleRevealed(r);
       setAugurCooldown(3);
+    } else if (card.id === "mascarade") {
+      // Bluff: poison the NEXT round's CPU read (disinformation lands later).
+      mascaradePoisonRef.current = true;
+    } else if (card.id === "boussole") {
+      // Surveyor: reveal which lane the opponent's card targets this round.
+      const oc = cpuDecisionRef.current?.card;
+      const lane = oc && "lane" in oc ? (oc.lane as LaneTarget) : null;
+      setCompassRevealed({ lane });
     }
-    // riposte, vortex, supernova, second-wind, tide, precision, anchor,
-    // curse, surge, aegis, heist → applied at resolve time, no immediate
-    // UI effect beyond the card badge.
+    // riposte, vortex, supernova, second-wind, tide, precision, anchor, curse,
+    // surge, aegis, heist, sangsue, rempart, trou-noir, trinite, prescience →
+    // applied at resolve time, no immediate UI effect beyond the card badge.
   }
   function handleCancelCard() {
     if (cardPlayed?.id === "augur") setAugurRevealed(null);
     if (cardPlayed?.id === "oracle") setOracleRevealed(null);
+    if (cardPlayed?.id === "mascarade") mascaradePoisonRef.current = false;
+    if (cardPlayed?.id === "boussole") setCompassRevealed(null);
     setCardPlayed(null);
   }
   function revealAugurFor(lane: LaneTarget): Move {
@@ -349,14 +390,20 @@ export function RankedGame({
     }
 
     const myCard = timedOut ? null : cardPlayed;
-    const oppCard = cpu.card;
+    // Trou noir (Singularity): annul the opponent's card entirely — none of its
+    // effects fire this round. `cpu.card` is still used below for logging, the
+    // one-shot burn, and the hand-count so a negated card is still consumed.
+    const trouNoirActive = !timedOut && myCard?.id === "trou-noir";
+    const oppCard = trouNoirActive ? null : cpu.card;
 
     // Log both sides' cards so the end-of-match recap can teach the player
     // what was played without forcing them to scroll back round-by-round.
     if (myCard?.id) youCardsPlayedRef.current.push(myCard.id);
-    if (oppCard?.id) oppCardsPlayedRef.current.push(oppCard.id);
+    if (cpu.card?.id) oppCardsPlayedRef.current.push(cpu.card.id);
 
     const fx = applyCardEffects(base, myCard, oppCard);
+    // Conduit (passive): the player's combos pay +1 extra.
+    const conduitActive = battle.passives.includes("conduit");
     // Combo detection uses post-Mirror picks so bonus history stays aligned
     // with what the reveal banner shows. AI history (playerHistoryRef) still
     // tracks the player's INTENT (original picks) — that's about reads.
@@ -368,8 +415,14 @@ export function RankedGame({
       myCard, oppCard,
       yourCombo, oppCombo,
       fx,
+      conduitActive, false,
     );
-    const finalWinner = finalRoundWinner(fx.outcome, bonuses, myCard, oppCard);
+    let finalWinner = finalRoundWinner(fx.outcome, bonuses, myCard, oppCard);
+    // Trinité parfaite (Perfect Trinity): if your three picks are ALL different
+    // (a true trinity), you win the round outright. Otherwise the card is wasted.
+    const trinityActive = !timedOut && myCard?.id === "trinite";
+    const trinityHit = trinityActive && new Set(playerPicks).size === 3;
+    if (trinityHit) finalWinner = "a";
     // Gambit (high-roll): a won Gambit round counts DOUBLE toward the match
     // (extra round-win) and doubles the shown points; a lost Gambit round
     // costs an extra card (the normal loss-discard PLUS one). Pure swing.
@@ -377,11 +430,15 @@ export function RankedGame({
     const gambitWinBonus = gambitActive && finalWinner === "a" ? 1 : 0;
     const yourTotalRaw = Math.max(0,
       fx.outcome.aPoints + bonuses.comboBonusA + bonuses.favouredBonusA +
-      bonuses.surgeBonusA + bonuses.surgePenaltyB + bonuses.tideBonusA - bonuses.cursePenaltyA);
-    const yourTotal = gambitActive ? yourTotalRaw * 2 : yourTotalRaw;
+      bonuses.surgeBonusA + bonuses.surgePenaltyB + bonuses.tideBonusA -
+      bonuses.cursePenaltyA - bonuses.leechPenaltyA);
+    let yourTotal = gambitActive ? yourTotalRaw * 2 : yourTotalRaw;
     const oppTotal = Math.max(0,
       fx.outcome.bPoints + bonuses.comboBonusB + bonuses.favouredBonusB +
-      bonuses.surgeBonusB + bonuses.surgePenaltyA + bonuses.tideBonusB - bonuses.cursePenaltyB);
+      bonuses.surgeBonusB + bonuses.surgePenaltyA + bonuses.tideBonusB -
+      bonuses.cursePenaltyB - bonuses.leechPenaltyB);
+    // A forced Trinity win must read as a win on the score line too.
+    if (trinityHit && yourTotal <= oppTotal) yourTotal = oppTotal + 1;
 
     wonLastRoundRef.current = finalWinner === "a";
 
@@ -393,11 +450,12 @@ export function RankedGame({
     const oppHeistSuccess = oppHeistLane !== null && fx.outcome.lanes[oppHeistLane]?.winner === "b";
 
     // Track CPU one-shots burned this match (the CPU has a notional, infinite
-    // pool but we still want epic/legendary to be one-and-done).
-    if (oppCard) {
-      const oppRarity = CARDS[oppCard.id].rarity;
+    // pool but we still want epic/legendary to be one-and-done). Uses cpu.card
+    // (raw) so a Trou-noir-negated card is still spent.
+    if (cpu.card) {
+      const oppRarity = CARDS[cpu.card.id].rarity;
       if (oppRarity === "epic" || oppRarity === "legendary") {
-        cpuOneShotsRef.current = [...cpuOneShotsRef.current, oppCard.id];
+        cpuOneShotsRef.current = [...cpuOneShotsRef.current, cpu.card.id];
       }
     }
     // CPU successfully Heisted us → grant the victim (us) a free draw next round.
@@ -443,12 +501,21 @@ export function RankedGame({
           usedOneShotAfter = dr2.usedOneShotCards;
         }
       }
+      // Prescience (Foresight): draw 1 card immediately, above the hand cap.
+      // Resolved here (after the loss-discard) so it's a guaranteed net +1 card.
+      let deckAfter = b.deck;
+      if (myCard?.id === "prescience") {
+        const dr = drawN(deckAfter, handAfter, discardAfter, 1, handAfter.length + 1);
+        deckAfter = dr.deck;
+        handAfter = dr.hand;
+        discardAfter = dr.discard;
+      }
       const winsA = b.roundWinsA + (finalWinner === "a" ? 1 : 0) + gambitWinBonus;
       const winsB = b.roundWinsB + (finalWinner === "b" ? 1 : 0);
       // Mirror the player's draw/discard rules onto the notional opp hand so
       // the indicator above OpponentRow tracks meaningfully across rounds.
       let oppHandAfter = b.oppHandSize;
-      if (oppCard) oppHandAfter -= 1; // they played a card this round
+      if (cpu.card) oppHandAfter -= 1; // they played a card this round (even if negated)
       if (myHeistSuccess) oppHandAfter -= 1; // we stole from them
       if (oppHeistSuccess) oppHandAfter += 1; // they stole from us
       if (finalWinner === "b") oppHandAfter += 1; // they win → draw 1
@@ -456,6 +523,7 @@ export function RankedGame({
       oppHandAfter = Math.max(0, Math.min(4, oppHandAfter));
       return {
         ...b,
+        deck: deckAfter,
         hand: handAfter,
         discard: discardAfter,
         usedOneShotCards: usedOneShotAfter,
@@ -562,12 +630,14 @@ export function RankedGame({
     setCardPlayed(null);
     setAugurRevealed(null);
     setOracleRevealed(null);
+    setCompassRevealed(null);
     setRiposteData(null);
     setSuddenDeathData(null);
     setAugurCooldown(0);
     setMana(1);
     setBattle(makeBattle(savedDeck));
     cpuDecisionRef.current = null;
+    mascaradePoisonRef.current = false;
     playerHistoryRef.current = [];
     moodRef.current = "random";
     roundNoRef.current = 0;
@@ -811,6 +881,9 @@ export function RankedGame({
         cardPlayed={cardPlayed}
         augurRevealed={augurRevealed}
         mana={mana}
+        manaMax={battle.passives.includes("cadence") ? 5 : MAX_MANA}
+        passives={battle.passives}
+        compassRevealed={compassRevealed}
         hand={battle.hand}
         oppHandSize={battle.oppHandSize}
         roundWinsYou={battle.roundWinsA}

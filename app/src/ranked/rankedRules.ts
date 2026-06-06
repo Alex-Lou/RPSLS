@@ -1,6 +1,6 @@
 /**
  * Constellation Ranked — pure round-resolution rules.
- * 12 cards, 4 rarities. All functions are pure and deterministic.
+ * 26 cards, 4 rarities. All functions are pure and deterministic.
  *
  * Card effects by resolution order:
  * 1. Pre-lock: Augur/Oracle (reveal), Echo (copy pick), Vortex (rotate opp picks)
@@ -59,6 +59,8 @@ export function applyCardEffects(
   tideBonusB: number;
   cursePenaltyA: number;
   cursePenaltyB: number;
+  leechPenaltyA: number;
+  leechPenaltyB: number;
 } {
   const lanes = base.lanes.map(cloneLane);
   let aPoints = base.aPoints;
@@ -68,6 +70,7 @@ export function applyCardEffects(
   let surgePenaltyA = 0, surgePenaltyB = 0;
   let tideBonusA = 0, tideBonusB = 0;
   let cursePenaltyA = 0, cursePenaltyB = 0;
+  let leechPenaltyA = 0, leechPenaltyB = 0;
 
   // Check if lanes are anchored (immune to opponent card effects)
   const aAnchorLane = myCard?.id === "anchor" ? (myCard as { lane: LaneTarget }).lane : null;
@@ -108,6 +111,26 @@ export function applyCardEffects(
     }
   }
 
+  // 1c. Rempart (global aegis): EVERY lane you lose this round becomes a draw —
+  //     a panic button against a big opposing hand. No points gained, just the
+  //     bleeding stopped. An anchored lane (opp Anchor) is left untouched.
+  if (myCard?.id === "rempart") {
+    for (let i = 0; i < lanes.length; i++) {
+      if (lanes[i]?.winner === "b" && bAnchorLane !== i) {
+        lanes[i] = { ...lanes[i], winner: "draw", points: 0 };
+        bPoints -= 1;
+      }
+    }
+  }
+  if (oppCard?.id === "rempart") {
+    for (let i = 0; i < lanes.length; i++) {
+      if (lanes[i]?.winner === "a" && aAnchorLane !== i) {
+        lanes[i] = { ...lanes[i], winner: "draw", points: 0 };
+        aPoints -= 1;
+      }
+    }
+  }
+
   // 2. Precision: lane treated as favoured → handled in computeRoundBonuses
 
   // 3. Surge: win = +1, lose = opponent +1. Blocked by opponent Aegis.
@@ -138,6 +161,18 @@ export function applyCardEffects(
     if (lanes[i]?.winner === "a" && aAnchorLane !== i) cursePenaltyA += 1;
   }
 
+  // 4b. Sangsue (Leech): if YOU win the targeted lane, the opponent loses 1pt
+  //     from their total (offensive mirror of Curse). Blocked if that lane is
+  //     anchored by the opponent.
+  if (myCard?.id === "sangsue") {
+    const i = (myCard as { lane: LaneTarget }).lane;
+    if (lanes[i]?.winner === "a" && bAnchorLane !== i) leechPenaltyB += 1;
+  }
+  if (oppCard?.id === "sangsue") {
+    const i = (oppCard as { lane: LaneTarget }).lane;
+    if (lanes[i]?.winner === "b" && aAnchorLane !== i) leechPenaltyA += 1;
+  }
+
   // 5. Tide: if you win 2+ lanes, ALL your wins give +1
   const aWinCount = lanes.filter((l) => l.winner === "a").length;
   const bWinCount = lanes.filter((l) => l.winner === "b").length;
@@ -160,6 +195,7 @@ export function applyCardEffects(
     aegisSavedA, aegisSavedB,
     tideBonusA, tideBonusB,
     cursePenaltyA, cursePenaltyB,
+    leechPenaltyA, leechPenaltyB,
   };
 }
 
@@ -169,6 +205,8 @@ export function computeRoundBonuses(
   myCard: PlayedCard | null, oppCard: PlayedCard | null,
   aCombo: ComboTheme | null, bCombo: ComboTheme | null,
   fx: ReturnType<typeof applyCardEffects>,
+  /** Conduit (passive): the side's combos pay +1 extra. */
+  aConduit = false, bConduit = false,
 ): RoundBonusBreakdown {
   const aPrecisionLane = myCard?.id === "precision" ? (myCard as { lane: LaneTarget }).lane : null;
   const bPrecisionLane = oppCard?.id === "precision" ? (oppCard as { lane: LaneTarget }).lane : null;
@@ -184,8 +222,12 @@ export function computeRoundBonuses(
     }
   }
 
-  const comboBonusA = aCombo?.bonus && outcome.aPoints >= outcome.bPoints ? aCombo.bonus : 0;
-  const comboBonusB = bCombo?.bonus && outcome.bPoints >= outcome.aPoints ? bCombo.bonus : 0;
+  // Conduit (passive) adds +1 to a side's combo payoff — but only when that
+  // side actually has a combo this round, so it never grants points from thin air.
+  const aComboBase = aCombo?.bonus && outcome.aPoints >= outcome.bPoints ? aCombo.bonus : 0;
+  const bComboBase = bCombo?.bonus && outcome.bPoints >= outcome.aPoints ? bCombo.bonus : 0;
+  const comboBonusA = aComboBase > 0 ? aComboBase + (aConduit ? 1 : 0) : 0;
+  const comboBonusB = bComboBase > 0 ? bComboBase + (bConduit ? 1 : 0) : 0;
 
   return {
     comboBonusA, comboBonusB,
@@ -195,6 +237,7 @@ export function computeRoundBonuses(
     aegisSavedA: fx.aegisSavedA, aegisSavedB: fx.aegisSavedB,
     tideBonusA: fx.tideBonusA, tideBonusB: fx.tideBonusB,
     cursePenaltyA: fx.cursePenaltyA, cursePenaltyB: fx.cursePenaltyB,
+    leechPenaltyA: fx.leechPenaltyA, leechPenaltyB: fx.leechPenaltyB,
   };
 }
 
@@ -221,11 +264,11 @@ export function finalRoundWinner(
   let aTotal =
     outcome.aPoints + bonuses.comboBonusA + bonuses.favouredBonusA +
     bonuses.surgeBonusA + bonuses.surgePenaltyB + bonuses.tideBonusA -
-    bonuses.cursePenaltyA;
+    bonuses.cursePenaltyA - bonuses.leechPenaltyA;
   let bTotal =
     outcome.bPoints + bonuses.comboBonusB + bonuses.favouredBonusB +
     bonuses.surgeBonusB + bonuses.surgePenaltyA + bonuses.tideBonusB -
-    bonuses.cursePenaltyB;
+    bonuses.cursePenaltyB - bonuses.leechPenaltyB;
 
   aTotal = applySupernovaToTotal(aTotal, aLanesWon, myCard?.id === "supernova");
   bTotal = applySupernovaToTotal(bTotal, bLanesWon, oppCard?.id === "supernova");

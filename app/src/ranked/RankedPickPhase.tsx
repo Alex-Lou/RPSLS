@@ -25,6 +25,9 @@ export interface RankedPickPhaseProps {
   augurRevealed: { lane: LaneTarget; move: Move } | null;
   cardPlayed: PlayedCard | null;
   mana: number;
+  manaMax?: number;
+  passives?: CardId[];
+  compassRevealed?: { lane: LaneTarget | null } | null;
   hand: CardId[];
   oppHandSize: number;
   augurCooldown: number;
@@ -41,7 +44,8 @@ export interface RankedPickPhaseProps {
 
 export function RankedPickPhase({
   youName, opponentName,
-  picks, augurRevealed, cardPlayed, mana, hand, oppHandSize, augurCooldown,
+  picks, augurRevealed, cardPlayed, mana, manaMax = 4, passives = [], compassRevealed,
+  hand, oppHandSize, augurCooldown,
   startedAt, deadlineMs, showTimer = true,
   onPickMove, onPlayCard, onCancelCard, onClearLane, onLock,
   revealAugurFor,
@@ -59,7 +63,7 @@ export function RankedPickPhase({
     if (selectedCard) {
       const card = CARDS[selectedCard];
       if (card.target === "lane") {
-        onPlayCard({ id: selectedCard as "aegis" | "surge" | "precision" | "anchor" | "curse" | "tide" | "riposte" | "mirror", lane });
+        onPlayCard({ id: selectedCard as "aegis" | "surge" | "precision" | "anchor" | "curse" | "tide" | "riposte" | "mirror" | "sangsue", lane });
         setSelectedCard(null);
       }
       return;
@@ -79,7 +83,7 @@ export function RankedPickPhase({
     if (cardPlayed) onCancelCard();
     const card = id ? CARDS[id] : null;
     // Cards with no lane target: activate immediately
-    if (card && (card.target === "lane-reveal-all" || card.target === "lane-rotate" || card.target === "self" || card.target === "gamble")) {
+    if (card && (card.target === "lane-reveal-all" || card.target === "lane-rotate" || card.target === "self" || card.target === "gamble" || card.target === "none")) {
       if (id === "oracle") {
         const r: [Move, Move, Move] = [revealAugurFor(0), revealAugurFor(1), revealAugurFor(2)];
         onPlayCard({ id: "oracle", revealed: r });
@@ -94,6 +98,10 @@ export function RankedPickPhase({
         onPlayCard({ id: "tide", lane: 0 as LaneTarget });
       } else if (id === "gambit") {
         onPlayCard({ id: "gambit" });
+      } else if (id) {
+        // Bonus "none"-target actives — immediate, no lane tap:
+        // prescience, mascarade, boussole, rempart, trou-noir, trinite.
+        onPlayCard({ id: id as "prescience" | "mascarade" | "boussole" | "rempart" | "trou-noir" | "trinite" });
       }
       return;
     }
@@ -161,10 +169,34 @@ export function RankedPickPhase({
         />
       </div>
 
+      {/* Boussole (Surveyor) reveal + always-on passives strip. Both are
+          compact so the ScaleToFit wrapper keeps the Lock button on-screen. */}
+      {(compassRevealed || passives.length > 0) && (
+        <div className="w-full max-w-md flex flex-wrap items-center justify-center gap-1.5 px-1">
+          {compassRevealed && (
+            <span className="text-[11px] font-bold rounded-full px-2 py-0.5 bg-sky-500/20 border border-sky-400/40 text-sky-200">
+              🧭 {compassRevealed.lane === null
+                ? t("ranked.compass.none")
+                : t("ranked.compass.lane", { n: compassRevealed.lane + 1 })}
+            </span>
+          )}
+          {passives.map((id) => (
+            <span
+              key={id}
+              className="text-[11px] font-bold rounded-full px-2 py-0.5 bg-violet-500/15 border border-violet-400/30 text-violet-200 inline-flex items-center gap-1"
+              title={t(CARDS[id].descKey)}
+            >
+              <span aria-hidden>{CARDS[id].glyph}</span>
+              {t(CARDS[id].nameKey)}
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* Mana + your fanned hand — bottom-of-board zone, near the move
           picker so cards and moves are reachable by the same thumb. */}
       <div className="w-full max-w-md flex items-center gap-2 px-1">
-        <ManaBar mana={mana} spent={reservedMana} />
+        <ManaBar mana={mana} max={manaMax} spent={reservedMana} />
         <div className="flex-1 min-w-0">
           <CardHand
             hand={hand}

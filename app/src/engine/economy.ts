@@ -116,6 +116,8 @@ export const CODEX_TIERS: CodexTier[] = [
   { threshold: 5,  eclats: 50,  dust: 0 },
   { threshold: 10, eclats: 120, dust: 30 },
   { threshold: 15, eclats: 300, dust: 80 },
+  { threshold: 20, eclats: 450, dust: 120 },
+  { threshold: 26, eclats: 700, dust: 200 },
 ];
 
 /** Find the tier definition for a given threshold, or undefined if unknown. */

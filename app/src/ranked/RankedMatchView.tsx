@@ -91,6 +91,12 @@ export interface RankedMatchViewProps {
   cardPlayed: PlayedCard | null;
   augurRevealed: { lane: LaneTarget; move: Move } | null;
   mana: number;
+  /** Mana ceiling for the pip display — 5 with Cadence, else 4. */
+  manaMax?: number;
+  /** Equipped passive cards — shown as an always-on strip in the pick phase. */
+  passives?: CardId[];
+  /** Boussole reveal: which lane the opponent's card targets (null = none). */
+  compassRevealed?: { lane: LaneTarget | null } | null;
   hand: CardId[];
   oppHandSize: number;
   // Actions
@@ -119,7 +125,7 @@ type Phase = "matched" | "picking" | "reveal-intro" | "reveal" | "match-end";
 export function RankedMatchView({
   nickname, match,
   round, lastResult, end,
-  picks, cardPlayed, augurRevealed, mana, hand, oppHandSize,
+  picks, cardPlayed, augurRevealed, mana, manaMax, passives, compassRevealed, hand, oppHandSize,
   roundWinsYou, roundWinsOpp, augurCooldown,
   onPickMove, onClearLane, onPlayCard, onCancelCard, onLock,
   revealAugurFor, onLeave, onRematch, onNext, showTimer = true,
@@ -199,6 +205,9 @@ export function RankedMatchView({
             augurRevealed={augurRevealed}
             cardPlayed={cardPlayed}
             mana={mana}
+            manaMax={manaMax}
+            passives={passives}
+            compassRevealed={compassRevealed}
             hand={hand}
             oppHandSize={oppHandSize}
             augurCooldown={augurCooldown}

@@ -35,6 +35,18 @@ const UNLOCK_HINTS: Partial<Record<CardId, string>> = {
   oracle: "Atteins le rang Gold",
   vortex: "Fais 3 sweeps (3-0) en mode classé",
   supernova: "Atteins le rang Platinum",
+  // Bonus cards — obtained through the boutique (packs / forge).
+  prescience: "Ouvre des packs à la boutique",
+  cadence: "Ouvre des packs à la boutique",
+  mascarade: "Ouvre des packs à la boutique",
+  boussole: "Ouvre des packs à la boutique",
+  sangsue: "Ouvre des packs ou forge-la",
+  rempart: "Ouvre des packs ou forge-la",
+  pillage: "Ouvre des packs ou forge-la",
+  "trou-noir": "Ouvre des packs ou forge-la",
+  prophetie: "Ouvre des packs ou forge-la",
+  conduit: "Ouvre des packs ou forge-la",
+  trinite: "Pack rare ou forge légendaire",
 };
 
 export function DeckManager({ onClose }: { onClose: () => void }) {
