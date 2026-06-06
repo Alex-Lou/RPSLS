@@ -24,6 +24,7 @@ import {
   detectOutcomeCombo,
   detectPlayerCombo,
   LANE_IDENTITIES,
+  laneIdentityAt,
   laneFavoursMove,
   type ComboTheme,
 } from "../engine/lanesCombos";
@@ -584,7 +585,7 @@ function LaneSlot({
   index, pick, onClear,
 }: { index: number; pick: Move | null; onClear: () => void }) {
   const t = useT();
-  const identity = LANE_IDENTITIES[index];
+  const identity = laneIdentityAt(index);
   const favoured = pick ? laneFavoursMove(index, pick) : false;
   const idKey = IDENTITY_KEYS[index];
   const title = t(`${idKey}.title`);
@@ -1130,7 +1131,7 @@ function SideLaneCard({
   side: "opp" | "you";
 }) {
   const t = useT();
-  const identity = LANE_IDENTITIES[lane];
+  const identity = laneIdentityAt(lane);
   const idKey = IDENTITY_KEYS[lane];
   const favoured = laneFavoursMove(lane, move);
   const isWin  = verdictForSide === "win";

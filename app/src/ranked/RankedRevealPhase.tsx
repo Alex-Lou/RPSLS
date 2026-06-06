@@ -14,6 +14,7 @@ import {
   detectPlayerCombo,
   detectOutcomeCombo,
   laneFavoursMove,
+  laneIdentityAt,
   type ComboTheme,
 } from "../engine/lanesCombos";
 import { LanesBoard } from "./LanesBoard";
@@ -22,9 +23,9 @@ import type { LaneTarget, PlayedCard, RoundBonusBreakdown } from "./rankedTypes"
 import { totalBonusForSide } from "./rankedRules";
 import { useT } from "../i18n";
 
-/** Localised lane names for inline hints — match the FR labels shown on the
- *  board (FORCE / SAGESSE / RUSE) rather than the en lanesCombos titles. */
-const LANE_FR = ["FORCE", "SAGESSE", "RUSE"] as const;
+/** Localised lane name for inline hints — reads the live per-match lane
+ *  permutation so the hint matches the shuffled board, not a fixed order. */
+const laneFr = (i: number) => laneIdentityAt(i).titleFr;
 const MOVE_FR: Record<Move, string> = {
   rock: "Pierre",
   paper: "Feuille",
@@ -207,9 +208,9 @@ function favouredHints(
     if (laneResults[i].winner !== side) continue;
     const mv = picks[i];
     if (laneFavoursMove(i, mv)) {
-      hints.push(`${MOVE_FR[mv]} sur ${LANE_FR[i]}`);
+      hints.push(`${MOVE_FR[mv]} sur ${laneFr(i)}`);
     } else if (precisionLane === i) {
-      hints.push(`🎯 Précision sur ${LANE_FR[i]}`);
+      hints.push(`🎯 Précision sur ${laneFr(i)}`);
     }
   }
   return hints;
@@ -225,7 +226,7 @@ function surgeHint(
   if (card?.id !== "surge") return null;
   const lane = (card as { lane: LaneTarget }).lane;
   if (laneResults[lane]?.winner !== side) return null;
-  return `⚡ Surge gagnant sur ${LANE_FR[lane]}`;
+  return `⚡ Surge gagnant sur ${laneFr(lane)}`;
 }
 
 function tideHint(

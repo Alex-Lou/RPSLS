@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Hand, MoveGlyph } from "../icons";
 import type { Move } from "../engine/game";
 import type { LaneResult } from "../online/online";
-import { LANE_IDENTITIES, laneFavoursMove } from "../engine/lanesCombos";
+import { laneIdentityAt, laneFavoursMove } from "../engine/lanesCombos";
 import { CardSlot } from "./CardSlot";
 import { CardImage } from "./CardImage";
 import { OppHandIndicator } from "./OppHandIndicator";
@@ -261,7 +261,7 @@ function LaneSlot({ index, pick, favoured, verdict, cardHere, onClick, disabled 
   onClick: () => void; disabled: boolean;
 }) {
   const t = useT();
-  const identity = LANE_IDENTITIES[index];
+  const identity = laneIdentityAt(index);
   const idKey = IDENTITY_KEYS[index];
   const title = t(`${idKey}.title`);
   const accent = identity.accent;

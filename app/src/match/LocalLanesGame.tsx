@@ -15,6 +15,7 @@ import {
 } from "./LanesMatchView";
 import { type AiMood, type Move } from "../engine/game";
 import { eclatsReward } from "../engine/economy";
+import { shuffleLaneIdentities } from "../engine/lanesCombos";
 import { useStore } from "../store/store";
 import {
   battleStatus,
@@ -71,6 +72,10 @@ export function LocalLanesGame({
   // aggressive/logical bias, true 1/5 per move). The challenge is dialed up
   // only via the explicit difficulty setting (Profil), never by a hidden bias.
   const moodRef = useRef<AiMood>("random");
+  // Shuffle the lane arrangement once per match (synchronous, before the board
+  // renders) so position no longer always means the same identity.
+  const laneShuffled = useRef(false);
+  if (!laneShuffled.current) { shuffleLaneIdentities(); laneShuffled.current = true; }
   // Player move history fed to the hard AI.
   const playerHistoryRef = useRef<Move[]>([]);
   // Local battle state machine.

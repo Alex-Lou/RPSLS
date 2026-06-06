@@ -19,7 +19,7 @@ import {
   rpslsBeats,
   type RoundOutcome,
 } from "../engine/lanesEngine";
-import { detectPlayerCombo } from "../engine/lanesCombos";
+import { detectPlayerCombo, shuffleLaneIdentities } from "../engine/lanesCombos";
 import { eclatsReward } from "../engine/economy";
 import {
   hapticLock, hapticMatchStart, hapticMatchWin, hapticMatchLoss,
@@ -111,6 +111,12 @@ export function RankedGame({
   const recordMatch = useStore((s) => s.recordMatch);
   const savedDeck = useStore((s) => s.player.rankedDeck);
   const awardCardMasteryXp = useStore((s) => s.awardCardMasteryXp);
+
+  // Shuffle the lane arrangement once per match — synchronously during this
+  // (parent) render so the board children read the SAME arrangement on first
+  // paint. The ref guards against re-shuffling on re-renders / StrictMode.
+  const laneShuffled = useRef(false);
+  if (!laneShuffled.current) { shuffleLaneIdentities(); laneShuffled.current = true; }
 
   const matchInfo: RankedMatchInfo = {
     matchId: "ranked-local",

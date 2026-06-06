@@ -199,6 +199,8 @@ export interface LaneIdentity {
   index: number;
   /** Display title and short hint. */
   title: string;
+  /** French display name (used by the in-match bonus hints). */
+  titleFr: string;
   glyph: string;
   hint: string;
   /** Move ids this lane "favours" — cosmetic Phase 1, can be wired to a real
@@ -209,13 +211,17 @@ export interface LaneIdentity {
 }
 
 /**
- * The three Phase-1 lane identities. Static across all matches so players
- * memorise them and start placing moves intentionally.
+ * The three lane archetypes. The favoured-move SETS are fixed (so players can
+ * learn "FORCE = Rock/Scissors"), but their POSITION on the board is shuffled
+ * per match (see LANE_PERM) so a lane index no longer always means the same
+ * thing — kills the "lane 0 is always FORCE" pattern while staying legible
+ * (each lane header shows its identity + favoured moves in-match).
  */
 export const LANE_IDENTITIES: LaneIdentity[] = [
   {
     index: 0,
     title: "FORCE",
+    titleFr: "FORCE",
     glyph: "⚔️",
     hint: "Rock & Scissors thrive here.",
     favours: ["rock", "scissors"],
@@ -224,6 +230,7 @@ export const LANE_IDENTITIES: LaneIdentity[] = [
   {
     index: 1,
     title: "WISDOM",
+    titleFr: "SAGESSE",
     glyph: "🧠",
     hint: "Paper & Spock thrive here.",
     favours: ["paper", "spock"],
@@ -232,6 +239,7 @@ export const LANE_IDENTITIES: LaneIdentity[] = [
   {
     index: 2,
     title: "CUNNING",
+    titleFr: "RUSE",
     glyph: "🦎",
     hint: "Lizard thrives here.",
     favours: ["lizard"],
@@ -239,6 +247,27 @@ export const LANE_IDENTITIES: LaneIdentity[] = [
   },
 ];
 
+/** Per-match permutation of the three identities across board positions.
+ *  position i shows LANE_IDENTITIES[LANE_PERM[i]]. Default = identity. */
+let LANE_PERM: [number, number, number] = [0, 1, 2];
+
+/** Shuffle the lane arrangement for a fresh match. Call once when a lanes /
+ *  ranked match starts — synchronously, before the board renders, so the
+ *  display and the scoring read the SAME arrangement on the first paint. */
+export function shuffleLaneIdentities(): void {
+  const a: number[] = [0, 1, 2];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  LANE_PERM = a as [number, number, number];
+}
+
+/** The identity occupying board position `laneIdx` for the current match. */
+export function laneIdentityAt(laneIdx: number): LaneIdentity {
+  return LANE_IDENTITIES[LANE_PERM[laneIdx] ?? laneIdx] ?? LANE_IDENTITIES[laneIdx];
+}
+
 export function laneFavoursMove(laneIdx: number, mv: Move): boolean {
-  return LANE_IDENTITIES[laneIdx]?.favours.includes(mv) ?? false;
+  return laneIdentityAt(laneIdx)?.favours.includes(mv) ?? false;
 }
