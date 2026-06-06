@@ -224,7 +224,10 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack, onGoShop }: {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-base leading-none">{card.glyph}</span>
+                    {/* The card art preview on the left already carries the
+                        glyph fallback when no PNG ships, so duplicating the
+                        emoji next to the title reads as redundant — title +
+                        rarity dot are enough. */}
                     <span className="font-bold text-sm">{t(card.nameKey)}</span>
                     <span className={"inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide " + RARITY_COLOR[card.rarity]}>
                       <span className={"w-2 h-2 rounded-full " + RARITY_DOT[card.rarity]} />
