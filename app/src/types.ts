@@ -163,7 +163,7 @@ export interface Player {
  *  - "img"    = the player's uploaded image */
 export type PadCategory = "styled" | "svg" | "img";
 
-export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: string; category: PadCategory }> = {
+export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: string; category: PadCategory; premiumSetId?: string }> = {
   chalkboard: { label: "Blackboard",     emoji: "🧪", tagline: "Hand-drawn chalk, formulas, lab vibes.",            category: "svg" },
   vintage:    { label: "Vintage Hall",   emoji: "🎲", tagline: "Felt mat, gold trim, retro lounge.",                 category: "svg" },
   cosmos:     { label: "Cosmos",         emoji: "🌌", tagline: "Dark sky, orbits, particle trails.",                 category: "styled" },
@@ -180,7 +180,7 @@ export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: st
   aura:       { label: "Aura",           emoji: "🎨", tagline: "S'accorde à ton thème : couleurs et lueurs vivantes.", category: "styled" },
   volcanic:   { label: "Volcanic",      emoji: "🌋", tagline: "Obsidienne craquelée, veines de lave, braises montantes.", category: "styled" },
   abyss:      { label: "Abyss",         emoji: "🐙", tagline: "Abysses océaniques, méduses bioluminescentes, profondeurs.", category: "styled" },
-  quartz:     { label: "Quartz",        emoji: "💠", tagline: "Cristaux prismatiques, refractions glaciales, lumière douce.",     category: "styled" },
+  quartz:     { label: "Quartz",        emoji: "💠", tagline: "Cristaux prismatiques, refractions glaciales, lumière douce.",     category: "styled", premiumSetId: "quartz" },
   custom:     { label: "Mon image",      emoji: "🖼️", tagline: "Ton propre tapis (paysage 3:2, ex. 1500×1000).",     category: "img" },
 };
 

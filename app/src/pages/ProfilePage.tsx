@@ -651,6 +651,12 @@ export function ProfilePage() {
                     updateProfile({ padId: "custom", padChosen: true });
                     return;
                   }
+                  // Premium gate: same flow as the bg picker — tapping a
+                  // locked premium pad opens the purchase modal.
+                  if (meta.premiumSetId && !(player.ownedPremiumSets ?? []).includes(meta.premiumSetId)) {
+                    setPremiumModalSetId(meta.premiumSetId);
+                    return;
+                  }
                   setPreviewPad(id);
                 }}
                 className={
@@ -694,6 +700,13 @@ export function ProfilePage() {
                     <div className="absolute top-2 right-2 bg-emerald-500/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
                       ACTIVE
                     </div>
+                  )}
+                  {meta.premiumSetId && (
+                    <PremiumBadge
+                      variant="ribbon"
+                      label={(player.ownedPremiumSets ?? []).includes(meta.premiumSetId) ? "✓ OWNED" : "PREMIUM"}
+                      className="top-2 left-2"
+                    />
                   )}
                   {needsImport && (
                     <div className="absolute inset-0 flex items-center justify-center text-ink text-xs font-bold bg-black/45">
