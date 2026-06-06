@@ -169,6 +169,51 @@ impl LobbyAttemptTracker {
     pub fn record_success(&self, ip: IpAddr) {
         self.by_ip.remove(&ip);
     }
+
+    /// Drop entries whose deques are stale (all timestamps older than WINDOW).
+    /// Returns the count removed. Called from the background janitor below.
+    fn sweep(&self) -> usize {
+        let now = Instant::now();
+        let stale: Vec<IpAddr> = self
+            .by_ip
+            .iter()
+            .filter_map(|e| {
+                let back = e.value().back().copied()?;
+                if now.duration_since(back) >= WINDOW {
+                    Some(*e.key())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let n = stale.len();
+        for ip in stale {
+            // Re-check under write-lock: don't drop an IP that hit a fresh
+            // failure between our scan and the remove.
+            self.by_ip.remove_if(&ip, |_, v| {
+                v.back().is_some_and(|t| now.duration_since(*t) >= WINDOW)
+            });
+        }
+        n
+    }
+
+    /// Spawn a background task that periodically prunes stale entries so the
+    /// map can't accumulate one perpetual entry per unique IP that ever tried
+    /// a lobby join. Cheap: scans the map every 5 minutes.
+    pub fn spawn_janitor(self: Arc<Self>) {
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(Duration::from_secs(300));
+            // Skip the immediate first tick — there's nothing to sweep at boot.
+            tick.tick().await;
+            loop {
+                tick.tick().await;
+                let n = self.sweep();
+                if n > 0 {
+                    tracing::debug!(removed = n, "lobby attempt tracker swept");
+                }
+            }
+        });
+    }
 }
 
 fn prune_old(entry: &mut VecDeque<Instant>, now: Instant) {

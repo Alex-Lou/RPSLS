@@ -72,6 +72,11 @@ async fn main() {
         sync_throttle: DashMap::new(),
     });
 
+    // Background janitor — purges stale per-IP attempt entries so the tracker
+    // doesn't accumulate one perpetual entry per unique IP that ever tried
+    // a lobby join. Runs every 5 min, no-op when nothing to prune.
+    state.lobby_attempts.clone().spawn_janitor();
+
     // `/health` is infra-only: Render hammers it during rolling deploys
     // (multiple probes per second to confirm the new instance is up before
     // switching traffic) and UptimeRobot keeps it warm against the free-tier
