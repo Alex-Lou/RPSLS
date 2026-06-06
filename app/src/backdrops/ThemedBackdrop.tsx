@@ -149,12 +149,18 @@ vec3 grid(vec2 uv, float aspect){
     col += softStars(uv, aspect, 0.994, vec3(0.9,0.85,1.0)) * smoothstep(horizon + 0.18, 1.0, uv.y);
   } else {
     // ── Lower half: neon perspective floor grid ──
+    // depth+0.06 made persp explode right under the horizon → the fract()
+    // oscillated faster than the pixel grid = shimmering moiré that reads as
+    // jank and costs GPU. A higher floor (0.12) caps the worst-case frequency:
+    // smoother, cheaper, same synthwave look.
     float depth = (horizon - uv.y);
-    float persp = 1.0 / (depth + 0.06);
+    float persp = 1.0 / (depth + 0.12);
     float gx = abs(fract((uv.x - 0.5) * persp * 1.8) - 0.5);
     float gz = abs(fract(u_time * 0.3 + persp * 0.55) - 0.5);
-    float lx = smoothstep(0.045, 0.0, gx);
-    float lz = smoothstep(0.045, 0.0, gz);
+    // Widen the line a hair as it recedes so far lines don't alias to noise.
+    float lw = 0.045 + depth * 0.05;
+    float lx = smoothstep(lw, 0.0, gx);
+    float lz = smoothstep(lw, 0.0, gz);
     float line = max(lx, lz);
     vec3 neon = mix(vec3(0.10,0.92,1.0), vec3(1.0,0.22,0.85), uv.x);
     col += neon * line * (0.4 + depth * 2.6);
