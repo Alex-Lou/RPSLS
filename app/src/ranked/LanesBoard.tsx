@@ -153,7 +153,7 @@ function OpponentRow({
                 onClick={() => onOppLaneClick?.(lane)}
               />
             )}
-            {showCard && oppCard && <CardSlot id={oppCard.id} position="tr" />}
+            {showCard && oppCard && <CardSlot id={oppCard.id} position="tr" flipReveal />}
           </div>
         );
       })}

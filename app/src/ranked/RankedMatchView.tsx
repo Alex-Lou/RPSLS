@@ -23,6 +23,7 @@ import {
 import { LoadingTip } from "../flavor/LoadingTip";
 import { RankedPickPhase } from "./RankedPickPhase";
 import { RankedRevealPhase } from "./RankedRevealPhase";
+import { CARDS } from "./cards";
 import type {
   CardId,
   LaneTarget,
@@ -70,6 +71,13 @@ export interface RankedEndData {
   xpGained?: number;
   /** Boutique éclats granted on this match end — same logic as LanesEndData. */
   eclatsGained?: number;
+  /** Every card the player played during the match — fed into a "Cartes
+   *  utilisées" recap below the cinematic so the player gradually learns
+   *  the cards by reading them in context, no rulebook open. */
+  youCardsPlayed?: CardId[];
+  /** Same on the opponent side — visible to the player so they understand
+   *  what was thrown at them and can plan a counter next time. */
+  oppCardsPlayed?: CardId[];
 }
 
 export interface RankedMatchViewProps {
@@ -226,27 +234,111 @@ export function RankedMatchView({
         )}
 
         {phase === "match-end" && end && (
-          <CinematicMatchEnd
-            outcome={
-              end.roundWinsYou > end.roundWinsOpp ? "win" :
-              end.roundWinsYou < end.roundWinsOpp ? "loss" : "draw"
-            }
-            forfeit={end.forfeit}
-            forfeitByYou={end.forfeit && end.winner === "b"}
-            scoreLine={`${end.roundWinsYou} — ${end.roundWinsOpp}`}
-            youScore={end.roundWinsYou}
-            oppScore={end.roundWinsOpp}
-            bestOf={match.winTo * 2 - 1}
-            onRematch={onNext ? undefined : onRematch}
-            onBack={onNext ? onNext : onLeave!}
-            backLabel={onNext ? "Suivant →" : undefined}
-            reward={{ xp: end.xpGained, eclats: end.eclatsGained }}
-          />
+          <>
+            <CinematicMatchEnd
+              outcome={
+                end.roundWinsYou > end.roundWinsOpp ? "win" :
+                end.roundWinsYou < end.roundWinsOpp ? "loss" : "draw"
+              }
+              forfeit={end.forfeit}
+              forfeitByYou={end.forfeit && end.winner === "b"}
+              scoreLine={`${end.roundWinsYou} — ${end.roundWinsOpp}`}
+              youScore={end.roundWinsYou}
+              oppScore={end.roundWinsOpp}
+              bestOf={match.winTo * 2 - 1}
+              onRematch={onNext ? undefined : onRematch}
+              onBack={onNext ? onNext : onLeave!}
+              backLabel={onNext ? "Suivant →" : undefined}
+              reward={{ xp: end.xpGained, eclats: end.eclatsGained }}
+            />
+            <MatchCardsRecap
+              youCards={end.youCardsPlayed ?? []}
+              oppCards={end.oppCardsPlayed ?? []}
+            />
+          </>
         )}
         </div>
       </ScaleToFit>
     </div>
   );
+}
+
+/* ──────────── End-of-match cards recap ──────────── */
+
+/**
+ * MatchCardsRecap — small "Cartes utilisées" block under the cinematic.
+ *
+ * Lists the unique cards each side actually played during the match, with
+ * their name and short description. Stays inside the same panel so the
+ * screen never overflows: the player learns by reading the cards in
+ * context instead of opening a rulebook.
+ */
+function MatchCardsRecap({ youCards, oppCards }: { youCards: CardId[]; oppCards: CardId[] }) {
+  const t = useT();
+  const youUnique = unique(youCards);
+  const oppUnique = unique(oppCards);
+  if (youUnique.length === 0 && oppUnique.length === 0) return null;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 1.4, duration: 0.35 }}
+      className="mt-3 w-full max-w-md mx-auto rounded-2xl bg-surface border border-hairline p-3"
+    >
+      <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-ink-faint text-center mb-2">
+        Cartes utilisées
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <CardsColumn label="Toi" cards={youUnique} tone="emerald" t={t} />
+        <CardsColumn label="Adv." cards={oppUnique} tone="rose" t={t} />
+      </div>
+    </motion.div>
+  );
+}
+
+function CardsColumn({
+  label, cards, tone, t,
+}: {
+  label: string;
+  cards: CardId[];
+  tone: "emerald" | "rose";
+  t: (k: string) => string;
+}) {
+  const ring = tone === "emerald" ? "ring-emerald-400/30" : "ring-rose-400/30";
+  const head = tone === "emerald" ? "text-emerald-300" : "text-rose-300";
+  return (
+    <div>
+      <div className={"text-[10px] uppercase tracking-wider font-bold mb-1 " + head}>{label}</div>
+      {cards.length === 0 ? (
+        <p className="text-[11px] text-ink-faint italic">Aucune carte jouée</p>
+      ) : (
+        <div className="flex flex-col gap-1">
+          {cards.map((id) => {
+            const c = CARDS[id];
+            return (
+              <div key={id} className={"rounded-lg p-2 bg-hairline ring-1 " + ring}>
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <span className="text-base">{c.glyph}</span>
+                  <span className="text-[11px] font-bold text-ink">{t(c.nameKey)}</span>
+                </div>
+                <p className="text-[10px] text-ink-muted leading-snug">{t(c.descKey)}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Dedupe while keeping first-seen order. */
+function unique<T>(arr: T[]): T[] {
+  const seen = new Set<T>();
+  const out: T[] = [];
+  for (const x of arr) {
+    if (!seen.has(x)) { seen.add(x); out.push(x); }
+  }
+  return out;
 }
 
 /* ──────────── Sub-pieces ──────────── */

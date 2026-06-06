@@ -46,7 +46,12 @@ type Phase =
   | "error";
 
 /** How long we look for a real opponent before dropping into a bot match. */
-const QUEUE_BOT_TIMEOUT_MS = 10_000;
+/** Wait this long for a real opponent before quietly offering a CPU fallback.
+ *  Bumped from 10s — Alex's point: if we swap to a bot too fast, the player
+ *  never *feels* like they're meeting humans, the queue never has time to
+ *  fill, and the real-player base never gets to build itself. 25s gives the
+ *  system a real chance to pair two humans across the world before defaulting. */
+const QUEUE_BOT_TIMEOUT_MS = 25_000;
 
 /** Believable opponent handles for the practice-bot fallback. */
 const BOT_NAMES = ["Nova", "Blitz", "Echo", "Vortex", "Cipher", "Riot", "Saber", "Quasar"];
@@ -187,6 +192,10 @@ export function OnlinePage() {
   const [joinCode, setJoinCode] = useState("");          // input
   const [queuePosition, setQueuePosition] = useState(0);
   const [queueStartAt, setQueueStartAt] = useState<number | null>(null);
+  /** Timestamp of the most recent bot-fallback arming. The QueueRadar reads
+   *  this to fill its "🤖 IA dans Ys" countdown; resets when the player taps
+   *  "Attendre encore" so the bar restarts from zero. */
+  const [botArmedAt, setBotArmedAt] = useState<number | null>(null);
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [m, setM] = useState<MatchState>(emptyMatch());
 
@@ -607,6 +616,7 @@ export function OnlinePage() {
 
   function armBotFallback() {
     disarmBotFallback();
+    setBotArmedAt(Date.now());
     botFallbackTimer.current = window.setTimeout(() => {
       // Only kick in if we're still hunting (not already matched).
       if (phaseRef.current === "connecting" || phaseRef.current === "queued") {
@@ -619,6 +629,13 @@ export function OnlinePage() {
       window.clearTimeout(botFallbackTimer.current);
       botFallbackTimer.current = null;
     }
+    setBotArmedAt(null);
+  }
+  /** Player tapped "Attendre encore un humain" — restart the fallback timer
+   *  from zero so they get another full window without re-queueing. */
+  function extendBotFallback() {
+    if (phaseRef.current !== "connecting" && phaseRef.current !== "queued") return;
+    armBotFallback();
   }
   function clearBotTimers() {
     if (botRoundTimer.current) { window.clearTimeout(botRoundTimer.current); botRoundTimer.current = null; }
@@ -973,9 +990,11 @@ export function OnlinePage() {
           <QueueRadar
             key="queued"
             position={queuePosition}
-            startedAt={queueStartAt}
+            startedAt={botArmedAt ?? queueStartAt}
             bestOf={bestOf}
             onCancel={cancel}
+            botTimeoutMs={QUEUE_BOT_TIMEOUT_MS}
+            onExtend={extendBotFallback}
           />
         )}
 
@@ -2062,11 +2081,21 @@ function QueueRadar({
   startedAt,
   bestOf,
   onCancel,
+  botTimeoutMs,
+  onExtend,
 }: {
   position: number;
   startedAt: number | null;
   bestOf: number;
   onCancel: () => void;
+  /** Total ms the matchmaker will wait for a real opponent before offering
+   *  a CPU fallback. Used here only for display — the actual timer lives
+   *  in armBotFallback() above. */
+  botTimeoutMs: number;
+  /** Re-arm the bot-fallback timer by another `botTimeoutMs`. Lets a patient
+   *  player tell the system "I'd rather wait for a real one" without having
+   *  to cancel and re-queue from scratch. */
+  onExtend?: () => void;
 }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -2074,6 +2103,12 @@ function QueueRadar({
     return () => clearInterval(id);
   }, []);
   const elapsedSec = startedAt ? Math.floor((now - startedAt) / 1000) : 0;
+  // Progression toward the bot fallback, from the most recent (re)arm. The
+  // armBot timer is reset when `onExtend` fires, so `startedAt` already
+  // reflects that — we simply count up here.
+  const elapsedMs = startedAt ? now - startedAt : 0;
+  const botRemainingSec = Math.max(0, Math.ceil((botTimeoutMs - elapsedMs) / 1000));
+  const botProgress = Math.max(0, Math.min(1, elapsedMs / botTimeoutMs));
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -2110,7 +2145,7 @@ function QueueRadar({
           <div className="w-4 h-4 rounded-full bg-violet-400 shadow-[0_0_20px_rgba(167,139,250,0.8)]" />
         </div>
       </div>
-      <div className="text-center">
+      <div className="text-center w-full max-w-sm">
         <div className="text-2xl font-black bg-gradient-to-r from-violet-200 to-fuchsia-300 bg-clip-text text-transparent">
           Looking for an opponent…
         </div>
@@ -2118,9 +2153,38 @@ function QueueRadar({
           {position > 0 ? `Position #${position}` : "Scanning the network…"} ·{" "}
           Best of {bestOf} · {elapsedSec}s
         </div>
-        <div className="text-[11px] text-amber-300/70 mt-1">
-          🤖 Un adversaire CPU prendra le relais si personne ne se présente
+
+        {/* Bot-fallback countdown — a small bar fills from violet to amber so
+            the player can SEE how much time is left before a CPU takes over.
+            That visible budget is what lets them choose to wait longer instead
+            of feeling pushed into a fake match. */}
+        <div className="mt-3 px-2">
+          <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-1">
+            <span>Vrai adversaire</span>
+            <span className="text-amber-300">🤖 IA dans {botRemainingSec}s</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+            <motion.div
+              animate={{ width: `${botProgress * 100}%` }}
+              transition={{ duration: 0.25, ease: "linear" }}
+              className="h-full rounded-full bg-gradient-to-r from-violet-400 to-amber-400"
+            />
+          </div>
         </div>
+
+        {/* "Wait longer" affordance — only useful when an extend handler is
+            wired, and only shown once the player is close enough to bot
+            fallback to actually need it. */}
+        {onExtend && botRemainingSec <= 10 && (
+          <motion.button
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            onClick={onExtend}
+            className="mt-2 px-4 py-1.5 rounded-full text-[11px] font-bold bg-white/10 border border-white/20 text-white hover:bg-white/15 transition"
+          >
+            ⏳ Attendre encore un humain
+          </motion.button>
+        )}
       </div>
       <button
         onClick={onCancel}

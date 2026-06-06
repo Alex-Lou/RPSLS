@@ -124,6 +124,11 @@ export function RankedGame({
   const [round, setRound] = useState<RankedRoundData | null>(null);
   const [picks, setPicks] = useState<[Move | null, Move | null, Move | null]>([null, null, null]);
   const [cardPlayed, setCardPlayed] = useState<PlayedCard | null>(null);
+  /** Rolling log of every card actually played per side — used by the
+   *  end-of-match "Cartes utilisées" recap so the player reads each card's
+   *  description in context (and learns the rules without a rulebook). */
+  const youCardsPlayedRef = useRef<CardId[]>([]);
+  const oppCardsPlayedRef = useRef<CardId[]>([]);
   const [augurRevealed, setAugurRevealed] = useState<{ lane: LaneTarget; move: Move } | null>(null);
   const [oracleRevealed, setOracleRevealed] = useState<[Move, Move, Move] | null>(null);
   void oracleRevealed; // consumed later by RankedMatchView
@@ -340,6 +345,11 @@ export function RankedGame({
     const myCard = timedOut ? null : cardPlayed;
     const oppCard = cpu.card;
 
+    // Log both sides' cards so the end-of-match recap can teach the player
+    // what was played without forcing them to scroll back round-by-round.
+    if (myCard?.id) youCardsPlayedRef.current.push(myCard.id);
+    if (oppCard?.id) oppCardsPlayedRef.current.push(oppCard.id);
+
     const fx = applyCardEffects(base, myCard, oppCard);
     // Combo detection uses post-Mirror picks so bonus history stays aligned
     // with what the reveal banner shows. AI history (playerHistoryRef) still
@@ -514,6 +524,8 @@ export function RankedGame({
           forfeit: false,
           xpGained: youWon ? 60 : 15,
           eclatsGained: eclatsReward("constellation", youWon ? "win" : "loss"),
+          youCardsPlayed: youCardsPlayedRef.current.slice(),
+          oppCardsPlayed: oppCardsPlayedRef.current.slice(),
         });
       }, ROUND_PAUSE_MS);
     } else if (riposteWillFire) {
@@ -746,6 +758,8 @@ export function RankedGame({
         forfeit: false,
         xpGained: youWon ? 60 : 15,
         eclatsGained: eclatsReward("constellation", youWon ? "win" : "loss"),
+        youCardsPlayed: youCardsPlayedRef.current.slice(),
+        oppCardsPlayed: oppCardsPlayedRef.current.slice(),
       });
     }, ROUND_PAUSE_MS);
   }

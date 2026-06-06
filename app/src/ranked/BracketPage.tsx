@@ -43,6 +43,15 @@ export function BracketPage({
   const [joined, setJoined] = useState(() =>
     tournament.rounds.some((r) => r.some((m) => m.status === "done")),
   );
+  /** Brief "le tournoi se prépare…" countdown that fires once between
+   *  "Intégrer" and the bracket actually running. Gives the moment a sense
+   *  of weight — Alex insisted that without the ramp-up the tournament
+   *  feels like a UI flick instead of an event. */
+  const [preparing, setPreparing] = useState(false);
+  const handleJoin = useCallback(() => {
+    hapticTick();
+    setPreparing(true);
+  }, []);
 
   const pickSize = useCallback((size: TournamentSize) => {
     hapticTick();
@@ -130,7 +139,7 @@ export function BracketPage({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           whileTap={{ scale: 0.97 }}
-          onClick={() => { hapticTick(); setJoined(true); }}
+          onClick={handleJoin}
           className="mx-auto px-8 py-3.5 rounded-2xl font-bold text-white shadow-lg shadow-violet-500/30 transition hover:scale-[1.02]"
           style={{
             background: "linear-gradient(to right, var(--theme-primary), var(--theme-secondary))",
@@ -182,6 +191,76 @@ export function BracketPage({
           <LoadingTip rotateMs={4000} className="justify-center text-center" />
         </div>
       )}
+
+      <AnimatePresence>
+        {preparing && (
+          <TournamentPreparingOverlay
+            onDone={() => {
+              setPreparing(false);
+              setJoined(true);
+            }}
+          />
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+/* ─────────── Tournament preparing overlay ─────────── */
+
+/**
+ * TournamentPreparingOverlay — drumroll between "Intégrer" and the bracket
+ * actually starting. A 3-2-1 countdown over a darkened backdrop with a
+ * pulsing trophy gives the tournament its own start beat.
+ */
+function TournamentPreparingOverlay({ onDone }: { onDone: () => void }) {
+  const [beat, setBeat] = useState(3);
+  useEffect(() => {
+    if (beat === 0) {
+      const id = window.setTimeout(onDone, 480);
+      return () => window.clearTimeout(id);
+    }
+    const id = window.setTimeout(() => setBeat((b) => b - 1), 850);
+    return () => window.clearTimeout(id);
+  }, [beat, onDone]);
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm"
+    >
+      <div className="flex flex-col items-center gap-5 text-center">
+        <motion.div
+          animate={{ scale: [1, 1.08, 1], rotate: [0, -3, 3, 0] }}
+          transition={{ duration: 1.7, repeat: Infinity }}
+          className="text-7xl drop-shadow-[0_4px_20px_rgba(251,191,36,0.45)]"
+        >
+          🏆
+        </motion.div>
+        <motion.h2
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-2xl font-black bg-gradient-to-r from-amber-300 to-orange-400 bg-clip-text text-transparent"
+          style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.05em" }}
+        >
+          Le tournoi se prépare…
+        </motion.h2>
+        <p className="text-[12px] text-zinc-400 max-w-xs leading-snug px-6">
+          Les 8 challengers prennent place sur leur estrade. Premier coup d'envoi imminent.
+        </p>
+        <motion.div
+          key={beat}
+          initial={{ scale: 0.5, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 1.4, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 280, damping: 18 }}
+          className="text-6xl font-black tabular-nums text-amber-200 drop-shadow-[0_2px_12px_rgba(251,191,36,0.65)]"
+        >
+          {beat > 0 ? beat : "GO !"}
+        </motion.div>
+      </div>
     </motion.div>
   );
 }
