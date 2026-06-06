@@ -86,11 +86,17 @@ function useServerStatus(url: string): {
 } {
   const [status, setStatus] = useState<ConnStatus>("idle");
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
-  const probeRef = useRef<WebSocket | null>(null);
+  // AbortController of the in-flight probe — `refresh()` is HTTP `GET /health`
+  // now, not a WS handshake. The endpoint sits OUT of the governor layer (see
+  // main.rs), so probing is cheap and never trips a 429; cold-starting a
+  // dormant instance works the same way (any request wakes Render). Replaced
+  // the WS probe because that opened a fresh TCP + upgrade + close per call —
+  // ~3× the traffic of a plain HTTP probe for the exact same information.
+  const probeRef = useRef<AbortController | null>(null);
 
   const refresh = useCallback(() => {
-    // Tear down any running probe.
-    try { probeRef.current?.close(); } catch { /* ignore */ }
+    // Cancel any in-flight probe.
+    try { probeRef.current?.abort(); } catch { /* ignore */ }
     probeRef.current = null;
 
     if (!url.trim()) {
@@ -98,59 +104,73 @@ function useServerStatus(url: string): {
       setLatencyMs(null);
       return;
     }
-    const wsUrl = normalizeServerUrl(url).replace(/\/+$/, "") + "/ws";
+    // /health is served over plain HTTP(S), not WS — turn `ws(s)://host/ws`
+    // back into `http(s)://host/health`.
+    const normalized = normalizeServerUrl(url).replace(/\/+$/, "");
+    const healthUrl = normalized
+      .replace(/^wss:\/\//, "https://")
+      .replace(/^ws:\/\//, "http://") + "/health";
     setStatus("checking");
 
-    let ws: WebSocket;
-    try {
-      ws = new WebSocket(wsUrl);
-    } catch {
-      setStatus("offline");
-      return;
-    }
-    probeRef.current = ws;
-
-    // Cold-start budget for Render free tier: up to ~90s. Flip to "waking"
-    // after 2.5s so the user sees we know it's slow.
+    const ac = new AbortController();
+    probeRef.current = ac;
     const t0 = performance.now();
+    // Flip to "waking" if the request is still pending after 2.5s, so the
+    // user sees we know Render is cold-starting.
     const wakingT = setTimeout(() => {
-      if (probeRef.current === ws) setStatus("waking");
+      if (probeRef.current === ac) setStatus("waking");
     }, 2_500);
+    // Cold-start budget for Render free tier: up to ~90s.
     const hardT = setTimeout(() => {
-      try { ws.close(); } catch { /* ignore */ }
-      if (probeRef.current === ws) setStatus("offline");
+      try { ac.abort(); } catch { /* ignore */ }
     }, 90_000);
 
-    ws.onopen = () => {
-      clearTimeout(wakingT);
-      clearTimeout(hardT);
-      const dt = Math.round(performance.now() - t0);
-      try { ws.close(); } catch { /* ignore */ }
-      if (probeRef.current === ws) {
-        setLatencyMs(dt);
+    fetch(healthUrl, { signal: ac.signal, cache: "no-store" })
+      .then((r) => {
+        clearTimeout(wakingT);
+        clearTimeout(hardT);
+        if (probeRef.current !== ac) return;
+        if (!r.ok) {
+          setStatus("offline");
+          return;
+        }
+        setLatencyMs(Math.round(performance.now() - t0));
         setStatus("online");
-      }
-    };
-    ws.onerror = () => {
-      clearTimeout(wakingT);
-      clearTimeout(hardT);
-      if (probeRef.current === ws) setStatus("offline");
-    };
+      })
+      .catch(() => {
+        clearTimeout(wakingT);
+        clearTimeout(hardT);
+        if (probeRef.current === ac) setStatus("offline");
+      });
   }, [url]);
 
   useEffect(() => {
     refresh();
     return () => {
-      try { probeRef.current?.close(); } catch { /* ignore */ }
+      try { probeRef.current?.abort(); } catch { /* ignore */ }
     };
   }, [refresh]);
 
-  // Auto-retry every 15s while we're stuck offline so a slow first
-  // wake-up eventually self-recovers without the user touching ↻.
+  // Auto-retry while offline, with jitter so N clients hitting a cold-started
+  // server don't all retry at the same instants and synchronise into a herd.
+  // Window: 15s ± 5s (range 10–20s).
   useEffect(() => {
     if (status !== "offline") return;
-    const id = setInterval(refresh, 15_000);
-    return () => clearInterval(id);
+    let cancelled = false;
+    let id: ReturnType<typeof setTimeout> | null = null;
+    const schedule = () => {
+      const delay = 10_000 + Math.floor(Math.random() * 10_000);
+      id = setTimeout(() => {
+        if (cancelled) return;
+        refresh();
+        schedule();
+      }, delay);
+    };
+    schedule();
+    return () => {
+      cancelled = true;
+      if (id) clearTimeout(id);
+    };
   }, [status, refresh]);
 
   return { status, latencyMs, refresh };

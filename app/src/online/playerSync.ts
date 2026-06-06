@@ -196,14 +196,25 @@ function syncFingerprint(p: Player): string {
 }
 
 let _lastFingerprint = "";
+let _lastPlayerRef: Player | null = null;
 let _debounce: ReturnType<typeof setTimeout> | null = null;
 
 /** Subscribe to the store and auto-push state when progression changes.
  *  Called once at app boot (App.tsx). */
 export function startSyncSubscriber() {
-  _lastFingerprint = syncFingerprint(useStore.getState().player);
+  const initial = useStore.getState().player;
+  _lastFingerprint = syncFingerprint(initial);
+  _lastPlayerRef = initial;
 
   useStore.subscribe((state) => {
+    // Ref-check first: every store action that touches the player spreads a
+    // new object (`{ player: { ...s.player, ...patch } }`), so a referentially
+    // equal player means a non-player change (locale, serverConfig, …). Bail
+    // before paying the 13-field fingerprint join — this fires for the vast
+    // majority of store updates.
+    if (state.player === _lastPlayerRef) return;
+    _lastPlayerRef = state.player;
+
     const fp = syncFingerprint(state.player);
     if (fp === _lastFingerprint) return;
     _lastFingerprint = fp;
