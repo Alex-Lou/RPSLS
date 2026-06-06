@@ -8,7 +8,7 @@
  */
 
 import { useState } from "react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
 import { ALL_CARD_IDS, CARDS, RARITY_COLOR } from "./cards";
 import { CardImage } from "./CardImage";
@@ -16,6 +16,7 @@ import type { CardId } from "./rankedTypes";
 import { useT } from "../i18n";
 import { useNoMenuFx } from "../fx/menuFx";
 import { CurrencyBadges } from "./CurrencyBadges";
+import { hapticTap } from "../haptic";
 
 const MAIN_SLOTS = 3;
 const RESERVE_SLOTS = 3;
@@ -49,6 +50,7 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
     return padded.slice(0, TOTAL) as (CardId | null)[];
   });
   const [selected, setSelected] = useState<CardId | null>(null);
+  const [collectionOpen, setCollectionOpen] = useState(true);
 
   const mainSlots = deck.slice(0, MAIN_SLOTS) as (CardId | null)[];
   const reserveSlots = deck.slice(MAIN_SLOTS, TOTAL) as (CardId | null)[];
@@ -83,16 +85,21 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
 
   const usedInDeck = new Set(deck.filter(Boolean));
 
+  const ownedCount = ALL_CARD_IDS.filter((id) => collection.includes(id)).length;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -16 }}
-      className="flex flex-col gap-4 flex-1 py-2 px-2 max-w-lg mx-auto w-full overflow-y-auto"
+      // Root no longer scrolls: a fixed header + a scroll region + a docked
+      // Save footer means the Save button is ALWAYS visible (the player no
+      // longer has to discover a hidden scroll to find it).
+      className="flex flex-col flex-1 min-h-0 py-2 px-2 max-w-lg mx-auto w-full"
     >
       {/* Header — title + close, plus the read-only wallet so the player
           always knows what they have without leaving the editor. */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="shrink-0 flex items-center justify-between gap-3 pb-3">
         <h1 className="text-xl font-extrabold text-themed">Mon Deck</h1>
         <div className="flex items-center gap-2">
           <CurrencyBadges inert />
@@ -100,95 +107,127 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
         </div>
       </div>
 
-      {/* Main hand */}
-      <div>
-        <h2 className="text-[10px] uppercase tracking-[0.25em] font-bold text-emerald-400 mb-2">
-          Main ({mainSlots.filter(Boolean).length}/{MAIN_SLOTS})
-        </h2>
-        <div className="grid grid-cols-3 gap-2">
-          {mainSlots.map((cardId, i) => (
-            <DeckSlot key={`main-${i}`} cardId={cardId} slotLabel={`${i + 1}`}
-              onClick={() => handleSlotTap(i)} highlight={!!selected} />
-          ))}
+      {/* Scroll region — only this middle band scrolls. */}
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 pr-1">
+        {/* Main hand */}
+        <div>
+          <h2 className="text-[10px] uppercase tracking-[0.25em] font-bold text-emerald-400 mb-2">
+            Main ({mainSlots.filter(Boolean).length}/{MAIN_SLOTS})
+          </h2>
+          <div className="grid grid-cols-3 gap-2">
+            {mainSlots.map((cardId, i) => (
+              <DeckSlot key={`main-${i}`} cardId={cardId} slotLabel={`${i + 1}`}
+                onClick={() => handleSlotTap(i)} highlight={!!selected} />
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* Reserve */}
-      <div>
-        <h2 className="text-[10px] uppercase tracking-[0.25em] font-bold text-amber-400 mb-2">
-          Réserve ({reserveSlots.filter(Boolean).length}/{RESERVE_SLOTS})
-        </h2>
-        <div className="grid grid-cols-3 gap-2">
-          {reserveSlots.map((cardId, i) => (
-            <DeckSlot key={`res-${i}`} cardId={cardId} slotLabel={`R${i + 1}`}
-              onClick={() => handleSlotTap(MAIN_SLOTS + i)} highlight={!!selected} />
-          ))}
+        {/* Reserve */}
+        <div>
+          <h2 className="text-[10px] uppercase tracking-[0.25em] font-bold text-amber-400 mb-2">
+            Réserve ({reserveSlots.filter(Boolean).length}/{RESERVE_SLOTS})
+          </h2>
+          <div className="grid grid-cols-3 gap-2">
+            {reserveSlots.map((cardId, i) => (
+              <DeckSlot key={`res-${i}`} cardId={cardId} slotLabel={`R${i + 1}`}
+                onClick={() => handleSlotTap(MAIN_SLOTS + i)} highlight={!!selected} />
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* Collection */}
-      <div>
-        <h2 className="text-[10px] uppercase tracking-[0.25em] font-bold text-ink-muted mb-2">
-          Collection
-        </h2>
-        <div className="grid grid-cols-4 gap-2">
-          {ALL_CARD_IDS.map((id) => {
-            const card = CARDS[id];
-            const unlocked = collection.includes(id);
-            const inDeck = usedInDeck.has(id);
-            const isSelected = selected === id;
-            return (
-              <motion.button
-                key={id}
-                onClick={() => handleCardTap(id)}
-                whileTap={unlocked ? { scale: 0.92 } : undefined}
-                className={
-                  "relative rounded-xl overflow-hidden aspect-[3/4] flex flex-col items-center justify-center transition " +
-                  (isSelected
-                    ? "ring-2 ring-white shadow-lg shadow-white/30 scale-105"
-                    : inDeck
-                    ? "ring-2 ring-emerald-400/50 opacity-60"
-                    : unlocked
-                    ? "ring-1 ring-white/20"
-                    : "ring-1 ring-white/5 grayscale opacity-30")
-                }
+        {/* Collection — collapsible. Tap the header to fold/unfold; the count
+            badge + chevron make the affordance obvious, and folding it shrinks
+            a long card list so the deck slots stay the focus. */}
+        <div>
+          <button
+            onClick={() => { hapticTap(); setCollectionOpen((o) => !o); }}
+            className="w-full flex items-center justify-between gap-2 mb-2 group"
+          >
+            <span className="flex items-center gap-2">
+              <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-ink-muted">
+                Collection
+              </span>
+              <span className="text-[9px] font-black tabular-nums px-1.5 py-0.5 rounded-full bg-hairline text-ink-muted">
+                {ownedCount}/{ALL_CARD_IDS.length}
+              </span>
+            </span>
+            <span className={"text-ink-faint text-xs transition-transform duration-200 " + (collectionOpen ? "rotate-180" : "")}>▾</span>
+          </button>
+          <AnimatePresence initial={false}>
+            {collectionOpen && (
+              <motion.div
+                key="collection-grid"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                className="overflow-hidden"
               >
-                <CardImage id={id} glyphSize="text-xl" />
-                <div className="relative z-10 flex flex-col items-center gap-0.5 p-1">
-                  <span className="text-xl">{card.glyph}</span>
-                  <span className="text-[7px] font-bold uppercase text-white/90 text-center leading-tight">
-                    {t(card.nameKey)}
-                  </span>
-                  <span className={"text-[7px] font-bold " + RARITY_COLOR[card.rarity]}>
-                    {card.cost}m · {card.rarity}
-                  </span>
+                <div className="grid grid-cols-4 gap-2 pt-0.5">
+                  {ALL_CARD_IDS.map((id) => {
+                    const card = CARDS[id];
+                    const unlocked = collection.includes(id);
+                    const inDeck = usedInDeck.has(id);
+                    const isSelected = selected === id;
+                    return (
+                      <motion.button
+                        key={id}
+                        onClick={() => handleCardTap(id)}
+                        whileTap={unlocked ? { scale: 0.92 } : undefined}
+                        className={
+                          "relative rounded-xl overflow-hidden aspect-[3/4] flex flex-col items-center justify-center transition " +
+                          (isSelected
+                            ? "ring-2 ring-white shadow-lg shadow-white/30 scale-105"
+                            : inDeck
+                            ? "ring-2 ring-emerald-400/50 opacity-60"
+                            : unlocked
+                            ? "ring-1 ring-white/20"
+                            : "ring-1 ring-white/5 grayscale opacity-30")
+                        }
+                      >
+                        <CardImage id={id} glyphSize="text-xl" />
+                        <div className="relative z-10 flex flex-col items-center gap-0.5 p-1">
+                          <span className="text-xl">{card.glyph}</span>
+                          <span className="text-[7px] font-bold uppercase text-white/90 text-center leading-tight">
+                            {t(card.nameKey)}
+                          </span>
+                          <span className={"text-[7px] font-bold " + RARITY_COLOR[card.rarity]}>
+                            {card.cost}m · {card.rarity}
+                          </span>
+                        </div>
+                        {!unlocked && (
+                          <div className="absolute inset-0 bg-black/70 flex items-center justify-center p-1 z-20">
+                            <span className="text-[8px] text-ink-muted text-center leading-tight">
+                              🔒 {UNLOCK_HINTS[id] ?? "Bientôt"}
+                            </span>
+                          </div>
+                        )}
+                        {inDeck && !isSelected && (
+                          <div className="absolute top-0.5 right-0.5 w-3 h-3 rounded-full bg-emerald-400 flex items-center justify-center z-20">
+                            <span className="text-[7px] text-zinc-900 font-black">✓</span>
+                          </div>
+                        )}
+                      </motion.button>
+                    );
+                  })}
                 </div>
-                {!unlocked && (
-                  <div className="absolute inset-0 bg-black/70 flex items-center justify-center p-1 z-20">
-                    <span className="text-[8px] text-ink-muted text-center leading-tight">
-                      🔒 {UNLOCK_HINTS[id] ?? "Bientôt"}
-                    </span>
-                  </div>
-                )}
-                {inDeck && !isSelected && (
-                  <div className="absolute top-0.5 right-0.5 w-3 h-3 rounded-full bg-emerald-400 flex items-center justify-center z-20">
-                    <span className="text-[7px] text-zinc-900 font-black">✓</span>
-                  </div>
-                )}
-              </motion.button>
-            );
-          })}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
-      {/* Save */}
-      <motion.button
-        whileTap={{ scale: 0.97 }}
-        onClick={handleSave}
-        className="w-full py-3 rounded-2xl font-bold text-white bg-themed shadow-lg transition"
-      >
-        Sauvegarder le deck
-      </motion.button>
+      {/* Docked Save footer — always visible, never hidden below the fold.
+          A faint top border + raised surface read it as a fixed action bar. */}
+      <div className="shrink-0 pt-3 mt-1 border-t border-hairline">
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={handleSave}
+          className="w-full py-3 rounded-2xl font-bold text-white bg-themed shadow-lg transition"
+        >
+          Sauvegarder le deck
+        </motion.button>
+      </div>
     </motion.div>
   );
 }
