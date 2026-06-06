@@ -50,6 +50,11 @@ export interface BackgroundDef {
    *  background is usable. Picker still shows it (with a Premium ribbon)
    *  but tapping opens the purchase modal until owned. */
   premiumSetId?: string;
+  /** True when the scene reads as visually LIGHT (pearlescent, washed-out,
+   *  pastel). App.tsx puts a `theme-light` class on the root so App.css can
+   *  bump card opacity + text contrast — the default dark-glass surfaces
+   *  blur out against Quartz-style pastels. */
+  light?: boolean;
   /** When true, this entry is the player's OWN uploaded image (stored as a
    *  data URL on the player). App.tsx paints player.customBgUrl. */
   custom?: boolean;
@@ -155,6 +160,7 @@ export const BACKGROUNDS: BackgroundDef[] = [
   {
     id: "quartz",    label: "Quartz",         emoji: "💠",
     src: null,       premiumScene: "quartz",  premiumSetId: "quartz",
+    light: true,
     defaultPadId: "quartz",
     skin: { fontHeadline: "cinzel",       fontBody: "cormorant",    fontMono: "spaceMono" },
     miniature: null,

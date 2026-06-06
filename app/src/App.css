@@ -63,6 +63,24 @@
   --info-soft:    color-mix(in oklab, #0ea5e9 18%, transparent);
 }
 
+/* Override pack for light / pastel backdrops (Quartz). App.tsx toggles the
+   class on <html> when the active background is flagged `light: true`. The
+   default dark-glass surfaces vanish into pearl backdrops, so:
+   - panels go thicker (less transparent) so card content stays anchored
+   - ink-muted / ink-faint get a darker bias for AA contrast
+   - hairlines tint warmer so they stay visible against a pastel wash
+   The accent / state colours stay untouched — wins still read green. */
+:root.theme-light {
+  --surface:        color-mix(in oklab, var(--theme-bg) 92%, transparent);
+  --surface-2:      color-mix(in oklab, color-mix(in oklab, var(--theme-bg) 95%, var(--theme-primary) 5%) 94%, transparent);
+  --surface-raised: color-mix(in oklab, color-mix(in oklab, var(--theme-bg) 92%, var(--theme-primary) 8%) 96%, transparent);
+  --hairline:        color-mix(in oklab, var(--theme-primary) 35%, rgba(0,0,0,0.25));
+  --hairline-strong: color-mix(in oklab, var(--theme-primary) 60%, rgba(0,0,0,0.4));
+  --ink:        #f7f5fb;
+  --ink-muted:  #d6d2e5;
+  --ink-faint:  color-mix(in oklab, #b6b1c8 70%, var(--theme-primary) 30%);
+}
+
 /* Expose the semantic tokens as Tailwind utilities. `inline` means Tailwind
    references the runtime var() directly (doesn't snapshot it), so the classes
    stay live: changing the theme/background recolours bg-surface, text-ink-*,
