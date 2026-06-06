@@ -222,6 +222,8 @@ function FighterCard({
 
 /* ─────────── The coin ─────────── */
 
+const COIN = 108;
+
 function Coin({
   phase, winner, youTheme, oppTheme,
 }: {
@@ -232,29 +234,83 @@ function Coin({
 }) {
   // Landing rotation: many full turns + a half-turn when the opponent wins so
   // the "tails" (opp) face ends up toward the camera. You = heads (0°).
-  const spins = 5;
+  const spins = 6;
   const target = phase === "idle" ? 0 : spins * 360 + (winner === "opp" ? 180 : 0);
+  const winColor = winner === "opp" ? oppTheme.primary : youTheme.primary;
 
   return (
-    <div className="relative" style={{ perspective: 900, width: 90, height: 90 }}>
+    <div className="relative flex items-center justify-center" style={{ perspective: 1100, width: COIN + 40, height: COIN + 40 }}>
       {/* Glow puck under the coin */}
       <motion.div
         aria-hidden
-        animate={{ opacity: phase === "flipping" ? [0.3, 0.7, 0.3] : 0.4, scale: phase === "flipping" ? [0.9, 1.1, 0.9] : 1 }}
+        animate={{
+          opacity: phase === "flipping" ? [0.3, 0.7, 0.3] : phase === "landed" ? 0.6 : 0.4,
+          scale: phase === "flipping" ? [0.9, 1.15, 0.9] : 1,
+        }}
         transition={{ duration: 0.6, repeat: phase === "flipping" ? Infinity : 0 }}
-        className="absolute inset-0 rounded-full blur-2xl"
-        style={{ background: "radial-gradient(circle, rgba(168,85,247,0.6), transparent 70%)" }}
+        className="absolute rounded-full blur-2xl"
+        style={{ width: COIN, height: COIN, background: `radial-gradient(circle, ${winColor}, transparent 70%)` }}
       />
+
+      {/* Landing shockwave ring — fires once when the verdict settles. */}
+      <AnimatePresence>
+        {phase === "landed" && (
+          <motion.div
+            key="shock"
+            aria-hidden
+            initial={{ opacity: 0.8, scale: 0.5 }}
+            animate={{ opacity: 0, scale: 2.1 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="absolute rounded-full"
+            style={{ width: COIN, height: COIN, border: `3px solid ${winColor}` }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Landing sparkles in the winner's colour. */}
+      <AnimatePresence>
+        {phase === "landed" && Array.from({ length: 10 }).map((_, i) => {
+          const ang = (i / 10) * Math.PI * 2;
+          return (
+            <motion.span
+              key={"sp" + i}
+              aria-hidden
+              initial={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+              animate={{ opacity: 0, x: Math.cos(ang) * 70, y: Math.sin(ang) * 70, scale: 0.2 }}
+              transition={{ duration: 0.7, delay: 0.05 + (i % 3) * 0.04, ease: "easeOut" }}
+              className="absolute w-1.5 h-1.5 rounded-full"
+              style={{ background: winColor, boxShadow: `0 0 8px ${winColor}` }}
+            />
+          );
+        })}
+      </AnimatePresence>
+
+      {/* The coin — toss arc (y/scale) wraps the spin (rotateY) + tumble. */}
       <motion.div
-        animate={{ rotateY: target }}
-        transition={phase === "idle" ? { duration: 0 } : { duration: 1.8, ease: [0.2, 0.7, 0.2, 1] }}
-        style={{ transformStyle: "preserve-3d", width: 90, height: 90 }}
-        className="relative mx-auto"
+        animate={
+          phase === "idle"
+            ? { y: [0, -5, 0] }
+            : { y: [0, -46, 6, 0], scale: [1, 1.18, 1.0, 1] }
+        }
+        transition={
+          phase === "idle"
+            ? { duration: 2.6, ease: "easeInOut", repeat: Infinity }
+            : { duration: 1.8, ease: [0.2, 0.7, 0.2, 1], times: [0, 0.4, 0.8, 1] }
+        }
+        style={{ width: COIN, height: COIN }}
+        className="relative"
       >
-        {/* Heads = you */}
-        <CoinFace theme={youTheme} label="TOI" rotate={0} />
-        {/* Tails = opponent */}
-        <CoinFace theme={oppTheme} label="ADV" rotate={180} />
+        <motion.div
+          animate={{ rotateY: target, rotateX: phase === "flipping" ? [0, 18, 0] : 0 }}
+          transition={phase === "idle" ? { duration: 0 } : { duration: 1.8, ease: [0.2, 0.7, 0.2, 1] }}
+          style={{ transformStyle: "preserve-3d", width: COIN, height: COIN }}
+          className="relative"
+        >
+          {/* Heads = you */}
+          <CoinFace theme={youTheme} label="TOI" rotate={0} />
+          {/* Tails = opponent */}
+          <CoinFace theme={oppTheme} label="ADV" rotate={180} />
+        </motion.div>
       </motion.div>
     </div>
   );
@@ -269,14 +325,26 @@ function CoinFace({
 }) {
   return (
     <div
-      className="absolute inset-0 rounded-full flex items-center justify-center border-4 border-white/30 shadow-2xl"
+      className="absolute inset-0 rounded-full flex items-center justify-center overflow-hidden"
       style={{
-        background: `radial-gradient(circle at 35% 30%, color-mix(in oklab, ${theme.primary} 80%, #fff), ${theme.secondary})`,
+        // Metallic disc: bright highlight top-left → theme primary → darker rim,
+        // with a crisp light ring border for a struck-coin edge.
+        background: `radial-gradient(circle at 34% 28%, #fff 2%, color-mix(in oklab, ${theme.primary} 78%, #fff) 30%, ${theme.primary} 58%, color-mix(in oklab, ${theme.secondary} 70%, #000) 100%)`,
         transform: `rotateY(${rotate}deg)`,
         backfaceVisibility: "hidden",
+        border: "3px solid rgba(255,255,255,0.55)",
+        boxShadow: `inset 0 0 14px rgba(0,0,0,0.45), inset 0 3px 6px rgba(255,255,255,0.5), 0 8px 22px rgba(0,0,0,0.5)`,
       }}
     >
-      <span className="text-lg font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]" style={{ fontFamily: "var(--font-headline)" }}>
+      {/* Diagonal glint sweep across the face. */}
+      <motion.div
+        aria-hidden
+        animate={{ x: ["-120%", "120%"] }}
+        transition={{ duration: 2.4, ease: "easeInOut", repeat: Infinity, repeatDelay: 0.6 }}
+        className="absolute inset-y-0 w-1/3 -skew-x-12"
+        style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)" }}
+      />
+      <span className="relative text-xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.7)]" style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.05em" }}>
         {label}
       </span>
     </div>
