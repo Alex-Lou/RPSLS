@@ -64,10 +64,26 @@ export function QuartzPad({ compact = false, ...props }: React.SVGProps<SVGSVGEl
           <stop offset="0%"  stopColor={GLOW} stopOpacity="0.55" />
           <stop offset="100%" stopColor={GLOW} stopOpacity="0" />
         </radialGradient>
+
+        {/* Warm halo — matches the backdrop's drifting gold so the set reads
+            as one cohesive piece across bg + pad. */}
+        <radialGradient id="qpad-warm" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"  stopColor="#ffeed1" stopOpacity="0.55" />
+          <stop offset="55%" stopColor="#fbcf80" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="#fbcf80" stopOpacity="0" />
+        </radialGradient>
       </defs>
 
       {/* Felt base — pearl wash. */}
       <rect width={W} height={H} fill="url(#qpad-bg)" />
+
+      {/* Warm drifting halo behind the central glow — adds matter / warmth. */}
+      <g transform={`translate(${cx} ${cy})`}>
+        <ellipse rx={compact ? 380 : 480} ry={compact ? 260 : 320} fill="url(#qpad-warm)" opacity="0.9">
+          <animateTransform attributeName="transform" type="translate"
+            values="-30 -20; 40 28; -30 -20" dur="34s" repeatCount="indefinite" />
+        </ellipse>
+      </g>
 
       {/* Two slow prism streaks — same rhythm as the backdrop so set parts
           feel of-a-piece. */}

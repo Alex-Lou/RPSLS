@@ -17,14 +17,19 @@
 
 import { useEffect, useRef } from "react";
 
-/** Cool prismatic palette — not interchangeable with existing themes. */
+/** Prismatic palette + warm gold accents so the canvas reads as luxurious
+ *  matter, not a frozen synthetic grid. The cool stops carry the depth; the
+ *  warm stops are reserved for fracture traces and one drifting halo so the
+ *  composition gains a "lit-from-within" quality. */
 const STOPS = {
-  ice: "#dbe7ff",      // pale azure
+  ice: "#dbe7ff",        // pale azure
   lavender: "#c8aef0",
   blush: "#f0c2dd",
   warmRose: "#f6a5b8",
-  deep: "#4b3a72",     // anchor shadow
-  glow: "#fde9ff",     // highlight
+  deep: "#4b3a72",       // anchor shadow
+  glow: "#fde9ff",       // highlight
+  gold: "#fbcf80",       // warm amber accent
+  softGold: "#ffeed1",   // gold whisper for fracture interiors
 } as const;
 
 /** Six crystal shards at fixed positions — count picked so the canvas stays
@@ -99,10 +104,80 @@ export function QuartzBackdrop() {
           <stop offset="60%"  stopColor="#f6a5b8" stopOpacity="0.35" />
           <stop offset="100%" stopColor="#ffe2a0" stopOpacity="0" />
         </linearGradient>
+
+        {/* Warm drifting halo — the centre of "lit-from-within". */}
+        <radialGradient id="qz-warm" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"   stopColor={STOPS.softGold} stopOpacity="0.7" />
+          <stop offset="40%"  stopColor={STOPS.gold} stopOpacity="0.35" />
+          <stop offset="100%" stopColor={STOPS.gold} stopOpacity="0" />
+        </radialGradient>
+
+        {/* Soft bokeh blob — used 8× at varied positions for depth behind shards. */}
+        <radialGradient id="qz-bokeh" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"  stopColor={STOPS.glow} stopOpacity="0.45" />
+          <stop offset="60%" stopColor={STOPS.lavender} stopOpacity="0.15" />
+          <stop offset="100%" stopColor={STOPS.lavender} stopOpacity="0" />
+        </radialGradient>
+
+        {/* Fracture trace — sells matter cracked by inner light. */}
+        <linearGradient id="qz-fracture" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%"   stopColor={STOPS.softGold} stopOpacity="0" />
+          <stop offset="50%"  stopColor={STOPS.softGold} stopOpacity="0.9" />
+          <stop offset="100%" stopColor={STOPS.softGold} stopOpacity="0" />
+        </linearGradient>
       </defs>
 
       {/* Base wash. */}
       <rect width="100" height="100" fill="url(#qz-base)" />
+
+      {/* Layer A — depth bokeh. Eight large soft blobs drift slowly in opposing
+          directions to create parallax behind the shards. */}
+      <g opacity="0.7">
+        {[
+          { cx: 15, cy: 30, r: 28, dx: 6,  dur: 32 },
+          { cx: 70, cy: 22, r: 22, dx: -4, dur: 38 },
+          { cx: 88, cy: 60, r: 26, dx: 5,  dur: 30 },
+          { cx: 32, cy: 78, r: 30, dx: -6, dur: 36 },
+          { cx: 56, cy: 44, r: 18, dx: 7,  dur: 28 },
+          { cx: 22, cy: 55, r: 16, dx: -5, dur: 42 },
+          { cx: 78, cy: 84, r: 20, dx: 4,  dur: 34 },
+          { cx: 6,  cy: 8,  r: 14, dx: 3,  dur: 40 },
+        ].map((b, i) => (
+          <circle key={i} cx={b.cx} cy={b.cy} r={b.r} fill="url(#qz-bokeh)">
+            <animate attributeName="cx" values={`${b.cx};${b.cx + b.dx};${b.cx}`}
+              dur={`${b.dur}s`} repeatCount="indefinite" />
+            <animate attributeName="r" values={`${b.r};${b.r * 1.15};${b.r}`}
+              dur={`${b.dur * 0.8}s`} repeatCount="indefinite" />
+          </circle>
+        ))}
+      </g>
+
+      {/* Layer B — one warm halo that drifts in a slow ellipse: the "lit from
+          within" centre. Big radius + soft gold = injects matter + warmth
+          against the cool base. */}
+      <g transform="translate(50 50)">
+        <ellipse rx="40" ry="32" fill="url(#qz-warm)" opacity="0.85">
+          <animateTransform attributeName="transform" type="translate"
+            values="-8 -4; 10 6; -8 -4" dur="22s" repeatCount="indefinite" />
+          <animate attributeName="rx" values="40;46;40" dur="14s" repeatCount="indefinite" />
+        </ellipse>
+      </g>
+
+      {/* Layer C — three hairline fractures crossing the canvas. Each is a
+          slim band with a gold inner trace that pulses, like a vein of fire
+          inside ice. */}
+      {[
+        { x: 0, y: 40, w: 100, h: 0.4, rot: -8,  dur: 9,  delay: 0 },
+        { x: 0, y: 64, w: 100, h: 0.5, rot: 14,  dur: 12, delay: 1.6 },
+        { x: 0, y: 28, w: 100, h: 0.3, rot: -22, dur: 11, delay: 3.2 },
+      ].map((f, i) => (
+        <g key={i} transform={`rotate(${f.rot} 50 50)`}>
+          <rect x={f.x} y={f.y} width={f.w} height={f.h} fill="url(#qz-fracture)">
+            <animate attributeName="opacity" values="0.0;0.85;0.0"
+              dur={`${f.dur}s`} begin={`${f.delay}s`} repeatCount="indefinite" />
+          </rect>
+        </g>
+      ))}
 
       {/* Two slow prismatic streaks crossing — pure SMIL, no JS. */}
       <g opacity="0.65">
@@ -144,16 +219,20 @@ export function QuartzBackdrop() {
         </g>
       ))}
 
-      {/* Soft dust motes drifting up — kept sparse so they read as light,
-          not as snow. Eight motes total, randomised periods, looping forever. */}
-      <g opacity="0.55">
-        {Array.from({ length: 8 }).map((_, i) => {
-          const x = 8 + i * 11;
-          const dur = 18 + (i % 4) * 5;
+      {/* Layered drifting motes — denser pass (16) with mixed white + gold
+          tones so the air reads as alive instead of vacuum. */}
+      <g opacity="0.65">
+        {Array.from({ length: 16 }).map((_, i) => {
+          const x = 4 + i * 6 + (i % 3);
+          const dur = 16 + (i % 5) * 4;
+          const r = 0.45 + ((i * 7) % 5) * 0.18;
+          const tone = i % 4 === 0 ? STOPS.gold : i % 3 === 0 ? STOPS.softGold : "#ffffff";
           return (
-            <circle key={i} cx={x} cy="110" r="0.7" fill="#ffffff">
-              <animate attributeName="cy" values="110;-10" dur={`${dur}s`} begin={`${i * 1.4}s`} repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0;0.9;0" dur={`${dur}s`} begin={`${i * 1.4}s`} repeatCount="indefinite" />
+            <circle key={i} cx={x} cy="110" r={r} fill={tone}>
+              <animate attributeName="cy" values="110;-10"
+                dur={`${dur}s`} begin={`${i * 0.7}s`} repeatCount="indefinite" />
+              <animate attributeName="opacity" values="0;0.85;0"
+                dur={`${dur}s`} begin={`${i * 0.7}s`} repeatCount="indefinite" />
             </circle>
           );
         })}
