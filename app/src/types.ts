@@ -77,6 +77,16 @@ export interface Player {
   /** Craft resource. Granted from duplicate pulls in packs (more on rare
    *  cards), spent to forge a specific locked card. */
   dust?: number;
+  /** Collection-completion thresholds the player has already claimed
+   *  (5 / 10 / 15 cards). Each threshold can be claimed at most once. */
+  codexClaimed?: number[];
+  /** Mastery XP per card. Grows when the card is in the active deck during
+   *  a finished match. Cosmetic levels 1–5 (a gold star at 5). */
+  cardMastery?: Record<string, number>;
+  /** Current season — bumps every {@link SEASON_DURATION_MS} with a soft
+   *  LP reset and a tier-based reward. Stored as a timestamp so rollover
+   *  detection stays trivial across timezones. */
+  season?: { number: number; startedAt: number };
   /** Cosmetic background image painted behind every page. Defaults to the
    *  original radial-gradient. */
   backgroundId?: BackgroundId;

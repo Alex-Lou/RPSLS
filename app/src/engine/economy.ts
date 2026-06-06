@@ -102,3 +102,85 @@ export interface PackResult {
   /** Poussière gained from duplicates in this pack. */
   dustGained: number;
 }
+
+/** Codex (B3) completion tiers. Once the player's collection reaches the
+ *  threshold, the tier becomes claimable for a one-shot éclats+poussière
+ *  reward, giving long-term collectors a reason to chase every card. */
+export interface CodexTier {
+  threshold: number;
+  eclats: number;
+  dust: number;
+}
+
+export const CODEX_TIERS: CodexTier[] = [
+  { threshold: 5,  eclats: 50,  dust: 0 },
+  { threshold: 10, eclats: 120, dust: 30 },
+  { threshold: 15, eclats: 300, dust: 80 },
+];
+
+/** Find the tier definition for a given threshold, or undefined if unknown. */
+export function codexTier(threshold: number): CodexTier | undefined {
+  return CODEX_TIERS.find((t) => t.threshold === threshold);
+}
+
+/** Per-card mastery (B4). XP grows when the card is in the deck during a
+ *  finished match — pure cosmetic (a gold star at level 5) so the system
+ *  never reads as pay-to-win.
+ *  Index in the array = level - 1, value = XP required to reach the level. */
+export const MASTERY_THRESHOLDS = [0, 25, 75, 150, 300] as const;
+export const MASTERY_MAX_LEVEL = MASTERY_THRESHOLDS.length;
+
+export function masteryLevel(xp: number): number {
+  for (let i = MASTERY_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (xp >= MASTERY_THRESHOLDS[i]) return i + 1;
+  }
+  return 1;
+}
+
+/** Mastery XP granted per card in the deck when a match ends. Tuned so a
+ *  motivated player gradually masters their favourite cards (~60 wins to
+ *  cap a card) without it feeling slow. */
+export function masteryXpForMatch(outcome: Outcome): number {
+  if (outcome === "win") return 5;
+  if (outcome === "loss") return 1;
+  return 0;
+}
+
+/** Season (B5) — 30-day cadence. At rollover the player's LP is softly
+ *  reset (so the ladder churns instead of fossilising) and they receive a
+ *  one-shot reward based on the tier they ended the season in. */
+export const SEASON_DURATION_MS = 30 * 24 * 3600 * 1000;
+
+export interface SeasonReward {
+  /** Inclusive LP floor used to pick this reward (matches the tier order
+   *  in engine/rank.ts: Bronze 0, Silver 1100, Gold 1300, Platinum 1500,
+   *  Diamond 1750). */
+  minLp: number;
+  /** Display label — the human-readable tier name baked in. */
+  tier: string;
+  eclats: number;
+  dust: number;
+}
+
+export const SEASON_REWARDS: SeasonReward[] = [
+  { minLp: 0,    tier: "Bronze",   eclats: 50,  dust: 0   },
+  { minLp: 1100, tier: "Silver",   eclats: 150, dust: 20  },
+  { minLp: 1300, tier: "Gold",     eclats: 300, dust: 50  },
+  { minLp: 1500, tier: "Platinum", eclats: 500, dust: 100 },
+  { minLp: 1750, tier: "Diamond",  eclats: 700, dust: 200 },
+];
+
+/** Pick the reward bucket the LP value falls into — highest-tier wins. */
+export function seasonRewardForLp(lp: number): SeasonReward {
+  let pick = SEASON_REWARDS[0];
+  for (const r of SEASON_REWARDS) {
+    if (lp >= r.minLp) pick = r;
+  }
+  return pick;
+}
+
+/** Soft-reset the player's LP so the next season starts in the lower half
+ *  of their previous tier. Floor of 1000 keeps the bronze entry meaningful. */
+export function softResetLp(lp: number): number {
+  return Math.max(1000, Math.floor(lp * 0.8));
+}

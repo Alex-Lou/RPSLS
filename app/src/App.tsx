@@ -29,6 +29,7 @@ const HistoryPage  = lazy(() => import("./pages/HistoryPage").then(m => ({ defau
 const QuestsPage   = lazy(() => import("./pages/QuestsPage").then(m => ({ default: m.QuestsPage })));
 const LeaderboardPage = lazy(() => import("./pages/LeaderboardPage").then(m => ({ default: m.LeaderboardPage })));
 const ShopPage     = lazy(() => import("./pages/ShopPage").then(m => ({ default: m.ShopPage })));
+import { SeasonRolloverModal } from "./ranked/SeasonRolloverModal";
 const PacksPage    = lazy(() => import("./pages/PacksPage").then(m => ({ default: m.PacksPage })));
 const AboutPage    = lazy(() => import("./pages/AboutPage").then(m => ({ default: m.AboutPage })));
 const ContactPage  = lazy(() => import("./pages/ContactPage").then(m => ({ default: m.ContactPage })));
@@ -89,6 +90,17 @@ export default function App() {
   useEffect(() => {
     setHapticSettings({ enabled: hapticEnabled, intensity: hapticIntensity });
   }, [hapticEnabled, hapticIntensity]);
+
+  // Season rollover (B5) — fires the soft-LP-reset + tier reward when the
+  // 30-day window has elapsed. We run it once on mount: a session crossing
+  // midnight stays on the current season until the next launch (acceptable).
+  const rolloverSeasonIfDue = useStore((s) => s.rolloverSeasonIfDue);
+  const [seasonRollover, setSeasonRollover] = useState<ReturnType<typeof rolloverSeasonIfDue>>(null);
+  useEffect(() => {
+    const r = rolloverSeasonIfDue();
+    if (r) setSeasonRollover(r);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Apply theme on mount and whenever it changes
   useEffect(() => {
@@ -266,6 +278,21 @@ export default function App() {
               </main>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Season rollover modal — fires once at app start when the 30-day
+          window has elapsed (the store already credited the reward + soft
+          reset LP before we got here). */}
+      <AnimatePresence>
+        {seasonRollover && (
+          <SeasonRolloverModal
+            fromSeason={seasonRollover.fromSeason}
+            reward={seasonRollover.reward}
+            lpBefore={seasonRollover.lpBefore}
+            lpAfter={seasonRollover.lpAfter}
+            onClose={() => setSeasonRollover(null)}
+          />
         )}
       </AnimatePresence>
     </div>

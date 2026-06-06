@@ -110,6 +110,7 @@ export function RankedGame({
   const difficulty = useStore((s) => s.player.difficulty);
   const recordMatch = useStore((s) => s.recordMatch);
   const savedDeck = useStore((s) => s.player.rankedDeck);
+  const awardCardMasteryXp = useStore((s) => s.awardCardMasteryXp);
 
   const matchInfo: RankedMatchInfo = {
     matchId: "ranked-local",
@@ -505,6 +506,7 @@ export function RankedGame({
       });
       window.setTimeout(() => {
         if (youWon) hapticMatchWin(); else hapticMatchLoss();
+        awardCardMasteryXp((savedDeck ?? []) as CardId[], youWon ? "win" : "loss");
         setEnd({
           winner: youWon ? "a" : "b",
           roundWinsYou: nextRoundWinsA,
@@ -736,6 +738,7 @@ export function RankedGame({
     });
     window.setTimeout(() => {
       if (youWon) hapticMatchWin(); else hapticMatchLoss();
+      awardCardMasteryXp((savedDeck ?? []) as CardId[], youWon ? "win" : "loss");
       setEnd({
         winner: youWon ? "a" : "b",
         roundWinsYou: winsA,

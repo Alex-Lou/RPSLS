@@ -9,13 +9,20 @@ import { abandonPenaltyLp, activeAbandonCount, nextAbandon } from "../match/forf
 import { nextStreak, streakBonusXp } from "../match/streak";
 import {
   PACK_COST,
+  SEASON_DURATION_MS,
   type PackResult,
+  type SeasonReward,
+  codexTier,
   craftCost,
   dustForDuplicate,
   eclatsReward,
+  masteryXpForMatch,
   rollPack,
+  seasonRewardForLp,
+  softResetLp,
 } from "../engine/economy";
 import type { CardId } from "../ranked/rankedTypes";
+import type { Outcome } from "../types";
 
 const emptyByMove = () => ({
   rock:     { picked: 0, won: 0 },
@@ -53,6 +60,9 @@ export function defaultPlayer(): Player {
     rankedDeck: ["aegis", "precision", "surge", "augur", "anchor", "second-wind"],
     eclats: 0,
     dust: 0,
+    codexClaimed: [],
+    cardMastery: {},
+    season: { number: 1, startedAt: Date.now() },
     backgroundId: "default",
     customBgs: [],
     customPads: [],
@@ -102,6 +112,19 @@ interface AppState {
    *  `true` on success, `false` if the player can't afford it or already
    *  owns the card. */
   craftCard: (id: CardId) => boolean;
+  /** Codex completion tier — grants the éclats/poussière bonus tied to
+   *  {@link import("../engine/economy").CODEX_TIERS}. Returns `false` if
+   *  the player hasn't unlocked enough cards yet, or has already claimed
+   *  this tier. */
+  claimCodexTier: (threshold: number) => boolean;
+  /** Award per-card mastery XP for every card listed (typically the deck
+   *  contents at match end). Cosmetic — no balance impact. */
+  awardCardMasteryXp: (cards: CardId[], outcome: Outcome) => void;
+  /** Roll the season over when its 30-day window has elapsed: grant the
+   *  tier-based reward, soft-reset LP, bump the season number. Returns
+   *  the rollover payload so the caller (App boot) can show a modal,
+   *  or null when no rollover is due yet. */
+  rolloverSeasonIfDue: () => { fromSeason: number; reward: SeasonReward; lpBefore: number; lpAfter: number } | null;
 }
 
 function detectLocale(): Locale {
@@ -317,10 +340,64 @@ export const useStore = create<AppState>()(
         }));
         return true;
       },
+
+      claimCodexTier: (threshold) => {
+        const tier = codexTier(threshold);
+        if (!tier) return false;
+        const player = get().player;
+        const collection = player.cardCollection ?? [];
+        if (collection.length < threshold) return false;
+        const claimed = player.codexClaimed ?? [];
+        if (claimed.includes(threshold)) return false;
+        set((s) => ({
+          player: {
+            ...s.player,
+            eclats: (s.player.eclats ?? 0) + tier.eclats,
+            dust: (s.player.dust ?? 0) + tier.dust,
+            codexClaimed: [...claimed, threshold],
+          },
+        }));
+        return true;
+      },
+
+      awardCardMasteryXp: (cards, outcome) => {
+        const xp = masteryXpForMatch(outcome);
+        if (xp <= 0 || cards.length === 0) return;
+        set((s) => {
+          const cur = { ...(s.player.cardMastery ?? {}) };
+          for (const c of cards) cur[c] = (cur[c] ?? 0) + xp;
+          return { player: { ...s.player, cardMastery: cur } };
+        });
+      },
+
+      rolloverSeasonIfDue: () => {
+        const player = get().player;
+        const now = Date.now();
+        const season = player.season ?? { number: 1, startedAt: now };
+        // If we just initialised, persist that and report no rollover.
+        if (!player.season) {
+          set((s) => ({ player: { ...s.player, season } }));
+          return null;
+        }
+        if (now - season.startedAt < SEASON_DURATION_MS) return null;
+        const lpBefore = player.rankLp;
+        const reward = seasonRewardForLp(lpBefore);
+        const lpAfter = softResetLp(lpBefore);
+        set((s) => ({
+          player: {
+            ...s.player,
+            rankLp: lpAfter,
+            eclats: (s.player.eclats ?? 0) + reward.eclats,
+            dust: (s.player.dust ?? 0) + reward.dust,
+            season: { number: season.number + 1, startedAt: now },
+          },
+        }));
+        return { fromSeason: season.number, reward, lpBefore, lpAfter };
+      },
     }),
     {
       name: "rpsls-app-state",
-      version: 17,
+      version: 20,
       migrate: (persisted: unknown, version: number): AppState => {
         const state = persisted as {
           player?: Partial<Player> & { customVariants?: unknown };
@@ -407,6 +484,24 @@ export const useStore = create<AppState>()(
         if (version < 17 && state?.player) {
           if (state.player.eclats === undefined) state.player.eclats = 0;
           if (state.player.dust === undefined) state.player.dust = 0;
+        }
+        // v18: codex completion tracker. Empty array — even players who
+        // already own enough cards have to come claim the tier themselves
+        // (the boutique tab makes that one tap, and avoids a silent grant).
+        if (version < 18 && state?.player) {
+          if (state.player.codexClaimed === undefined) state.player.codexClaimed = [];
+        }
+        // v19: per-card mastery XP. Empty map — old matches don't count.
+        if (version < 19 && state?.player) {
+          if (state.player.cardMastery === undefined) state.player.cardMastery = {};
+        }
+        // v20: seasons. Initialise the current season at "now" so existing
+        // profiles get a fresh 30-day window starting on the next launch
+        // (no surprise auto-reset on upgrade day).
+        if (version < 20 && state?.player) {
+          if (state.player.season === undefined) {
+            state.player.season = { number: 1, startedAt: Date.now() };
+          }
         }
         // Final pass — sanitise the persisted shape so a tampered
         // localStorage can never inject a payload that would crash the
