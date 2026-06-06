@@ -15,6 +15,7 @@ import {
   findPlayerMatch,
   isPlayerEliminated,
   hasPendingCpuMatch,
+  hasPlayingCpuMatch,
   simulateOneCpuMatch,
 } from "./TournamentBracket";
 import { BracketTree } from "./BracketUI";
@@ -58,19 +59,26 @@ export function BracketPage({
     setTournament((t) => buildBracket(t.you, size));
   }, [setTournament]);
 
-  // Auto-simulate one CPU match every ~1.6s while it isn't the player's turn.
+  // Drive the bracket one tick at a time. Each CPU duel now takes two ticks
+  // (start → resolve) so the round visibly plays out; we keep ticking while
+  // a match is pending OR a CPU duel is mid-play. Slower cadence than before
+  // (was 1.6s and resolved instantly) so the tournament reads as a sequence
+  // of duels rather than collapsing in a blink.
   useEffect(() => {
     if (!joined) return; // hold the bracket as a preview until the player joins
     if (tournament.phase !== "running") return;
     if (simRef.current) return;
     if (findPlayerMatch(tournament)) return; // player's turn — wait for them
-    if (!hasPendingCpuMatch(tournament) && !hasPlayerPending(tournament)) return;
+    if (!hasPendingCpuMatch(tournament) && !hasPlayingCpuMatch(tournament) && !hasPlayerPending(tournament)) return;
 
+    // A duel "in progress" lingers a touch longer than the gap between duels,
+    // so the eye catches the amber "en cours" pulse before the result lands.
+    const inProgress = hasPlayingCpuMatch(tournament);
     simRef.current = true;
     const id = setTimeout(() => {
       simRef.current = false;
       setTournament((t) => simulateOneCpuMatch(t));
-    }, 1600);
+    }, inProgress ? 1500 : 900);
     return () => { clearTimeout(id); simRef.current = false; };
   }, [tournament, setTournament, joined]);
 

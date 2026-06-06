@@ -213,6 +213,18 @@ export function hasPendingCpuMatch(t: TournamentState): boolean {
   return false;
 }
 
+/** A CPU-vs-CPU match currently shown "in progress" (awaiting its resolve
+ *  tick). The bracket page keeps ticking while one exists so the match
+ *  visibly plays out instead of resolving the instant it starts. */
+export function hasPlayingCpuMatch(t: TournamentState): boolean {
+  for (const round of t.rounds) {
+    for (const m of round) {
+      if (m.status === "playing" && m.p1 && m.p2 && !m.p1.isYou && !m.p2.isYou) return true;
+    }
+  }
+  return false;
+}
+
 /** Slight upset-friendly winner pick weighted by level. */
 function pickCpuWinner(a: BracketPlayer, b: BracketPlayer): BracketPlayer {
   const pa = (a.level + 4) / (a.level + b.level + 8); // dampened so upsets happen
@@ -220,29 +232,48 @@ function pickCpuWinner(a: BracketPlayer, b: BracketPlayer): BracketPlayer {
 }
 
 /**
- * Advance the bracket by one step:
- *  - if the next pending match is the player's, flag it "playing" (the page
- *    then surfaces the "Combattre" CTA);
- *  - otherwise resolve one CPU-vs-CPU match.
- * Returns a new state (immutable).
+ * Advance the bracket by one step. Matches now play out in TWO visible ticks
+ * so the tournament reads as a sequence of duels instead of resolving in a
+ * blink (Alex: "ça monte en 5 secondes, on comprend rien"):
+ *  - Phase A: if a CPU match is already "playing" (in progress), resolve it
+ *    to "done" this tick.
+ *  - Phase B: otherwise flag the next pending match "playing". The player's
+ *    own match stays "playing" until the real RankedGame finishes (the page
+ *    surfaces the "Combattre" CTA via findPlayerMatch); a CPU match will be
+ *    resolved by Phase A on the following tick.
+ * Only one match is ever "in progress" at a time. Returns new state.
  */
 export function simulateOneCpuMatch(t: TournamentState): TournamentState {
   const next: TournamentState = { ...t, rounds: cloneRounds(t), phase: "running" };
+
+  // Phase A — finish the CPU duel currently shown "in progress".
   for (let ri = 0; ri < next.rounds.length; ri++) {
     for (let mi = 0; mi < next.rounds[ri].length; mi++) {
       const m = next.rounds[ri][mi];
-      if (m.status === "pending" && m.p1 && m.p2) {
-        if (m.p1.isYou || m.p2.isYou) {
-          next.rounds[ri][mi] = { ...m, status: "playing" };
-          return next;
-        }
+      if (m.status === "playing" && m.p1 && m.p2 && !m.p1.isYou && !m.p2.isYou) {
         const winner = pickCpuWinner(m.p1, m.p2);
         next.rounds[ri][mi] = { ...m, winner, status: "done" };
         feedWinner(next, ri, mi, winner);
+        const fin = finalMatch(next);
+        if (fin && fin.status === "done" && fin.winner) {
+          return { ...next, champion: fin.winner, phase: "complete" };
+        }
         return next;
       }
     }
   }
+
+  // Phase B — kick off the next pending match (player or CPU) as "playing".
+  for (let ri = 0; ri < next.rounds.length; ri++) {
+    for (let mi = 0; mi < next.rounds[ri].length; mi++) {
+      const m = next.rounds[ri][mi];
+      if (m.status === "pending" && m.p1 && m.p2) {
+        next.rounds[ri][mi] = { ...m, status: "playing" };
+        return next;
+      }
+    }
+  }
+
   const fin = finalMatch(next);
   if (fin && fin.status === "done" && fin.winner) {
     return { ...next, champion: fin.winner, phase: "complete" };
