@@ -9,6 +9,8 @@ export type PadId =
   // Fully coded, animated playmats (SVG/SMIL — no PNGs anymore).
   | "chalkboard" | "vintage" | "cosmos" | "galaxy" | "neon" | "comics"
   | "cyberpunk" | "holy" | "quantum" | "casino"
+  // Theme-reactive pad: colours follow the active theme/background accent.
+  | "aura"
   // Player's own uploaded mat (data URL on the player).
   | "custom";
 
@@ -134,6 +136,7 @@ export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: st
   holy:       { label: "Holy Game",      emoji: "✝️", tagline: "Cathedral light, gilded relics, sacred geometry." },
   quantum:    { label: "Quantum Lab",    emoji: "⚛️", tagline: "Particle traces, physics equations." },
   casino:     { label: "Casino Royale",  emoji: "🎰", tagline: "Feutre émeraude, roulette, jetons et or Art Déco." },
+  aura:       { label: "Aura",           emoji: "🎨", tagline: "S'accorde à ton thème : couleurs et lueurs vivantes." },
   custom:     { label: "Mon image",      emoji: "🖼️", tagline: "Ton propre tapis (paysage 3:2, ex. 1500×1000)." },
 };
 

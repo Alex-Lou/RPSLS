@@ -32,7 +32,7 @@ export interface Arena {
 
 /** Coded pads offered for the quick-swap row (excludes the player's custom mat). */
 const QUICK_PADS: PadId[] = [
-  "chalkboard", "vintage", "cosmos", "galaxy", "neon",
+  "aura", "chalkboard", "vintage", "cosmos", "galaxy", "neon",
   "comics", "cyberpunk", "holy", "quantum", "casino",
 ];
 

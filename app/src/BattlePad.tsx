@@ -12,6 +12,7 @@ import { QuantumPad } from "./battlepads/QuantumPad";
 import { GalaxyPad } from "./battlepads/GalaxyPad";
 import { CyberpunkPad } from "./battlepads/CyberpunkPad";
 import { CasinoPad } from "./battlepads/CasinoPad";
+import { AuraPad } from "./battlepads/AuraPad";
 
 export function BattlePad({
   padId,
@@ -48,6 +49,7 @@ export function BattlePad({
     case "cyberpunk":  return <CyberpunkPad {...common} compact={compact} />;
     case "comics":     return <ComicsPad {...common} />;
     case "casino":     return <CasinoPad {...common} compact={compact} />;
+    case "aura":       return <AuraPad {...common} compact={compact} />;
     case "custom":
       // Uploaded mat, or a graceful coded fallback until one is imported.
       return customPadUrl
