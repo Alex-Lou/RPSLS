@@ -18,46 +18,48 @@ export function cpuRankedDecision(
   laneCount: number,
 ): { plays: LanePlay[]; card: PlayedCard | null } {
   const plays = cpuLanesPicks(ctx, laneCount);
-  const card = ctx.difficulty === "hard" ? chooseCpuCard(ctx, plays) : null;
+  // Easy stays card-free (gentle). Normal AND hard now actually commit cards
+  // at a decent rate — otherwise the opponent's hand counter moves (draw /
+  // discard) yet the player never SEES a card played: no reveal, empty
+  // end-of-match recap. That disconnect read as a bug.
+  const card = ctx.difficulty === "easy" ? null : chooseCpuCard(ctx, plays);
   return { plays, card };
 }
 
 function chooseCpuCard(ctx: RankedCpuContext, picks: LanePlay[]): PlayedCard | null {
-  // Filter to affordable cards in hand
   const playable = ctx.hand.filter((id) => CARDS[id].cost <= ctx.mana);
   if (playable.length === 0) return null;
 
-  // Prioritize: surge on favoured lane > curse on random > aegis on random > precision
-  for (const id of playable) {
-    if (id === "surge" && Math.random() < 0.5) {
-      for (let i = 0; i < picks.length; i++) {
-        if (laneFavoursMove(i, picks[i].mv)) {
-          return { id: "surge", lane: i as LaneTarget };
-        }
-      }
-    }
-    if (id === "curse" && Math.random() < 0.4) {
-      return { id: "curse", lane: Math.floor(Math.random() * picks.length) as LaneTarget };
-    }
-    if (id === "aegis" && Math.random() < 0.4) {
-      return { id: "aegis", lane: Math.floor(Math.random() * picks.length) as LaneTarget };
-    }
-    if (id === "precision" && Math.random() < 0.3) {
-      return { id: "precision", lane: Math.floor(Math.random() * picks.length) as LaneTarget };
-    }
-    if (id === "tide" && Math.random() < 0.3) {
-      return { id: "tide", lane: 0 as LaneTarget };
-    }
-    if (id === "heist" && Math.random() < 0.25) {
-      // Aim Heist at the lane we expect to win — fallback to a random one.
-      for (let i = 0; i < picks.length; i++) {
-        if (laneFavoursMove(i, picks[i].mv)) {
-          return { id: "heist", lane: i as LaneTarget };
-        }
-      }
-      return { id: "heist", lane: Math.floor(Math.random() * picks.length) as LaneTarget };
-    }
+  // Difficulty-tuned chance to actually commit a card this round (when it can
+  // afford one). High enough that the player regularly sees opponent cards.
+  const playChance = ctx.difficulty === "hard" ? 0.72 : 0.5;
+  if (Math.random() > playChance) return null;
+
+  // Best lane for offensive cards = a lane the opponent's own move favours;
+  // fall back to a random lane.
+  let favLane: LaneTarget = Math.floor(Math.random() * picks.length) as LaneTarget;
+  for (let i = 0; i < picks.length; i++) {
+    if (laneFavoursMove(i, picks[i].mv)) { favLane = i as LaneTarget; break; }
   }
+  const randLane = () => Math.floor(Math.random() * picks.length) as LaneTarget;
+  const has = (id: CardId) => playable.includes(id);
+
+  // Priority order — strongest/most impactful affordable card first. Only
+  // cards whose PlayedCard shape we can construct without extra reveal data
+  // (so Augur/Oracle are skipped for the CPU).
+  if (has("supernova")) return { id: "supernova" };
+  if (has("surge"))     return { id: "surge", lane: favLane };
+  if (has("tide"))      return { id: "tide", lane: 0 as LaneTarget };
+  if (has("heist"))     return { id: "heist", lane: favLane };
+  if (has("curse"))     return { id: "curse", lane: randLane() };
+  if (has("vortex"))    return { id: "vortex" };
+  if (has("gambit"))    return { id: "gambit" };
+  if (has("precision")) return { id: "precision", lane: favLane };
+  if (has("aegis"))     return { id: "aegis", lane: randLane() };
+  if (has("anchor"))    return { id: "anchor", lane: randLane() };
+  if (has("riposte"))   return { id: "riposte", lane: randLane() };
+  if (has("mirror"))    return { id: "mirror", lane: randLane() };
+  if (has("second-wind")) return { id: "second-wind" };
 
   return null;
 }
