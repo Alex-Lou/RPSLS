@@ -48,7 +48,7 @@ export function BracketTree({ tournament }: { tournament: TournamentState }) {
   // legibility. The unit drives a fixed per-column height so every round
   // aligns vertically via justify-around.
   const compact = t.size === 16;
-  const unit = compact ? 60 : 80;
+  const unit = compact ? 54 : 76;
   const rows = Math.max(2, t.rounds[0]?.length ?? 2);
   const height = rows * unit;
 
@@ -67,7 +67,7 @@ export function BracketTree({ tournament }: { tournament: TournamentState }) {
     // max-h: leaves room above for the page header and below for the CTA.
     <div
       className="
-        w-full max-h-[55vh] sm:max-h-[60vh]
+        w-full max-h-[68vh] sm:max-h-[72vh]
         overflow-auto py-3 px-2
         rounded-2xl
         bg-surface border border-hairline
