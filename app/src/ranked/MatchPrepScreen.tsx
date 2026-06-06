@@ -16,7 +16,6 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import type { CardId } from "./rankedTypes";
 import type { PadId, ThemeId } from "../types";
-import { PAD_META } from "../types";
 import { CardImage } from "./CardImage";
 import { THEMES } from "../theme/theme";
 import { useStore } from "../store/store";
@@ -29,12 +28,6 @@ export interface Arena {
   themeId: ThemeId;
   padId: PadId;
 }
-
-/** Coded pads offered for the quick-swap row (excludes the player's custom mat). */
-const QUICK_PADS: PadId[] = [
-  "aura", "chalkboard", "vintage", "cosmos", "galaxy", "neon",
-  "comics", "cyberpunk", "holy", "quantum", "casino",
-];
 
 export function MatchPrepScreen({
   youName, youAvatar, youThemeId,
@@ -54,7 +47,6 @@ export function MatchPrepScreen({
 }) {
   const deck = (useStore((s) => s.player.rankedDeck) ?? []) as CardId[];
   const youPadId = useStore((s) => s.player.padId);
-  const updateProfile = useStore((s) => s.updateProfile);
 
   // Coin state: idle → flipping → landed. `winner` is the resolved side.
   const [phase, setPhase] = useState<"idle" | "flipping" | "landed">("idle");
@@ -98,20 +90,17 @@ export function MatchPrepScreen({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -16 }}
       transition={{ duration: 0.3 }}
-      className="flex flex-col gap-4 flex-1 py-2 px-2 max-w-lg mx-auto w-full overflow-y-auto"
+      className="flex flex-col gap-3 flex-1 min-h-0 py-2 px-3 max-w-md mx-auto w-full justify-center"
     >
       <FloatingMatchBackButton onClick={onBack} label="Retour" />
 
-      <div className="text-center mt-7">
+      <div className="text-center shrink-0">
         <h1
-          className="text-2xl sm:text-3xl font-extrabold text-themed leading-tight"
+          className="text-xl sm:text-2xl font-extrabold text-themed leading-tight"
           style={{ fontFamily: "var(--font-headline)" }}
         >
           Préparation du duel
         </h1>
-        <p className="text-[11px] text-ink-faint mt-1">
-          Vérifie ton deck, ajuste ton terrain, puis joue la pièce.
-        </p>
       </div>
 
       {/* VS — you vs opponent, each with avatar + theme swatch. */}
@@ -149,34 +138,8 @@ export function MatchPrepScreen({
         )}
       </div>
 
-      {/* Pad quick-swap — persists immediately (useful tweak before a match). */}
-      <div className="rounded-2xl bg-surface border border-hairline p-3">
-        <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-ink-muted mb-2">
-          Ton terrain (pad)
-        </div>
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-          {QUICK_PADS.map((pid) => {
-            const on = youPadId === pid;
-            return (
-              <button
-                key={pid}
-                onClick={() => { hapticTick(); updateProfile({ padId: pid }); }}
-                className={
-                  "shrink-0 px-3 py-2 rounded-xl text-[11px] font-bold whitespace-nowrap transition border " +
-                  (on
-                    ? "bg-themed text-white border-transparent shadow"
-                    : "bg-hairline text-ink-muted border-hairline hover:text-white")
-                }
-              >
-                {PAD_META[pid].emoji} {PAD_META[pid].label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Coin flip — the centrepiece. */}
-      <div className="rounded-2xl bg-surface-raised border border-hairline p-4 flex flex-col items-center gap-3">
+      <div className="rounded-2xl bg-surface-raised border border-hairline p-3 flex flex-col items-center gap-2.5">
         <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-ink-muted text-center">
           À qui le terrain ?
         </div>
@@ -199,6 +162,7 @@ export function MatchPrepScreen({
                   ? "Tes couleurs et ton pad habillent le duel."
                   : "Tu joues sur le terrain adverse — adapte-toi."}
               </div>
+              <div className="text-[10px] text-emerald-300 font-bold mt-1">✓ {oppName} est prêt</div>
             </motion.div>
           ) : (
             <p key="hint" className="text-[11px] text-ink-faint text-center max-w-xs">
@@ -267,7 +231,7 @@ function FighterCard({
       }}
     >
       <div
-        className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl overflow-hidden ring-1 ring-white/20"
+        className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl overflow-hidden ring-1 ring-white/20"
         style={{ background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})` }}
       >
         {isAvatarImage(avatar) ? (
@@ -302,7 +266,7 @@ function Coin({
   const target = phase === "idle" ? 0 : spins * 360 + (winner === "opp" ? 180 : 0);
 
   return (
-    <div className="relative" style={{ perspective: 900, width: 110, height: 110 }}>
+    <div className="relative" style={{ perspective: 900, width: 90, height: 90 }}>
       {/* Glow puck under the coin */}
       <motion.div
         aria-hidden
@@ -314,7 +278,7 @@ function Coin({
       <motion.div
         animate={{ rotateY: target }}
         transition={phase === "idle" ? { duration: 0 } : { duration: 1.8, ease: [0.2, 0.7, 0.2, 1] }}
-        style={{ transformStyle: "preserve-3d", width: 110, height: 110 }}
+        style={{ transformStyle: "preserve-3d", width: 90, height: 90 }}
         className="relative mx-auto"
       >
         {/* Heads = you */}
