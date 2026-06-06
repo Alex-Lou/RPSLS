@@ -32,9 +32,13 @@ pub fn start_match(
     a: Arc<Session>,
     b: Arc<Session>,
     best_of: u8,
+    on_end: Box<dyn FnOnce() + Send>,
 ) -> mpsc::UnboundedSender<MatchCommand> {
     let (tx, rx) = mpsc::unbounded_channel();
-    tokio::spawn(run_match(a, b, best_of, rx));
+    tokio::spawn(async move {
+        run_match(a, b, best_of, rx).await;
+        on_end();
+    });
     tx
 }
 

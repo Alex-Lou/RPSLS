@@ -330,7 +330,13 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
             }
             // Legit join — clear any pent-up counter for this IP.
             state.lobby_attempts.record_success(session.peer_ip);
-            let match_tx = start_match(lobby.host.clone(), session.clone(), lobby.best_of);
+            let a_id = lobby.host.id.clone();
+            let b_id = session.id.clone();
+            let st = state.clone();
+            let match_tx = start_match(lobby.host.clone(), session.clone(), lobby.best_of, Box::new(move || {
+                st.in_match.remove(&a_id);
+                st.in_match.remove(&b_id);
+            }));
             state
                 .in_match
                 .insert(lobby.host.id.clone(), (match_tx.clone(), PlayerSlot::A));
@@ -344,7 +350,13 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
                 return reply_error(session, "bad_best_of", "best_of must be odd 1..=9");
             }
             if let Some(opp) = state.lobbies.join_or_match(session.clone(), best_of).await {
-                let match_tx = start_match(opp.clone(), session.clone(), best_of);
+                let a_id = opp.id.clone();
+                let b_id = session.id.clone();
+                let st = state.clone();
+                let match_tx = start_match(opp.clone(), session.clone(), best_of, Box::new(move || {
+                    st.in_match.remove(&a_id);
+                    st.in_match.remove(&b_id);
+                }));
                 state
                     .in_match
                     .insert(opp.id.clone(), (match_tx.clone(), PlayerSlot::A));
@@ -366,7 +378,13 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
                 .join_or_match_lanes(session.clone(), win_to)
                 .await
             {
-                let lanes_tx = start_lanes_match(opp.clone(), session.clone(), win_to);
+                let a_id = opp.id.clone();
+                let b_id = session.id.clone();
+                let st = state.clone();
+                let lanes_tx = start_lanes_match(opp.clone(), session.clone(), win_to, Box::new(move || {
+                    st.in_lanes.remove(&a_id);
+                    st.in_lanes.remove(&b_id);
+                }));
                 state
                     .in_lanes
                     .insert(opp.id.clone(), (lanes_tx.clone(), PlayerSlot::A));

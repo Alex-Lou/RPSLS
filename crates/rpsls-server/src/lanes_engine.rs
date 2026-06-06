@@ -60,9 +60,13 @@ pub fn start_lanes_match(
     a: Arc<Session>,
     b: Arc<Session>,
     win_to: u8,
+    on_end: Box<dyn FnOnce() + Send>,
 ) -> mpsc::UnboundedSender<LanesCommand> {
     let (tx, rx) = mpsc::unbounded_channel();
-    tokio::spawn(run_lanes_match(a, b, win_to, rx));
+    tokio::spawn(async move {
+        run_lanes_match(a, b, win_to, rx).await;
+        on_end();
+    });
     tx
 }
 
