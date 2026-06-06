@@ -30,9 +30,9 @@ function Avatar({ avatar, size }: { avatar: string; size: number }) {
 }
 
 const PODIUM_STYLE: Record<number, { medal: string; grad: string; bar: string; h: number; av: number; delay: number }> = {
-  1: { medal: "🥇", grad: "from-yellow-300 to-amber-500", bar: "from-amber-400/80 to-yellow-600/40", h: 96, av: 68, delay: 0.15 },
-  2: { medal: "🥈", grad: "from-zinc-200 to-slate-400",   bar: "from-slate-300/70 to-slate-500/30", h: 64, av: 54, delay: 0.35 },
-  3: { medal: "🥉", grad: "from-amber-600 to-orange-700", bar: "from-orange-500/70 to-amber-700/30", h: 48, av: 54, delay: 0.5 },
+  1: { medal: "🥇", grad: "from-yellow-300 to-amber-500", bar: "from-amber-400/80 to-yellow-600/40", h: 140, av: 84, delay: 0.15 },
+  2: { medal: "🥈", grad: "from-zinc-200 to-slate-400",   bar: "from-slate-300/70 to-slate-500/30", h: 96,  av: 68, delay: 0.35 },
+  3: { medal: "🥉", grad: "from-amber-600 to-orange-700", bar: "from-orange-500/70 to-amber-700/30", h: 72,  av: 68, delay: 0.5 },
 };
 
 function PodiumBlock({ s, you }: { s: Standing; you: boolean }) {
@@ -65,20 +65,20 @@ function PodiumBlock({ s, you }: { s: Standing; you: boolean }) {
         )}
         <span className="relative block"><Avatar avatar={s.player.avatar} size={st.av} /></span>
       </div>
-      <div className="text-base leading-none">{st.medal}</div>
-      <div className={"text-xs font-bold truncate max-w-[8rem] text-center " + (you ? "text-white" : "text-ink")}>
+      <div className="text-xl leading-none">{st.medal}</div>
+      <div className={"text-sm sm:text-base font-bold truncate max-w-[10rem] text-center " + (you ? "text-white" : "text-ink")}>
         {s.player.name}{you ? " (toi)" : ""}
       </div>
-      <div className="text-[10px] text-ink-faint">Niv. {s.player.level}</div>
-      <div className="text-[11px] font-black text-emerald-300">+{s.reward} XP</div>
-      {/* Pedestal bar */}
+      <div className="text-xs text-ink-faint">Niv. {s.player.level}</div>
+      <div className="text-sm font-black text-emerald-300">+{s.reward} XP</div>
+      {/* Pedestal bar — wider + taller per the bumped PODIUM_STYLE heights. */}
       <motion.div
         initial={{ height: 0 }}
         animate={{ height: st.h }}
         transition={{ delay: st.delay + 0.1, type: "spring", stiffness: 160, damping: 20 }}
-        className={"w-full max-w-[6.5rem] rounded-t-xl bg-gradient-to-b border-t border-white/20 flex items-start justify-center pt-1 " + st.bar}
+        className={"w-full max-w-[9rem] rounded-t-xl bg-gradient-to-b border-t border-white/20 flex items-start justify-center pt-1.5 " + st.bar}
       >
-        <span className={"text-2xl font-black bg-gradient-to-br bg-clip-text text-transparent " + st.grad}>{s.place}</span>
+        <span className={"text-3xl sm:text-4xl font-black bg-gradient-to-br bg-clip-text text-transparent " + st.grad}>{s.place}</span>
       </motion.div>
     </motion.div>
   );
@@ -111,38 +111,44 @@ export function TournamentPodium({
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="relative flex flex-col items-center gap-3 flex-1 min-h-0 overflow-y-auto py-3 px-2 w-full max-w-md mx-auto"
+      // Was max-w-md → screen-in-a-screen feel. Bumped to max-w-3xl so the
+      // celebration fills modern phones edge-to-edge (md+) without the dead
+      // gutters. Outer gap also grows for breathing room.
+      className="relative flex flex-col items-center gap-5 flex-1 min-h-0 overflow-y-auto py-4 px-3 sm:px-6 w-full max-w-3xl mx-auto"
     >
       <CelebrationBurst variant="fire" />
 
-      <div className="text-center shrink-0">
-        <div className="text-[11px] uppercase tracking-[0.35em] text-ink-faint">Tournoi terminé</div>
-        <h1 className="text-2xl sm:text-3xl font-black text-themed leading-tight" style={{ fontFamily: "var(--font-headline)" }}>
+      <div className="text-center shrink-0 w-full">
+        <div className="text-xs sm:text-sm uppercase tracking-[0.35em] text-ink-faint">Tournoi terminé</div>
+        <h1
+          className="text-4xl sm:text-5xl md:text-6xl font-black text-themed leading-tight mt-1"
+          style={{ fontFamily: "var(--font-headline)" }}
+        >
           {you?.place === 1 ? "🏆 Tu es Champion !" : `${tournament.champion?.name ?? "—"} remporte le tournoi`}
         </h1>
       </div>
 
-      {/* Podium 2-1-3 */}
-      <div className="flex items-end justify-center gap-2 w-full px-1 mt-1">
+      {/* Podium 2-1-3 — gap + lift go up alongside the wider canvas. */}
+      <div className="flex items-end justify-center gap-4 sm:gap-6 w-full px-1 mt-2">
         {order.map((s) => <PodiumBlock key={s.player.id} s={s} you={!!s.player.isYou} />)}
       </div>
 
-      {/* Full standings */}
+      {/* Full standings — wider rows, bigger text, more vertical padding. */}
       {rest.length > 0 && (
         <div className="w-full mt-1 rounded-2xl bg-zinc-950/50 border border-hairline divide-y divide-white/5">
           {rest.map((s) => (
             <div
               key={s.player.id}
-              className={"flex items-center gap-3 px-3 py-2 " + (s.player.isYou ? "bg-white/[0.07]" : "")}
-              style={s.player.isYou ? { boxShadow: "inset 3px 0 0 var(--theme-primary)" } : undefined}
+              className={"flex items-center gap-4 px-4 py-3 " + (s.player.isYou ? "bg-white/[0.07]" : "")}
+              style={s.player.isYou ? { boxShadow: "inset 4px 0 0 var(--theme-primary)" } : undefined}
             >
-              <span className="w-6 text-center text-sm font-bold text-ink-faint tabular-nums">{s.place}</span>
-              <Avatar avatar={s.player.avatar} size={28} />
-              <span className={"flex-1 min-w-0 truncate text-sm " + (s.player.isYou ? "text-white font-semibold" : "text-ink-muted")}>
+              <span className="w-8 text-center text-base font-bold text-ink-faint tabular-nums">{s.place}</span>
+              <Avatar avatar={s.player.avatar} size={36} />
+              <span className={"flex-1 min-w-0 truncate text-base " + (s.player.isYou ? "text-white font-semibold" : "text-ink-muted")}>
                 {s.player.name}{s.player.isYou ? " (toi)" : ""}
               </span>
-              <span className="text-[10px] text-ink-faint">Niv. {s.player.level}</span>
-              <span className="text-[11px] font-bold text-emerald-300/90">+{s.reward}</span>
+              <span className="text-xs text-ink-faint">Niv. {s.player.level}</span>
+              <span className="text-sm font-bold text-emerald-300/90">+{s.reward}</span>
             </div>
           ))}
         </div>
@@ -150,8 +156,8 @@ export function TournamentPodium({
 
       <button
         onClick={onContinue}
-        className="shrink-0 mt-2 w-full max-w-xs px-7 py-3 rounded-2xl font-bold text-white bg-themed shadow-lg shadow-violet-500/30 transition hover:scale-[1.02]"
-        style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
+        className="shrink-0 mt-3 w-full max-w-xl px-8 py-4 rounded-2xl font-black text-white text-base sm:text-lg uppercase tracking-wider bg-themed shadow-lg shadow-violet-500/30 transition hover:scale-[1.02]"
+        style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.06em" }}
       >
         {t("lanes.backToMenu")}
       </button>

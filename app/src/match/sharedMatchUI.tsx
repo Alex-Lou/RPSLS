@@ -421,7 +421,11 @@ export function CinematicMatchEnd({
     <motion.div
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative flex flex-col items-center gap-2.5 py-2"
+      // w-full + horizontal padding so every inner row can claim the full
+      // viewport width — fixes the "screen-in-a-screen" framing Alex flagged
+      // where the cinematic was capped to max-w-md and a wide blank gutter
+      // showed on both sides.
+      className="relative flex flex-col items-center gap-3 py-2 w-full px-3 sm:px-6"
     >
       {youWon && <CelebrationBurst />}
 
@@ -432,7 +436,7 @@ export function CinematicMatchEnd({
           initial={{ opacity: 0, scale: 0.4 }}
           animate={{ opacity: youWon ? [0.45, 0.85, 0.45] : 0.3, scale: [0.9, 1.15, 0.9] }}
           transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut", delay: 0.3 }}
-          className="absolute w-28 h-28 rounded-full blur-2xl pointer-events-none"
+          className="absolute w-36 h-36 sm:w-44 sm:h-44 rounded-full blur-2xl pointer-events-none"
           style={{
             background: youWon
               ? "radial-gradient(circle, rgba(52,211,153,0.75), transparent 70%)"
@@ -449,13 +453,14 @@ export function CinematicMatchEnd({
             rotate: { type: "spring", stiffness: 200, damping: 12, delay: 0.1 },
             y:      { duration: 3.2, repeat: Infinity, ease: "easeInOut", delay: 1.0 },
           }}
-          className="relative text-5xl sm:text-6xl leading-none"
+          className="relative text-6xl sm:text-7xl leading-none"
         >
           {glyph}
         </motion.div>
       </div>
 
-      {/* Wordmark: enter then breathe. */}
+      {/* Wordmark: enter then breathe. Sized to BREATHE wide — fills the
+          available width on every screen instead of a cramped pill. */}
       <motion.div
         initial={{ opacity: 0, y: 6 }}
         animate={{
@@ -469,7 +474,7 @@ export function CinematicMatchEnd({
           scale:   { duration: 2.6, repeat: Infinity, ease: "easeInOut", delay: 1.2 },
         }}
         className={
-          "text-3xl sm:text-4xl font-black bg-gradient-to-br bg-clip-text text-transparent leading-tight " +
+          "text-5xl sm:text-6xl md:text-7xl font-black bg-gradient-to-br bg-clip-text text-transparent leading-tight tracking-tight " +
           gradient
         }
       >
@@ -499,7 +504,7 @@ export function CinematicMatchEnd({
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.95, duration: 0.4 }}
-            className="max-w-xs sm:max-w-sm px-4 text-center text-sm text-ink-muted leading-snug"
+            className="w-full max-w-2xl px-2 text-center text-base sm:text-lg text-ink-muted leading-snug"
           >
             {phrase}
           </motion.div>
@@ -507,7 +512,7 @@ export function CinematicMatchEnd({
       })()}
 
       {scoreLine && (
-        <div className="text-xl font-mono text-ink">{scoreLine}</div>
+        <div className="text-2xl sm:text-3xl font-mono font-black text-ink tracking-wider">{scoreLine}</div>
       )}
 
       {/* Reward reveal — animated +XP / ±LP / 💎 counters. */}
@@ -552,15 +557,15 @@ export function CinematicMatchEnd({
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 1.2, duration: 0.4 }}
-        className="max-w-md mx-auto px-4 text-center"
+        className="w-full max-w-2xl mx-auto px-2 text-center"
       >
         <div
-          className="text-[13px] italic text-ink-muted leading-snug overflow-hidden"
+          className="text-base sm:text-lg italic text-ink-muted leading-snug overflow-hidden"
           style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}
         >
           « {t(`lanes.endQuote.${quoteIdx}.text`)} »
         </div>
-        <div className="text-[11px] text-ink-faint mt-0.5 tracking-wide">
+        <div className="text-sm text-ink-faint mt-1 tracking-wide">
           {t(`lanes.endQuote.${quoteIdx}.author`)}
         </div>
       </motion.div>
@@ -569,19 +574,19 @@ export function CinematicMatchEnd({
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 1.5 }}
-        className="flex flex-row gap-2 w-full max-w-md px-2"
+        className="flex flex-row gap-3 w-full max-w-2xl px-2"
       >
         {onRematch && (
           <button
             onClick={onRematch}
-            className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 font-bold text-white shadow-lg shadow-emerald-500/30 transition text-sm"
+            className="flex-1 px-5 py-3 sm:py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 font-black text-white shadow-lg shadow-emerald-500/30 transition text-base uppercase tracking-wider"
           >
             {rematchLabel ?? t("lanes.rematch")}
           </button>
         )}
         <button
           onClick={onBack}
-          className="flex-1 px-4 py-2.5 rounded-xl bg-hairline hover:bg-white/20 border border-hairline font-semibold text-ink transition text-sm"
+          className="flex-1 px-5 py-3 sm:py-3.5 rounded-2xl bg-hairline hover:bg-white/20 border border-hairline font-bold text-ink transition text-base uppercase tracking-wider"
         >
           {backLabel ?? t("lanes.backToMenu")}
         </button>
