@@ -1,4 +1,5 @@
 import type { ThemeId } from "../types";
+import type { FontStackKey } from "./fonts";
 
 export interface ThemeDef {
   id: ThemeId;
@@ -7,21 +8,29 @@ export interface ThemeDef {
   primary: string;
   secondary: string;
   bg: string;
+  /** Typography identity for this palette — applied when the active background
+   *  is the plain "default" or the player's own "custom" image (a coded scene
+   *  background overrides these with its own bespoke skin). Headline = titles,
+   *  body = UI text, mono = numbers/timers. Picking a colour palette now also
+   *  shifts the font mood, so each HUD theme feels like a complete identity. */
+  fontHeadline: FontStackKey;
+  fontBody: FontStackKey;
+  fontMono: FontStackKey;
 }
 
 export const THEMES: Record<ThemeId, ThemeDef> = {
-  violet: { id: "violet", label: "Violet",  emoji: "🔮", primary: "#7c5cff", secondary: "#2dd4bf", bg: "#0b0d12" },
-  neon:   { id: "neon",   label: "Neon",    emoji: "⚡", primary: "#22d3ee", secondary: "#ec4899", bg: "#0a0a12" },
-  pastel: { id: "pastel", label: "Pastel",  emoji: "🌸", primary: "#fda4af", secondary: "#86efac", bg: "#1a1620" },
-  sunset: { id: "sunset", label: "Sunset",  emoji: "🌅", primary: "#fb923c", secondary: "#f43f5e", bg: "#1a0f12" },
-  forest: { id: "forest", label: "Forest",  emoji: "🌲", primary: "#34d399", secondary: "#fbbf24", bg: "#0a1410" },
-  ocean:  { id: "ocean",  label: "Ocean",   emoji: "🌊", primary: "#38bdf8", secondary: "#22d3ee", bg: "#08111a" },
-  ember:  { id: "ember",  label: "Ember",   emoji: "🔥", primary: "#fb7185", secondary: "#f59e0b", bg: "#160a0a" },
-  aurora: { id: "aurora", label: "Aurora",  emoji: "🌌", primary: "#a78bfa", secondary: "#34d399", bg: "#0a0f16" },
-  gold:   { id: "gold",   label: "Gold",    emoji: "👑", primary: "#fcd34d", secondary: "#f97316", bg: "#14100a" },
-  cyber:  { id: "cyber",  label: "Cyber",   emoji: "🤖", primary: "#22d3ee", secondary: "#a3e635", bg: "#0a0f0d" },
-  rose:   { id: "rose",   label: "Rosé",    emoji: "🌹", primary: "#fb7185", secondary: "#c084fc", bg: "#160a12" },
-  mono:   { id: "mono",   label: "Mono",    emoji: "🪐", primary: "#e5e7eb", secondary: "#9ca3af", bg: "#0b0d12" },
+  violet: { id: "violet", label: "Violet",  emoji: "🔮", primary: "#7c5cff", secondary: "#2dd4bf", bg: "#0b0d12", fontHeadline: "spaceGrotesk", fontBody: "inter",   fontMono: "jetbrains" },
+  neon:   { id: "neon",   label: "Neon",    emoji: "⚡", primary: "#22d3ee", secondary: "#ec4899", bg: "#0a0a12", fontHeadline: "audiowide",    fontBody: "exo2",    fontMono: "shareTech" },
+  pastel: { id: "pastel", label: "Pastel",  emoji: "🌸", primary: "#fda4af", secondary: "#86efac", bg: "#1a1620", fontHeadline: "inter",        fontBody: "inter",   fontMono: "jetbrains" },
+  sunset: { id: "sunset", label: "Sunset",  emoji: "🌅", primary: "#fb923c", secondary: "#f43f5e", bg: "#1a0f12", fontHeadline: "bebas",        fontBody: "rajdhani", fontMono: "jetbrains" },
+  forest: { id: "forest", label: "Forest",  emoji: "🌲", primary: "#34d399", secondary: "#fbbf24", bg: "#0a1410", fontHeadline: "ebGaramond",   fontBody: "inter",   fontMono: "jetbrains" },
+  ocean:  { id: "ocean",  label: "Ocean",   emoji: "🌊", primary: "#38bdf8", secondary: "#22d3ee", bg: "#08111a", fontHeadline: "spaceGrotesk", fontBody: "ibmPlex", fontMono: "fira" },
+  ember:  { id: "ember",  label: "Ember",   emoji: "🔥", primary: "#fb7185", secondary: "#f59e0b", bg: "#160a0a", fontHeadline: "bebas",        fontBody: "rajdhani", fontMono: "fira" },
+  aurora: { id: "aurora", label: "Aurora",  emoji: "🌌", primary: "#a78bfa", secondary: "#34d399", bg: "#0a0f16", fontHeadline: "exo2",         fontBody: "exo2",    fontMono: "spaceMono" },
+  gold:   { id: "gold",   label: "Gold",    emoji: "👑", primary: "#fcd34d", secondary: "#f97316", bg: "#14100a", fontHeadline: "cinzel",       fontBody: "cormorant", fontMono: "jetbrains" },
+  cyber:  { id: "cyber",  label: "Cyber",   emoji: "🤖", primary: "#22d3ee", secondary: "#a3e635", bg: "#0a0f0d", fontHeadline: "orbitron",     fontBody: "rajdhani", fontMono: "shareTech" },
+  rose:   { id: "rose",   label: "Rosé",    emoji: "🌹", primary: "#fb7185", secondary: "#c084fc", bg: "#160a12", fontHeadline: "playfair",     fontBody: "cormorant", fontMono: "jetbrains" },
+  mono:   { id: "mono",   label: "Mono",    emoji: "🪐", primary: "#e5e7eb", secondary: "#9ca3af", bg: "#0b0d12", fontHeadline: "ibmPlex",      fontBody: "inter",   fontMono: "jetbrains" },
 };
 
 export function applyTheme(themeId: ThemeId) {

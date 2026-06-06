@@ -25,27 +25,42 @@ export function BattlePad({
   className,
   style,
   compact = false,
+  frozen = false,
 }: {
   padId: PadId;
   className?: string;
   style?: CSSProperties;
   compact?: boolean;
+  /** Render a single still frame (SMIL paused on a settled frame). Used for
+   *  thumbnails: a real, representative image of the pad with zero animation
+   *  cost — the full animation only plays in the open preview. */
+  frozen?: boolean;
 }) {
   const customPadUrl = useStore((s) => s.player.customPadUrl);
   const visible = usePageVisible();
   const svgRef = useRef<SVGSVGElement | null>(null);
 
+  // Jump to a settled frame (~2.6s in, past any intro fade) then freeze, so
+  // the thumbnail shows the pad "in motion" rather than its blank t=0 state.
+  const freeze = useCallback((el: SVGSVGElement) => {
+    try { el.setCurrentTime(2.6); } catch { /* SMIL not ready — harmless */ }
+    el.pauseAnimations();
+  }, []);
+
   const setRef = useCallback((el: SVGSVGElement | null) => {
     svgRef.current = el;
-    if (el && !visible) el.pauseAnimations();
-  }, [visible]);
+    if (!el) return;
+    if (frozen) freeze(el);
+    else if (!visible) el.pauseAnimations();
+  }, [visible, frozen, freeze]);
 
   useEffect(() => {
     const el = svgRef.current;
     if (!el) return;
+    if (frozen) { freeze(el); return; }
     if (visible) el.unpauseAnimations();
     else el.pauseAnimations();
-  }, [visible]);
+  }, [visible, frozen, freeze]);
 
   const common = {
     ref: setRef,

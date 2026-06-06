@@ -7,7 +7,8 @@ import { motion } from "motion/react";
 import { useStore } from "../store/store";
 import { rankFromLp } from "../engine/rank";
 import { levelFromXp } from "../engine/leveling";
-import { ALL_CARD_IDS, CARDS, RARITY_COLOR } from "./cards";
+import { ALL_CARD_IDS, CARDS, RARITY_COLOR, RARITY_ORDER } from "./cards";
+import { CRAFT_COST } from "../engine/economy";
 import { CardImage } from "./CardImage";
 import { useT } from "../i18n";
 import { InfoBubble } from "../flavor/InfoBubble";
@@ -197,35 +198,16 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack, onGoShop }: {
               text="1 mana au round 1, +1 par round (max 4). Sert à jouer des cartes." />
             <RuleBlock emoji="🃏" iconSrc={HIW_ICONS.cartes} title="Cartes"
               text="Main de 3 cartes. Tu pioches si tu GAGNES un round. Tu perds 1 carte si tu PERDS. 0 ou 1 carte par round." />
-
-            <div className="text-[10px] uppercase tracking-wider font-bold text-ink-faint mt-1">⚪ Communes (1 mana)</div>
-            <CardRule id="aegis" />
-            <CardRule id="precision" />
-            <CardRule id="anchor" />
-            <CardRule id="second-wind" />
-
-            <div className="text-[10px] uppercase tracking-wider font-bold text-blue-400 mt-1">🔵 Rares (2 mana)</div>
-            <CardRule id="surge" />
-            <CardRule id="augur" />
-            <CardRule id="riposte" />
-            <CardRule id="curse" />
-
-            <div className="text-[10px] uppercase tracking-wider font-bold text-violet-400 mt-1">🟣 Épiques (3 mana)</div>
-            <CardRule id="heist" />
-            <CardRule id="tide" />
-            <CardRule id="oracle" />
-            <CardRule id="vortex" />
-
-            <div className="text-[10px] uppercase tracking-wider font-bold text-amber-400 mt-1">🟡 Légendaire (4 mana)</div>
-            <CardRule id="supernova" />
-
             <RuleBlock emoji="✨" title="Bonus"
               text="Lane favorisée = +1 pt. Combo (3× même coup) = +1. Sweep (3-0) = +2." />
           </div>
+          <CardOverviewTable />
         </div>
       )}
 
-      {/* Cards overview — all 13 */}
+      {/* Full card list — names + descriptions + type symbols per card. The
+          general type legend lives in "Comment ça marche" above; here is the
+          detailed per-card reference (no duplication of the legend). */}
       <div className="bg-surface border border-hairline rounded-3xl p-4 sm:p-5">
         <h2 className="text-xs uppercase tracking-[0.25em] font-bold text-ink-muted mb-3">
           Toutes les cartes
@@ -233,18 +215,27 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack, onGoShop }: {
         <div className="flex flex-col gap-2">
           {ALL_CARD_IDS.map((id) => {
             const card = CARDS[id];
+            const usage = USAGE_LABEL[card.rarity];
+            const oneShot = card.rarity === "epic" || card.rarity === "legendary";
             return (
-              <div key={id} className="flex items-center gap-3 rounded-xl bg-hairline border border-hairline p-2">
-                <div className="relative shrink-0 w-10 h-14 rounded-lg overflow-hidden bg-surface-raised">
+              <div key={id} className="flex items-center gap-3 rounded-xl bg-hairline border border-hairline p-2.5">
+                <div className="relative shrink-0 w-11 h-14 rounded-lg overflow-hidden bg-surface-raised">
                   <CardImage id={id} glyphSize="text-xl" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-base leading-none">{card.glyph}</span>
                     <span className="font-bold text-sm">{t(card.nameKey)}</span>
-                    <span className={"text-[8px] font-bold uppercase " + RARITY_COLOR[card.rarity]}>{card.rarity}</span>
-                    <span className="text-[9px] text-ink-faint bg-hairline px-1 py-0.5 rounded-full">{card.cost}m</span>
+                    <span className={"inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide " + RARITY_COLOR[card.rarity]}>
+                      <span className={"w-2 h-2 rounded-full " + RARITY_DOT[card.rarity]} />
+                      {RARITY_LABEL_FR[card.rarity]}
+                    </span>
+                    <span className="text-[9px] text-ink-faint bg-black/25 px-1.5 py-0.5 rounded-full font-semibold">{card.cost} mana</span>
+                    <span className={"text-[9px] font-bold px-1.5 py-0.5 rounded-full " + (oneShot ? "bg-rose-500/15 text-rose-300" : "bg-emerald-500/15 text-emerald-300")}>
+                      {usage.label}
+                    </span>
                   </div>
-                  <p className="text-[10px] text-ink-muted mt-0.5 leading-snug">{t(card.descKey)}</p>
+                  <p className="text-[11px] text-ink-muted mt-1 leading-snug">{t(card.descKey)}</p>
                 </div>
               </div>
             );
@@ -279,18 +270,85 @@ function useCountdown(intervalMinutes: number) {
   return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 
-function CardRule({ id }: { id: string }) {
-  const t = useT();
-  const card = CARDS[id as keyof typeof CARDS];
-  if (!card) return null;
+const USAGE_LABEL: Record<string, { label: string; color: string }> = {
+  common: { label: "Permanent", color: "text-emerald-400" },
+  rare: { label: "Permanent", color: "text-emerald-400" },
+  epic: { label: "Usage unique", color: "text-rose-400" },
+  legendary: { label: "Usage unique", color: "text-rose-400" },
+};
+
+const RARITY_LABEL_FR: Record<string, string> = {
+  common: "Commune",
+  rare: "Rare",
+  epic: "Épique",
+  legendary: "Légendaire",
+};
+
+const RARITY_DOT: Record<string, string> = {
+  common: "bg-zinc-400",
+  rare: "bg-blue-400",
+  epic: "bg-violet-400",
+  legendary: "bg-amber-400",
+};
+
+/** GENERAL legend of card TYPES — one row per rarity, NOT per card. Explains
+ *  what each tier means (how many exist, forge price, reusable vs one-shot) so
+ *  the player understands the system; the full card list with names +
+ *  descriptions + glyphs lives in "Toutes les cartes" just below — no
+ *  duplication. Bigger, readable type since there are only 4 rows. */
+function CardOverviewTable() {
+  const tiers = RARITY_ORDER.map((rarity) => ({
+    rarity,
+    count: ALL_CARD_IDS.filter((id) => CARDS[id].rarity === rarity).length,
+    usage: USAGE_LABEL[rarity],
+    forge: CRAFT_COST[rarity],
+  }));
+
   return (
-    <div className="flex items-start gap-2">
-      <span className="text-base shrink-0 mt-0.5">{card.glyph}</span>
-      <div>
-        <span className="font-bold text-ink">{t(card.nameKey)}</span>
-        <span className="text-ink-faint ml-1">({card.cost}m)</span>
-        <span className="text-ink-muted"> — {t(card.descKey)}</span>
+    <div className="mt-4">
+      <div
+        className="rounded-2xl overflow-hidden border"
+        style={{ borderColor: "color-mix(in oklab, var(--theme-primary) 28%, transparent)" }}
+      >
+        <table className="w-full text-[13px] sm:text-sm border-separate border-spacing-0">
+          <thead>
+            <tr
+              className="text-left uppercase tracking-wider text-[11px]"
+              style={{
+                background: "color-mix(in oklab, var(--theme-primary) 16%, transparent)",
+                color: "color-mix(in oklab, var(--theme-primary) 82%, white)",
+              }}
+            >
+              <th className="text-left py-2.5 pl-3 pr-1 font-bold">Rareté</th>
+              <th className="text-center py-2.5 px-1 font-bold">Cartes</th>
+              <th className="text-center py-2.5 px-1 font-bold">Forge</th>
+              <th className="text-right py-2.5 px-1 pr-3 font-bold">Usage</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tiers.map(({ rarity, count, usage, forge }, i) => (
+              <tr key={rarity} style={{ background: i % 2 ? "rgba(255,255,255,0.025)" : "transparent" }}>
+                <td className="py-2.5 pl-3 pr-1 border-t border-white/[0.06]">
+                  <span className="flex items-center gap-2">
+                    <span className={"w-2.5 h-2.5 rounded-full shrink-0 " + RARITY_DOT[rarity]} />
+                    <span className={"font-bold " + RARITY_COLOR[rarity]}>{RARITY_LABEL_FR[rarity]}</span>
+                  </span>
+                </td>
+                <td className="text-center py-2.5 px-1 border-t border-white/[0.06] text-ink font-bold tabular-nums">{count}</td>
+                <td className="text-center py-2.5 px-1 border-t border-white/[0.06] text-ink-muted whitespace-nowrap font-semibold">{forge} ✨</td>
+                <td className="text-right py-2.5 px-1 pr-3 border-t border-white/[0.06]">
+                  <span className={"font-bold whitespace-nowrap " + usage.color}>{usage.label}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
+      <p className="text-[11px] sm:text-xs text-ink-faint mt-2 leading-relaxed">
+        <span className="text-emerald-400 font-semibold">Permanent</span> : la carte revient dans ta pioche, rejouable toute la partie.{" "}
+        <span className="text-rose-400 font-semibold">Usage unique</span> : consommée définitivement après l'avoir jouée.{" "}
+        <span className="text-ink-muted">Forge</span> = coût en ✨ pour la fabriquer.
+      </p>
     </div>
   );
 }

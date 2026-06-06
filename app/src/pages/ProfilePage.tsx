@@ -1,22 +1,39 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { useStore } from "../store/store";
 import { THEMES, gradientFromTheme } from "../theme/theme";
 import { levelFromXp } from "../engine/leveling";
 import { DIFFICULTY_META, PAD_META } from "../types";
 import type { BackgroundId, Difficulty, PadId, ThemeId } from "../types";
-import { BACKGROUNDS } from "../theme/themes";
+import { BACKGROUNDS, BG_DEFAULT_THEME } from "../theme/themes";
 import { isAvatarImage, avatarImgStyle } from "../theme/avatar";
 import { MOVES } from "../engine/game";
 import { BattlePad } from "../BattlePad";
 import { useT } from "../i18n";
 import { hapticTap, hapticMatchStart } from "../haptic";
+import { useBackdropPeek } from "../backdrops/previewScene";
 
 /** 17 themed PNG avatars under /public/Profile miniatures/.
  *  Mix of 8 dark-fantasy badge sigils and 9 cute kawaii chibis (one per
  *  RPSLS move + 3 gaming staples + 1 frost dragon). Custom uploads still
  *  work alongside. */
 const AVATAR_PRESETS: string[] = [
+  // Premium "hero" emblems — drop a new hero_*.png in /public/Profile miniatures
+  // and add one line here to extend the set (clean, renewable chain).
+  "/Profile miniatures/hero_king.png",
+  "/Profile miniatures/hero_royal.png",
+  "/Profile miniatures/hero_oracle.png",
+  "/Profile miniatures/hero_frost.png",
+  "/Profile miniatures/hero_zen.png",
+  "/Profile miniatures/hero_sage.png",
+  "/Profile miniatures/hero_serpent.png",
+  "/Profile miniatures/hero_elf.png",
+  "/Profile miniatures/hero_jester.png",
+  "/Profile miniatures/hero_knight.png",
+  "/Profile miniatures/hero_guardian.png",
+  "/Profile miniatures/hero_fox.png",
+  "/Profile miniatures/hero_shard.png",
   "/Profile miniatures/badge_crown.png",
   "/Profile miniatures/badge_eye.png",
   "/Profile miniatures/badge_shield.png",
@@ -36,6 +53,11 @@ const AVATAR_PRESETS: string[] = [
   "/Profile miniatures/chibi_crown.png",
 ];
 
+/** Plain, flat-illustration pads (chalk / felt / comic) — visually a world
+ *  apart from the flashy animated cosmic pads, so the Pads tab sorts them into
+ *  their own "Simples" bucket. Add an id here to move a pad into that bucket. */
+const PLAIN_PADS = new Set<PadId>(["chalkboard", "vintage", "comics"]);
+
 
 export function ProfilePage() {
   const player = useStore((s) => s.player);
@@ -49,13 +71,25 @@ export function ProfilePage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const bgFileRef = useRef<HTMLInputElement>(null);
   const padFileRef = useRef<HTMLInputElement>(null);
-  // The "Apparence" card holds Background (scenes) + HUD palette under two
-  // tabs, so both visual settings live together without taking two big cards.
-  const [appearanceTab, setAppearanceTab] = useState<"bg" | "hud">("bg");
-  // Battle pad card: animated (coded) pads vs imported images, under tabs.
-  const [padTab, setPadTab] = useState<"coded" | "img">("coded");
+  // One "Style" card, two tabs: Apparences (a full look — background + HUD
+  // colours + fonts + matched pad, applied together) and Pads (override just
+  // the playmat). Picking an appearance links the whole look by default.
+  const [cosmeticTab, setCosmeticTab] = useState<"appearance" | "pads">("appearance");
+  // Inside the Pads tab, three buckets: flashy themed pads / plain illustrative
+  // SVG pads / imported images — kept apart because the plain SVGs looked off
+  // mixed in with the flashy ones.
+  const [padTab, setPadTab] = useState<"styled" | "svg" | "img">("styled");
   const [previewPad, setPreviewPad] = useState<PadId | null>(null);
-  const [previewBg, setPreviewBg] = useState<typeof BACKGROUNDS[number] | null>(null);
+  const peek = useBackdropPeek((s) => s.peek);
+  const setPeek = useBackdropPeek((s) => s.setPeek);
+  // Guards the ghost-click: the same tap that opens the peek must not be the
+  // one that dismisses it. We ignore dismiss taps for a short window.
+  const peekOpenedAt = useRef(0);
+  const openPeek = () => { peekOpenedAt.current = performance.now(); setPeek(true); };
+  const closePeek = () => { setPeek(false); };
+  // Never leave the shell hidden if the page unmounts while peeking.
+  useEffect(() => () => setPeek(false), [setPeek]);
+  const currentBg = BACKGROUNDS.find((b) => b.id === (player.backgroundId ?? "default"));
 
   const info = levelFromXp(player.xp);
   const theme = THEMES[player.themeId];
@@ -467,19 +501,20 @@ export function ProfilePage() {
         </button>
       </section>
 
-      {/* Apparence — Arrière-plan (scènes animées) + Couleurs (palette HUD) sous
-          deux onglets, pour gérer tout le visuel dans une seule card. */}
+      {/* Style — one card, two tabs. "Apparences" applies a COMPLETE look in a
+          single tap (animated background + HUD colours + fonts + matched pad);
+          "Pads" only overrides the playmat. Everything is linked by default. */}
       <section className="bg-surface border border-hairline rounded-3xl p-5">
         <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-muted">Apparence</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-muted">Style</h2>
           <div className="ml-auto flex gap-1 p-1 rounded-xl bg-hairline border border-hairline">
-            {([["bg", "Arrière-plan"], ["hud", "Couleurs"]] as const).map(([id, label]) => (
+            {([["appearance", "Apparences"], ["pads", "Pads"]] as const).map(([id, label]) => (
               <button
                 key={id}
-                onClick={() => setAppearanceTab(id)}
+                onClick={() => setCosmeticTab(id)}
                 className={
                   "px-3 py-1 rounded-lg text-xs font-semibold transition " +
-                  (appearanceTab === id ? "bg-themed text-zinc-900 shadow" : "text-ink-muted hover:text-ink")
+                  (cosmeticTab === id ? "bg-themed text-zinc-900 shadow" : "text-ink-muted hover:text-ink")
                 }
               >
                 {label}
@@ -488,10 +523,10 @@ export function ProfilePage() {
           </div>
         </div>
 
-        {appearanceTab === "bg" && (
+        {cosmeticTab === "appearance" && (
         <>
         <p className="text-xs text-ink-faint mb-3">
-          Des thèmes 100% animés et codés. « Mon image » importe la tienne (portrait 9:16, ex. 1080×1920 — affichée plein écran). Tu peux en garder jusqu'à {MAX_CUSTOM_IMAGES} dans ta bibliothèque.
+          Une apparence applique tout le look d'un coup : fond animé, couleurs du HUD, typo et tapis assorti. Tu pourras changer juste le tapis dans l'onglet Pads. « Mon image » importe la tienne (portrait 9:16, ex. 1080×1920). Jusqu'à {MAX_CUSTOM_IMAGES} en bibliothèque.
         </p>
         <input
           ref={bgFileRef}
@@ -513,9 +548,20 @@ export function ProfilePage() {
                       return;
                     }
                     updateProfile({ backgroundId: "custom" });
+                    openPeek();
                     return;
                   }
-                  setPreviewBg(bg);
+                  // Apply instantly (selection can never fail), then open a
+                  // full-screen peek of the now-live animated backdrop. Picking
+                  // a background auto-applies its matched pad + HUD palette so
+                  // the whole look stays coherent (still overridable after).
+                  hapticMatchStart();
+                  const patch: Partial<{ backgroundId: BackgroundId; padId: PadId; themeId: ThemeId }> = { backgroundId: bg.id };
+                  if (bg.defaultPadId) patch.padId = bg.defaultPadId;
+                  const matchedTheme = BG_DEFAULT_THEME[bg.id];
+                  if (matchedTheme) patch.themeId = matchedTheme;
+                  updateProfile(patch);
+                  openPeek();
                 }}
                 className={
                   "group rounded-2xl border overflow-hidden transition text-left " +
@@ -599,56 +645,23 @@ export function ProfilePage() {
         </>
         )}
 
-        {appearanceTab === "hud" && (
+        {cosmeticTab === "pads" && (
         <>
-        <p className="text-xs text-ink-faint mb-3">
-          La palette de l'interface : boutons, accents, barres, focus. Les surfaces du HUD se teintent automatiquement selon le choix.
-        </p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          {(Object.keys(THEMES) as ThemeId[]).map((id) => {
-            const tt = THEMES[id];
-            const active = player.themeId === id;
-            return (
-              <button
-                key={id}
-                onClick={() => { hapticTap(); updateProfile({ themeId: id }); }}
-                className={
-                  "group relative rounded-2xl overflow-hidden border-2 transition text-left " +
-                  (active ? "border-white/70 ring-2 ring-white/15" : "border-hairline hover:border-white/30")
-                }
-              >
-                {/* Large diagonal gradient preview of the palette. */}
-                <div className="h-14 w-full relative" style={{ background: gradientFromTheme(tt) }}>
-                  <div className="absolute inset-0" style={{ background: "radial-gradient(120% 80% at 0% 0%, rgba(255,255,255,0.18), transparent 60%)" }} />
-                </div>
-                {/* Dark strip: the two raw colours as dots + the label. */}
-                <div className="flex items-center gap-1.5 px-2 py-1.5 bg-surface">
-                  <span className="w-3 h-3 rounded-full ring-1 ring-white/25 shrink-0" style={{ background: tt.primary }} />
-                  <span className="w-3 h-3 rounded-full ring-1 ring-white/25 shrink-0" style={{ background: tt.secondary }} />
-                  <span className="text-[11px] font-semibold truncate">{tt.label}</span>
-                </div>
-                {active && (
-                  <span className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-emerald-500 text-white text-[11px] font-black flex items-center justify-center shadow-lg">✓</span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-        </>
-        )}
-      </section>
-
-      {/* Battle pad picker */}
-      <section className="bg-surface border border-hairline rounded-3xl p-5">
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-muted">Battle pad</h2>
-          <div className="ml-auto flex gap-1 p-1 rounded-xl bg-hairline border border-hairline">
-            {([["coded", "Animés"], ["img", "Images"]] as const).map(([id, label]) => (
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          <p className="text-[11px] text-ink-faint flex-1 min-w-[55%] leading-snug">
+            {padTab === "styled"
+              ? "Tapis animés et thématiques, assortis à tes apparences."
+              : padTab === "svg"
+              ? "Tapis sobres et illustrés — un style à part, plus épuré."
+              : `Importe ton image (paysage 3:2, ex. 1500×1000). Jusqu'à ${MAX_CUSTOM_IMAGES} en bibliothèque.`}
+          </p>
+          <div className="ml-auto flex gap-1 p-1 rounded-xl bg-hairline border border-hairline shrink-0">
+            {([["styled", "Stylés"], ["svg", "Simples"], ["img", "Images"]] as const).map(([id, label]) => (
               <button
                 key={id}
                 onClick={() => setPadTab(id)}
                 className={
-                  "px-3 py-1 rounded-lg text-xs font-semibold transition " +
+                  "px-2.5 py-1 rounded-lg text-xs font-semibold transition " +
                   (padTab === id ? "bg-themed text-zinc-900 shadow" : "text-ink-muted hover:text-ink")
                 }
               >
@@ -657,11 +670,6 @@ export function ProfilePage() {
             ))}
           </div>
         </div>
-        <p className="text-xs text-ink-faint mb-3">
-          {padTab === "coded"
-            ? "Le tapis sur lequel se jouent tes parties — 100% codés et animés. Indépendant du background."
-            : `Importe ton image (paysage 3:2, ex. 1500×1000 — couvre tout le tapis). Tu peux en garder jusqu'à ${MAX_CUSTOM_IMAGES}.`}
-        </p>
         <input
           ref={padFileRef}
           type="file"
@@ -670,7 +678,11 @@ export function ProfilePage() {
           onChange={onUploadPad}
         />
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {(Object.keys(PAD_META) as PadId[]).filter((id) => (padTab === "img" ? id === "custom" : id !== "custom")).map((id) => {
+          {(Object.keys(PAD_META) as PadId[]).filter((id) => {
+            if (padTab === "img") return id === "custom";
+            if (padTab === "svg") return PLAIN_PADS.has(id);
+            return id !== "custom" && !PLAIN_PADS.has(id);
+          }).map((id) => {
             const meta = PAD_META[id];
             const active = player.padId === id;
             const isCustom = id === "custom";
@@ -716,11 +728,14 @@ export function ProfilePage() {
                     }, transparent 70%), linear-gradient(135deg, rgba(15,15,25,0.95), rgba(25,20,35,0.95))`
                   }}
                 >
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-3xl">{meta.emoji}</span>
-                  </div>
+                  {/* Real pad, frozen on a settled frame — a representative
+                      still that entices, with zero animation cost (the full
+                      animation plays when the preview is opened). */}
+                  {!needsImport && (
+                    <BattlePad padId={id} frozen compact className="absolute inset-0 w-full h-full" />
+                  )}
                   {active && (
-                    <div className="absolute top-2 right-2 bg-emerald-500/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    <div className="absolute top-2 right-2 bg-emerald-500/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
                       ACTIVE
                     </div>
                   )}
@@ -758,6 +773,8 @@ export function ProfilePage() {
             onDelete={deleteStoredPad}
             onAdd={() => padFileRef.current?.click()}
           />
+        )}
+        </>
         )}
       </section>
 
@@ -871,119 +888,98 @@ export function ProfilePage() {
         )}
       </section>
 
-      {/* ── Pad preview modal ── */}
-      <AnimatePresence>
-        {previewPad && (
-          <motion.div
-            key="pad-preview"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            className="fixed inset-0 z-[90] flex flex-col items-center justify-center bg-black/95"
-            onClick={() => setPreviewPad(null)}
-          >
-            <div className="w-full max-w-2xl aspect-[3/2] relative pointer-events-none" onClick={(e) => e.stopPropagation()}>
-              <BattlePad padId={previewPad} className="w-full h-full rounded-2xl overflow-hidden" />
-            </div>
-            <div className="flex items-center gap-2 mt-2 text-xs text-ink-faint">
-              <span className="font-bold text-white text-sm">{PAD_META[previewPad]?.label}</span>
-              <span>—</span>
-              <span>{PAD_META[previewPad]?.tagline}</span>
-            </div>
-            <div className="flex gap-3 mt-4 relative z-10" onClick={(e) => e.stopPropagation()}>
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  hapticMatchStart();
-                  updateProfile({ padId: previewPad, padChosen: true });
-                  setPreviewPad(null);
-                }}
-                className={
-                  "px-6 py-2.5 rounded-2xl font-bold text-sm shadow-lg transition " +
-                  (player.padId === previewPad
-                    ? "bg-emerald-500/80 text-white"
-                    : "bg-themed text-white")
-                }
-              >
-                {player.padId === previewPad ? "✓ Actif" : "Choisir ce tapis"}
-              </motion.button>
-              <button
-                onClick={() => setPreviewPad(null)}
-                className="px-5 py-2.5 rounded-2xl font-bold text-sm bg-white/10 text-ink hover:bg-white/15 transition"
-              >
-                Fermer
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ── Background preview modal ── */}
-      <AnimatePresence>
-        {previewBg && (
-          <motion.div
-            key="bg-preview"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            className="fixed inset-0 z-[90] flex flex-col items-center justify-center bg-black/95"
-            onClick={() => setPreviewBg(null)}
-          >
-            <div
-              className="w-full max-w-md aspect-[9/16] max-h-[75vh] rounded-2xl overflow-hidden border border-white/10 relative"
-              onClick={(e) => e.stopPropagation()}
-              style={
-                previewBg.accent
-                  ? {
-                      backgroundImage:
-                        `radial-gradient(120% 90% at 15% 0%, ${previewBg.accent.from}cc, transparent 60%), ` +
-                        `radial-gradient(120% 90% at 100% 100%, ${previewBg.accent.to}bb, transparent 60%)`,
-                      backgroundColor: "#0a0a14",
-                    }
-                  : { background: "radial-gradient(120% 80% at 20% 0%, rgba(124,92,255,0.45), transparent 60%), radial-gradient(120% 80% at 100% 100%, rgba(45,212,191,0.35), transparent 60%)" }
-              }
+      {/* ── Pad preview modal (portal to body so it escapes scroll/stacking) ── */}
+      {createPortal(
+        <AnimatePresence>
+          {previewPad && (
+            <motion.div
+              key="pad-preview"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black/95"
+              onClick={() => setPreviewPad(null)}
             >
-              {previewBg.scene && (
-                <div className="absolute bottom-3 left-3 bg-cyan-500/80 text-white text-[10px] font-bold px-2 py-1 rounded-full">
-                  ✦ LIVE — rendu temps-réel en jeu
+              <div className="w-full max-w-2xl aspect-[3/2] relative pointer-events-none" onClick={(e) => e.stopPropagation()}>
+                <BattlePad padId={previewPad} className="w-full h-full rounded-2xl overflow-hidden" />
+              </div>
+              <div className="flex items-center gap-2 mt-2 text-xs text-ink-faint">
+                <span className="font-bold text-white text-sm">{PAD_META[previewPad]?.label}</span>
+                <span>—</span>
+                <span>{PAD_META[previewPad]?.tagline}</span>
+              </div>
+              <div className="flex gap-3 mt-4 relative z-10" onClick={(e) => e.stopPropagation()}>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    hapticMatchStart();
+                    updateProfile({ padId: previewPad, padChosen: true });
+                    setPreviewPad(null);
+                  }}
+                  className={
+                    "px-6 py-2.5 rounded-2xl font-bold text-sm shadow-lg transition " +
+                    (player.padId === previewPad
+                      ? "bg-emerald-500/80 text-white"
+                      : "bg-themed text-white")
+                  }
+                >
+                  {player.padId === previewPad ? "✓ Actif" : "Choisir ce tapis"}
+                </motion.button>
+                <button
+                  onClick={() => setPreviewPad(null)}
+                  className="px-5 py-2.5 rounded-2xl font-bold text-sm bg-white/10 text-ink hover:bg-white/15 transition"
+                >
+                  Fermer
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* ── Full-screen backdrop peek (portal to body) ──
+          The background is applied for real the instant a tile is tapped, so
+          selection can never fail. This overlay just hides the menu shell (via
+          App's `peek` flag) so the live animated backdrop fills the screen for
+          a true preview. Tap anywhere — or the button — to return. */}
+      {createPortal(
+        <AnimatePresence>
+          {peek && (
+            <motion.div
+              key="bg-peek"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="fixed inset-0 z-[9999] flex flex-col items-center justify-end pb-10"
+              onClick={() => {
+                // Ignore the opening tap's trailing click (mobile ghost-click).
+                if (performance.now() - peekOpenedAt.current < 400) return;
+                closePeek();
+              }}
+            >
+              <div className="flex flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/55 backdrop-blur-md border border-white/15">
+                  <span className="text-emerald-400 text-sm font-black">✓</span>
+                  <span className="font-bold text-white text-sm drop-shadow">{currentBg?.label ?? "Fond"}</span>
+                  <span className="text-cyan-300 text-[11px] font-bold uppercase tracking-wide">appliqué</span>
                 </div>
-              )}
-            </div>
-            <div className="flex items-center gap-2 mt-2 text-xs text-ink-faint">
-              <span className="font-bold text-white text-sm">{previewBg.label}</span>
-              {previewBg.scene && <span className="text-cyan-400 text-[10px] font-bold">✦ LIVE</span>}
-            </div>
-            <div className="flex gap-3 mt-4 relative z-10" onClick={(e) => e.stopPropagation()}>
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  hapticMatchStart();
-                  const patch: Partial<{ backgroundId: BackgroundId; padId: PadId }> = { backgroundId: previewBg.id };
-                  if (previewBg.defaultPadId) patch.padId = previewBg.defaultPadId;
-                  updateProfile(patch);
-                  setPreviewBg(null);
-                }}
-                className={
-                  "px-6 py-2.5 rounded-2xl font-bold text-sm shadow-lg transition " +
-                  ((player.backgroundId ?? "default") === previewBg.id
-                    ? "bg-emerald-500/80 text-white"
-                    : "bg-themed text-white")
-                }
-              >
-                {(player.backgroundId ?? "default") === previewBg.id ? "✓ Actif" : "Choisir ce fond"}
-              </motion.button>
-              <button
-                onClick={() => setPreviewBg(null)}
-                className="px-5 py-2.5 rounded-2xl font-bold text-sm bg-white/10 text-ink hover:bg-white/15 transition"
-              >
-                Fermer
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={closePeek}
+                  className="px-8 py-3 rounded-2xl font-bold text-base shadow-xl bg-themed text-white"
+                >
+                  Fermer l'aperçu
+                </motion.button>
+                <span className="text-white/55 text-[11px]">Touche l'écran pour revenir</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </motion.div>
   );
 }

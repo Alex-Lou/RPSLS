@@ -1,11 +1,12 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store/store";
-import { applyTheme } from "./theme/theme";
+import { applyTheme, THEMES } from "./theme/theme";
 import { BACKGROUNDS_BY_ID, resolveFontFamily } from "./theme/themes";
 import { RTL_LOCALES } from "./i18n";
 import { SplashShader } from "./fx/SplashShader";
 import { ThemedBackdrop } from "./backdrops/ThemedBackdrop";
+import { useBackdropPeek } from "./backdrops/previewScene";
 import { ThemeTouchFX } from "./fx/ThemeTouchFX";
 import { Sidebar, MobileShell, type Page } from "./Sidebar";
 // PlayPage stays eagerly imported — it's the initial route after splash
@@ -133,10 +134,16 @@ export default function App() {
     } else {
       root.style.removeProperty("--app-bg-image");
     }
-    if (def?.skin) {
-      root.style.setProperty("--font-headline", resolveFontFamily(def.skin.fontHeadline));
-      root.style.setProperty("--font-body",     resolveFontFamily(def.skin.fontBody));
-      root.style.setProperty("--font-mono",     resolveFontFamily(def.skin.fontMono));
+    // Typography precedence: a coded scene background (nebula/casino/holy…)
+    // owns a bespoke font skin harmonised with its art, so it WINS. On the
+    // plain "default" or the player's own "custom" image there is no scene
+    // identity, so the chosen HUD colour palette drives the fonts too — which
+    // gives every "Couleurs" theme its own type mood, not just colours.
+    const skin = def?.scene ? def.skin : THEMES[themeId];
+    if (skin) {
+      root.style.setProperty("--font-headline", resolveFontFamily(skin.fontHeadline));
+      root.style.setProperty("--font-body",     resolveFontFamily(skin.fontBody));
+      root.style.setProperty("--font-mono",     resolveFontFamily(skin.fontMono));
     }
     // Accent override — when the chosen background ships an accent palette,
     // it WINS over the global theme. Every "primary action" surface uses
@@ -148,7 +155,7 @@ export default function App() {
     }
     // Note: if def.accent is null (default bg), we leave the theme-driven
     // values alone — they were set by applyTheme(themeId) right above.
-  }, [backgroundId, stage, customBgUrl]);
+  }, [backgroundId, stage, customBgUrl, themeId]);
 
   // Mirror the locale onto <html> so Tailwind / browser can pick up text
   // direction and language-aware features (forms, hyphenation, screen reader).
@@ -176,6 +183,9 @@ export default function App() {
   // Live coded backdrop — rendered behind everything when the chosen
   // background is a procedural scene (nebula/aurora/grid) and we're past
   // the splash. Sits at z-0; the app shell renders above it.
+  // Full-screen backdrop peek: when on, the menu shell hides so the live,
+  // already-applied animated backdrop fills the screen (real preview).
+  const peek = useBackdropPeek((s) => s.peek);
   const activeScene = BACKGROUNDS_BY_ID[backgroundId]?.scene;
 
   return (
@@ -185,7 +195,7 @@ export default function App() {
           already ship their own vignette, but a raw photo can be bright/busy
           enough to drown menu text. A very light dark wash keeps every page
           legible without hiding the chosen picture. */}
-      {stage !== "splash" && backgroundId === "custom" && customBgUrl && (
+      {stage !== "splash" && !peek && backgroundId === "custom" && customBgUrl && (
         <div
           className="fixed inset-0 z-0 pointer-events-none"
           style={{
@@ -196,8 +206,9 @@ export default function App() {
       )}
       {/* Coded scenes ship their own vignette, but the flashy ones (aurora,
           casino, grid…) can still drown menu text. A lighter top/bottom-weighted
-          wash keeps titles + nav legible while leaving the scene visible. */}
-      {stage !== "splash" && backgroundId !== "custom" && activeScene && (
+          wash keeps titles + nav legible while leaving the scene visible.
+          Dropped during a full-screen peek so the pure backdrop shows. */}
+      {stage !== "splash" && !peek && backgroundId !== "custom" && activeScene && (
         <div
           className="fixed inset-0 z-0 pointer-events-none"
           style={{
@@ -227,7 +238,8 @@ export default function App() {
             // Clean fade-in after the splash has fully exited (mode="wait").
             transition={{ duration: 0.5, ease: [0.4, 0.0, 0.2, 1] }}
             // relative z-10 keeps the shell above the z-0 coded backdrop.
-            className="relative z-10 flex h-full min-h-0"
+            // During a full-screen peek, hide the shell so the live backdrop fills the screen.
+            className={"relative z-10 flex h-full min-h-0" + (peek ? " invisible" : "")}
           >
             <Sidebar page={page} onNavigate={navigateTo} />
             <MobileShell page={page} onNavigate={navigateTo} />

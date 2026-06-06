@@ -19,7 +19,7 @@
  * BattlePad.tsx and extend PadId in types.ts + PAD_META.
  */
 
-import type { BackgroundId, PadId } from "../types";
+import type { BackgroundId, PadId, ThemeId } from "../types";
 import { FONT_STACK, type FontStackKey } from "./fonts";
 import type { BackdropScene } from "../backdrops/ThemedBackdrop";
 
@@ -78,21 +78,21 @@ export const BACKGROUNDS: BackgroundDef[] = [
   {
     id: "nebula",    label: "Nebula",         emoji: "🌌",
     src: null, scene: "nebula",               defaultPadId: "cosmos",
-    skin: { fontHeadline: "orbitron",     fontBody: "rajdhani",     fontMono: "spaceMono"  },
+    skin: { fontHeadline: "orbitron",     fontBody: "exo2",         fontMono: "spaceMono"  },
     miniature: null,
     accent: { from: "#a855f7", to: "#22d3ee" },
   },
   {
     id: "galaxy",    label: "Galaxy",         emoji: "✨",
     src: null, scene: "galaxy",               defaultPadId: "galaxy",
-    skin: { fontHeadline: "orbitron",     fontBody: "rajdhani",     fontMono: "spaceMono"  },
+    skin: { fontHeadline: "audiowide",    fontBody: "exo2",         fontMono: "spaceMono"  },
     miniature: null,
     accent: { from: "#a855f7", to: "#22d3ee" },
   },
   {
     id: "aurora",    label: "Aurora",         emoji: "🌠",
     src: null, scene: "aurora",               defaultPadId: "cosmos",
-    skin: { fontHeadline: "orbitron",     fontBody: "rajdhani",     fontMono: "spaceMono"  },
+    skin: { fontHeadline: "exo2",         fontBody: "rajdhani",     fontMono: "spaceMono"  },
     miniature: null,
     accent: { from: "#34d399", to: "#8b5cf6" },
   },
@@ -106,7 +106,7 @@ export const BACKGROUNDS: BackgroundDef[] = [
   {
     id: "quantum",   label: "Quantum",        emoji: "⚛️",
     src: null, scene: "quantum",              defaultPadId: "quantum",
-    skin: { fontHeadline: "orbitron",     fontBody: "rajdhani",     fontMono: "fira"       },
+    skin: { fontHeadline: "spaceGrotesk", fontBody: "rajdhani",     fontMono: "fira"       },
     miniature: null,
     accent: { from: "#22d3ee", to: "#3b82f6" },
   },
@@ -120,7 +120,7 @@ export const BACKGROUNDS: BackgroundDef[] = [
   {
     id: "casino",    label: "Casino Royale",  emoji: "🎰",
     src: null, scene: "casino",               defaultPadId: "casino",
-    skin: { fontHeadline: "cinzel",       fontBody: "cormorant",    fontMono: "jetbrains"  },
+    skin: { fontHeadline: "playfair",     fontBody: "cormorant",    fontMono: "bebas"      },
     miniature: null,
     accent: { from: "#10b981", to: "#f5c543" },
   },
@@ -128,14 +128,14 @@ export const BACKGROUNDS: BackgroundDef[] = [
   {
     id: "volcanic",  label: "Volcanic",       emoji: "🌋",
     src: null, scene: "volcanic",             defaultPadId: "volcanic",
-    skin: { fontHeadline: "cinzel",       fontBody: "rajdhani",     fontMono: "fira"       },
+    skin: { fontHeadline: "bebas",        fontBody: "rajdhani",     fontMono: "shareTech"  },
     miniature: null,
     accent: { from: "#ff4500", to: "#ff8c00" },
   },
   {
     id: "abyss",     label: "Abyss",          emoji: "🐙",
     src: null, scene: "abyss",               defaultPadId: "abyss",
-    skin: { fontHeadline: "orbitron",     fontBody: "rajdhani",     fontMono: "spaceMono"  },
+    skin: { fontHeadline: "orbitron",     fontBody: "ibmPlex",      fontMono: "spaceMono"  },
     miniature: null,
     accent: { from: "#00e5c8", to: "#6040c0" },
   },
@@ -166,3 +166,20 @@ export const BACKGROUNDS_BY_ID: Record<BackgroundId, BackgroundDef> = Object.fro
 export const PAD_DEFAULT_BG: Partial<Record<PadId, BackgroundId>> = Object.fromEntries(
   BACKGROUNDS.filter((b) => b.defaultPadId).map((b) => [b.defaultPadId!, b.id]),
 );
+
+/** HUD colour palette that pairs with each coded background. Selecting the
+ *  background auto-applies this palette (and its `defaultPadId`) so the whole
+ *  look stays coherent — the player can still re-pick a palette in the
+ *  Couleurs tab afterwards (mix & match). To add a style: one line here.
+ *  Omitted backgrounds (default / custom) keep the player's current palette. */
+export const BG_DEFAULT_THEME: Partial<Record<BackgroundId, ThemeId>> = {
+  nebula:   "violet",
+  galaxy:   "aurora",
+  aurora:   "aurora",
+  holy:     "gold",
+  quantum:  "ocean",
+  grid:     "neon",
+  casino:   "forest",
+  volcanic: "sunset",
+  abyss:    "ocean",
+};
