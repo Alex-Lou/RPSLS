@@ -77,6 +77,56 @@ async fn main() {
     // a lobby join. Runs every 5 min, no-op when nothing to prune.
     state.lobby_attempts.clone().spawn_janitor();
 
+    // Inactive-user sweeper: every 24h, SCAN `player:*`, read each row's
+    // `updatedAt`, and DELETE both `player:{id}` and `claim:{id}` when the
+    // row is older than INACTIVE_TTL_DAYS. Idempotent (a row that was
+    // already deleted last sweep just isn't there next sweep). Bounded:
+    // we sleep between SCAN pages so a sudden 100k-key sweep can't burn
+    // through the Upstash request budget.
+    tokio::spawn(async move {
+        const INACTIVE_TTL_DAYS: u64 = 180;
+        const SWEEP_INTERVAL_SECS: u64 = 24 * 3600;
+        const SCAN_PAGE: u32 = 200;
+        const PAGE_PAUSE_MS: u64 = 250;
+        let ttl_ms: u64 = INACTIVE_TTL_DAYS * 24 * 3600 * 1000;
+        // Skip the immediate first tick — boot-time bursts are bad form.
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(SWEEP_INTERVAL_SECS));
+        tick.tick().await;
+        loop {
+            tick.tick().await;
+            if !player_state::enabled() {
+                continue;
+            }
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0);
+            let cutoff_ms = now_ms.saturating_sub(ttl_ms);
+            let mut cursor = "0".to_string();
+            let mut deleted = 0u32;
+            let mut scanned = 0u32;
+            loop {
+                let Some((next, keys)) = player_state::scan_player_keys(&cursor, SCAN_PAGE).await else {
+                    break;
+                };
+                scanned += keys.len() as u32;
+                for key in &keys {
+                    let updated = player_state::read_updated_at(key).await;
+                    let Some(ts) = updated else { continue };
+                    if ts >= cutoff_ms { continue }
+                    let Some(pid) = player_state::player_id_from_key(key) else { continue };
+                    if player_state::delete_player(pid).await {
+                        deleted += 1;
+                    }
+                }
+                cursor = next;
+                if cursor == "0" { break }
+                tokio::time::sleep(std::time::Duration::from_millis(PAGE_PAUSE_MS)).await;
+            }
+            info!(scanned, deleted, days = INACTIVE_TTL_DAYS, "inactive-user sweep done");
+        }
+    });
+
     // Same pattern for the SyncState throttle map: each player_id who ever
     // pushed leaves an Instant entry; without periodic pruning the map grows
     // monotonically. 5-min sweep dropping entries older than 60s (12× the
@@ -313,15 +363,35 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
                             });
                         }
                         None => {
-                            // First connection for this player_id — issue token.
-                            let new_token = Uuid::new_v4().to_string();
-                            player_state::save_claim_token(pid.clone(), new_token.clone());
-                            session_clone.set_player_id(pid);
-                            let state = progress.unwrap_or_default();
-                            session_clone.send(ServerMessage::StateLoaded {
-                                state,
-                                claim_token: Some(new_token),
-                            });
+                            // First connection for this player_id — atomically
+                            // create the token via Redis SET NX so two concurrent
+                            // Hellos can't both mint and one steal. If NX fails
+                            // it means another connection won the race; we reject
+                            // and ask the client to retry with its existing token.
+                            match player_state::try_create_claim_token(&pid).await {
+                                Ok(Some(new_token)) => {
+                                    session_clone.set_player_id(pid);
+                                    let state = progress.unwrap_or_default();
+                                    session_clone.send(ServerMessage::StateLoaded {
+                                        state,
+                                        claim_token: Some(new_token),
+                                    });
+                                }
+                                Ok(None) => {
+                                    warn!(player_id = %pid, "claim token NX race — id was claimed by another session");
+                                    session_clone.send(ServerMessage::Error {
+                                        code: "auth_needed".into(),
+                                        message: "player_id was just claimed by another session — re-send with your claim_token".into(),
+                                    });
+                                }
+                                Err(()) => {
+                                    warn!(player_id = %pid, "claim token NX-create transient error");
+                                    session_clone.send(ServerMessage::Error {
+                                        code: "auth_transient".into(),
+                                        message: "transient auth backend error".into(),
+                                    });
+                                }
+                            }
                         }
                     }
                 });
