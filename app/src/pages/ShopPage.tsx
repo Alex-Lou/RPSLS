@@ -11,8 +11,9 @@
  * second tab is a one-line change).
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { BurstCanvas } from "../fx/LevelUpOverlay";
 import { useStore } from "../store/store";
 import { useT } from "../i18n";
 import { ALL_CARD_IDS, CARDS, RARITY_BG, RARITY_COLOR } from "../ranked/cards";
@@ -164,12 +165,13 @@ export function ShopPage() {
                     animate={wasJustCrafted ? { scale: [1, 1.04, 1] } : undefined}
                     transition={{ duration: 0.5 }}
                     className={
-                      "flex items-center gap-3 rounded-xl p-2 border transition " +
+                      "relative overflow-hidden flex items-center gap-3 rounded-xl p-2 border transition " +
                       (canCraft
                         ? "border-violet-400/40 bg-violet-500/10"
                         : "border-hairline bg-hairline")
                     }
                   >
+                    {wasJustCrafted && <CraftSparkles />}
                     <div
                       className={
                         "relative w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center bg-gradient-to-br " +
@@ -417,6 +419,56 @@ function CodexView({
   );
 }
 
+/* ─────────── Craft sparkles ─────────── */
+
+/**
+ * CraftSparkles — short burst of violet motes that converge into the row
+ * the moment a card is forged. Pure decoration; lives ~1.8s in sync with
+ * the parent's `justCrafted` window.
+ */
+function CraftSparkles() {
+  const DOTS = 14;
+  return (
+    <div aria-hidden className="absolute inset-0 pointer-events-none z-30">
+      {/* Soft violet wash so the row reads "just lit up" before the dust
+          arrives — primes the eye for the sparkle layer. */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: [0, 0.55, 0] }}
+        transition={{ duration: 1.6 }}
+        className="absolute inset-0 rounded-xl bg-gradient-to-r from-violet-400/30 via-fuchsia-400/20 to-transparent"
+      />
+      {Array.from({ length: DOTS }).map((_, i) => {
+        // Particles start at random positions across the row and travel
+        // toward the icon on the left (the freshly-forged card thumbnail).
+        const startX = 30 + (i * 7) % 70;
+        const startY = -20 + (i * 11) % 60;
+        const endX = -10 + (i * 3) % 14;
+        const endY = 18 + (i * 5) % 12;
+        const delay = (i % 5) * 0.05;
+        const size = 3 + (i % 3);
+        return (
+          <motion.div
+            key={i}
+            initial={{ x: `${startX}%`, y: startY, opacity: 0, scale: 0.4 }}
+            animate={{ x: `${endX}%`, y: endY, opacity: [0, 1, 0], scale: [0.4, 1.1, 0.2] }}
+            transition={{ duration: 1.4, delay, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute rounded-full"
+            style={{
+              width: size,
+              height: size,
+              background: i % 2 ? "#c4b5fd" : "#f0abfc",
+              boxShadow: i % 2
+                ? "0 0 8px rgba(196,181,253,0.9)"
+                : "0 0 8px rgba(240,171,252,0.9)",
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 /* ─────────── Pack opening modal ─────────── */
 
 function PackOpeningModal({
@@ -426,90 +478,195 @@ function PackOpeningModal({
   onClose: () => void;
 }) {
   const t = useT();
+  // Cards start face-down — the player taps to flip each one. Letting the
+  // user pace the reveal is what makes a pack opening *feel* like an event
+  // instead of an automatic stagger.
+  const [revealed, setRevealed] = useState<boolean[]>(() => result.cards.map(() => false));
+  const allRevealed = revealed.every(Boolean);
+  // Highest rarity in the pack drives the celebratory burst behind the
+  // grid (epic/legendary get a warm fire palette, rare gets the cool one,
+  // commons-only is calm — no burst). The intensity tracks how lucky the
+  // pull was so the moment really lands.
+  const maxRarity = useMemo(() => {
+    const order = { common: 0, rare: 1, epic: 2, legendary: 3 } as const;
+    return result.cards.reduce<keyof typeof order>(
+      (acc, id) => (order[CARDS[id].rarity] > order[acc] ? CARDS[id].rarity : acc),
+      "common",
+    );
+  }, [result.cards]);
+  const showBurst = allRevealed && maxRarity !== "common";
+
+  function reveal(idx: number) {
+    if (revealed[idx]) return;
+    hapticTap();
+    const r = CARDS[result.cards[idx]].rarity;
+    // A juicier buzz on the rare pulls so the player physically feels luck.
+    if (r === "legendary") hapticMatchWin();
+    else if (r === "epic") hapticMatchWin();
+    setRevealed((cur) => {
+      const next = cur.slice();
+      next[idx] = true;
+      return next;
+    });
+  }
+  function revealAll() {
+    if (allRevealed) return;
+    hapticMatchWin();
+    setRevealed(result.cards.map(() => true));
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm"
+      onClick={allRevealed ? onClose : undefined}
     >
+      {/* Celebratory backdrop — the level-up burst reused at a calmer
+          intensity. Only fires once the last card has flipped so it stays
+          a reward, not noise. */}
+      {showBurst && (
+        <div className="fixed inset-0 z-40 pointer-events-none">
+          <BurstCanvas
+            warm={maxRarity === "epic" || maxRarity === "legendary"}
+            intensity={maxRarity === "legendary" ? 1.1 : maxRarity === "epic" ? 0.85 : 0.6}
+          />
+        </div>
+      )}
+
       <motion.div
         initial={{ scale: 0.92, y: 10 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 5 }}
         transition={{ type: "spring", stiffness: 280, damping: 26 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md bg-surface-raised border border-hairline rounded-3xl p-5 shadow-2xl flex flex-col gap-4"
+        className="relative z-50 w-full max-w-md bg-surface-raised border border-hairline rounded-3xl p-5 shadow-2xl flex flex-col gap-4"
       >
         <div className="text-center">
           <div className="text-3xl mb-1">🎉</div>
           <h2 className="text-lg font-black bg-gradient-to-br from-amber-300 to-orange-400 bg-clip-text text-transparent">
             Pack ouvert
           </h2>
-          {result.dustGained > 0 && (
-            <p className="text-[11px] text-violet-300 mt-1 font-bold">
-              + {result.dustGained} ✨ (doublons convertis en poussière)
-            </p>
-          )}
+          <p className="text-[11px] text-ink-muted mt-1">
+            {allRevealed
+              ? result.dustGained > 0
+                ? <>Doublons → <span className="text-violet-300 font-bold">+{result.dustGained} ✨</span></>
+                : "Tu as ouvert ton pack."
+              : "Touche chaque carte pour la révéler"}
+          </p>
         </div>
 
         <div className="grid grid-cols-3 gap-2">
-          {result.cards.map((id, i) => {
-            const card = CARDS[id];
-            const isNew = result.isNew[i];
-            const dust = DUST_PER_DUPLICATE[card.rarity] ?? 0;
-            return (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, scale: 0.6, y: 12 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ delay: 0.15 + i * 0.18, type: "spring", stiffness: 220, damping: 18 }}
-                className={
-                  "relative rounded-xl overflow-hidden aspect-[3/4] flex flex-col items-center justify-center " +
-                  (isNew ? "ring-2 ring-emerald-400 shadow-lg shadow-emerald-400/40" : "ring-1 ring-white/20")
-                }
-              >
-                <CardImage id={id} glyphSize="text-2xl" />
-                <div className="relative z-10 flex flex-col items-center gap-0.5 p-1">
-                  <span className="text-2xl">{card.glyph}</span>
-                  <span className="text-[8px] font-bold uppercase text-white/90 text-center leading-tight">
-                    {t(card.nameKey)}
-                  </span>
-                  <span className={"text-[8px] font-bold " + RARITY_COLOR[card.rarity]}>
-                    {card.rarity}
-                  </span>
-                </div>
-                <motion.div
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.45 + i * 0.18 }}
-                  className="absolute top-1 right-1 z-20"
-                >
-                  {isNew ? (
-                    <span className="text-[8px] font-black uppercase tracking-wider bg-emerald-400 text-zinc-900 px-1.5 py-0.5 rounded-full">
-                      NEW
-                    </span>
-                  ) : (
-                    <span className="text-[8px] font-black uppercase tracking-wider bg-violet-400/90 text-zinc-900 px-1.5 py-0.5 rounded-full">
-                      +{dust} ✨
-                    </span>
-                  )}
-                </motion.div>
-              </motion.div>
-            );
-          })}
+          {result.cards.map((id, i) => (
+            <PackCardFlip
+              key={i}
+              cardId={id}
+              isNew={result.isNew[i]}
+              revealed={revealed[i]}
+              onReveal={() => reveal(i)}
+              t={t}
+            />
+          ))}
         </div>
 
+        {/* Bouton bascule "Tout révéler" → "Terminer" — un seul slot, deux
+            comportements selon l'état du flip. */}
         <motion.button
           whileTap={{ scale: 0.97 }}
-          onClick={onClose}
-          className="w-full py-3 rounded-2xl font-bold text-white bg-themed shadow-lg"
+          onClick={allRevealed ? onClose : revealAll}
+          className={
+            "w-full py-3 rounded-2xl font-bold text-white shadow-lg transition " +
+            (allRevealed ? "bg-themed" : "bg-violet-500/40 hover:bg-violet-500/60 border border-violet-400/50")
+          }
         >
-          Terminer
+          {allRevealed ? "Terminer" : "Tout révéler"}
         </motion.button>
       </motion.div>
     </motion.div>
+  );
+}
+
+/* ─────────── Pack card flip ─────────── */
+
+function PackCardFlip({
+  cardId, isNew, revealed, onReveal, t,
+}: {
+  cardId: CardId;
+  isNew: boolean;
+  revealed: boolean;
+  onReveal: () => void;
+  t: (k: string) => string;
+}) {
+  const card = CARDS[cardId];
+  const dust = DUST_PER_DUPLICATE[card.rarity] ?? 0;
+  const rarityRing =
+    card.rarity === "legendary" ? "ring-amber-400 shadow-amber-500/40" :
+    card.rarity === "epic"      ? "ring-violet-400 shadow-violet-500/40" :
+    card.rarity === "rare"      ? "ring-sky-400 shadow-sky-500/40" :
+                                  "ring-white/15";
+
+  return (
+    <motion.button
+      onClick={onReveal}
+      whileTap={!revealed ? { scale: 0.95 } : undefined}
+      animate={revealed ? { rotateY: 0 } : { rotateY: 180 }}
+      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+      style={{ transformStyle: "preserve-3d", perspective: 800 }}
+      className={
+        "relative rounded-xl overflow-hidden aspect-[3/4] flex flex-col items-center justify-center transition shadow-lg " +
+        (revealed
+          ? ((isNew ? "ring-2 ring-emerald-400 shadow-emerald-400/40 " : "ring-2 ") + rarityRing)
+          : "ring-1 ring-violet-400/30 bg-gradient-to-br from-indigo-900 to-violet-900 cursor-pointer hover:brightness-110")
+      }
+    >
+      {/* Back face (hidden once flipped) */}
+      <div
+        className={"absolute inset-0 flex items-center justify-center " + (revealed ? "invisible" : "")}
+        style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-br from-violet-700 via-fuchsia-700 to-indigo-800" />
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 12, ease: "linear", repeat: Infinity }}
+          className="absolute inset-2 rounded-lg border-2 border-fuchsia-300/40"
+        />
+        <span className="relative text-3xl drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]">🎴</span>
+      </div>
+
+      {/* Front face */}
+      <div
+        className={"absolute inset-0 " + (revealed ? "" : "invisible")}
+        style={{ backfaceVisibility: "hidden" }}
+      >
+        <CardImage id={cardId} glyphSize="text-2xl" />
+        <div className="relative z-10 flex flex-col items-center gap-0.5 p-1 mt-auto">
+          <span className="text-2xl">{card.glyph}</span>
+          <span className="text-[8px] font-bold uppercase text-white/90 text-center leading-tight">
+            {t(card.nameKey)}
+          </span>
+          <span className={"text-[8px] font-bold " + RARITY_COLOR[card.rarity]}>
+            {card.rarity}
+          </span>
+        </div>
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.45 }}
+          className="absolute top-1 right-1 z-20"
+        >
+          {isNew ? (
+            <span className="text-[8px] font-black uppercase tracking-wider bg-emerald-400 text-zinc-900 px-1.5 py-0.5 rounded-full">
+              NEW
+            </span>
+          ) : (
+            <span className="text-[8px] font-black uppercase tracking-wider bg-violet-400/90 text-zinc-900 px-1.5 py-0.5 rounded-full">
+              +{dust} ✨
+            </span>
+          )}
+        </motion.div>
+      </div>
+    </motion.button>
   );
 }

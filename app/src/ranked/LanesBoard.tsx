@@ -4,14 +4,15 @@
  */
 
 import { useEffect, useState } from "react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { Hand, MoveGlyph } from "../icons";
 import type { Move } from "../engine/game";
 import type { LaneResult } from "../online/online";
 import { LANE_IDENTITIES, laneFavoursMove } from "../engine/lanesCombos";
 import { CardSlot } from "./CardSlot";
+import { CardImage } from "./CardImage";
 import { OppHandIndicator } from "./OppHandIndicator";
-import type { LaneTarget, PlayedCard } from "./rankedTypes";
+import type { CardId, LaneTarget, PlayedCard } from "./rankedTypes";
 import { useT } from "../i18n";
 import { useStore } from "../store/store";
 import { BattlePad } from "../BattlePad";
@@ -69,6 +70,19 @@ export function LanesBoard({
             "radial-gradient(closest-side, rgba(0,0,0,0.7), rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.18) 100%)",
         }}
       />
+
+      {/* Broadcast the cards over the board during the reveal so the player
+          actually SEES what was thrown — the mini badge on the lane is too
+          small for a learning moment. Opp side has more weight (you need to
+          read it to counter), you side gets a smaller mirror. */}
+      <AnimatePresence>
+        {mode === "reveal" && oppCard && (
+          <BigCardReveal key={"opp-" + oppCard.id} id={oppCard.id} side="opp" />
+        )}
+        {mode === "reveal" && myCard && (
+          <BigCardReveal key={"you-" + myCard.id} id={myCard.id} side="you" />
+        )}
+      </AnimatePresence>
 
       <div className="relative p-3 sm:p-4 flex flex-col gap-3 sm:gap-4 [@media(max-height:560px)]:p-1.5 [@media(max-height:560px)]:gap-1.5">
       <div className="flex items-center justify-between gap-2 px-0.5">
@@ -291,5 +305,81 @@ function LaneSlot({ index, pick, favoured, verdict, cardHere, onClick, disabled 
         )}
       </button>
     </div>
+  );
+}
+
+/* ─────────── BigCardReveal ─────────── */
+
+/**
+ * BigCardReveal — the dramatic version of CardSlot for the reveal phase.
+ *
+ * The mini lane badge is too tiny to communicate "the opponent played
+ * Foo" — the player just sees a sticker pop. This component layers an
+ * oversized card over the board centre: it descends face-down from the
+ * top (suggesting a draw from the deck), flips horizontally, glows
+ * briefly, and fades out into thin air ~1.6s later, by which time the
+ * mini badge on the lane has already locked in. The whole sequence
+ * happens BEFORE the verdict text (`showAfter` fires at 1.5s) so the
+ * player reads the card first, then sees what it did.
+ *
+ * `side="opp"` is the loud reveal (top-right, ~2× the size). `side="you"`
+ * gives a smaller mirror in the bottom-left so you can recognise what
+ * you played too, without competing with the opponent's reveal.
+ */
+function BigCardReveal({ id, side }: { id: CardId; side: "opp" | "you" }) {
+  const isOpp = side === "opp";
+  // Drop the opp card from the centre-top (most attention); slide the you
+  // card up from the centre-bottom — it's our own play, no surprise.
+  const startY = isOpp ? -130 : 130;
+  const restingY = isOpp ? -34 : 34;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: startY, rotateY: 180, scale: 0.82 }}
+      animate={{
+        opacity: [0, 1, 1, 1, 0],
+        y: [startY, restingY, restingY, restingY, restingY * 0.6],
+        rotateY: [180, 180, 0, 0, 0],
+        scale: [0.82, 1, 1.05, 1, 0.7],
+      }}
+      exit={{ opacity: 0 }}
+      transition={{
+        duration: 1.6,
+        times: [0, 0.18, 0.42, 0.7, 1],
+        ease: "easeOut",
+      }}
+      style={{ transformStyle: "preserve-3d", perspective: 900 }}
+      className={
+        "absolute left-1/2 -translate-x-1/2 z-30 pointer-events-none " +
+        (isOpp
+          ? "top-1/2 -translate-y-[58%] w-20 h-28 sm:w-24 sm:h-32"
+          : "top-1/2 -translate-y-[42%] w-14 h-20 sm:w-16 sm:h-22")
+      }
+    >
+      {/* Aura behind the card — colour-matched to the rarity for a punchier
+          "this is a Rare" sensation as the card lands. */}
+      <motion.div
+        aria-hidden
+        initial={{ opacity: 0, scale: 0.6 }}
+        animate={{ opacity: [0, 0.85, 0.5, 0], scale: [0.6, 1.5, 1.7, 1.9] }}
+        transition={{ duration: 1.6, times: [0, 0.45, 0.75, 1], ease: "easeOut" }}
+        className={
+          "absolute inset-0 rounded-3xl blur-2xl " +
+          (isOpp ? "bg-rose-400/55" : "bg-emerald-400/45")
+        }
+      />
+      <div
+        className={
+          "relative w-full h-full rounded-xl overflow-hidden border-2 shadow-2xl " +
+          (isOpp ? "border-rose-300/80 shadow-rose-900/50" : "border-emerald-300/80 shadow-emerald-900/50")
+        }
+      >
+        <CardImage id={id} glyphSize="text-3xl" />
+        <div className="absolute bottom-0 left-0 right-0 bg-black/65 py-0.5">
+          <div className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-center text-white">
+            {isOpp ? "Adv" : "Toi"}
+          </div>
+        </div>
+      </div>
+    </motion.div>
   );
 }
