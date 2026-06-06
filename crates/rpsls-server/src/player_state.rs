@@ -94,7 +94,11 @@ impl PlayerProgress {
     /// cap is inert on read.
     pub fn sanitize(&mut self) {
         self.xp = self.xp.min(MAX_NUM);
-        self.rank_lp = self.rank_lp.min(MAX_NUM);
+        // rank_lp is a competitive number — diamond tier opens at 1750 (see
+        // engine/rank.ts). A 5000 ceiling leaves room for future tiers without
+        // letting a tampered client mint billions for season-rollover rewards.
+        // Server-issued LP from real online matches already lives well below.
+        self.rank_lp = self.rank_lp.min(5_000);
         self.eclats = self.eclats.min(MAX_NUM);
         self.dust = self.dust.min(MAX_NUM);
         self.wins = self.wins.min(MAX_NUM);
