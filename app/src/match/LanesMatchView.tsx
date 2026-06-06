@@ -62,6 +62,10 @@ export interface LanesEndData {
   roundWinsYou: number;
   roundWinsOpp: number;
   forfeit: boolean;
+  /** Boutique éclats granted by the store on this match end (animated as
+   *  a +N 💎 counter in the cinematic). Caller computes via eclatsReward()
+   *  so the wrapper stays mode-agnostic. */
+  eclatsGained?: number;
 }
 
 /**
@@ -1204,6 +1208,7 @@ function MatchEndScene({
       bestOf={Math.max(end.roundWinsYou, end.roundWinsOpp) * 2 - 1}
       onRematch={onRematch}
       onBack={onBack}
+      reward={end.eclatsGained ? { eclats: end.eclatsGained } : undefined}
     />
   );
 }

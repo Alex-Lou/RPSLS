@@ -13,9 +13,10 @@ import { useT } from "../i18n";
 import { InfoBubble } from "../flavor/InfoBubble";
 import { avatarImgStyle } from "../theme/avatar";
 import { FloatingMatchBackButton } from "../match/sharedMatchUI";
+import { CurrencyBadges } from "./CurrencyBadges";
 // Tournament state now lives in PlayPage
 
-export function RankedLobby({ onViewBracket, onManageDeck, onBack }: { onViewBracket: () => void; onManageDeck: () => void; onBack?: () => void }) {
+export function RankedLobby({ onViewBracket, onManageDeck, onBack, onGoShop }: { onViewBracket: () => void; onManageDeck: () => void; onBack?: () => void; onGoShop?: () => void }) {
   const t = useT();
   const player = useStore((s) => s.player);
   const tier = rankFromLp(player.rankLp);
@@ -119,6 +120,12 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack }: { onViewBra
           <StatCell label={t("profile.stat.games")} value={String(totalGames)} color="text-ink" />
           <StatCell label={t("profile.stat.winrate")} value={`${winrate}%`} color="text-amber-300" />
           <StatCell label={t("profile.stat.lp")} value={String(player.rankLp)} color="text-violet-300" />
+        </div>
+        {/* Wallet — clickable, jumps straight to the boutique so the player
+            can spend match earnings in one tap instead of unwinding back to
+            the home menu. */}
+        <div className="flex items-center justify-center pt-1">
+          <CurrencyBadges size="full" onClick={onGoShop} />
         </div>
       </div>
 

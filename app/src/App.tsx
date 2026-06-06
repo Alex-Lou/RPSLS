@@ -28,6 +28,7 @@ const ProfilePage  = lazy(() => import("./pages/ProfilePage").then(m => ({ defau
 const HistoryPage  = lazy(() => import("./pages/HistoryPage").then(m => ({ default: m.HistoryPage })));
 const QuestsPage   = lazy(() => import("./pages/QuestsPage").then(m => ({ default: m.QuestsPage })));
 const LeaderboardPage = lazy(() => import("./pages/LeaderboardPage").then(m => ({ default: m.LeaderboardPage })));
+const ShopPage     = lazy(() => import("./pages/ShopPage").then(m => ({ default: m.ShopPage })));
 const PacksPage    = lazy(() => import("./pages/PacksPage").then(m => ({ default: m.PacksPage })));
 const AboutPage    = lazy(() => import("./pages/AboutPage").then(m => ({ default: m.AboutPage })));
 const ContactPage  = lazy(() => import("./pages/ContactPage").then(m => ({ default: m.ContactPage })));
@@ -251,6 +252,7 @@ export default function App() {
                     <Suspense key="lazy-routes" fallback={<RouteFallback />}>
                       {page === "online"  && <PageWrap key="online"><OnlinePage /></PageWrap>}
                       {page === "leaderboard" && <PageWrap key="leaderboard"><LeaderboardPage /></PageWrap>}
+                      {page === "shop"    && <PageWrap key="shop"><ShopPage /></PageWrap>}
                       {page === "quests"  && <PageWrap key="quests"><QuestsPage /></PageWrap>}
                       {page === "packs"   && <PageWrap key="packs"><PacksPage /></PageWrap>}
                       {page === "profile" && <PageWrap key="profile"><ProfilePage /></PageWrap>}

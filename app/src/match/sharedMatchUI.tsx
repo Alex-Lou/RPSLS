@@ -374,8 +374,11 @@ export interface CinematicMatchEndProps {
   rematchLabel?: string;
   /** Override the back button label. */
   backLabel?: string;
-  /** Optional reward reveal — animates a +XP / ±LP counter on the end screen. */
-  reward?: { xp?: number; lp?: number };
+  /** Optional reward reveal — animates a +XP / ±LP / 💎 counter on the end
+   *  screen. The éclats slot reads the recordMatch award the store just
+   *  granted, so the player physically sees the boutique progress arrive
+   *  instead of finding it later by chance. */
+  reward?: { xp?: number; lp?: number; eclats?: number };
 }
 
 const QUOTE_COUNT = 10;
@@ -507,13 +510,13 @@ export function CinematicMatchEnd({
         <div className="text-xl font-mono text-ink">{scoreLine}</div>
       )}
 
-      {/* Reward reveal — animated +XP / ±LP counter. */}
-      {(!!reward?.xp || (reward?.lp != null && reward.lp !== 0)) && (
+      {/* Reward reveal — animated +XP / ±LP / 💎 counters. */}
+      {(!!reward?.xp || (reward?.lp != null && reward.lp !== 0) || !!reward?.eclats) && (
         <motion.div
           initial={{ opacity: 0, y: 8, scale: 0.9 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ delay: 1.0, type: "spring", stiffness: 260, damping: 18 }}
-          className="flex items-center gap-4"
+          className="flex items-center flex-wrap justify-center gap-x-4 gap-y-1"
         >
           {!!reward?.xp && reward.xp > 0 && (
             <span className="text-lg font-black text-emerald-300">+<CountUp to={reward.xp} /> XP</span>
@@ -522,6 +525,9 @@ export function CinematicMatchEnd({
             <span className={"text-lg font-black " + (reward.lp > 0 ? "text-amber-300" : "text-rose-300")}>
               {reward.lp > 0 ? "+" : ""}<CountUp to={reward.lp} /> LP
             </span>
+          )}
+          {!!reward?.eclats && reward.eclats > 0 && (
+            <span className="text-lg font-black text-cyan-300">+<CountUp to={reward.eclats} /> 💎</span>
           )}
         </motion.div>
       )}

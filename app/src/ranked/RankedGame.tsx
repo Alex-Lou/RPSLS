@@ -20,6 +20,7 @@ import {
   type RoundOutcome,
 } from "../engine/lanesEngine";
 import { detectPlayerCombo } from "../engine/lanesCombos";
+import { eclatsReward } from "../engine/economy";
 import {
   hapticLock, hapticMatchStart, hapticMatchWin, hapticMatchLoss,
   hapticTap, hapticWin, hapticLoss,
@@ -510,6 +511,7 @@ export function RankedGame({
           roundWinsOpp: nextRoundWinsB,
           forfeit: false,
           xpGained: youWon ? 60 : 15,
+          eclatsGained: eclatsReward("constellation", youWon ? "win" : "loss"),
         });
       }, ROUND_PAUSE_MS);
     } else if (riposteWillFire) {
@@ -739,6 +741,8 @@ export function RankedGame({
         roundWinsYou: winsA,
         roundWinsOpp: winsB,
         forfeit: false,
+        xpGained: youWon ? 60 : 15,
+        eclatsGained: eclatsReward("constellation", youWon ? "win" : "loss"),
       });
     }, ROUND_PAUSE_MS);
   }

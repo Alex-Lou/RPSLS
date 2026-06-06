@@ -28,6 +28,7 @@ import {
   REWARDS,
 } from "../../types";
 import { type DailyChallenge } from "../../engine/daily";
+import { eclatsReward } from "../../engine/economy";
 import { useT } from "../../i18n";
 import {
   CinematicMatchEnd,
@@ -1362,6 +1363,11 @@ function EndPanel({
         onBack={onMatchResult ? () => onMatchResult(outcome === "win") : onQuit}
         rematchLabel={t("match.playAgain")}
         backLabel={onMatchResult ? "Suivant →" : t("match.back")}
+        reward={{
+          xp: xpDelta > 0 ? xpDelta : undefined,
+          lp: lpDelta !== 0 ? lpDelta : undefined,
+          eclats: eclatsReward(mode, outcome),
+        }}
       />
 
       {/* Local single-player extras — compacted to one wrap line so the

@@ -68,6 +68,8 @@ export interface RankedEndData {
   forfeit: boolean;
   /** XP awarded for this match — shown as an animated reward on the end screen. */
   xpGained?: number;
+  /** Boutique éclats granted on this match end — same logic as LanesEndData. */
+  eclatsGained?: number;
 }
 
 export interface RankedMatchViewProps {
@@ -238,7 +240,7 @@ export function RankedMatchView({
             onRematch={onNext ? undefined : onRematch}
             onBack={onNext ? onNext : onLeave!}
             backLabel={onNext ? "Suivant →" : undefined}
-            reward={{ xp: end.xpGained }}
+            reward={{ xp: end.xpGained, eclats: end.eclatsGained }}
           />
         )}
         </div>

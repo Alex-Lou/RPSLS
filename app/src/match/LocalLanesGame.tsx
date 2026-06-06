@@ -14,6 +14,7 @@ import {
   type LanesEndData,
 } from "./LanesMatchView";
 import { type AiMood, type Move } from "../engine/game";
+import { eclatsReward } from "../engine/economy";
 import { useStore } from "../store/store";
 import {
   battleStatus,
@@ -182,6 +183,7 @@ export function LocalLanesGame({
     });
     if (status.kind === "won") {
       const youWon = status.winner === "a";
+      const outcomeKind: "win" | "loss" = youWon ? "win" : "loss";
       // Log this vs-CPU Constellation match to history (simplified entry — the
       // 3-lane rounds don't map to the per-move round log). Earns casual-like XP.
       recordMatch({
@@ -191,7 +193,7 @@ export function LocalLanesGame({
         opponent: { kind: "cpu", mood: moodRef.current },
         scorePlayer: battle.roundWinsA,
         scoreOpponent: battle.roundWinsB,
-        outcome: youWon ? "win" : "loss",
+        outcome: outcomeKind,
         rounds: [],
         xpDelta: youWon ? 40 : 10,
         lpDelta: 0,
@@ -205,6 +207,7 @@ export function LocalLanesGame({
           roundWinsYou: battle.roundWinsA,
           roundWinsOpp: battle.roundWinsB,
           forfeit: false,
+          eclatsGained: eclatsReward("constellation", outcomeKind),
         });
       }, ROUND_PAUSE_MS);
     } else {

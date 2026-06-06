@@ -5,6 +5,7 @@ const fr: Record<string, string> = {
   "nav.home": "Accueil",
   "nav.online": "En ligne",
   "nav.leaderboard": "Classement",
+  "nav.shop": "Boutique",
   "leaderboard.title": "Classement",
   "leaderboard.subtitle": "Meilleurs joueurs · matchs en ligne classés uniquement",
   "leaderboard.yourRank": "Ton rang : n°{rank}",

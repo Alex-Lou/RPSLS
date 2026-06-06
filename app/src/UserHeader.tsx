@@ -7,6 +7,7 @@ import { THEMES, gradientFromTheme } from "./theme/theme";
 import { avatarImgStyle } from "./theme/avatar";
 import { useT } from "./i18n";
 import type { Page } from "./Sidebar";
+import { CurrencyBadges } from "./ranked/CurrencyBadges";
 
 /**
  * Persistent player header, shown at the top of every menu page (never during a
@@ -47,9 +48,10 @@ export function UserHeader({ onNavigate }: { onNavigate: (p: Page) => void }) {
         (gain > 0 ? "z-[60]" : "z-20")
       }
     >
+      <div className="relative w-full flex items-stretch gap-2 rounded-2xl border border-hairline bg-surface-raised backdrop-blur-md px-3 py-2 shadow-lg shadow-black/40 overflow-hidden">
       <button
         onClick={() => onNavigate("profile")}
-        className="relative w-full flex items-center gap-3 rounded-2xl border border-hairline bg-surface-raised backdrop-blur-md px-3 py-2 text-left shadow-lg shadow-black/40 overflow-hidden"
+        className="relative flex-1 min-w-0 flex items-center gap-3 text-left"
       >
         {/* Avatar */}
         <div
@@ -153,6 +155,13 @@ export function UserHeader({ onNavigate }: { onNavigate: (p: Page) => void }) {
           )}
         </AnimatePresence>
       </button>
+        {/* Currency badges — own click target so a tap on 💎 routes to the
+            boutique without ever passing through the profile button. The
+            separator line keeps the two affordances visually distinct. */}
+        <div className="shrink-0 flex items-center pl-2 border-l border-hairline">
+          <CurrencyBadges onClick={() => onNavigate("shop")} />
+        </div>
+      </div>
     </div>
   );
 }

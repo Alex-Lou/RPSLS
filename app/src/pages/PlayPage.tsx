@@ -143,6 +143,7 @@ export function PlayPage({
               setView({ kind: "ranked_bracket" });
             }}
             onManageDeck={() => setView({ kind: "ranked_deck" })}
+            onGoShop={onNavigate ? () => onNavigate("shop") : undefined}
           />
         )}
         {view.kind === "ranked_deck" && (

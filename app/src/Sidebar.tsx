@@ -7,7 +7,7 @@ import { useT } from "./i18n";
 import { LanguagePicker } from "./LanguagePicker";
 import { avatarImgStyle } from "./theme/avatar";
 
-export type Page = "play" | "online" | "leaderboard" | "quests" | "packs" | "profile" | "history" | "about" | "contact" | "privacy";
+export type Page = "play" | "online" | "leaderboard" | "shop" | "quests" | "packs" | "profile" | "history" | "about" | "contact" | "privacy";
 
 interface NavItem {
   id: Page;
@@ -22,6 +22,7 @@ const NAV: NavItem[] = [
   { id: "play",        labelKey: "nav.home",        iconSrc: "/Burger Icons/nav_accueil.png"    },
   { id: "online",      labelKey: "nav.online",      iconSrc: "/Burger Icons/nav_en_ligne.png"   },
   { id: "leaderboard", labelKey: "nav.leaderboard", glyph: "🏆"                                  },
+  { id: "shop",        labelKey: "nav.shop",        glyph: "🎁"                                  },
   { id: "quests",      labelKey: "nav.quests",      iconSrc: "/Burger Icons/nav_quetes.png"     },
   { id: "packs",   labelKey: "nav.packs",   iconSrc: "/Burger Icons/nav_variantes.png"  },
   { id: "profile", labelKey: "nav.profile", iconSrc: "/Burger Icons/nav_profil.png"     },
