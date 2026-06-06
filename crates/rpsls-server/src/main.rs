@@ -158,9 +158,14 @@ async fn main() {
     // pushed leaves an Instant entry; without periodic pruning the map grows
     // monotonically. 5-min sweep dropping entries older than 60s (12× the
     // 5s throttle window — well past any legitimate cooldown).
+    // sync_throttle sweep: was 300s — at 1000 unique pushers, that left up to
+    // ~60k stale entries between sweeps (waste, not a crash threat). Dropped
+    // to 60s so the map'\''s upper bound is bounded by the actual concurrent
+    // pusher count, not by the sweep interval. cutoff stays 60s — 12× the
+    // 5s throttle window, so a legitimate cooldown is never evicted early.
     let throttle_state = state.clone();
     tokio::spawn(async move {
-        let mut tick = tokio::time::interval(std::time::Duration::from_secs(300));
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(60));
         tick.tick().await; // skip first immediate tick
         loop {
             tick.tick().await;
@@ -179,6 +184,43 @@ async fn main() {
             }
             if !stale.is_empty() {
                 tracing::debug!(removed = stale.len(), "sync throttle swept");
+            }
+        }
+    });
+
+    // Dead-match janitor: on_end runs when a match task exits cleanly, but a
+    // panic inside run_match (e.g. channel send failure) skips on_end and
+    // leaves the in_match / in_lanes entries forever. Over weeks of uptime
+    // that'\''s a slow leak. Every 2 min, scan both maps and drop entries whose
+    // command sender is closed — a closed sender means the match task is no
+    // longer receiving, so cleanup is safe and idempotent.
+    let dead_match_state = state.clone();
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(120));
+        tick.tick().await;
+        loop {
+            tick.tick().await;
+            let dead_classic: Vec<String> = dead_match_state
+                .in_match
+                .iter()
+                .filter(|e| e.value().0.is_closed())
+                .map(|e| e.key().clone())
+                .collect();
+            let dead_lanes: Vec<String> = dead_match_state
+                .in_lanes
+                .iter()
+                .filter(|e| e.value().0.is_closed())
+                .map(|e| e.key().clone())
+                .collect();
+            let total = dead_classic.len() + dead_lanes.len();
+            for id in &dead_classic {
+                dead_match_state.in_match.remove_if(id, |_, v| v.0.is_closed());
+            }
+            for id in &dead_lanes {
+                dead_match_state.in_lanes.remove_if(id, |_, v| v.0.is_closed());
+            }
+            if total > 0 {
+                tracing::warn!(removed = total, "dead match channels swept (on_end skipped?)");
             }
         }
     });

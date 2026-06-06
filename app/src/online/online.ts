@@ -166,8 +166,26 @@ export function normalizeServerUrl(input: string): string {
 
 export type Listener = (msg: ServerMessage) => void;
 
-/** Backoff schedule (ms) for reconnection attempts after an unexpected drop. */
-const RECONNECT_DELAYS = [400, 1_200, 3_000];
+/** Backoff schedule (ms) for reconnection attempts after an unexpected drop.
+ *  Three fast retries cover transient drops, then four longer ones cover the
+ *  Render free-tier cold-start window (~30-90 s of dormant wake-up). Past the
+ *  end we continue with exponential backoff (see `nextReconnectDelay`) so a
+ *  flat-out outage doesn't permanently kill the client — we keep trying every
+ *  few minutes until the server comes back. Every delay gets ±30% jitter so N
+ *  clients hitting a cold-started server don't synchronise into a herd. */
+const RECONNECT_DELAYS = [400, 1_200, 3_000, 8_000, 15_000, 30_000, 60_000];
+/** Backoff base once RECONNECT_DELAYS is exhausted. Capped to ~16 min. */
+const BACKOFF_BASE_MS = 60_000;
+const BACKOFF_MAX_MS  = 16 * 60_000;
+function jitter(ms: number): number {
+  return Math.round(ms * (0.7 + Math.random() * 0.6));
+}
+function nextReconnectDelay(attempt: number): number {
+  if (attempt < RECONNECT_DELAYS.length) return jitter(RECONNECT_DELAYS[attempt]);
+  const exp = attempt - RECONNECT_DELAYS.length;
+  const raw = BACKOFF_BASE_MS * Math.pow(2, Math.min(exp, 4));
+  return jitter(Math.min(raw, BACKOFF_MAX_MS));
+}
 
 export class OnlineClient {
   private ws: WebSocket | null = null;
@@ -261,11 +279,15 @@ export class OnlineClient {
   }
 
   private scheduleReconnect(openTimeoutMs: number) {
-    if (this.reconnectAttempt >= RECONNECT_DELAYS.length || !this.lastUrl) {
+    if (!this.lastUrl) {
       this.setStatus("error");
       return;
     }
-    const delay = RECONNECT_DELAYS[this.reconnectAttempt];
+    // No hard "give up after N attempts" anymore — we just slow down. A
+    // dormant Render instance may take 90 s to wake; an outage may take
+    // minutes. Capping at 16 min between attempts keeps the radio quiet
+    // while still recovering automatically when the server returns.
+    const delay = nextReconnectDelay(this.reconnectAttempt);
     this.reconnectAttempt += 1;
     this.setStatus("reconnecting");
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
