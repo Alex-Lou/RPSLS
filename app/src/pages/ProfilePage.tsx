@@ -582,9 +582,7 @@ export function ProfilePage() {
                         draggable={false}
                         className="w-7 h-7 shrink-0 object-contain select-none"
                       />
-                    ) : (
-                      <span className="text-base">{bg.emoji}</span>
-                    )}
+                    ) : null}
                     <span className="text-xs font-semibold truncate">{bg.label}</span>
                   </div>
                 </div>
@@ -633,7 +631,7 @@ export function ProfilePage() {
                 <div className="flex items-center gap-1.5 px-2 py-1.5 bg-surface">
                   <span className="w-3 h-3 rounded-full ring-1 ring-white/25 shrink-0" style={{ background: tt.primary }} />
                   <span className="w-3 h-3 rounded-full ring-1 ring-white/25 shrink-0" style={{ background: tt.secondary }} />
-                  <span className="text-[11px] font-semibold truncate">{tt.emoji} {tt.label}</span>
+                  <span className="text-[11px] font-semibold truncate">{tt.label}</span>
                 </div>
                 {active && (
                   <span className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-emerald-500 text-white text-[11px] font-black flex items-center justify-center shadow-lg">✓</span>
@@ -729,7 +727,6 @@ export function ProfilePage() {
                 </div>
                 <div className="p-3 bg-hairline">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">{meta.emoji}</span>
                     <span className="text-sm font-semibold">{meta.label}</span>
                   </div>
                   <p className="text-[11px] text-ink-muted mt-0.5">{meta.tagline}</p>
