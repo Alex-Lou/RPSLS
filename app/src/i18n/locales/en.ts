@@ -191,6 +191,7 @@ const en: Record<string, string> = {
   "premium.alreadyOwned": "✓ Owned — apply from Profile",
   "premium.devGrant": "+1000 ✦ (test only)",
   "premium.close": "Close",
+  "premium.unlocked": "Unlocked!",
   "premium.quartz.name": "Quartz",
   "premium.quartz.tagline": "Crystalline shards refracting prismatic light — a soft, glacial world.",
   "ranked.bonus.combo": "Combo",

@@ -12,12 +12,12 @@
  * `__DEV_PREMIUM__` flag at the top of the file.
  */
 
-import { useEffect } from "react";
-import { motion } from "motion/react";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
 import { PremiumBadge } from "./PremiumBadge";
 import { useT } from "../i18n";
-import { hapticMatchWin, hapticTap } from "../haptic";
+import { hapticMatchStart, hapticMatchWin, hapticTap } from "../haptic";
 
 const __DEV_PREMIUM__ = true;
 
@@ -47,26 +47,35 @@ export function PremiumPurchaseModal({
   const buy = useStore((s) => s.simulatePremiumPurchase);
   const grant = useStore((s) => s.grantStars);
   const t = useT();
+  /** Three phases:
+   *   idle        — preview + buttons (normal)
+   *   celebrating — gold burst + "✦ DÉBLOQUÉ" pulse, auto-closes ~2.2s later
+   *   The closing handoff back to onClose is the parent's responsibility. */
+  const [phase, setPhase] = useState<"idle" | "celebrating">("idle");
 
   useEffect(() => {
     if (!set) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    setPhase("idle"); // reset whenever a fresh set opens
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && phase === "idle") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+    // phase intentionally outside deps — we don't want closing-during-celebrate.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [set, onClose]);
 
   if (!set) return null;
   const affordable = stars >= set.cost;
 
   const handleBuy = () => {
-    if (owned) return;
+    if (owned || phase !== "idle") return;
     const ok = buy(set.id, set.cost);
-    if (ok) {
-      hapticMatchWin();
-      onClose();
-    } else {
-      hapticTap();
-    }
+    if (!ok) { hapticTap(); return; }
+    // Tap-confirm haptic NOW, success haptic at the burst peak (~280ms later)
+    // so the player feels two distinct beats: "tap accepted" → "REWARD".
+    hapticMatchStart();
+    setPhase("celebrating");
+    window.setTimeout(() => hapticMatchWin(), 280);
+    window.setTimeout(() => onClose(), 2200);
   };
 
   return (
@@ -90,6 +99,9 @@ export function PremiumPurchaseModal({
         <div className="absolute top-3 right-3 z-10">
           <PremiumBadge variant="pill" label={t("premium.label")} />
         </div>
+        <AnimatePresence>
+          {phase === "celebrating" && <CelebrationOverlay label={t("premium.unlocked")} />}
+        </AnimatePresence>
         <div className="aspect-[4/3] w-full bg-gradient-to-br from-zinc-900 via-zinc-800 to-black relative overflow-hidden">
           {set.previewArt}
         </div>
@@ -146,6 +158,98 @@ export function PremiumPurchaseModal({
               {t("premium.close")}
             </button>
           </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/* ───── Celebration overlay — gold burst + shockwave + "✦ DÉBLOQUÉ !" ─────
+ *
+ * Pure CSS / motion. Sits on top of the modal card (absolute inset-0, z-[5])
+ * so it covers the preview + content without breaking the rounded outline.
+ * Twenty-four particles burst from the centre, a ring shockwave expands, and
+ * the unlock label scales in with a slight rubber-band overshoot. Auto-fades
+ * out after 2 s so the parent's setTimeout-onClose lands on a clean exit.
+ */
+function CelebrationOverlay({ label }: { label: string }) {
+  const PARTICLES = 24;
+  return (
+    <motion.div
+      className="absolute inset-0 z-[5] flex items-center justify-center pointer-events-none overflow-hidden"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25 }}
+    >
+      {/* Gold wash that floods the card on entry. */}
+      <motion.span
+        className="absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(circle at 50% 45%, rgba(251,191,36,0.55), rgba(251,191,36,0.18) 35%, transparent 70%)",
+        }}
+        animate={{ opacity: [0, 0.95, 0.6, 0] }}
+        transition={{ duration: 1.9, times: [0, 0.18, 0.5, 1], ease: "easeOut" }}
+      />
+      {/* Two expanding shockwave rings — staggered. */}
+      {[0, 0.18].map((delay, i) => (
+        <motion.span
+          key={i}
+          className="absolute rounded-full border-2 border-amber-300"
+          style={{ width: 12, height: 12 }}
+          initial={{ scale: 0, opacity: 0.9 }}
+          animate={{ scale: [0, 14], opacity: [0.95, 0] }}
+          transition={{ duration: 1.1, delay, ease: "easeOut" }}
+        />
+      ))}
+      {/* Burst particles. Angle + distance chosen per index — deterministic,
+          no Math.random so motion doesn't desync between StrictMode mounts. */}
+      {Array.from({ length: PARTICLES }).map((_, i) => {
+        const angle = (i / PARTICLES) * Math.PI * 2;
+        const dist = 110 + (i % 3) * 24;
+        const dx = Math.cos(angle) * dist;
+        const dy = Math.sin(angle) * dist;
+        const size = 5 + (i % 4);
+        return (
+          <motion.span
+            key={i}
+            className="absolute rounded-full"
+            style={{
+              width: size,
+              height: size,
+              background: i % 2 === 0 ? "#fde68a" : "#fbbf24",
+              boxShadow: "0 0 10px rgba(251,191,36,0.85)",
+            }}
+            initial={{ x: 0, y: 0, opacity: 0, scale: 0.4 }}
+            animate={{
+              x: dx,
+              y: dy,
+              opacity: [0, 1, 1, 0],
+              scale: [0.4, 1.2, 1, 0.6],
+            }}
+            transition={{ duration: 1.4, delay: i * 0.008, ease: [0.22, 1, 0.36, 1] }}
+          />
+        );
+      })}
+      {/* Unlock label — big, with a rubber-band scale-in + sustained shimmer. */}
+      <motion.div
+        className="relative text-center"
+        initial={{ scale: 0.4, opacity: 0, y: 12 }}
+        animate={{ scale: [0.4, 1.18, 1], opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, times: [0, 0.55, 1], ease: [0.22, 1, 0.36, 1] }}
+      >
+        <div
+          className="text-2xl sm:text-3xl font-black uppercase tracking-[0.18em]"
+          style={{
+            background: "linear-gradient(90deg, #fde68a, #fbbf24, #fde68a)",
+            backgroundClip: "text",
+            WebkitBackgroundClip: "text",
+            color: "transparent",
+            textShadow: "0 0 24px rgba(251,191,36,0.65)",
+          }}
+        >
+          ✦ {label}
         </div>
       </motion.div>
     </motion.div>
