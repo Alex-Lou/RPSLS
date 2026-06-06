@@ -328,18 +328,19 @@ function LaneSlot({ index, pick, favoured, verdict, cardHere, onClick, disabled 
  */
 function BigCardReveal({ id, side }: { id: CardId; side: "opp" | "you" }) {
   const isOpp = side === "opp";
-  // Slide-in trajectory: each card enters from off-screen on its OWN side
-  // (opp from the left, you from the right) so the eye tracks two arcs
-  // arriving in different directions rather than two cards stacked.
-  const startX = isOpp ? -160 : 160;
+  // Mirror of the previous version per Alex's reread: opponent lands in the
+  // TOP-RIGHT (sliding in from the right edge), yours in the BOTTOM-LEFT
+  // (sliding in from the left). Matches the natural "their move comes at me
+  // from above, mine comes out from where my thumb lives" reading.
+  const startX = isOpp ? 160 : -160;
   const startY = isOpp ? -40 : 40;
-  const restingTilt = isOpp ? -8 : 8;
+  const restingTilt = isOpp ? 8 : -8;
   return (
     <motion.div
       initial={{ opacity: 0, x: startX, y: startY, rotateY: 180, rotateZ: restingTilt * 1.4, scale: 0.78 }}
       animate={{
         opacity: [0, 1, 1, 1, 0],
-        x: [startX, 0, 0, 0, isOpp ? -8 : 8],
+        x: [startX, 0, 0, 0, isOpp ? 8 : -8],
         y: [startY, 0, 0, 0, isOpp ? -6 : 6],
         rotateY: [180, 180, 0, 0, 0],
         rotateZ: [restingTilt * 1.4, restingTilt, restingTilt, restingTilt, restingTilt * 0.6],
@@ -351,8 +352,8 @@ function BigCardReveal({ id, side }: { id: CardId; side: "opp" | "you" }) {
       className={
         "absolute z-30 pointer-events-none " +
         (isOpp
-          ? "top-2 left-2 sm:top-3 sm:left-3 w-20 h-28 sm:w-24 sm:h-32"
-          : "bottom-2 right-2 sm:bottom-3 sm:right-3 w-16 h-22 sm:w-20 sm:h-28")
+          ? "top-2 right-2 sm:top-3 sm:right-3 w-20 h-28 sm:w-24 sm:h-32"
+          : "bottom-2 left-2 sm:bottom-3 sm:left-3 w-16 h-22 sm:w-20 sm:h-28")
       }
     >
       {/* Rarity-coloured aura that pulses behind the card. */}
