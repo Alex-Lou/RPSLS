@@ -138,6 +138,10 @@ interface AppState {
   /** Dev / test helper: credit stars directly. Wired only to the dev modal
    *  ("+1000 ✦ test"), never exposed to players. */
   grantStars: (n: number) => void;
+  /** Dev / test helper: remove an "owned" set so the purchase flow can be
+   *  re-tested. Reached via a long-press on the "✓ OWNED" badge in Profile.
+   *  Production builds will gate this behind __DEV__ at the call site. */
+  revokePremiumSet: (setId: string) => void;
 }
 
 function detectLocale(): Locale {
@@ -435,6 +439,13 @@ export const useStore = create<AppState>()(
       },
       grantStars: (n) =>
         set((s) => ({ player: { ...s.player, stars: Math.max(0, (s.player.stars ?? 0) + Math.round(n)) } })),
+      revokePremiumSet: (setId) =>
+        set((s) => ({
+          player: {
+            ...s.player,
+            ownedPremiumSets: (s.player.ownedPremiumSets ?? []).filter((id) => id !== setId),
+          },
+        })),
     }),
     {
       name: "rpsls-app-state",

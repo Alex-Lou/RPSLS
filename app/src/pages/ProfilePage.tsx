@@ -15,6 +15,7 @@ import { resizeImageToDataUrl, ResizeImageError } from "../util/resizeImage";
 import { TabPicker } from "../ui/TabPicker";
 import { PremiumPurchaseModal, type PremiumSet } from "../ui/PremiumPurchaseModal";
 import { PremiumBadge } from "../ui/PremiumBadge";
+import { OwnedBadgeLongPress } from "../ui/OwnedBadgeLongPress";
 import { QuartzBackdrop } from "../backdrops/QuartzBackdrop";
 import { useT } from "../i18n";
 import { hapticTap, hapticMatchStart } from "../haptic";
@@ -555,11 +556,11 @@ export function ProfilePage() {
                     </div>
                   )}
                   {bg.premiumSetId && (
-                    <PremiumBadge
-                      variant="ribbon"
-                      label={(player.ownedPremiumSets ?? []).includes(bg.premiumSetId) ? "✓ OWNED" : "PREMIUM"}
-                      className="top-2 left-2"
-                    />
+                    (player.ownedPremiumSets ?? []).includes(bg.premiumSetId) ? (
+                      <OwnedBadgeLongPress setId={bg.premiumSetId} className="top-2 left-2" />
+                    ) : (
+                      <PremiumBadge variant="ribbon" label="PREMIUM" className="top-2 left-2" />
+                    )
                   )}
                   {bg.custom && (player.customBgs?.length ?? 0) === 0 && (
                     <div className="absolute inset-0 flex items-center justify-center text-ink-muted text-xs font-bold">
@@ -702,11 +703,11 @@ export function ProfilePage() {
                     </div>
                   )}
                   {meta.premiumSetId && (
-                    <PremiumBadge
-                      variant="ribbon"
-                      label={(player.ownedPremiumSets ?? []).includes(meta.premiumSetId) ? "✓ OWNED" : "PREMIUM"}
-                      className="top-2 left-2"
-                    />
+                    (player.ownedPremiumSets ?? []).includes(meta.premiumSetId) ? (
+                      <OwnedBadgeLongPress setId={meta.premiumSetId} className="top-2 left-2" />
+                    ) : (
+                      <PremiumBadge variant="ribbon" label="PREMIUM" className="top-2 left-2" />
+                    )
                   )}
                   {needsImport && (
                     <div className="absolute inset-0 flex items-center justify-center text-ink text-xs font-bold bg-black/45">
