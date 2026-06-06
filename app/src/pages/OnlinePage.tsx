@@ -689,10 +689,21 @@ export function OnlinePage() {
 
   function startBotFallback() {
     disarmBotFallback();
-    // Fully drop the socket so no late "queued"/"match_found" can yank the
-    // player out of the local match (the cloud server may still wake up and
-    // try to pair us seconds later).
-    try { clientRef.current?.disconnect(); } catch { /* ignore */ }
+    // Tell the server we'\''re leaving any pending match BEFORE dropping the
+    // socket. Without this, a match task spawned in the last few hundred ms
+    // (between our last queue check and now) sits there waiting for a move
+    // from a disconnected client, holding the slot until the 12s deadline.
+    // The on_end cleanup eventually removes the DashMap entries, but the
+    // race window means we burn match-cap quota and CPU for nothing.
+    const c = clientRef.current;
+    if (c && c.status === "open") {
+      try { c.send({ type: "leave_match" }); } catch { /* ignore */ }
+    }
+    // Brief grace so the leave_match text frame actually flushes to the
+    // socket before disconnect cancels its in-flight write.
+    window.setTimeout(() => {
+      try { c?.disconnect(); } catch { /* ignore */ }
+    }, 80);
     clientRef.current = null;
     setQueueStartAt(null);
 

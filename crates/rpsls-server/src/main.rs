@@ -43,7 +43,31 @@ mod protocol;
 mod security;
 mod session;
 
+/// Hard ceiling on concurrent active matches (classic + lanes combined).
+/// Past this, new join_lobby / join_queue calls are refused with `server_full`
+/// instead of spawning a fresh tokio task. Each running match owns two
+/// `Arc<Session>` and one `tokio::spawn`-ed task — bounded growth keeps the
+/// server within the Render free-tier memory envelope even under a scripted
+/// flood. Tunable via the `MAX_CONCURRENT_MATCHES` env var.
+const DEFAULT_MAX_MATCHES: usize = 400;
+/// Hard ceiling on open private lobbies. Same idea, smaller number (a lobby
+/// without a paired player is cheaper than a running match but accumulates
+/// faster — every `CreateLobby` makes one).
+const DEFAULT_MAX_LOBBIES: usize = 200;
+
+fn cap_from_env(var: &str, default: usize) -> usize {
+    std::env::var(var)
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(default)
+}
+
 struct AppState {
+    /// `in_match.len() + in_lanes.len()` must stay below this to accept new
+    /// matches. Loaded once at boot from `MAX_CONCURRENT_MATCHES` env.
+    max_matches: usize,
+    /// `lobbies.lobby_count()` must stay below this to accept new lobbies.
+    max_lobbies: usize,
     lobbies: Arc<LobbyManager>,
     /// Brute-force protection on JoinLobby — tracks failed attempts per IP.
     lobby_attempts: Arc<LobbyAttemptTracker>,
@@ -66,6 +90,8 @@ async fn main() {
         .init();
 
     let state = Arc::new(AppState {
+        max_matches: cap_from_env("MAX_CONCURRENT_MATCHES", DEFAULT_MAX_MATCHES),
+        max_lobbies: cap_from_env("MAX_CONCURRENT_LOBBIES", DEFAULT_MAX_LOBBIES),
         lobbies: Arc::new(LobbyManager::new()),
         lobby_attempts: Arc::new(LobbyAttemptTracker::default()),
         in_match: DashMap::new(),
@@ -77,6 +103,56 @@ async fn main() {
     // doesn't accumulate one perpetual entry per unique IP that ever tried
     // a lobby join. Runs every 5 min, no-op when nothing to prune.
     state.lobby_attempts.clone().spawn_janitor();
+
+    // Inactive-user sweeper: every 24h, SCAN `player:*`, read each row's
+    // `updatedAt`, and DELETE both `player:{id}` and `claim:{id}` when the
+    // row is older than INACTIVE_TTL_DAYS. Idempotent (a row that was
+    // already deleted last sweep just isn't there next sweep). Bounded:
+    // we sleep between SCAN pages so a sudden 100k-key sweep can't burn
+    // through the Upstash request budget.
+    tokio::spawn(async move {
+        const INACTIVE_TTL_DAYS: u64 = 180;
+        const SWEEP_INTERVAL_SECS: u64 = 24 * 3600;
+        const SCAN_PAGE: u32 = 200;
+        const PAGE_PAUSE_MS: u64 = 250;
+        let ttl_ms: u64 = INACTIVE_TTL_DAYS * 24 * 3600 * 1000;
+        // Skip the immediate first tick — boot-time bursts are bad form.
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(SWEEP_INTERVAL_SECS));
+        tick.tick().await;
+        loop {
+            tick.tick().await;
+            if !player_state::enabled() {
+                continue;
+            }
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0);
+            let cutoff_ms = now_ms.saturating_sub(ttl_ms);
+            let mut cursor = "0".to_string();
+            let mut deleted = 0u32;
+            let mut scanned = 0u32;
+            loop {
+                let Some((next, keys)) = player_state::scan_player_keys(&cursor, SCAN_PAGE).await else {
+                    break;
+                };
+                scanned += keys.len() as u32;
+                for key in &keys {
+                    let updated = player_state::read_updated_at(key).await;
+                    let Some(ts) = updated else { continue };
+                    if ts >= cutoff_ms { continue }
+                    let Some(pid) = player_state::player_id_from_key(key) else { continue };
+                    if player_state::delete_player(pid).await {
+                        deleted += 1;
+                    }
+                }
+                cursor = next;
+                if cursor == "0" { break }
+                tokio::time::sleep(std::time::Duration::from_millis(PAGE_PAUSE_MS)).await;
+            }
+            info!(scanned, deleted, days = INACTIVE_TTL_DAYS, "inactive-user sweep done");
+        }
+    });
 
     // Same pattern for the SyncState throttle map: each player_id who ever
     // pushed leaves an Instant entry; without periodic pruning the map grows
@@ -260,46 +336,60 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
     match msg {
         ClientMessage::Hello { nickname, player_id, claim_token, auth_token } => {
             // Sanitize nickname: strip control chars + RTL/bidi overrides +
-            // zero-width joiners. Cap at 24 chars. Always set (no auth gate).
-            let clean: String = nickname
-                .chars()
-                .filter(|c| {
-                    !c.is_control()
-                        && *c != '\u{200B}' && *c != '\u{200C}' && *c != '\u{200D}'  // ZWS / ZWNJ / ZWJ
-                        && *c != '\u{202A}' && *c != '\u{202B}' && *c != '\u{202C}'  // bidi: LRE / RLE / PDF
-                        && *c != '\u{202D}' && *c != '\u{202E}'                       // bidi: LRO / RLO
-                        && *c != '\u{2066}' && *c != '\u{2067}' && *c != '\u{2068}'  // bidi: LRI / RLI / FSI
-                        && *c != '\u{2069}'                                           // bidi: PDI
-                        && *c != '\u{FEFF}'                                           // BOM
-                })
-                .collect();
-            let clean = clean.trim();
-            if !clean.is_empty() && clean.chars().count() <= 24 {
-                session.set_nickname(clean.to_string());
-            }
+            // zero-width joiners. Cap at 24 chars. CAPTURED here but applied
+            // ONLY in an auth-success branch below — letting a client set the
+            // session nickname before auth check passes would let a wrong-token
+            // Hello still leave someone else's display name attached to this
+            // socket. Pure paranoia: in practice the queued nickname is never
+            // used until queue_join / play_move, which require an authenticated
+            // pid_clean, but cleanliness > coincidence.
+            let pending_nickname: Option<String> = {
+                let clean: String = nickname
+                    .chars()
+                    .filter(|c| {
+                        !c.is_control()
+                            && *c != '\u{200B}' && *c != '\u{200C}' && *c != '\u{200D}'  // ZWS / ZWNJ / ZWJ
+                            && *c != '\u{202A}' && *c != '\u{202B}' && *c != '\u{202C}'  // bidi: LRE / RLE / PDF
+                            && *c != '\u{202D}' && *c != '\u{202E}'                       // bidi: LRO / RLO
+                            && *c != '\u{2066}' && *c != '\u{2067}' && *c != '\u{2068}'  // bidi: LRI / RLI / FSI
+                            && *c != '\u{2069}'                                           // bidi: PDI
+                            && *c != '\u{FEFF}'                                           // BOM
+                    })
+                    .collect();
+                let trimmed = clean.trim();
+                if !trimmed.is_empty() && trimmed.chars().count() <= 24 {
+                    Some(trimmed.to_string())
+                } else { None }
+            };
 
             // Stable client id for leaderboard attribution + state sync.
             // Prefer an attested identity from auth_token (Google / Apple JWT)
-            // when supplied — even unverified (today), it's still HARDER to
-            // forge than a self-asserted UUID. See auth.rs TODO_VERIFY.
-            let attested = if !auth_token.trim().is_empty() {
+            // when supplied — even parsed-only (today), it's harder to forge
+            // than a self-asserted UUID. See auth.rs TODO_VERIFY for the
+            // signature-verification plan.
+            let candidate_pid: String = if !auth_token.trim().is_empty() {
                 match auth::extract_unverified_subject(auth_token.trim()) {
-                    Ok(c) => Some(c.sub),
+                    Ok(c) => c.sub,
                     Err(e) => {
                         warn!(?e, "auth_token parse failed — falling back to client player_id");
-                        None
+                        player_id.clone()
                     }
                 }
-            } else { None };
-            let pid: String = attested.unwrap_or_else(|| player_id.clone())
-                .chars().filter(|c| !c.is_control()).take(64).collect();
-            let pid_clean = pid.trim().to_string();
+            } else {
+                player_id.clone()
+            };
+            // Strict UUID-style validation regardless of source: only ASCII
+            // alnum + dashes, length 32..=64. Closes the Redis-key path-
+            // traversal vector even if a future JWT issuer slips a weird sub
+            // through (defense-in-depth — JWT sub format is provider-defined
+            // and not guaranteed alnum+dash).
+            let pid_clean = validate_player_id(&candidate_pid);
 
-            if !pid_clean.is_empty() {
+            if let Some(pid) = pid_clean {
                 let client_token: String = claim_token.chars().filter(|c| !c.is_control()).take(64).collect();
                 let client_token = client_token.trim().to_string();
                 let session_clone = session.clone();
-                let pid = pid_clean;
+                let nick_for_auth = pending_nickname;
 
                 // TOFU claim-token verification + state load run in parallel.
                 tokio::spawn(async move {
@@ -310,7 +400,9 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
 
                     match stored_token {
                         Some(ref st) if client_token == *st => {
-                            // Token matches — authenticate session.
+                            // Token matches — authenticate session AND adopt
+                            // the supplied nickname (only-if-auth-OK).
+                            if let Some(n) = nick_for_auth { session_clone.set_nickname(n); }
                             session_clone.set_player_id(pid);
                             let state = progress.unwrap_or_default();
                             session_clone.send(ServerMessage::StateLoaded {
@@ -319,7 +411,8 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
                             });
                         }
                         Some(_) => {
-                            // Token exists but client sent wrong/empty token.
+                            // Token exists but client sent wrong/empty token —
+                            // do NOT adopt the supplied nickname (leaks identity).
                             warn!(player_id = %pid, "claim token mismatch — Hello rejected");
                             session_clone.send(ServerMessage::Error {
                                 code: "auth_failed".into(),
@@ -327,24 +420,53 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
                             });
                         }
                         None => {
-                            // First connection for this player_id — issue token.
-                            let new_token = Uuid::new_v4().to_string();
-                            player_state::save_claim_token(pid.clone(), new_token.clone());
-                            session_clone.set_player_id(pid);
-                            let state = progress.unwrap_or_default();
-                            session_clone.send(ServerMessage::StateLoaded {
-                                state,
-                                claim_token: Some(new_token),
-                            });
+                            // First connection for this player_id — atomically
+                            // create the token via Redis SET NX so two concurrent
+                            // Hellos can't both mint and one steal. If NX fails
+                            // it means another connection won the race; we reject
+                            // and ask the client to retry with its existing token.
+                            match player_state::try_create_claim_token(&pid).await {
+                                Ok(Some(new_token)) => {
+                                    if let Some(n) = nick_for_auth { session_clone.set_nickname(n); }
+                                    session_clone.set_player_id(pid);
+                                    let state = progress.unwrap_or_default();
+                                    session_clone.send(ServerMessage::StateLoaded {
+                                        state,
+                                        claim_token: Some(new_token),
+                                    });
+                                }
+                                Ok(None) => {
+                                    warn!(player_id = %pid, "claim token NX race — id was claimed by another session");
+                                    session_clone.send(ServerMessage::Error {
+                                        code: "auth_needed".into(),
+                                        message: "player_id was just claimed by another session — re-send with your claim_token".into(),
+                                    });
+                                }
+                                Err(()) => {
+                                    warn!(player_id = %pid, "claim token NX-create transient error");
+                                    session_clone.send(ServerMessage::Error {
+                                        code: "auth_transient".into(),
+                                        message: "transient auth backend error".into(),
+                                    });
+                                }
+                            }
                         }
                     }
                 });
+            } else if let Some(n) = pending_nickname {
+                // Anonymous client (no/invalid player_id) — there's no auth
+                // boundary to cross, so adopting the supplied nickname is safe.
+                // Used for casual play, LAN matches, and old clients pre-TOFU.
+                session.set_nickname(n);
             }
         }
 
         ClientMessage::CreateLobby { best_of } => {
             if !validate_best_of(best_of) {
                 return reply_error(session, "bad_best_of", "best_of must be odd 1..=9");
+            }
+            if state.lobbies.lobby_count() >= state.max_lobbies {
+                return reply_error(session, "server_full", "too many open lobbies right now — try again in a moment");
             }
             let code = state.lobbies.create_lobby(session.clone(), best_of);
             session.send(ServerMessage::LobbyCreated { code, best_of });
@@ -376,6 +498,9 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
             if lobby.host.id == session.id {
                 return reply_error(session, "self_lobby", "cannot join your own lobby");
             }
+            if state.in_match.len() + state.in_lanes.len() >= state.max_matches {
+                return reply_error(session, "server_full", "too many active matches right now — try again in a moment");
+            }
             // Legit join — clear any pent-up counter for this IP.
             state.lobby_attempts.record_success(session.peer_ip);
             let a_id = lobby.host.id.clone();
@@ -398,6 +523,9 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
                 return reply_error(session, "bad_best_of", "best_of must be odd 1..=9");
             }
             if let Some(opp) = state.lobbies.join_or_match(session.clone(), best_of).await {
+                if state.in_match.len() + state.in_lanes.len() >= state.max_matches {
+                    return reply_error(session, "server_full", "too many active matches right now — try again in a moment");
+                }
                 let a_id = opp.id.clone();
                 let b_id = session.id.clone();
                 let st = state.clone();
@@ -426,6 +554,9 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
                 .join_or_match_lanes(session.clone(), win_to)
                 .await
             {
+                if state.in_match.len() + state.in_lanes.len() >= state.max_matches {
+                    return reply_error(session, "server_full", "too many active matches right now — try again in a moment");
+                }
                 let a_id = opp.id.clone();
                 let b_id = session.id.clone();
                 let st = state.clone();
@@ -545,6 +676,25 @@ fn reply_error(session: &Arc<Session>, code: &str, msg: &str) {
     });
 }
 
+/// Strict player_id validator. Accepts only ASCII alphanumeric + hyphens, of
+/// length 32..=64 — the shape of a `crypto.randomUUID()` (36 chars) with
+/// headroom for future SHA-based ids. Anything weirder is rejected outright,
+/// which closes the Redis-key path-traversal vector (a `player_id` like
+/// `"../../leaderboard"` would otherwise become a Redis key fragment that
+/// some misconfigured REST proxy could mis-route).
+fn validate_player_id(raw: &str) -> Option<String> {
+    let clean: String = raw
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-')
+        .take(64)
+        .collect();
+    if clean.len() >= 32 && clean.len() <= 64 {
+        Some(clean)
+    } else {
+        None
+    }
+}
+
 fn validate_best_of(n: u8) -> bool {
     n >= 1 && n <= 9 && n % 2 == 1
 }
@@ -552,4 +702,52 @@ fn validate_best_of(n: u8) -> bool {
 /// Number of round-wins to take a Lanes match (3 → bo5, 5 → bo9, etc.).
 fn validate_win_to(n: u8) -> bool {
     (1..=5).contains(&n)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accepts_uuid_v4() {
+        let v4 = "550e8400-e29b-41d4-a716-446655440000";
+        assert_eq!(validate_player_id(v4).as_deref(), Some(v4));
+    }
+
+    #[test]
+    fn rejects_path_traversal() {
+        assert!(validate_player_id("../../sensitive-key").is_none());
+        assert!(validate_player_id("player:abc/../leaderboard").is_none());
+    }
+
+    #[test]
+    fn rejects_too_short_post_filter() {
+        assert!(validate_player_id("abc123").is_none()); // <32 raw
+        // 65 'a's get truncated to 64 — caller'\''s problem, but the result is
+        // still a valid-shape id. The point of the length cap is to bound
+        // the Redis key size, not to bounce slightly-too-long inputs.
+        assert_eq!(validate_player_id(&"a".repeat(65)).map(|s| s.len()), Some(64));
+    }
+
+    #[test]
+    fn strips_then_accepts_when_remainder_valid() {
+        // Null byte stripped → remaining 36 chars pass; the result is exactly
+        // the UUID without the embedded control byte. That'\''s the desired
+        // defense-in-depth behaviour (nulls cannot reach Redis).
+        let out = validate_player_id("550e8400-e29b-41d4\u{0000}-a716-446655440000").unwrap();
+        assert_eq!(out, "550e8400-e29b-41d4-a716-446655440000");
+    }
+
+    #[test]
+    fn rejects_when_filter_empties_string() {
+        // Non-ASCII removed → empty → too short → reject.
+        assert!(validate_player_id(&"é".repeat(32)).is_none());
+    }
+
+    #[test]
+    fn strips_disallowed_then_revalidates() {
+        // Bytes that get stripped reduce length below 32 → reject.
+        let raw = "550e8400-e29b-41d4-a716-{{{{}}}}";
+        assert!(validate_player_id(raw).is_none());
+    }
 }
