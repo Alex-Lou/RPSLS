@@ -14,9 +14,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import type { CardId } from "./rankedTypes";
 import type { PadId, ThemeId } from "../types";
-import { CardImage } from "./CardImage";
 import { THEMES } from "../theme/theme";
 import { useStore } from "../store/store";
 import { isAvatarImage, avatarImgStyle } from "../theme/avatar";
@@ -32,7 +30,7 @@ export interface Arena {
 export function MatchPrepScreen({
   youName, youAvatar, youThemeId,
   oppName, oppAvatar, oppThemeId, oppPadId,
-  onManageDeck, onReady, onBack,
+  onReady, onBack,
 }: {
   youName: string;
   youAvatar: string;
@@ -41,11 +39,11 @@ export function MatchPrepScreen({
   oppAvatar: string;
   oppThemeId: ThemeId;
   oppPadId: PadId;
-  onManageDeck?: () => void;
   onReady: (arena: Arena) => void;
   onBack: () => void;
 }) {
-  const deck = (useStore((s) => s.player.rankedDeck) ?? []) as CardId[];
+  // Deck is prepared earlier (in the ranked lobby), so this screen is just
+  // the coin flip for the arena — no deck management here.
   const youPadId = useStore((s) => s.player.padId);
 
   // Coin state: idle → flipping → landed. `winner` is the resolved side.
@@ -108,34 +106,6 @@ export function MatchPrepScreen({
         <FighterCard name={youName} avatar={youAvatar} theme={youTheme} tag="Toi" highlight={winner === "you"} />
         <div className="flex items-center text-lg font-black text-ink-faint">VS</div>
         <FighterCard name={oppName} avatar={oppAvatar} theme={oppTheme} tag="Adv." highlight={winner === "opp"} />
-      </div>
-
-      {/* Deck check */}
-      <div className="rounded-2xl bg-surface border border-hairline p-3">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-ink-muted">
-            Ton deck
-          </span>
-          {onManageDeck && (
-            <button
-              onClick={() => { hapticTick(); onManageDeck(); }}
-              className="text-[11px] font-bold text-violet-300 hover:text-violet-200"
-            >
-              Gérer →
-            </button>
-          )}
-        </div>
-        {deck.length === 0 ? (
-          <p className="text-[11px] text-ink-faint">Deck par défaut.</p>
-        ) : (
-          <div className="flex gap-1.5">
-            {deck.slice(0, 6).map((id, i) => (
-              <div key={i} className="relative w-9 h-12 rounded-md overflow-hidden ring-1 ring-white/15 shrink-0">
-                <CardImage id={id} glyphSize="text-sm" />
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Coin flip — the centrepiece. */}
