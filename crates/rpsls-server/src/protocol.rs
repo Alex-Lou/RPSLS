@@ -23,6 +23,12 @@ pub enum ClientMessage {
         player_id: String,
         #[serde(default)]
         claim_token: String,
+        /// Optional Google Play Games / Sign-in-with-Apple ID token (JWT).
+        /// When present, the server prefers its `sub` claim as the effective
+        /// player_id over the client-supplied one. See `auth.rs` for the
+        /// migration plan (currently parsed UNVERIFIED — scaffolding only).
+        #[serde(default)]
+        auth_token: String,
     },
 
     /// Create a private lobby. Server replies with a 6-char code.

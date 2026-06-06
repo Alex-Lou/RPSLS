@@ -33,6 +33,7 @@ use crate::protocol::{ClientMessage, PlayerSlot, ServerMessage};
 use crate::security::{cors_layer, governor_layer, LobbyAttemptTracker, MsgRateLimit};
 use crate::session::Session;
 
+mod auth;
 mod lanes_engine;
 mod leaderboard;
 mod lobby;
@@ -257,7 +258,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, peer_ip: std::ne
 
 async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, msg: ClientMessage) {
     match msg {
-        ClientMessage::Hello { nickname, player_id, claim_token } => {
+        ClientMessage::Hello { nickname, player_id, claim_token, auth_token } => {
             // Sanitize nickname: strip control chars + RTL/bidi overrides +
             // zero-width joiners. Cap at 24 chars. Always set (no auth gate).
             let clean: String = nickname
@@ -278,7 +279,20 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
             }
 
             // Stable client id for leaderboard attribution + state sync.
-            let pid: String = player_id.chars().filter(|c| !c.is_control()).take(64).collect();
+            // Prefer an attested identity from auth_token (Google / Apple JWT)
+            // when supplied — even unverified (today), it's still HARDER to
+            // forge than a self-asserted UUID. See auth.rs TODO_VERIFY.
+            let attested = if !auth_token.trim().is_empty() {
+                match auth::extract_unverified_subject(auth_token.trim()) {
+                    Ok(c) => Some(c.sub),
+                    Err(e) => {
+                        warn!(?e, "auth_token parse failed — falling back to client player_id");
+                        None
+                    }
+                }
+            } else { None };
+            let pid: String = attested.unwrap_or_else(|| player_id.clone())
+                .chars().filter(|c| !c.is_control()).take(64).collect();
             let pid_clean = pid.trim().to_string();
 
             if !pid_clean.is_empty() {
