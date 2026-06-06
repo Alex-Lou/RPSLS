@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { useStore } from "../store/store";
 import { THEMES, gradientFromTheme } from "../theme/theme";
 import { levelFromXp } from "../engine/leveling";
@@ -54,6 +54,8 @@ export function ProfilePage() {
   const [appearanceTab, setAppearanceTab] = useState<"bg" | "hud">("bg");
   // Battle pad card: animated (coded) pads vs imported images, under tabs.
   const [padTab, setPadTab] = useState<"coded" | "img">("coded");
+  const [previewPad, setPreviewPad] = useState<PadId | null>(null);
+  const [previewBg, setPreviewBg] = useState<typeof BACKGROUNDS[number] | null>(null);
 
   const info = levelFromXp(player.xp);
   const theme = THEMES[player.themeId];
@@ -505,9 +507,6 @@ export function ProfilePage() {
               <button
                 key={bg.id}
                 onClick={() => {
-                  // "Mon image" → the dedicated library below handles the picker;
-                  // tapping the tile just switches to custom (if there's anything
-                  // imported) or opens the file picker.
                   if (bg.custom) {
                     if ((player.customBgs?.length ?? 0) === 0) {
                       bgFileRef.current?.click();
@@ -516,12 +515,7 @@ export function ProfilePage() {
                     updateProfile({ backgroundId: "custom" });
                     return;
                   }
-                  const patch: Partial<{ backgroundId: BackgroundId; padId: PadId }> = { backgroundId: bg.id };
-                  // Only auto-apply the theme's default pad if the player has
-                  // never explicitly chosen one — otherwise pad stays put
-                  // (pad and background are independent once both are touched).
-                  if (bg.defaultPadId && !player.padChosen) patch.padId = bg.defaultPadId;
-                  updateProfile(patch);
+                  setPreviewBg(bg);
                 }}
                 className={
                   "group rounded-2xl border overflow-hidden transition text-left " +
@@ -685,9 +679,6 @@ export function ProfilePage() {
               <button
                 key={id}
                 onClick={() => {
-                  // "Mon image" → if nothing's imported yet, open the file picker.
-                  // Otherwise just switch to the custom slot; the library row
-                  // below handles per-image select / delete.
                   if (isCustom) {
                     if ((player.customPads?.length ?? 0) === 0) {
                       padFileRef.current?.click();
@@ -696,9 +687,7 @@ export function ProfilePage() {
                     updateProfile({ padId: "custom", padChosen: true });
                     return;
                   }
-                  // Pad pick is independent — it never changes the background.
-                  // Mark padChosen so backgrounds stop auto-overriding it.
-                  updateProfile({ padId: id, padChosen: true });
+                  setPreviewPad(id);
                 }}
                 className={
                   "group rounded-2xl border overflow-hidden transition text-left " +
@@ -860,6 +849,120 @@ export function ProfilePage() {
           </div>
         )}
       </section>
+
+      {/* ── Pad preview modal ── */}
+      <AnimatePresence>
+        {previewPad && (
+          <motion.div
+            key="pad-preview"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="fixed inset-0 z-[90] flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm"
+            onClick={() => setPreviewPad(null)}
+          >
+            <div className="w-full max-w-2xl aspect-[3/2] relative" onClick={(e) => e.stopPropagation()}>
+              <BattlePad padId={previewPad} className="w-full h-full rounded-2xl overflow-hidden" />
+            </div>
+            <div className="flex items-center gap-2 mt-2 text-xs text-ink-faint">
+              <span className="font-bold text-white text-sm">{PAD_META[previewPad]?.label}</span>
+              <span>—</span>
+              <span>{PAD_META[previewPad]?.tagline}</span>
+            </div>
+            <div className="flex gap-3 mt-4" onClick={(e) => e.stopPropagation()}>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  hapticMatchStart();
+                  updateProfile({ padId: previewPad, padChosen: true });
+                  setPreviewPad(null);
+                }}
+                className={
+                  "px-6 py-2.5 rounded-2xl font-bold text-sm shadow-lg transition " +
+                  (player.padId === previewPad
+                    ? "bg-emerald-500/80 text-white"
+                    : "bg-themed text-white")
+                }
+              >
+                {player.padId === previewPad ? "✓ Actif" : "Choisir ce tapis"}
+              </motion.button>
+              <button
+                onClick={() => setPreviewPad(null)}
+                className="px-5 py-2.5 rounded-2xl font-bold text-sm bg-white/10 text-ink hover:bg-white/15 transition"
+              >
+                Fermer
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Background preview modal ── */}
+      <AnimatePresence>
+        {previewBg && (
+          <motion.div
+            key="bg-preview"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="fixed inset-0 z-[90] flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm"
+            onClick={() => setPreviewBg(null)}
+          >
+            <div
+              className="w-full max-w-md aspect-[9/16] max-h-[75vh] rounded-2xl overflow-hidden border border-white/10"
+              onClick={(e) => e.stopPropagation()}
+              style={
+                previewBg.accent
+                  ? {
+                      backgroundImage:
+                        `radial-gradient(120% 90% at 15% 0%, ${previewBg.accent.from}cc, transparent 60%), ` +
+                        `radial-gradient(120% 90% at 100% 100%, ${previewBg.accent.to}bb, transparent 60%)`,
+                      backgroundColor: "#0a0a14",
+                    }
+                  : { background: "radial-gradient(120% 80% at 20% 0%, rgba(124,92,255,0.45), transparent 60%), radial-gradient(120% 80% at 100% 100%, rgba(45,212,191,0.35), transparent 60%)" }
+              }
+            >
+              {previewBg.scene && (
+                <div className="absolute inset-0 flex items-center justify-center text-ink-faint text-sm font-bold">
+                  ✦ Aperçu limité — rendu complet sur device
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2 mt-2 text-xs text-ink-faint">
+              <span className="font-bold text-white text-sm">{previewBg.label}</span>
+              {previewBg.scene && <span className="text-cyan-400 text-[10px] font-bold">✦ LIVE</span>}
+            </div>
+            <div className="flex gap-3 mt-4" onClick={(e) => e.stopPropagation()}>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  hapticMatchStart();
+                  const patch: Partial<{ backgroundId: BackgroundId; padId: PadId }> = { backgroundId: previewBg.id };
+                  if (previewBg.defaultPadId && !player.padChosen) patch.padId = previewBg.defaultPadId;
+                  updateProfile(patch);
+                  setPreviewBg(null);
+                }}
+                className={
+                  "px-6 py-2.5 rounded-2xl font-bold text-sm shadow-lg transition " +
+                  ((player.backgroundId ?? "default") === previewBg.id
+                    ? "bg-emerald-500/80 text-white"
+                    : "bg-themed text-white")
+                }
+              >
+                {(player.backgroundId ?? "default") === previewBg.id ? "✓ Actif" : "Choisir ce fond"}
+              </motion.button>
+              <button
+                onClick={() => setPreviewBg(null)}
+                className="px-5 py-2.5 rounded-2xl font-bold text-sm bg-white/10 text-ink hover:bg-white/15 transition"
+              >
+                Fermer
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

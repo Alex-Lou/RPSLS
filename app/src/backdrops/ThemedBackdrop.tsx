@@ -361,7 +361,7 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
     if (!canvas) return;
 
     const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    const MIN_DT = 1000 / 60; // 60fps target — smoother, more "liquid" feel (was 40)
+    const MIN_DT = 1000 / 60; // 60fps — capable devices run smooth; battery saved by visibility pause
     let gl: WebGLRenderingContext | null = null;
     let prog: WebGLProgram | null = null;
     let buf: WebGLBuffer | null = null;

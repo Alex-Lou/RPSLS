@@ -9,6 +9,10 @@ export type PadId =
   // Fully coded, animated playmats (SVG/SMIL — no PNGs anymore).
   | "chalkboard" | "vintage" | "cosmos" | "galaxy" | "neon" | "comics"
   | "cyberpunk" | "holy" | "quantum" | "casino"
+  // Dedicated pads matching coded backgrounds.
+  | "nebula" | "aurora_borealis"
+  // Second casino variant — black & gold Monte-Carlo midnight.
+  | "casino_noir"
   // Theme-reactive pad: colours follow the active theme/background accent.
   | "aura"
   // Player's own uploaded mat (data URL on the player).
@@ -135,7 +139,10 @@ export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: st
   cyberpunk:  { label: "Cyberpunk",      emoji: "🌆", tagline: "Neon hex grid, holographic HUD, scanlines." },
   holy:       { label: "Holy Game",      emoji: "✝️", tagline: "Cathedral light, gilded relics, sacred geometry." },
   quantum:    { label: "Quantum Lab",    emoji: "⚛️", tagline: "Particle traces, physics equations." },
+  nebula:     { label: "Nebula",         emoji: "🌌", tagline: "Nuages de gaz violet et cyan, étoiles, pulsations." },
+  aurora_borealis: { label: "Aurore Boréale", emoji: "🌌", tagline: "Ciel polaire, rideaux de lumière verte et violette." },
   casino:     { label: "Casino Royale",  emoji: "🎰", tagline: "Feutre émeraude, roulette, jetons et or Art Déco." },
+  casino_noir:{ label: "Casino Noir",   emoji: "🃏", tagline: "Monte-Carlo minuit : noir, or, médaillon Art Déco." },
   aura:       { label: "Aura",           emoji: "🎨", tagline: "S'accorde à ton thème : couleurs et lueurs vivantes." },
   custom:     { label: "Mon image",      emoji: "🖼️", tagline: "Ton propre tapis (paysage 3:2, ex. 1500×1000)." },
 };

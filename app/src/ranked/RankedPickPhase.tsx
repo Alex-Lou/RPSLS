@@ -262,8 +262,13 @@ function TimerBar({ startedAt, durationMs }: { startedAt: number; durationMs: nu
   const [now, setNow] = useState(Date.now());
   const prevLevel = useRef<"calm" | "urgent" | "critical">("calm");
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 80);
-    return () => clearInterval(id);
+    let id: ReturnType<typeof setInterval> | undefined;
+    const start = () => { if (!id) id = setInterval(() => setNow(Date.now()), 250); };
+    const stop = () => { if (id) { clearInterval(id); id = undefined; } };
+    const onVis = () => { if (document.hidden) stop(); else { setNow(Date.now()); start(); } };
+    document.addEventListener("visibilitychange", onVis);
+    start();
+    return () => { stop(); document.removeEventListener("visibilitychange", onVis); };
   }, []);
   const elapsed = Math.max(0, now - startedAt);
   const remaining = Math.max(0, durationMs - elapsed);

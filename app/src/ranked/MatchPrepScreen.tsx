@@ -59,11 +59,15 @@ export function MatchPrepScreen({
     const result: "you" | "opp" = Math.random() < 0.5 ? "you" : "opp";
     setWinner(result);
     setPhase("flipping");
-    // The coin animation runs ~1.8s; reveal the verdict when it settles.
-    window.setTimeout(() => {
+    // Haptic pulses during the toss
+    const t1 = window.setTimeout(() => hapticTick(), 400);
+    const t2 = window.setTimeout(() => hapticTick(), 900);
+    // The coin animation runs ~2.6s; reveal the verdict when it settles.
+    const t3 = window.setTimeout(() => {
       hapticMatchStart();
       setPhase("landed");
-    }, 1800);
+    }, 2600);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }
 
   function concede() {
@@ -222,7 +226,7 @@ function FighterCard({
 
 /* ─────────── The coin ─────────── */
 
-const COIN = 108;
+const COIN = 120;
 
 function Coin({
   phase, winner, youTheme, oppTheme,
@@ -232,84 +236,117 @@ function Coin({
   youTheme: { primary: string; secondary: string };
   oppTheme: { primary: string; secondary: string };
 }) {
-  // Landing rotation: many full turns + a half-turn when the opponent wins so
-  // the "tails" (opp) face ends up toward the camera. You = heads (0°).
-  const spins = 6;
+  const spins = 8;
   const target = phase === "idle" ? 0 : spins * 360 + (winner === "opp" ? 180 : 0);
   const winColor = winner === "opp" ? oppTheme.primary : youTheme.primary;
 
   return (
-    <div className="relative flex items-center justify-center" style={{ perspective: 1100, width: COIN + 40, height: COIN + 40 }}>
-      {/* Glow puck under the coin */}
+    <div className="relative flex items-center justify-center" style={{ perspective: 900, width: COIN + 48, height: COIN + 64 }}>
+      {/* Dynamic drop shadow under the coin */}
       <motion.div
         aria-hidden
         animate={{
-          opacity: phase === "flipping" ? [0.3, 0.7, 0.3] : phase === "landed" ? 0.6 : 0.4,
-          scale: phase === "flipping" ? [0.9, 1.15, 0.9] : 1,
+          opacity: phase === "flipping" ? [0.2, 0.06, 0.12, 0.35] : 0.25,
+          scaleX: phase === "flipping" ? [1, 0.6, 0.8, 1.1] : 1,
+          scaleY: phase === "flipping" ? [1, 0.4, 0.6, 1] : 1,
+          y: phase === "flipping" ? [0, 40, 20, 4] : 0,
         }}
-        transition={{ duration: 0.6, repeat: phase === "flipping" ? Infinity : 0 }}
-        className="absolute rounded-full blur-2xl"
-        style={{ width: COIN, height: COIN, background: `radial-gradient(circle, ${winColor}, transparent 70%)` }}
+        transition={{ duration: 2.6, ease: "easeInOut" }}
+        className="absolute rounded-full blur-xl"
+        style={{ width: COIN * 0.8, height: 18, bottom: 4, background: "rgba(0,0,0,0.6)" }}
       />
 
-      {/* Landing shockwave ring — fires once when the verdict settles. */}
+      {/* Ambient glow halo */}
+      <motion.div
+        aria-hidden
+        animate={{
+          opacity: phase === "flipping" ? [0.3, 0.6, 0.3] : phase === "landed" ? 0.7 : 0.35,
+          scale: phase === "flipping" ? [1, 1.3, 1] : phase === "landed" ? 1.2 : 1,
+        }}
+        transition={{ duration: phase === "flipping" ? 1.2 : 0.5, repeat: phase === "flipping" ? Infinity : 0 }}
+        className="absolute rounded-full blur-3xl"
+        style={{ width: COIN * 1.4, height: COIN * 1.4, background: `radial-gradient(circle, ${winColor}88, transparent 70%)` }}
+      />
+
+      {/* Landing shockwave — double ring burst */}
       <AnimatePresence>
-        {phase === "landed" && (
+        {phase === "landed" && [0, 0.12].map((delay, ri) => (
           <motion.div
-            key="shock"
+            key={"shock" + ri}
             aria-hidden
-            initial={{ opacity: 0.8, scale: 0.5 }}
-            animate={{ opacity: 0, scale: 2.1 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
+            initial={{ opacity: 0.7 - ri * 0.2, scale: 0.4 }}
+            animate={{ opacity: 0, scale: 2.4 - ri * 0.3 }}
+            transition={{ duration: 0.9, delay, ease: "easeOut" }}
             className="absolute rounded-full"
-            style={{ width: COIN, height: COIN, border: `3px solid ${winColor}` }}
+            style={{ width: COIN, height: COIN, border: `${2.5 - ri}px solid ${winColor}` }}
           />
-        )}
+        ))}
       </AnimatePresence>
 
-      {/* Landing sparkles in the winner's colour. */}
+      {/* Landing sparkles — more, varied sizes and velocities */}
       <AnimatePresence>
-        {phase === "landed" && Array.from({ length: 10 }).map((_, i) => {
-          const ang = (i / 10) * Math.PI * 2;
+        {phase === "landed" && Array.from({ length: 14 }).map((_, i) => {
+          const ang = (i / 14) * Math.PI * 2 + (i % 2) * 0.2;
+          const dist = 55 + (i % 3) * 25;
+          const size = 1 + (i % 4) * 0.6;
           return (
             <motion.span
               key={"sp" + i}
               aria-hidden
-              initial={{ opacity: 1, x: 0, y: 0, scale: 1 }}
-              animate={{ opacity: 0, x: Math.cos(ang) * 70, y: Math.sin(ang) * 70, scale: 0.2 }}
-              transition={{ duration: 0.7, delay: 0.05 + (i % 3) * 0.04, ease: "easeOut" }}
-              className="absolute w-1.5 h-1.5 rounded-full"
-              style={{ background: winColor, boxShadow: `0 0 8px ${winColor}` }}
+              initial={{ opacity: 1, x: 0, y: 0, scale: 1.2 }}
+              animate={{
+                opacity: 0,
+                x: Math.cos(ang) * dist,
+                y: Math.sin(ang) * dist - 10,
+                scale: 0,
+              }}
+              transition={{ duration: 0.8 + (i % 3) * 0.15, delay: (i % 4) * 0.03, ease: "easeOut" }}
+              className="absolute rounded-full"
+              style={{
+                width: size * 2, height: size * 2,
+                background: i % 3 === 0 ? "#fff" : winColor,
+                boxShadow: `0 0 ${6 + (i % 3) * 4}px ${winColor}`,
+              }}
             />
           );
         })}
       </AnimatePresence>
 
-      {/* The coin — toss arc (y/scale) wraps the spin (rotateY) + tumble. */}
+      {/* The coin — parabolic toss arc with hang time at the peak */}
       <motion.div
         animate={
           phase === "idle"
-            ? { y: [0, -5, 0] }
-            : { y: [0, -46, 6, 0], scale: [1, 1.18, 1.0, 1] }
+            ? { y: [0, -6, 0], rotateZ: [0, 1, 0, -1, 0] }
+            : { y: [0, -80, -85, -70, -10, 6, -2, 0], scale: [1, 1.12, 1.15, 1.08, 0.95, 1.06, 0.98, 1] }
         }
         transition={
           phase === "idle"
-            ? { duration: 2.6, ease: "easeInOut", repeat: Infinity }
-            : { duration: 1.8, ease: [0.2, 0.7, 0.2, 1], times: [0, 0.4, 0.8, 1] }
+            ? { duration: 3, ease: "easeInOut", repeat: Infinity }
+            : { duration: 2.6, ease: [0.22, 0.68, 0.36, 1], times: [0, 0.28, 0.36, 0.48, 0.72, 0.82, 0.92, 1] }
         }
         style={{ width: COIN, height: COIN }}
         className="relative"
       >
         <motion.div
-          animate={{ rotateY: target, rotateX: phase === "flipping" ? [0, 18, 0] : 0 }}
-          transition={phase === "idle" ? { duration: 0 } : { duration: 1.8, ease: [0.2, 0.7, 0.2, 1] }}
+          animate={{
+            rotateY: target,
+            rotateX: phase === "flipping" ? [0, 25, -15, 10, 0] : 0,
+            rotateZ: phase === "flipping" ? [0, 8, -6, 3, 0] : 0,
+          }}
+          transition={
+            phase === "idle"
+              ? { duration: 0 }
+              : {
+                  rotateY: { duration: 2.6, ease: [0.15, 0.6, 0.3, 1] },
+                  rotateX: { duration: 2.6, ease: "easeInOut", times: [0, 0.3, 0.55, 0.8, 1] },
+                  rotateZ: { duration: 2.6, ease: "easeInOut", times: [0, 0.25, 0.5, 0.8, 1] },
+                }
+          }
           style={{ transformStyle: "preserve-3d", width: COIN, height: COIN }}
           className="relative"
         >
-          {/* Heads = you */}
-          <CoinFace theme={youTheme} label="TOI" rotate={0} />
-          {/* Tails = opponent */}
-          <CoinFace theme={oppTheme} label="ADV" rotate={180} />
+          <CoinFace theme={youTheme} label="TOI" rotate={0} size={COIN} />
+          <CoinFace theme={oppTheme} label="ADV" rotate={180} size={COIN} />
         </motion.div>
       </motion.div>
     </div>
@@ -317,34 +354,78 @@ function Coin({
 }
 
 function CoinFace({
-  theme, label, rotate,
+  theme, label, rotate, size,
 }: {
   theme: { primary: string; secondary: string };
   label: string;
   rotate: number;
+  size: number;
 }) {
   return (
     <div
       className="absolute inset-0 rounded-full flex items-center justify-center overflow-hidden"
       style={{
-        // Metallic disc: bright highlight top-left → theme primary → darker rim,
-        // with a crisp light ring border for a struck-coin edge.
-        background: `radial-gradient(circle at 34% 28%, #fff 2%, color-mix(in oklab, ${theme.primary} 78%, #fff) 30%, ${theme.primary} 58%, color-mix(in oklab, ${theme.secondary} 70%, #000) 100%)`,
+        background: `
+          conic-gradient(from 160deg at 50% 50%,
+            color-mix(in oklab, ${theme.primary} 90%, #fff) 0deg,
+            ${theme.primary} 90deg,
+            color-mix(in oklab, ${theme.secondary} 80%, #000) 180deg,
+            ${theme.primary} 270deg,
+            color-mix(in oklab, ${theme.primary} 90%, #fff) 360deg
+          )`,
         transform: `rotateY(${rotate}deg)`,
         backfaceVisibility: "hidden",
-        border: "3px solid rgba(255,255,255,0.55)",
-        boxShadow: `inset 0 0 14px rgba(0,0,0,0.45), inset 0 3px 6px rgba(255,255,255,0.5), 0 8px 22px rgba(0,0,0,0.5)`,
+        border: "3.5px solid rgba(255,255,255,0.5)",
+        boxShadow: `
+          inset 0 0 18px rgba(0,0,0,0.5),
+          inset 0 4px 8px rgba(255,255,255,0.45),
+          inset 0 -3px 6px rgba(0,0,0,0.3),
+          0 10px 30px rgba(0,0,0,0.5)`,
       }}
     >
-      {/* Diagonal glint sweep across the face. */}
+      {/* Inner relief ring */}
+      <div
+        className="absolute rounded-full"
+        style={{
+          inset: 8,
+          border: "1.5px solid rgba(255,255,255,0.2)",
+          boxShadow: "inset 0 1px 3px rgba(255,255,255,0.15)",
+        }}
+      />
+      {/* Glint sweep — faster during flip for strobing effect */}
       <motion.div
         aria-hidden
-        animate={{ x: ["-120%", "120%"] }}
-        transition={{ duration: 2.4, ease: "easeInOut", repeat: Infinity, repeatDelay: 0.6 }}
-        className="absolute inset-y-0 w-1/3 -skew-x-12"
-        style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)" }}
+        animate={{ x: ["-140%", "140%"] }}
+        transition={{ duration: 1.8, ease: "easeInOut", repeat: Infinity, repeatDelay: 0.8 }}
+        className="absolute inset-y-0 w-2/5 -skew-x-12"
+        style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent)" }}
       />
-      <span className="relative text-xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.7)]" style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.05em" }}>
+      {/* Edge notch marks for coin authenticity */}
+      {Array.from({ length: 24 }).map((_, i) => {
+        const a = (i / 24) * Math.PI * 2;
+        const r = size / 2 - 4;
+        return (
+          <div
+            key={i}
+            className="absolute"
+            style={{
+              left: size / 2 + Math.cos(a) * r - 1,
+              top: size / 2 + Math.sin(a) * r - 1,
+              width: 2, height: 2,
+              borderRadius: "50%",
+              background: "rgba(255,255,255,0.2)",
+            }}
+          />
+        );
+      })}
+      <span
+        className="relative text-xl font-black text-white"
+        style={{
+          fontFamily: "var(--font-headline)",
+          letterSpacing: "0.06em",
+          textShadow: "0 2px 6px rgba(0,0,0,0.7), 0 0 12px rgba(255,255,255,0.15)",
+        }}
+      >
         {label}
       </span>
     </div>

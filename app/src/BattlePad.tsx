@@ -1,6 +1,7 @@
-import type { CSSProperties } from "react";
+import { type CSSProperties, useRef, useEffect, useCallback } from "react";
 import type { PadId } from "./types";
 import { useStore } from "./store/store";
+import { usePageVisible } from "./usePageVisible";
 import { W, H } from "./battlepads/dims";
 import { ChalkboardPad } from "./battlepads/ChalkboardPad";
 import { VintagePad } from "./battlepads/VintagePad";
@@ -11,7 +12,10 @@ import { HolyPad } from "./battlepads/HolyPad";
 import { QuantumPad } from "./battlepads/QuantumPad";
 import { GalaxyPad } from "./battlepads/GalaxyPad";
 import { CyberpunkPad } from "./battlepads/CyberpunkPad";
+import { NebulaPad } from "./battlepads/NebulaPad";
+import { AuroraBorealisPad } from "./battlepads/AuroraBorealisPad";
 import { CasinoPad } from "./battlepads/CasinoPad";
+import { CasinoNoirPad } from "./battlepads/CasinoNoirPad";
 import { AuraPad } from "./battlepads/AuraPad";
 
 export function BattlePad({
@@ -23,14 +27,26 @@ export function BattlePad({
   padId: PadId;
   className?: string;
   style?: CSSProperties;
-  /** When true, pads suppress big animated centerpieces (e.g. the Cosmos
-   *  atom orbits) so they read as quiet backdrops behind game content. */
   compact?: boolean;
 }) {
-  // The only image-based pad left is the player's own uploaded mat.
   const customPadUrl = useStore((s) => s.player.customPadUrl);
+  const visible = usePageVisible();
+  const svgRef = useRef<SVGSVGElement | null>(null);
+
+  const setRef = useCallback((el: SVGSVGElement | null) => {
+    svgRef.current = el;
+    if (el && !visible) el.pauseAnimations();
+  }, [visible]);
+
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    if (visible) el.unpauseAnimations();
+    else el.pauseAnimations();
+  }, [visible]);
 
   const common = {
+    ref: setRef,
     className,
     style,
     viewBox: `0 0 ${W} ${H}`,
@@ -48,10 +64,12 @@ export function BattlePad({
     case "quantum":    return <QuantumPad {...common} compact={compact} />;
     case "cyberpunk":  return <CyberpunkPad {...common} compact={compact} />;
     case "comics":     return <ComicsPad {...common} />;
+    case "nebula":     return <NebulaPad {...common} compact={compact} />;
+    case "aurora_borealis": return <AuroraBorealisPad {...common} compact={compact} />;
     case "casino":     return <CasinoPad {...common} compact={compact} />;
+    case "casino_noir":return <CasinoNoirPad {...common} compact={compact} />;
     case "aura":       return <AuraPad {...common} compact={compact} />;
     case "custom":
-      // Uploaded mat, or a graceful coded fallback until one is imported.
       return customPadUrl
         ? <ImagePad src={customPadUrl} {...common} />
         : <CosmosPad {...common} compact={compact} />;

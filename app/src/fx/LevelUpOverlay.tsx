@@ -139,7 +139,9 @@ export function BurstCanvas({ warm = false, intensity = 1 }: { warm?: boolean; i
     const uWarm = gl.getUniformLocation(prog, "u_warm");
     const uInt = gl.getUniformLocation(prog, "u_int");
     const start = performance.now();
+    let paused = false;
     const frame = (now: number) => {
+      if (paused) return;
       const t = (now - start) / 1000 / DURATION_S;
       gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
       gl.uniform2f(uRes, canvas.width, canvas.height);
@@ -149,12 +151,17 @@ export function BurstCanvas({ warm = false, intensity = 1 }: { warm?: boolean; i
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       if (t < 1.0) raf.current = requestAnimationFrame(frame);
     };
+    const onVis = () => {
+      if (document.hidden) { paused = true; cancelAnimationFrame(raf.current); }
+      else { paused = false; raf.current = requestAnimationFrame(frame); }
+    };
+    document.addEventListener("visibilitychange", onVis);
     raf.current = requestAnimationFrame(frame);
     return () => {
+      paused = true;
       cancelAnimationFrame(raf.current);
+      document.removeEventListener("visibilitychange", onVis);
       gl.deleteProgram(prog); gl.deleteBuffer(buf); gl.deleteShader(vs); gl.deleteShader(fs);
-      // Release the GL context immediately — celebration bursts mount/unmount
-      // often (every win + podium), so leaked contexts would pile up fast.
       gl.getExtension("WEBGL_lose_context")?.loseContext();
     };
   }, [warm, intensity]);

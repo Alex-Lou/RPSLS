@@ -1684,8 +1684,13 @@ function TimerRing({
 }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 80);
-    return () => clearInterval(id);
+    let id: ReturnType<typeof setInterval> | undefined;
+    const start = () => { if (!id) id = setInterval(() => setNow(Date.now()), 250); };
+    const stop = () => { if (id) { clearInterval(id); id = undefined; } };
+    const onVis = () => { if (document.hidden) stop(); else { setNow(Date.now()); start(); } };
+    document.addEventListener("visibilitychange", onVis);
+    start();
+    return () => { stop(); document.removeEventListener("visibilitychange", onVis); };
   }, []);
   const elapsed = startedAt ? Math.max(0, now - startedAt) : 0;
   const remaining = Math.max(0, durationMs - elapsed);
@@ -2153,8 +2158,13 @@ function QueueRadar({
 }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(id);
+    let id: ReturnType<typeof setInterval> | undefined;
+    const start = () => { if (!id) id = setInterval(() => setNow(Date.now()), 250); };
+    const stop = () => { if (id) { clearInterval(id); id = undefined; } };
+    const onVis = () => { if (document.hidden) stop(); else { setNow(Date.now()); start(); } };
+    document.addEventListener("visibilitychange", onVis);
+    start();
+    return () => { stop(); document.removeEventListener("visibilitychange", onVis); };
   }, []);
   const elapsedSec = startedAt ? Math.floor((now - startedAt) / 1000) : 0;
   // Progression toward the bot fallback, from the most recent (re)arm. The

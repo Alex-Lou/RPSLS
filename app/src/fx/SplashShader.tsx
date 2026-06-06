@@ -54,7 +54,7 @@ function DefaultCosmicShader() {
     // Resize canvas to fill its CSS box at devicePixelRatio capped at 2
     // (above 2 the perf hit isn't worth it on mobile).
     const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
       const w = Math.floor(window.innerWidth * dpr);
       const h = Math.floor(window.innerHeight * dpr);
       if (canvas.width !== w || canvas.height !== h) {
@@ -204,16 +204,23 @@ function DefaultCosmicShader() {
     const uTime = gl.getUniformLocation(prog, "u_time");
 
     const start = performance.now();
+    let running = true;
     const frame = () => {
+      if (!running) return;
       gl.uniform2f(uRes, canvas.width, canvas.height);
       gl.uniform1f(uTime, (performance.now() - start) / 1000);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       rafRef.current = requestAnimationFrame(frame);
     };
+    const startLoop = () => { if (running) return; running = true; rafRef.current = requestAnimationFrame(frame); };
+    const stopLoop = () => { running = false; cancelAnimationFrame(rafRef.current); };
+    const onVis = () => { if (document.hidden) stopLoop(); else startLoop(); };
+    document.addEventListener("visibilitychange", onVis);
     frame();
 
     return () => {
-      cancelAnimationFrame(rafRef.current);
+      stopLoop();
+      document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("resize", resize);
       gl.deleteProgram(prog);
       gl.deleteBuffer(buf);
