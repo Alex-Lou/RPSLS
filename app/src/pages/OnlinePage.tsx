@@ -231,6 +231,10 @@ export function OnlinePage() {
   // gets a game. `vsBot` drives the classic flow locally; lanes route to the
   // standalone LocalLanesGame via the "lanes_bot" phase.
   const [vsBot, setVsBot] = useState(false);
+  // Opponent watchdog: 0 = fine, 1 = "opponent is slow", 2 = "probably gone".
+  // Escalates while we're stuck waiting on the opponent/server so the player
+  // never sits on a frozen match without feedback or a clean way out.
+  const [oppWaitLevel, setOppWaitLevel] = useState(0);
   const botMoodRef = useRef<AiMood>("random");
   const playerRecentRef = useRef<Move[]>([]);
   const botFallbackTimer = useRef<number | null>(null);
@@ -240,6 +244,19 @@ export function OnlinePage() {
   // Phase mirror so timers can read the live phase without stale closures.
   const phaseRef = useRef(phase);
   useEffect(() => { phaseRef.current = phase; }, [phase]);
+
+  // Opponent watchdog — only against a real player. While we're waiting on the
+  // opponent (move locked, or just matched waiting for round 1), escalate a
+  // hint after 15s, then a "probably disconnected" + clean exit after 35s.
+  // Resets the instant the match advances (new round / reveal / move cleared).
+  useEffect(() => {
+    const waiting = !vsBot && ((phase === "round" && !!m.myMove) || phase === "matched");
+    if (!waiting) { setOppWaitLevel(0); return; }
+    setOppWaitLevel(0);
+    const t1 = window.setTimeout(() => setOppWaitLevel(1), 15_000);
+    const t2 = window.setTimeout(() => setOppWaitLevel(2), 35_000);
+    return () => { window.clearTimeout(t1); window.clearTimeout(t2); };
+  }, [phase, m.myMove, m.roundNo, vsBot]);
 
   // Latest match snapshots, so the WS message handler can write a one-shot
   // history entry at match end without trusting its stale closure (and without
@@ -1045,6 +1062,43 @@ export function OnlinePage() {
                 <div className="text-zinc-400 text-sm">Preparing round 1…</div>
               )}
             </div>
+
+            {/* Opponent watchdog — escalating feedback + a fair, penalty-free
+                exit when the opponent is slow or has dropped, so the player is
+                never stuck on a frozen match wondering what's happening. */}
+            <AnimatePresence>
+              {oppWaitLevel >= 1 && (
+                <motion.div
+                  key="oppwait"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className={
+                    "self-center flex flex-col items-center gap-2 rounded-2xl px-4 py-3 border text-center " +
+                    (oppWaitLevel >= 2
+                      ? "bg-rose-500/10 border-rose-400/40"
+                      : "bg-white/5 border-white/10")
+                  }
+                >
+                  <div className="flex items-center gap-2 text-xs font-semibold">
+                    <span className="inline-block w-3 h-3 rounded-full border-2 border-white/30 border-t-white/80 animate-spin" />
+                    <span className={oppWaitLevel >= 2 ? "text-rose-200" : "text-zinc-300"}>
+                      {oppWaitLevel >= 2
+                        ? "Adversaire probablement déconnecté"
+                        : "L'adversaire prend son temps…"}
+                    </span>
+                  </div>
+                  {oppWaitLevel >= 2 && (
+                    <button
+                      onClick={leaveMatch}
+                      className="px-4 py-1.5 rounded-xl bg-rose-500/25 hover:bg-rose-500/40 border border-rose-400/50 text-rose-100 text-[11px] font-bold transition"
+                    >
+                      Quitter (sans pénalité)
+                    </button>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <button
               onClick={() => setQuitOpen(true)}
