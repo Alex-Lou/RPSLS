@@ -112,6 +112,15 @@ export interface Player {
   /** Current consecutive-win streak (match/streak.ts). Grants escalating
    *  bonus XP; a loss resets it. */
   winStreak?: number;
+  /** Epoch millis of the last state we synced with the server (pushed or
+   *  adopted). Local-only anchor for last-write-wins on cosmetic prefs: on
+   *  load we adopt the server's chosen look only if its `updatedAt` is newer
+   *  than this. Not itself synced. */
+  syncedAt?: number;
+  /** TOFU (Trust On First Use) claim token — issued by the server on first
+   *  Hello, required on subsequent connections. Prevents player_id spoofing.
+   *  Local-only (not part of PlayerProgress). */
+  claimToken?: string;
   /** Player's own uploaded background image (data URL), shown when the
    *  "custom" background is selected. Pre-bibliothèque: stores ONLY the
    *  current pick. Post-bibliothèque: mirrors customBgs[0] for back-compat. */

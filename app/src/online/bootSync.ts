@@ -40,11 +40,12 @@ export function runBootSync() {
       type: "hello",
       nickname: player.nickname || "Anonymous",
       player_id: player.id,
+      claim_token: player.claimToken || "",
     }));
   };
 
   ws.onmessage = (ev) => {
-    let msg: { type: string; state?: PlayerProgress };
+    let msg: { type: string; state?: PlayerProgress; claim_token?: string };
     try {
       msg = JSON.parse(ev.data as string);
     } catch {
@@ -55,6 +56,11 @@ export function runBootSync() {
       const store = useStore.getState();
       const currentPlayer = store.player;
       const patch = mergeServerState(currentPlayer, msg.state);
+
+      // Persist TOFU claim token if issued/confirmed by the server.
+      if (msg.claim_token) {
+        patch.claimToken = msg.claim_token;
+      }
 
       if (Object.keys(patch).length > 0) {
         store.applyServerSync(patch);

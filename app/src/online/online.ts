@@ -49,11 +49,18 @@ export interface PlayerProgress {
   seasonStartedAt: number;
   winStreak: number;
   updatedAt: number;
+  // Cosmetic preferences (small) — synced so a reinstall restores the chosen
+  // look. Optional for back-compat with older saves that lack them.
+  themeId?: string;
+  backgroundId?: string;
+  padId?: string;
+  avatar?: string;
+  nickname?: string;
 }
 
 /* Client → Server */
 export type ClientMessage =
-  | { type: "hello"; nickname: string; player_id?: string }
+  | { type: "hello"; nickname: string; player_id?: string; claim_token?: string }
   | { type: "create_lobby"; best_of: number }
   | { type: "join_lobby"; code: string }
   | { type: "join_queue"; best_of: number }
@@ -103,7 +110,7 @@ export type ServerMessage =
   | { type: "pong" }
   | { type: "rematch_offered" }
   | { type: "rematch_declined" }
-  | { type: "state_loaded"; state: PlayerProgress }
+  | { type: "state_loaded"; state: PlayerProgress; claim_token?: string }
   /* Lanes variants */
   | {
       type: "lanes_match_found";

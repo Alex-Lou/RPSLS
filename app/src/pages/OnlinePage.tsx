@@ -308,11 +308,11 @@ export function OnlinePage() {
     c.onReconnect = () => {
       // Server session reset on reconnect — re-introduce ourselves so the
       // server has our nickname for the next match.
-      c.send({ type: "hello", nickname: player.nickname || "Anonymous", player_id: player.id });
+      c.send({ type: "hello", nickname: player.nickname || "Anonymous", player_id: player.id, claim_token: player.claimToken });
     };
     return c.connect(url).then(() => {
       // Send Hello once on connection.
-      c.send({ type: "hello", nickname: player.nickname || "Anonymous", player_id: player.id });
+      c.send({ type: "hello", nickname: player.nickname || "Anonymous", player_id: player.id, claim_token: player.claimToken });
       setActiveClient(c);
       return c;
     });
@@ -339,7 +339,7 @@ export function OnlinePage() {
         // session id — we don't display it.
         break;
       case "state_loaded":
-        if (clientRef.current) handleStateLoaded(msg.state, clientRef.current);
+        if (clientRef.current) handleStateLoaded(msg.state, clientRef.current, msg.claim_token);
         break;
       case "lobby_created":
         setLobbyCode(msg.code);
