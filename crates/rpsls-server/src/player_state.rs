@@ -13,8 +13,11 @@ use tracing::{debug, warn};
 
 const KEY_PREFIX: &str = "player:";
 
-/// The subset of player state that we persist server-side.
-/// Only progression data — cosmetic preferences stay local.
+/// The subset of player state that we persist server-side: progression data
+/// PLUS the player's small cosmetic preferences (theme / background / pad /
+/// avatar / nickname) so a reinstall restores the chosen look. Bulky custom
+/// uploaded images (data: URLs) are deliberately NOT synced — they stay
+/// device-local; `sanitize` drops anything that slips past via the length cap.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerProgress {
@@ -46,9 +49,77 @@ pub struct PlayerProgress {
     pub season_started_at: u64,
     #[serde(default)]
     pub win_streak: u32,
-    /// Epoch millis of last sync — used for conflict resolution.
+    /// Epoch millis of last sync — used for last-write-wins on cosmetics.
     #[serde(default)]
     pub updated_at: u64,
+
+    // ── Cosmetic preferences (small strings; empty = "unset") ──
+    #[serde(default)]
+    pub theme_id: String,
+    #[serde(default)]
+    pub background_id: String,
+    #[serde(default)]
+    pub pad_id: String,
+    #[serde(default)]
+    pub avatar: String,
+    #[serde(default)]
+    pub nickname: String,
+}
+
+/// Hard ceiling for any single numeric progression field — well above any
+/// legitimate value, but bounds a forged `u64::MAX` payload.
+const MAX_NUM: u64 = 10_000_000_000;
+
+fn clamp_str(s: &mut String, max: usize) {
+    if s.chars().count() > max {
+        *s = s.chars().take(max).collect();
+    }
+}
+
+fn cap_vec(v: &mut Vec<String>, max_len: usize, max_str: usize) {
+    v.truncate(max_len);
+    for s in v.iter_mut() {
+        clamp_str(s, max_str);
+    }
+}
+
+impl PlayerProgress {
+    /// Clamp every field to sane bounds before persisting. A `SyncState` is
+    /// fully client-authored, so without this a crafted payload could poison
+    /// Redis (junk card ids, giant arrays) or inflate storage/egress. Numbers
+    /// are capped, arrays length-bounded, strings truncated. Cosmetic strings
+    /// are length-capped here; the client additionally only ADOPTS a server
+    /// cosmetic value that maps to a known id, so any junk that survives the
+    /// cap is inert on read.
+    pub fn sanitize(&mut self) {
+        self.xp = self.xp.min(MAX_NUM);
+        self.rank_lp = self.rank_lp.min(MAX_NUM);
+        self.eclats = self.eclats.min(MAX_NUM);
+        self.dust = self.dust.min(MAX_NUM);
+        self.wins = self.wins.min(MAX_NUM);
+        self.losses = self.losses.min(MAX_NUM);
+        self.draws = self.draws.min(MAX_NUM);
+        self.season_number = self.season_number.min(100_000);
+        self.win_streak = self.win_streak.min(100_000);
+
+        cap_vec(&mut self.card_collection, 64, 64);
+        cap_vec(&mut self.ranked_deck, 16, 64);
+        self.codex_claimed.truncate(32);
+        if self.card_mastery.len() > 64 {
+            let keep: std::collections::HashSet<String> =
+                self.card_mastery.keys().take(64).cloned().collect();
+            self.card_mastery.retain(|k, _| keep.contains(k));
+        }
+        for v in self.card_mastery.values_mut() {
+            *v = (*v).min(MAX_NUM);
+        }
+
+        clamp_str(&mut self.theme_id, 32);
+        clamp_str(&mut self.background_id, 32);
+        clamp_str(&mut self.pad_id, 32);
+        clamp_str(&mut self.avatar, 300);
+        clamp_str(&mut self.nickname, 24);
+    }
 }
 
 fn config() -> Option<&'static (String, String)> {
@@ -116,11 +187,14 @@ pub async fn load(player_id: &str) -> Option<PlayerProgress> {
 }
 
 /// Save player state to Redis. Fire-and-forget (spawns a detached task).
-pub fn save(player_id: String, state: PlayerProgress) {
+/// The payload is `sanitize`d first — it is fully client-authored and must
+/// never reach Redis unbounded.
+pub fn save(player_id: String, mut state: PlayerProgress) {
     let Some((url, token)) = config() else { return };
     if player_id.trim().is_empty() {
         return;
     }
+    state.sanitize();
     let key = format!("{KEY_PREFIX}{player_id}");
     let token = token.clone();
 
