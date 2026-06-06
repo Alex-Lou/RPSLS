@@ -622,7 +622,7 @@ export function ClasseLobby({
         }}
       >
         <div className="flex items-center gap-3">
-          <span className="text-3xl">⚔️</span>
+          <img src="/Icones Tournoi/ConstRankedRapide.png" alt="" className="w-12 h-12 object-contain shrink-0 drop-shadow-[0_2px_8px_rgba(0,0,0,0.55)]" draggable={false} />
           <div className="min-w-0">
             <div className="font-bold text-base">Match rapide</div>
             <div className="text-[11px] text-zinc-300/80">Un duel immédiat contre l'IA (Best of 5).</div>
@@ -641,7 +641,7 @@ export function ClasseLobby({
         }}
       >
         <div className="flex items-center gap-3">
-          <span className="text-3xl">🗂️</span>
+          <img src="/Icones Tournoi/ConstRankedEpique.png" alt="" className="w-12 h-12 object-contain shrink-0 drop-shadow-[0_2px_8px_rgba(0,0,0,0.55)]" draggable={false} />
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="font-bold text-base">Tournoi</span>
