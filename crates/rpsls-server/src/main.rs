@@ -77,6 +77,35 @@ async fn main() {
     // a lobby join. Runs every 5 min, no-op when nothing to prune.
     state.lobby_attempts.clone().spawn_janitor();
 
+    // Same pattern for the SyncState throttle map: each player_id who ever
+    // pushed leaves an Instant entry; without periodic pruning the map grows
+    // monotonically. 5-min sweep dropping entries older than 60s (12× the
+    // 5s throttle window — well past any legitimate cooldown).
+    let throttle_state = state.clone();
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(300));
+        tick.tick().await; // skip first immediate tick
+        loop {
+            tick.tick().await;
+            let cutoff = std::time::Duration::from_secs(60);
+            let now = Instant::now();
+            let stale: Vec<String> = throttle_state
+                .sync_throttle
+                .iter()
+                .filter(|e| now.duration_since(*e.value()) >= cutoff)
+                .map(|e| e.key().clone())
+                .collect();
+            for pid in &stale {
+                throttle_state
+                    .sync_throttle
+                    .remove_if(pid, |_, v| now.duration_since(*v) >= cutoff);
+            }
+            if !stale.is_empty() {
+                tracing::debug!(removed = stale.len(), "sync throttle swept");
+            }
+        }
+    });
+
     // `/health` is infra-only: Render hammers it during rolling deploys
     // (multiple probes per second to confirm the new instance is up before
     // switching traffic) and UptimeRobot keeps it warm against the free-tier
