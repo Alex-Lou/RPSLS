@@ -16,6 +16,15 @@ import { FloatingMatchBackButton } from "../match/sharedMatchUI";
 import { CurrencyBadges } from "./CurrencyBadges";
 // Tournament state now lives in PlayPage
 
+/** Custom illustrated icons for the "Comment ça marche ?" section (replace
+ *  the base emojis). Dropped under public/IconesMenu CommentCaMarche/. */
+const HIW_ICONS = {
+  how:      "/IconesMenu CommentCaMarche/Comment Ca Marche Icone.png",
+  principe: "/IconesMenu CommentCaMarche/Principe Icone.png",
+  mana:     "/IconesMenu CommentCaMarche/Mana Icone.png",
+  cartes:   "/IconesMenu CommentCaMarche/Cartes icone.png",
+};
+
 export function RankedLobby({ onViewBracket, onManageDeck, onBack, onGoShop }: { onViewBracket: () => void; onManageDeck: () => void; onBack?: () => void; onGoShop?: () => void }) {
   const t = useT();
   const player = useStore((s) => s.player);
@@ -174,7 +183,7 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack, onGoShop }: {
         className="bg-surface border border-hairline rounded-2xl px-4 py-2.5 flex items-center justify-between text-left hover:bg-white/[0.07] transition"
       >
         <span className="text-sm flex items-center gap-2">
-          <span>💡</span>
+          <img src={HIW_ICONS.how} alt="" className="w-6 h-6 object-contain" draggable={false} />
           <span className="font-semibold text-ink-muted">Comment ça marche ?</span>
         </span>
         <span className={"text-ink-faint text-sm transition-transform duration-200 " + (rulesOpen ? "rotate-180" : "")}>▾</span>
@@ -182,11 +191,11 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack, onGoShop }: {
       {rulesOpen && (
         <div className="bg-surface border border-hairline rounded-3xl p-4 sm:p-5 -mt-1">
           <div className="flex flex-col gap-2.5 text-[12px] text-ink-muted leading-relaxed">
-            <RuleBlock emoji="🎯" title="Le principe"
+            <RuleBlock emoji="🎯" iconSrc={HIW_ICONS.principe} title="Le principe"
               text="Pose 3 coups sur 3 lanes (FORCE / SAGESSE / RUSE). Révélation. Le plus de lanes gagnées = round gagné. Premier à 3 rounds." />
-            <RuleBlock emoji="💜" title="Mana"
+            <RuleBlock emoji="💜" iconSrc={HIW_ICONS.mana} title="Mana"
               text="1 mana au round 1, +1 par round (max 4). Sert à jouer des cartes." />
-            <RuleBlock emoji="🃏" title="Cartes"
+            <RuleBlock emoji="🃏" iconSrc={HIW_ICONS.cartes} title="Cartes"
               text="Main de 3 cartes. Tu pioches si tu GAGNES un round. Tu perds 1 carte si tu PERDS. 0 ou 1 carte par round." />
 
             <div className="text-[10px] uppercase tracking-wider font-bold text-ink-faint mt-1">⚪ Communes (1 mana)</div>
@@ -295,10 +304,14 @@ function StatCell({ label, value, color }: { label: string; value: string; color
   );
 }
 
-function RuleBlock({ emoji, title, text }: { emoji: string; title: string; text: string }) {
+function RuleBlock({ emoji, title, text, iconSrc }: { emoji: string; title: string; text: string; iconSrc?: string }) {
   return (
     <div className="flex items-start gap-2">
-      <span className="text-base shrink-0 mt-0.5">{emoji}</span>
+      {iconSrc ? (
+        <img src={iconSrc} alt="" className="w-6 h-6 shrink-0 mt-0.5 object-contain drop-shadow-[0_1px_4px_rgba(0,0,0,0.5)]" draggable={false} />
+      ) : (
+        <span className="text-base shrink-0 mt-0.5">{emoji}</span>
+      )}
       <div>
         <span className="font-bold text-ink">{title}</span>
         <span className="text-ink-muted"> — {text}</span>
