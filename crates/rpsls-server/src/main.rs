@@ -20,6 +20,7 @@ use axum::{
 };
 use dashmap::DashMap;
 use futures_util::{sink::SinkExt, stream::StreamExt};
+use std::time::Instant;
 use tokio::sync::mpsc;
 use tower_http::trace::TraceLayer;
 use tracing::{info, warn};
@@ -49,6 +50,9 @@ struct AppState {
     in_match: DashMap<String, (mpsc::UnboundedSender<MatchCommand>, PlayerSlot)>,
     /// session_id → (lanes_tx, our_slot) — Constellation Lanes mode (Phase 1+).
     in_lanes: DashMap<String, (mpsc::UnboundedSender<LanesCommand>, PlayerSlot)>,
+    /// player_id → last SyncState save timestamp — server-side write throttle
+    /// (max 1 save per 5s per identity) to protect Upstash quota.
+    sync_throttle: DashMap<String, Instant>,
 }
 
 #[tokio::main]
@@ -65,6 +69,7 @@ async fn main() {
         lobby_attempts: Arc::new(LobbyAttemptTracker::default()),
         in_match: DashMap::new(),
         in_lanes: DashMap::new(),
+        sync_throttle: DashMap::new(),
     });
 
     // `/health` is infra-only: Render hammers it during rolling deploys
@@ -218,17 +223,9 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, peer_ip: std::ne
 
 async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, msg: ClientMessage) {
     match msg {
-        ClientMessage::Hello { nickname, player_id } => {
-            // Stable client id for leaderboard attribution. Cap length; ignore
-            // anything fishy (only keep a bounded alnum/uuid-ish string).
-            let pid: String = player_id.chars().filter(|c| !c.is_control()).take(64).collect();
-            let pid_clean = pid.trim().to_string();
-            if !pid_clean.is_empty() {
-                session.set_player_id(pid_clean.clone());
-            }
-            // Sanitize: strip control chars + RTL/bidi overrides + zero-width
-            // joiners. Cap at 24 chars (was 32) to leave room for the
-            // streak emoji we suffix in some surfaces. Reject if empty after.
+        ClientMessage::Hello { nickname, player_id, claim_token } => {
+            // Sanitize nickname: strip control chars + RTL/bidi overrides +
+            // zero-width joiners. Cap at 24 chars. Always set (no auth gate).
             let clean: String = nickname
                 .chars()
                 .filter(|c| {
@@ -245,13 +242,53 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
             if !clean.is_empty() && clean.chars().count() <= 24 {
                 session.set_nickname(clean.to_string());
             }
-            // Load saved player state from Redis and send it back.
+
+            // Stable client id for leaderboard attribution + state sync.
+            let pid: String = player_id.chars().filter(|c| !c.is_control()).take(64).collect();
+            let pid_clean = pid.trim().to_string();
+
             if !pid_clean.is_empty() {
+                let client_token: String = claim_token.chars().filter(|c| !c.is_control()).take(64).collect();
+                let client_token = client_token.trim().to_string();
                 let session_clone = session.clone();
-                let pid_for_load = pid_clean.clone();
+                let pid = pid_clean;
+
+                // TOFU claim-token verification + state load run in parallel.
                 tokio::spawn(async move {
-                    if let Some(progress) = player_state::load(&pid_for_load).await {
-                        session_clone.send(ServerMessage::StateLoaded { state: progress });
+                    let (stored_token, progress) = tokio::join!(
+                        player_state::load_claim_token(&pid),
+                        player_state::load(&pid),
+                    );
+
+                    match stored_token {
+                        Some(ref st) if client_token == *st => {
+                            // Token matches — authenticate session.
+                            session_clone.set_player_id(pid);
+                            let state = progress.unwrap_or_default();
+                            session_clone.send(ServerMessage::StateLoaded {
+                                state,
+                                claim_token: Some(st.clone()),
+                            });
+                        }
+                        Some(_) => {
+                            // Token exists but client sent wrong/empty token.
+                            warn!(player_id = %pid, "claim token mismatch — Hello rejected");
+                            session_clone.send(ServerMessage::Error {
+                                code: "auth_failed".into(),
+                                message: "claim token mismatch".into(),
+                            });
+                        }
+                        None => {
+                            // First connection for this player_id — issue token.
+                            let new_token = Uuid::new_v4().to_string();
+                            player_state::save_claim_token(pid.clone(), new_token.clone());
+                            session_clone.set_player_id(pid);
+                            let state = progress.unwrap_or_default();
+                            session_clone.send(ServerMessage::StateLoaded {
+                                state,
+                                claim_token: Some(new_token),
+                            });
+                        }
                     }
                 });
             }
@@ -416,10 +453,18 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
             }
         }
 
-        ClientMessage::SyncState { state } => {
+        ClientMessage::SyncState { state: progress } => {
             let pid = session.player_id();
             if !pid.is_empty() {
-                player_state::save(pid, state);
+                // Server-side write throttle: max 1 save per 5s per identity.
+                let now = Instant::now();
+                if let Some(last) = state.sync_throttle.get(&pid) {
+                    if now.duration_since(*last).as_secs() < 5 {
+                        return;
+                    }
+                }
+                state.sync_throttle.insert(pid.clone(), now);
+                player_state::save(pid, progress);
             }
         }
 

@@ -12,6 +12,7 @@ use std::sync::OnceLock;
 use tracing::{debug, warn};
 
 const KEY_PREFIX: &str = "player:";
+const CLAIM_PREFIX: &str = "claim:";
 
 /// The subset of player state that we persist server-side: progression data
 /// PLUS the player's small cosmetic preferences (theme / background / pad /
@@ -184,6 +185,68 @@ pub async fn load(player_id: &str) -> Option<PlayerProgress> {
             None
         }
     }
+}
+
+/// Load the TOFU claim token for a player. Returns None if not found or on
+/// error — meaning this is the player's first connection.
+pub async fn load_claim_token(player_id: &str) -> Option<String> {
+    let (url, token) = config()?;
+    if player_id.trim().is_empty() {
+        return None;
+    }
+    let key = format!("{CLAIM_PREFIX}{player_id}");
+    let endpoint = format!("{url}/get/{key}");
+
+    match http().get(&endpoint).bearer_auth(token).send().await {
+        Ok(resp) if resp.status().is_success() => {
+            let body: serde_json::Value = resp.json().await.ok()?;
+            let result = body.get("result")?;
+            if result.is_null() {
+                return None;
+            }
+            result.as_str().map(|s| s.to_string())
+        }
+        Ok(resp) => {
+            let status = resp.status();
+            warn!(player_id, %status, "claim token load rejected");
+            None
+        }
+        Err(e) => {
+            warn!(player_id, error = %e, "claim token load failed");
+            None
+        }
+    }
+}
+
+/// Persist a TOFU claim token. Fire-and-forget.
+pub fn save_claim_token(player_id: String, claim_token: String) {
+    let Some((url, auth_token)) = config() else { return };
+    if player_id.trim().is_empty() || claim_token.is_empty() {
+        return;
+    }
+    let key = format!("{CLAIM_PREFIX}{player_id}");
+    let auth_token = auth_token.clone();
+    let endpoint = format!("{url}/pipeline");
+    let cmds: Vec<Vec<String>> = vec![vec!["SET".into(), key, claim_token]];
+
+    tokio::spawn(async move {
+        match http()
+            .post(&endpoint)
+            .bearer_auth(&auth_token)
+            .json(&cmds)
+            .send()
+            .await
+        {
+            Ok(resp) if resp.status().is_success() => {
+                debug!(player_id = %player_id, "claim token saved");
+            }
+            Ok(resp) => {
+                let status = resp.status();
+                warn!(%status, "claim token save rejected");
+            }
+            Err(e) => warn!(error = %e, "claim token save failed"),
+        }
+    });
 }
 
 /// Save player state to Redis. Fire-and-forget (spawns a detached task).

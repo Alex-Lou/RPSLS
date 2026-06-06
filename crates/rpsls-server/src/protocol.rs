@@ -21,6 +21,8 @@ pub enum ClientMessage {
         nickname: String,
         #[serde(default)]
         player_id: String,
+        #[serde(default)]
+        claim_token: String,
     },
 
     /// Create a private lobby. Server replies with a 6-char code.
@@ -165,7 +167,11 @@ pub enum ServerMessage {
 
     /// Player's saved progression loaded from the server database.
     /// Sent once after Hello when saved state exists.
-    StateLoaded { state: PlayerProgress },
+    StateLoaded {
+        state: PlayerProgress,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        claim_token: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
