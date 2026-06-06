@@ -696,8 +696,29 @@ export function ProfilePage() {
                     : "border-hairline hover:border-white/30")
                 }
               >
-                <div className="aspect-[3/2] w-full bg-black/50 relative">
-                  <BattlePad padId={id} className="w-full h-full" />
+                <div className="aspect-[3/2] w-full bg-black/50 relative overflow-hidden"
+                  style={{
+                    background: `radial-gradient(ellipse 100% 80% at 30% 20%, ${
+                      id === "volcanic" ? "#ff450066" :
+                      id === "abyss" ? "#00e5c844" :
+                      id === "nebula" ? "#9333ea44" :
+                      id === "aurora_borealis" ? "#34d39944" :
+                      id === "casino_noir" ? "#fbbf2444" :
+                      id === "casino" ? "#10b98144" :
+                      id === "holy" ? "#fbbf2433" :
+                      id === "quantum" ? "#22d3ee44" :
+                      id === "galaxy" ? "#a855f744" :
+                      id === "neon" ? "#06b6d444" :
+                      id === "cyberpunk" ? "#f0abfc44" :
+                      id === "cosmos" ? "#6366f144" :
+                      id === "aura" ? "var(--theme-primary, #a855f7)44" :
+                      "rgba(100,100,120,0.25)"
+                    }, transparent 70%), linear-gradient(135deg, rgba(15,15,25,0.95), rgba(25,20,35,0.95))`
+                  }}
+                >
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-3xl">{meta.emoji}</span>
+                  </div>
                   {active && (
                     <div className="absolute top-2 right-2 bg-emerald-500/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                       ACTIVE
@@ -859,10 +880,10 @@ export function ProfilePage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
-            className="fixed inset-0 z-[90] flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm"
+            className="fixed inset-0 z-[90] flex flex-col items-center justify-center bg-black/95"
             onClick={() => setPreviewPad(null)}
           >
-            <div className="w-full max-w-2xl aspect-[3/2] relative" onClick={(e) => e.stopPropagation()}>
+            <div className="w-full max-w-2xl aspect-[3/2] relative pointer-events-none" onClick={(e) => e.stopPropagation()}>
               <BattlePad padId={previewPad} className="w-full h-full rounded-2xl overflow-hidden" />
             </div>
             <div className="flex items-center gap-2 mt-2 text-xs text-ink-faint">
@@ -870,7 +891,7 @@ export function ProfilePage() {
               <span>—</span>
               <span>{PAD_META[previewPad]?.tagline}</span>
             </div>
-            <div className="flex gap-3 mt-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex gap-3 mt-4 relative z-10" onClick={(e) => e.stopPropagation()}>
               <motion.button
                 whileTap={{ scale: 0.95 }}
                 onClick={() => {
@@ -907,11 +928,11 @@ export function ProfilePage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
-            className="fixed inset-0 z-[90] flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm"
+            className="fixed inset-0 z-[90] flex flex-col items-center justify-center bg-black/95"
             onClick={() => setPreviewBg(null)}
           >
             <div
-              className="w-full max-w-md aspect-[9/16] max-h-[75vh] rounded-2xl overflow-hidden border border-white/10"
+              className="w-full max-w-md aspect-[9/16] max-h-[75vh] rounded-2xl overflow-hidden border border-white/10 relative"
               onClick={(e) => e.stopPropagation()}
               style={
                 previewBg.accent
@@ -925,8 +946,8 @@ export function ProfilePage() {
               }
             >
               {previewBg.scene && (
-                <div className="absolute inset-0 flex items-center justify-center text-ink-faint text-sm font-bold">
-                  ✦ Aperçu limité — rendu complet sur device
+                <div className="absolute bottom-3 left-3 bg-cyan-500/80 text-white text-[10px] font-bold px-2 py-1 rounded-full">
+                  ✦ LIVE — rendu temps-réel en jeu
                 </div>
               )}
             </div>
@@ -934,13 +955,13 @@ export function ProfilePage() {
               <span className="font-bold text-white text-sm">{previewBg.label}</span>
               {previewBg.scene && <span className="text-cyan-400 text-[10px] font-bold">✦ LIVE</span>}
             </div>
-            <div className="flex gap-3 mt-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex gap-3 mt-4 relative z-10" onClick={(e) => e.stopPropagation()}>
               <motion.button
                 whileTap={{ scale: 0.95 }}
                 onClick={() => {
                   hapticMatchStart();
                   const patch: Partial<{ backgroundId: BackgroundId; padId: PadId }> = { backgroundId: previewBg.id };
-                  if (previewBg.defaultPadId && !player.padChosen) patch.padId = previewBg.defaultPadId;
+                  if (previewBg.defaultPadId) patch.padId = previewBg.defaultPadId;
                   updateProfile(patch);
                   setPreviewBg(null);
                 }}

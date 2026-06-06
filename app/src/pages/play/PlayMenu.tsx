@@ -94,7 +94,7 @@ export function ModeSelect({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -16 }}
       transition={{ duration: 0.3 }}
-      className="flex flex-col gap-3 sm:gap-5 flex-1 justify-center py-1"
+      className="flex flex-col gap-2 sm:gap-4 flex-1 justify-center py-1"
     >
       <div className="text-center">
         <h1
@@ -102,7 +102,7 @@ export function ModeSelect({
           // tracking spread, dropped one size step so the title doesn't
           // dominate the page anymore. The colours stay theme-driven so the
           // header still belongs to whichever background is active.
-          className="text-3xl sm:text-5xl font-semibold bg-clip-text text-transparent leading-[1.1]"
+          className="text-2xl sm:text-4xl font-semibold bg-clip-text text-transparent leading-[1.1]"
           style={{
             backgroundImage:
               "linear-gradient(135deg, color-mix(in oklab, var(--theme-primary) 85%, #fff) 0%, color-mix(in oklab, var(--theme-secondary) 85%, #fff) 100%)",

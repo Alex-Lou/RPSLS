@@ -36,6 +36,7 @@ mod lanes_engine;
 mod leaderboard;
 mod lobby;
 mod match_engine;
+mod player_state;
 mod protocol;
 mod security;
 mod session;
@@ -96,6 +97,10 @@ async fn main() {
     info!(
         "global leaderboard: {}",
         if leaderboard::enabled() { "ENABLED (Upstash)" } else { "disabled (no UPSTASH_REDIS_REST_* env)" }
+    );
+    info!(
+        "player state sync: {}",
+        if player_state::enabled() { "ENABLED (Upstash)" } else { "disabled" }
     );
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
@@ -217,8 +222,9 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
             // Stable client id for leaderboard attribution. Cap length; ignore
             // anything fishy (only keep a bounded alnum/uuid-ish string).
             let pid: String = player_id.chars().filter(|c| !c.is_control()).take(64).collect();
-            if !pid.trim().is_empty() {
-                session.set_player_id(pid.trim().to_string());
+            let pid_clean = pid.trim().to_string();
+            if !pid_clean.is_empty() {
+                session.set_player_id(pid_clean.clone());
             }
             // Sanitize: strip control chars + RTL/bidi overrides + zero-width
             // joiners. Cap at 24 chars (was 32) to leave room for the
@@ -238,6 +244,16 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
             let clean = clean.trim();
             if !clean.is_empty() && clean.chars().count() <= 24 {
                 session.set_nickname(clean.to_string());
+            }
+            // Load saved player state from Redis and send it back.
+            if !pid_clean.is_empty() {
+                let session_clone = session.clone();
+                let pid_for_load = pid_clean.clone();
+                tokio::spawn(async move {
+                    if let Some(progress) = player_state::load(&pid_for_load).await {
+                        session_clone.send(ServerMessage::StateLoaded { state: progress });
+                    }
+                });
             }
         }
 
@@ -397,6 +413,13 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
             } else if let Some(entry) = state.in_lanes.get(&session.id) {
                 let (tx, slot) = entry.value().clone();
                 let _ = tx.send(LanesCommand::RespondRematch { slot, accept });
+            }
+        }
+
+        ClientMessage::SyncState { state } => {
+            let pid = session.player_id();
+            if !pid.is_empty() {
+                player_state::save(pid, state);
             }
         }
 

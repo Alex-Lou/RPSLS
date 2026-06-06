@@ -7,6 +7,8 @@ use rpsls_core::constellation::{LanePlay, LaneResult};
 use rpsls_core::{Move, Outcome};
 use serde::{Deserialize, Serialize};
 
+use crate::player_state::PlayerProgress;
+
 /* ──────────── Client → Server ──────────── */
 
 #[derive(Debug, Clone, Deserialize)]
@@ -58,6 +60,9 @@ pub enum ClientMessage {
 
     /// Respond to the opponent's rematch offer.
     RespondRematch { accept: bool },
+
+    /// Push player progression state to the server for persistence.
+    SyncState { state: PlayerProgress },
 }
 
 /* ──────────── Server → Client ──────────── */
@@ -157,6 +162,10 @@ pub enum ServerMessage {
 
     /// Your rematch request was declined, or the opponent left — back to lobby.
     RematchDeclined,
+
+    /// Player's saved progression loaded from the server database.
+    /// Sent once after Hello when saved state exists.
+    StateLoaded { state: PlayerProgress },
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

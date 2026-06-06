@@ -32,6 +32,25 @@ export interface LaneResult {
   points: number;
 }
 
+/** Subset of player state synced to the server for persistence. */
+export interface PlayerProgress {
+  xp: number;
+  rankLp: number;
+  eclats: number;
+  dust: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  cardCollection: string[];
+  cardMastery: Record<string, number>;
+  codexClaimed: number[];
+  rankedDeck: string[];
+  seasonNumber: number;
+  seasonStartedAt: number;
+  winStreak: number;
+  updatedAt: number;
+}
+
 /* Client → Server */
 export type ClientMessage =
   | { type: "hello"; nickname: string; player_id?: string }
@@ -46,7 +65,8 @@ export type ClientMessage =
   | { type: "chat"; emoji: string }
   | { type: "ping" }
   | { type: "request_rematch" }
-  | { type: "respond_rematch"; accept: boolean };
+  | { type: "respond_rematch"; accept: boolean }
+  | { type: "sync_state"; state: PlayerProgress };
 
 /* Server → Client */
 export type ServerMessage =
@@ -83,6 +103,7 @@ export type ServerMessage =
   | { type: "pong" }
   | { type: "rematch_offered" }
   | { type: "rematch_declined" }
+  | { type: "state_loaded"; state: PlayerProgress }
   /* Lanes variants */
   | {
       type: "lanes_match_found";

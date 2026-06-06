@@ -12,6 +12,7 @@ import {
   type ServerMessage,
   type PlayerSlot,
 } from "../online/online";
+import { handleStateLoaded, pushPlayerState, setActiveClient } from "../online/playerSync";
 import {
   LanesMatchView,
   type LanesMatchInfo,
@@ -312,6 +313,7 @@ export function OnlinePage() {
     return c.connect(url).then(() => {
       // Send Hello once on connection.
       c.send({ type: "hello", nickname: player.nickname || "Anonymous", player_id: player.id });
+      setActiveClient(c);
       return c;
     });
   }
@@ -321,6 +323,7 @@ export function OnlinePage() {
     return () => {
       clientRef.current?.disconnect();
       clientRef.current = null;
+      setActiveClient(null);
       if (splashTimer.current) window.clearTimeout(splashTimer.current);
       if (revealTimer.current) window.clearTimeout(revealTimer.current);
       if (botFallbackTimer.current) window.clearTimeout(botFallbackTimer.current);
@@ -334,6 +337,9 @@ export function OnlinePage() {
     switch (msg.type) {
       case "welcome":
         // session id — we don't display it.
+        break;
+      case "state_loaded":
+        if (clientRef.current) handleStateLoaded(msg.state, clientRef.current);
         break;
       case "lobby_created":
         setLobbyCode(msg.code);
@@ -448,6 +454,7 @@ export function OnlinePage() {
           };
         });
         setPhase("match_end");
+        pushPlayerState(clientRef.current);
         break;
       }
       case "opponent_left":
@@ -556,6 +563,7 @@ export function OnlinePage() {
           });
           return cur;
         });
+        pushPlayerState(clientRef.current);
         break;
       }
 

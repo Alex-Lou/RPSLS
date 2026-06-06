@@ -125,6 +125,9 @@ interface AppState {
    *  the rollover payload so the caller (App boot) can show a modal,
    *  or null when no rollover is due yet. */
   rolloverSeasonIfDue: () => { fromSeason: number; reward: SeasonReward; lpBefore: number; lpAfter: number } | null;
+  /** Apply a server-synced progression patch to the local player. Used by
+   *  bootSync and the state_loaded handler to merge server-saved data. */
+  applyServerSync: (patch: Partial<Player>) => void;
 }
 
 function detectLocale(): Locale {
@@ -394,6 +397,9 @@ export const useStore = create<AppState>()(
         }));
         return { fromSeason: season.number, reward, lpBefore, lpAfter };
       },
+
+      applyServerSync: (patch) =>
+        set((s) => ({ player: { ...s.player, ...patch } })),
     }),
     {
       name: "rpsls-app-state",

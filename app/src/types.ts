@@ -15,6 +15,8 @@ export type PadId =
   | "casino_noir"
   // Theme-reactive pad: colours follow the active theme/background accent.
   | "aura"
+  // Elemental pads matching coded backgrounds.
+  | "volcanic" | "abyss"
   // Player's own uploaded mat (data URL on the player).
   | "custom";
 
@@ -22,6 +24,7 @@ export type BackgroundId =
   | "default"
   // Coded / animated WebGL backdrops (no PNG — fully procedural).
   | "nebula" | "galaxy" | "aurora" | "holy" | "quantum" | "grid" | "casino"
+  | "volcanic" | "abyss"
   // Player's own uploaded image.
   | "custom";
 
@@ -144,6 +147,8 @@ export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: st
   casino:     { label: "Casino Royale",  emoji: "🎰", tagline: "Feutre émeraude, roulette, jetons et or Art Déco." },
   casino_noir:{ label: "Casino Noir",   emoji: "🃏", tagline: "Monte-Carlo minuit : noir, or, médaillon Art Déco." },
   aura:       { label: "Aura",           emoji: "🎨", tagline: "S'accorde à ton thème : couleurs et lueurs vivantes." },
+  volcanic:   { label: "Volcanic",      emoji: "🌋", tagline: "Obsidienne craquelée, veines de lave, braises montantes." },
+  abyss:      { label: "Abyss",         emoji: "🐙", tagline: "Abysses océaniques, méduses bioluminescentes, profondeurs." },
   custom:     { label: "Mon image",      emoji: "🖼️", tagline: "Ton propre tapis (paysage 3:2, ex. 1500×1000)." },
 };
 

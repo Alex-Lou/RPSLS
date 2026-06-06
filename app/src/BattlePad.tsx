@@ -17,6 +17,8 @@ import { AuroraBorealisPad } from "./battlepads/AuroraBorealisPad";
 import { CasinoPad } from "./battlepads/CasinoPad";
 import { CasinoNoirPad } from "./battlepads/CasinoNoirPad";
 import { AuraPad } from "./battlepads/AuraPad";
+import { VolcanicPad } from "./battlepads/VolcanicPad";
+import { AbyssPad } from "./battlepads/AbyssPad";
 
 export function BattlePad({
   padId,
@@ -69,6 +71,8 @@ export function BattlePad({
     case "casino":     return <CasinoPad {...common} compact={compact} />;
     case "casino_noir":return <CasinoNoirPad {...common} compact={compact} />;
     case "aura":       return <AuraPad {...common} compact={compact} />;
+    case "volcanic":   return <VolcanicPad {...common} compact={compact} />;
+    case "abyss":      return <AbyssPad {...common} compact={compact} />;
     case "custom":
       return customPadUrl
         ? <ImagePad src={customPadUrl} {...common} />

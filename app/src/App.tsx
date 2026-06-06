@@ -17,6 +17,8 @@ import { LevelUpWatcher } from "./fx/LevelUpOverlay";
 import { useT } from "./i18n";
 import { setHapticSettings } from "./haptic";
 import { initSentry, shutdownSentry } from "./monitoring/sentry";
+import { startSyncSubscriber } from "./online/playerSync";
+import { runBootSync } from "./online/bootSync";
 
 // Code-split heavy pages — each becomes its own JS chunk that Vite ships
 // on demand the first time the user navigates there. Cuts the initial
@@ -99,6 +101,8 @@ export default function App() {
   useEffect(() => {
     const r = rolloverSeasonIfDue();
     if (r) setSeasonRollover(r);
+    startSyncSubscriber();
+    runBootSync();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -18,20 +18,24 @@ import { useEffect, useRef } from "react";
  */
 
 export type BackdropScene =
-  | "nebula" | "aurora" | "grid" | "galaxy" | "holy" | "quantum" | "casino";
+  | "nebula" | "aurora" | "grid" | "galaxy" | "holy" | "quantum" | "casino"
+  | "volcanic" | "abyss";
 
 export const BACKDROP_META: Record<BackdropScene, { label: string; emoji: string; accent: { from: string; to: string } }> = {
-  nebula:  { label: "Nebula",        emoji: "🌌", accent: { from: "#a855f7", to: "#22d3ee" } },
-  aurora:  { label: "Aurora",        emoji: "🌠", accent: { from: "#34d399", to: "#8b5cf6" } },
-  grid:    { label: "Neon Grid",     emoji: "🌐", accent: { from: "#06b6d4", to: "#f0abfc" } },
-  galaxy:  { label: "Galaxy",        emoji: "✨", accent: { from: "#a855f7", to: "#22d3ee" } },
-  holy:    { label: "Holy",          emoji: "✝️", accent: { from: "#fbbf24", to: "#6366f1" } },
-  quantum: { label: "Quantum",       emoji: "⚛️", accent: { from: "#22d3ee", to: "#3b82f6" } },
-  casino:  { label: "Casino Royale", emoji: "🎰", accent: { from: "#10b981", to: "#f5c543" } },
+  nebula:   { label: "Nebula",        emoji: "🌌", accent: { from: "#a855f7", to: "#22d3ee" } },
+  aurora:   { label: "Aurora",        emoji: "🌠", accent: { from: "#34d399", to: "#8b5cf6" } },
+  grid:     { label: "Neon Grid",     emoji: "🌐", accent: { from: "#06b6d4", to: "#f0abfc" } },
+  galaxy:   { label: "Galaxy",        emoji: "✨", accent: { from: "#a855f7", to: "#22d3ee" } },
+  holy:     { label: "Holy",          emoji: "✝️", accent: { from: "#fbbf24", to: "#6366f1" } },
+  quantum:  { label: "Quantum",       emoji: "⚛️", accent: { from: "#22d3ee", to: "#3b82f6" } },
+  casino:   { label: "Casino Royale", emoji: "🎰", accent: { from: "#10b981", to: "#f5c543" } },
+  volcanic: { label: "Volcanic",      emoji: "🌋", accent: { from: "#ff4500", to: "#ff8c00" } },
+  abyss:    { label: "Abyss",         emoji: "🐙", accent: { from: "#00e5c8", to: "#6040c0" } },
 };
 
 const SCENE_INDEX: Record<BackdropScene, number> = {
   nebula: 0, aurora: 1, grid: 2, galaxy: 3, holy: 4, quantum: 5, casino: 6,
+  volcanic: 7, abyss: 8,
 };
 
 const VERT = `attribute vec2 a; void main(){ gl_Position = vec4(a, 0.0, 1.0); }`;
@@ -292,6 +296,71 @@ vec3 casino(vec2 uv, float aspect){
   return felt;
 }
 
+// ── 7 VOLCANIC — cracked obsidian, flowing lava veins, rising embers ──
+vec3 volcanic(vec2 uv, float aspect){
+  vec2 p = uv*vec2(aspect,1.0)*3.0;
+  vec3 col = mix(vec3(0.06,0.03,0.02), vec3(0.10,0.05,0.03), fbm(p*2.0));
+  float t = u_time*0.08;
+  vec2 q = vec2(fbm(p + vec2(t,0.0)), fbm(p + vec2(5.2,1.3) + vec2(0.0,t)));
+  float cells = fbm(p + 3.0*q);
+  float crack = smoothstep(0.06, 0.0, abs(cells - 0.48));
+  float crackW = smoothstep(0.14, 0.0, abs(cells - 0.48));
+  col += vec3(1.0,0.27,0.0) * crack * 0.95;
+  col += vec3(1.0,0.55,0.08) * crackW * 0.25;
+  float pulse = 0.5 + 0.5*sin(u_time*0.6 + cells*8.0);
+  col += vec3(0.6,0.08,0.0) * crackW * pulse * 0.3;
+  vec2 ep = uv*vec2(aspect,1.0)*vec2(60.0,25.0);
+  ep.y -= u_time*0.8;
+  float ember = exp(-pow(length(fract(ep)-0.5),2.0)*50.0) * step(0.98, hash(floor(ep)));
+  float etw = 0.5+0.5*sin(u_time*3.0+hash(floor(ep))*20.0);
+  col += vec3(1.0,0.5,0.1) * ember * etw * 0.7;
+  float smoke = fbm(uv*vec2(aspect,1.0)*4.0 + vec2(t*2.0, 0.0)) * smoothstep(0.5, 1.0, uv.y);
+  col += vec3(0.15,0.10,0.08) * smoke * 0.3;
+  col += softStars(uv, aspect, 0.997, vec3(1.0,0.6,0.3));
+  return col;
+}
+
+// ── 8 ABYSS — deep ocean, bioluminescent glow, jellyfish silhouettes ──
+vec3 abyss(vec2 uv, float aspect){
+  vec3 col = mix(vec3(0.01,0.02,0.06), vec3(0.03,0.06,0.14), uv.y);
+  float t = u_time*0.12;
+  vec2 cp = uv*vec2(aspect,1.0)*5.0;
+  float caustic = 0.0;
+  for(int i=0;i<3;i++){
+    float fi=float(i);
+    caustic += noise(cp*2.0 + vec2(t*(0.8+fi*0.3), t*(0.5-fi*0.2)));
+  }
+  caustic = caustic/3.0;
+  col += vec3(0.08,0.25,0.45) * pow(caustic, 2.5) * smoothstep(0.3, 1.0, uv.y) * 0.4;
+  float shaft = smoothstep(0.18, 0.0, abs(uv.x - 0.48 + 0.03*sin(t))) * uv.y;
+  col += vec3(0.06,0.15,0.30) * shaft * 0.35;
+  vec2 bp = uv*vec2(aspect,1.0)*vec2(80.0,40.0); bp.y += t*2.0;
+  float bSeed = hash(floor(bp));
+  float alive = step(0.975, bSeed);
+  vec2 bj = vec2(hash(floor(bp)+1.7), hash(floor(bp)+5.3)) - 0.5;
+  float bd = length(fract(bp)-0.5 - bj*0.4);
+  float abg = exp(-bd*bd*60.0) * alive;
+  float btw = 0.4 + 0.6*sin(u_time*2.0 + bSeed*30.0);
+  vec3 bCol = mix(vec3(0.0,0.9,0.8), vec3(1.0,0.25,0.63), step(0.5, fract(bSeed*7.0)));
+  col += bCol * abg * btw * 0.55;
+  for(int i=0;i<3;i++){
+    float fi=float(i);
+    vec2 jc = vec2(0.25+fi*0.25 + 0.08*sin(t*0.7+fi*2.1),
+                   0.35+fi*0.15 + 0.10*cos(t*0.5+fi*1.7));
+    vec2 jp = (uv - jc)*vec2(aspect,1.0); jp.y *= 1.3;
+    float jr = length(jp);
+    vec3 jCol = mix(vec3(1.0,0.3,0.65), vec3(0.0,0.9,0.8), fi/2.0);
+    col += jCol * exp(-jr*jr*120.0) * 0.22;
+    float tent = smoothstep(0.01,0.0, abs(jp.x + 0.003*sin(jp.y*60.0-t*3.0)))
+               * smoothstep(jc.y-0.02, jc.y-0.15, uv.y) * smoothstep(jc.y-0.22, jc.y-0.12, uv.y);
+    col += jCol * tent * 0.10;
+  }
+  vec2 bb = uv*vec2(aspect,1.0)*vec2(30.0,60.0); bb.y -= t*4.0;
+  float bubble = smoothstep(0.42,0.40, length(fract(bb)-0.5)) * step(0.993, hash(floor(bb)));
+  col += vec3(0.3,0.6,0.8) * bubble * 0.15;
+  return col;
+}
+
 void main(){
   vec2 uv = gl_FragCoord.xy/u_res;
   float aspect = u_res.x/u_res.y;
@@ -302,6 +371,8 @@ void main(){
   else if(u_scene==4) col = holy(uv, aspect);
   else if(u_scene==5) col = quantum(uv, aspect);
   else if(u_scene==6) col = casino(uv, aspect);
+  else if(u_scene==7) col = volcanic(uv, aspect);
+  else if(u_scene==8) col = abyss(uv, aspect);
   else col = nebula(uv, aspect);
 
   // ── Per-scene touch interaction ──────────────────────────────────────
@@ -326,6 +397,14 @@ void main(){
       float sq = smoothstep(sz, sz*0.78, max(d2.x, d2.y));
       float glitch = step(0.5, fract(uv.y*70.0 + u_time*4.0));
       col += vec3(1.0,0.82,0.36) * sq * (0.45 + 0.55*glitch) * smoothstep(0.0,0.04,h);
+    } else if (u_scene == 7) {
+      // Volcanic → lava eruption burst from the tap point.
+      col += vec3(1.0,0.35,0.0) * exp(-td*td*40.0) * exp(-age*2.0) * 1.4;
+      col += vec3(1.0,0.7,0.2) * sin(td*30.0 - age*8.0) * exp(-td*5.0) * exp(-age*2.5) * 0.5;
+    } else if (u_scene == 8) {
+      // Abyss → bioluminescent pulse radiating outward.
+      col += vec3(0.0,0.9,0.8) * sin(td*35.0 - age*6.0) * exp(-td*4.0) * exp(-age*2.8) * 0.5;
+      col += vec3(1.0,0.3,0.65) * exp(-td*td*60.0) * exp(-age*1.8) * 0.6;
     } else {
       // Galaxy / Nebula / Aurora / Casino → a soft universal ripple.
       col += vec3(0.80,0.85,1.0) * sin(td*26.0 - age*7.0) * exp(-td*4.8) * exp(-age*2.6) * 0.35;

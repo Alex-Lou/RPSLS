@@ -125,6 +125,21 @@ export const BACKGROUNDS: BackgroundDef[] = [
     accent: { from: "#10b981", to: "#f5c543" },
   },
 
+  {
+    id: "volcanic",  label: "Volcanic",       emoji: "🌋",
+    src: null, scene: "volcanic",             defaultPadId: "volcanic",
+    skin: { fontHeadline: "cinzel",       fontBody: "rajdhani",     fontMono: "fira"       },
+    miniature: null,
+    accent: { from: "#ff4500", to: "#ff8c00" },
+  },
+  {
+    id: "abyss",     label: "Abyss",          emoji: "🐙",
+    src: null, scene: "abyss",               defaultPadId: "abyss",
+    skin: { fontHeadline: "orbitron",     fontBody: "rajdhani",     fontMono: "spaceMono"  },
+    miniature: null,
+    accent: { from: "#00e5c8", to: "#6040c0" },
+  },
+
   // Player's OWN image — uploaded in Profile, stored as a data URL. The
   // recommended format is shown in the picker (portrait 9:16, cover-fit).
   {
