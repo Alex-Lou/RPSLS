@@ -39,13 +39,37 @@ const ALLOWED_ORIGINS: &[&str] = &[
     "http://127.0.0.1:5173",
 ];
 
+/// Extra origins from the `CORS_EXTRA_ORIGINS` env var (comma-separated).
+/// Lets ops add the production landing-page / web-build origin without a
+/// recompile. Resolved once at boot via `OnceLock` so the request-path stays
+/// allocation-free.
+fn extra_origins() -> &'static Vec<String> {
+    use std::sync::OnceLock;
+    static EXTRA: OnceLock<Vec<String>> = OnceLock::new();
+    EXTRA.get_or_init(|| {
+        std::env::var("CORS_EXTRA_ORIGINS")
+            .ok()
+            .map(|raw| {
+                raw.split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect()
+            })
+            .unwrap_or_default()
+    })
+}
+
 /// Build the CORS layer. Strict allow-list — see [`ALLOWED_ORIGINS`].
+/// Additional origins can be supplied at boot via `CORS_EXTRA_ORIGINS`
+/// (comma-separated). Used to whitelist e.g. the production landing page or
+/// a real web build without redeploying server code.
 pub fn cors_layer() -> CorsLayer {
     CorsLayer::new()
         .allow_origin(AllowOrigin::predicate(
             |origin: &HeaderValue, _request_parts: &_| {
                 let Ok(s) = origin.to_str() else { return false };
                 ALLOWED_ORIGINS.iter().any(|p| s == *p)
+                    || extra_origins().iter().any(|p| s == *p)
             },
         ))
         .allow_methods([axum::http::Method::GET])

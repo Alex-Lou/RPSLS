@@ -165,7 +165,13 @@ pub async fn load(player_id: &str) -> Option<PlayerProgress> {
             }
             let json_str = result.as_str()?;
             match serde_json::from_str::<PlayerProgress>(json_str) {
-                Ok(state) => {
+                Ok(mut state) => {
+                    // Defense-in-depth: a poisoned row (left over from before
+                    // sanitize() was added to save(), or any future bug that
+                    // bypasses it) must not flow back to the client unchecked.
+                    // mergeServerState on the client takes Math.max — a leaked
+                    // u64::MAX would permanently corrupt the local player state.
+                    state.sanitize();
                     debug!(player_id, "player state loaded from Redis");
                     Some(state)
                 }

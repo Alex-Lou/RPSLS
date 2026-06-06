@@ -42,6 +42,13 @@ impl LobbyManager {
         Self::default()
     }
 
+    /// Number of open private lobbies right now. Used by the create_lobby
+    /// handler to refuse new lobbies past a configured ceiling so a scripted
+    /// attacker can't exhaust server memory by spamming `create_lobby`.
+    pub fn lobby_count(&self) -> usize {
+        self.lobbies.len()
+    }
+
     /// Create a private lobby and return its code.
     pub fn create_lobby(&self, host: Arc<Session>, best_of: u8) -> LobbyCode {
         // Try a few random codes until we find an unused one.
