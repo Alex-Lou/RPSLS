@@ -316,50 +316,46 @@ function LaneSlot({ index, pick, favoured, verdict, cardHere, onClick, disabled 
 /**
  * BigCardReveal — the dramatic version of CardSlot for the reveal phase.
  *
- * The mini lane badge is too tiny to communicate "the opponent played
- * Foo" — the player just sees a sticker pop. This component layers an
- * oversized card over the board centre: it descends face-down from the
- * top (suggesting a draw from the deck), flips horizontally, glows
- * briefly, and fades out into thin air ~1.6s later, by which time the
- * mini badge on the lane has already locked in. The whole sequence
- * happens BEFORE the verdict text (`showAfter` fires at 1.5s) so the
- * player reads the card first, then sees what it did.
+ * Two slots, two corners: the OPPONENT card lands top-left (where you read
+ * the threat first, like a notification), the PLAYER card lands bottom-right
+ * (your own play, mirroring your touch zone). Each card slides in from off-
+ * screen on its own side with a tilt, flips horizontally, glows briefly, and
+ * fades ~1.6s later — well before the verdict banner (`showAfter` 1.5s).
  *
- * `side="opp"` is the loud reveal (top-right, ~2× the size). `side="you"`
- * gives a smaller mirror in the bottom-left so you can recognise what
- * you played too, without competing with the opponent's reveal.
+ * Corner placement (vs the old centred stack) lets the player parse both
+ * cards in one glance instead of one above the other, and frees the board
+ * centre for the lane mini-badges to keep telling the round story.
  */
 function BigCardReveal({ id, side }: { id: CardId; side: "opp" | "you" }) {
   const isOpp = side === "opp";
-  // Drop the opp card from the centre-top (most attention); slide the you
-  // card up from the centre-bottom — it's our own play, no surprise.
-  const startY = isOpp ? -130 : 130;
-  const restingY = isOpp ? -34 : 34;
+  // Slide-in trajectory: each card enters from off-screen on its OWN side
+  // (opp from the left, you from the right) so the eye tracks two arcs
+  // arriving in different directions rather than two cards stacked.
+  const startX = isOpp ? -160 : 160;
+  const startY = isOpp ? -40 : 40;
+  const restingTilt = isOpp ? -8 : 8;
   return (
     <motion.div
-      initial={{ opacity: 0, y: startY, rotateY: 180, scale: 0.82 }}
+      initial={{ opacity: 0, x: startX, y: startY, rotateY: 180, rotateZ: restingTilt * 1.4, scale: 0.78 }}
       animate={{
         opacity: [0, 1, 1, 1, 0],
-        y: [startY, restingY, restingY, restingY, restingY * 0.6],
+        x: [startX, 0, 0, 0, isOpp ? -8 : 8],
+        y: [startY, 0, 0, 0, isOpp ? -6 : 6],
         rotateY: [180, 180, 0, 0, 0],
-        scale: [0.82, 1, 1.05, 1, 0.7],
+        rotateZ: [restingTilt * 1.4, restingTilt, restingTilt, restingTilt, restingTilt * 0.6],
+        scale: [0.78, 1, 1.05, 1, 0.72],
       }}
       exit={{ opacity: 0 }}
-      transition={{
-        duration: 1.6,
-        times: [0, 0.18, 0.42, 0.7, 1],
-        ease: "easeOut",
-      }}
-      style={{ transformStyle: "preserve-3d", perspective: 900 }}
+      transition={{ duration: 1.6, times: [0, 0.22, 0.45, 0.72, 1], ease: "easeOut" }}
+      style={{ transformStyle: "preserve-3d", perspective: 900, willChange: "transform" }}
       className={
-        "absolute left-1/2 -translate-x-1/2 z-30 pointer-events-none " +
+        "absolute z-30 pointer-events-none " +
         (isOpp
-          ? "top-1/2 -translate-y-[58%] w-20 h-28 sm:w-24 sm:h-32"
-          : "top-1/2 -translate-y-[42%] w-14 h-20 sm:w-16 sm:h-22")
+          ? "top-2 left-2 sm:top-3 sm:left-3 w-20 h-28 sm:w-24 sm:h-32"
+          : "bottom-2 right-2 sm:bottom-3 sm:right-3 w-16 h-22 sm:w-20 sm:h-28")
       }
     >
-      {/* Aura behind the card — colour-matched to the rarity for a punchier
-          "this is a Rare" sensation as the card lands. */}
+      {/* Rarity-coloured aura that pulses behind the card. */}
       <motion.div
         aria-hidden
         initial={{ opacity: 0, scale: 0.6 }}
