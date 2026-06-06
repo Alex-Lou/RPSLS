@@ -25,7 +25,7 @@ type View =
   | { kind: "constellation_prep" }
   | { kind: "lanes_cpu"; winTo: number }
   | { kind: "ranked_lobby" }
-  | { kind: "ranked_deck" }
+  | { kind: "ranked_deck"; fromPrep?: { oppName: string; oppAvatar: string } }
   | { kind: "ranked_bracket" }
   // Pre-match staging: deck check + pad swap + coin flip for the arena.
   | { kind: "ranked_prep"; oppName: string; oppAvatar: string }
@@ -188,7 +188,13 @@ export function PlayPage({
         {view.kind === "ranked_deck" && (
           <DeckManager
             key="ranked-deck"
-            onClose={() => setView({ kind: "ranked_lobby" })}
+            // Return to wherever the deck editor was opened from: the pre-match
+            // prep (with its opponent) if that's the origin, else the lobby.
+            onClose={() =>
+              view.fromPrep
+                ? setView({ kind: "ranked_prep", oppName: view.fromPrep.oppName, oppAvatar: view.fromPrep.oppAvatar })
+                : setView({ kind: "ranked_lobby" })
+            }
           />
         )}
         {view.kind === "ranked_bracket" && (
@@ -213,7 +219,7 @@ export function PlayPage({
               oppAvatar={view.oppAvatar}
               oppThemeId={persona.themeId}
               oppPadId={persona.padId}
-              onManageDeck={() => setView({ kind: "ranked_deck" })}
+              onManageDeck={() => setView({ kind: "ranked_deck", fromPrep: { oppName: view.oppName, oppAvatar: view.oppAvatar } })}
               onBack={() => setView({ kind: "ranked_bracket" })}
               onReady={(arena) =>
                 setView({ kind: "ranked_match", oppName: view.oppName, oppAvatar: view.oppAvatar, arena })
