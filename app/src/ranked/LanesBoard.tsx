@@ -12,6 +12,7 @@ import { LANE_IDENTITIES, laneFavoursMove } from "../engine/lanesCombos";
 import { CardSlot } from "./CardSlot";
 import { CardImage } from "./CardImage";
 import { OppHandIndicator } from "./OppHandIndicator";
+import { useArenaPad } from "./arena";
 import type { CardId, LaneTarget, PlayedCard } from "./rankedTypes";
 import { useT } from "../i18n";
 import { useStore } from "../store/store";
@@ -46,7 +47,9 @@ export function LanesBoard({
   myCard, oppCard, mode, laneResults, oppHandSize,
   onLaneClick, onOppLaneClick, augurTargeting = false,
 }: LanesBoardProps) {
-  const padId = useStore((s) => s.player.padId);
+  // The pad is the player's own — unless a coin-flipped arena overrides it
+  // for this duel (see ranked/arena.tsx).
+  const padId = useArenaPad(useStore((s) => s.player.padId));
   return (
     <div
       className="relative w-full max-w-2xl rounded-2xl overflow-hidden

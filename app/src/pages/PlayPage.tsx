@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
-import { GameMode } from "../types";
+import { GameMode, type PadId, type ThemeId } from "../types";
 import { type DailyChallenge } from "../engine/daily";
 import type { Page } from "../Sidebar";
 import { UserHeader } from "../UserHeader";
@@ -11,6 +11,9 @@ import { RankedLobby } from "../ranked/RankedLobby";
 import { initialTournament, resolvePlayerMatch, isPlayerEliminated, type TournamentState } from "../ranked/TournamentBracket";
 import { BracketPage } from "../ranked/BracketPage";
 import { DeckManager } from "../ranked/DeckManager";
+import { MatchPrepScreen, type Arena } from "../ranked/MatchPrepScreen";
+import { ArenaPadProvider } from "../ranked/arena";
+import { applyTheme } from "../theme/theme";
 import { levelFromXp } from "../engine/leveling";
 import { Game } from "./play/PlayGame";
 import { ModeSelect, SandboxView, ConstellationLobby, ClasseLobby } from "./play/PlayMenu";
@@ -24,11 +27,26 @@ type View =
   | { kind: "ranked_lobby" }
   | { kind: "ranked_deck" }
   | { kind: "ranked_bracket" }
-  | { kind: "ranked_match"; oppName: string; oppAvatar: string }
+  // Pre-match staging: deck check + pad swap + coin flip for the arena.
+  | { kind: "ranked_prep"; oppName: string; oppAvatar: string }
+  | { kind: "ranked_match"; oppName: string; oppAvatar: string; arena?: Arena }
   // Classé (classic 1v1) hub — its own lobby + tournament + match.
   | { kind: "classe_lobby" }
   | { kind: "classe_bracket" }
   | { kind: "classe_match"; oppName: string; oppAvatar: string };
+
+/** Deterministic theme+pad persona for a CPU opponent, seeded by name so the
+ *  same opponent always shows the same colours (used by the coin-flip arena). */
+const PERSONA_THEMES: ThemeId[] = ["violet", "neon", "sunset", "forest", "ocean", "ember", "aurora", "gold", "cyber", "rose"];
+const PERSONA_PADS: PadId[] = ["chalkboard", "vintage", "cosmos", "galaxy", "neon", "comics", "cyberpunk", "holy", "quantum", "casino"];
+function oppPersona(name: string): { themeId: ThemeId; padId: PadId } {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return {
+    themeId: PERSONA_THEMES[h % PERSONA_THEMES.length],
+    padId: PERSONA_PADS[(h >> 3) % PERSONA_PADS.length],
+  };
+}
 
 export function PlayPage({
   onNavigate, homeNonce,
@@ -68,6 +86,27 @@ export function PlayPage({
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, [view.kind]);
+
+  // Arena theme override — when the coin flip handed the duel to the
+  // opponent's colours, paint the HUD with their theme for the match only.
+  // We snapshot the LIVE CSS vars (so a background-accent override is
+  // restored faithfully, not just the player's base theme) and put them
+  // back when the match view unmounts.
+  useEffect(() => {
+    if (view.kind !== "ranked_match" || view.arena?.side !== "opp") return;
+    const root = document.documentElement;
+    const snap = {
+      p: root.style.getPropertyValue("--theme-primary"),
+      s: root.style.getPropertyValue("--theme-secondary"),
+      b: root.style.getPropertyValue("--theme-bg"),
+    };
+    applyTheme(view.arena.themeId);
+    return () => {
+      if (snap.p) root.style.setProperty("--theme-primary", snap.p);
+      if (snap.s) root.style.setProperty("--theme-secondary", snap.s);
+      if (snap.b) root.style.setProperty("--theme-bg", snap.b);
+    };
+  }, [view]);
 
   return (
     <div className="w-full max-w-6xl mx-auto px-3 sm:px-8 pt-0 pb-2 sm:py-4 flex-1 flex flex-col min-h-0">
@@ -157,10 +196,31 @@ export function PlayPage({
             key="ranked-bracket"
             tournament={tournament}
             setTournament={setTournament}
-            onStartMatch={(name, avatar) => setView({ kind: "ranked_match", oppName: name, oppAvatar: avatar })}
+            onStartMatch={(name, avatar) => setView({ kind: "ranked_prep", oppName: name, oppAvatar: avatar })}
             onBack={() => setView({ kind: "ranked_lobby" })}
           />
         )}
+        {view.kind === "ranked_prep" && (() => {
+          const persona = oppPersona(view.oppName);
+          const me = useStore.getState().player;
+          return (
+            <MatchPrepScreen
+              key={`ranked-prep-${view.oppName}`}
+              youName={me.nickname}
+              youAvatar={me.avatar}
+              youThemeId={me.themeId}
+              oppName={view.oppName}
+              oppAvatar={view.oppAvatar}
+              oppThemeId={persona.themeId}
+              oppPadId={persona.padId}
+              onManageDeck={() => setView({ kind: "ranked_deck" })}
+              onBack={() => setView({ kind: "ranked_bracket" })}
+              onReady={(arena) =>
+                setView({ kind: "ranked_match", oppName: view.oppName, oppAvatar: view.oppAvatar, arena })
+              }
+            />
+          );
+        })()}
         {view.kind === "ranked_match" && (
           <motion.div
             key={`ranked-match-${view.oppName}`}
@@ -170,15 +230,19 @@ export function PlayPage({
             transition={{ duration: 0.25 }}
             className="flex-1 flex flex-col min-h-0"
           >
-            <RankedGame
-              winTo={3}
-              opponentName={view.oppName}
-              onQuit={() => setView({ kind: "ranked_bracket" })}
-              onMatchResult={(won) => {
-                setTournament((t) => resolvePlayerMatch(t, won));
-                setView({ kind: "ranked_bracket" });
-              }}
-            />
+            {/* The arena pad override (if the coin gave the duel to the
+                opponent's pad) is supplied via context; null = player's pad. */}
+            <ArenaPadProvider value={view.arena?.side === "opp" ? view.arena.padId : null}>
+              <RankedGame
+                winTo={3}
+                opponentName={view.oppName}
+                onQuit={() => setView({ kind: "ranked_bracket" })}
+                onMatchResult={(won) => {
+                  setTournament((t) => resolvePlayerMatch(t, won));
+                  setView({ kind: "ranked_bracket" });
+                }}
+              />
+            </ArenaPadProvider>
           </motion.div>
         )}
 
