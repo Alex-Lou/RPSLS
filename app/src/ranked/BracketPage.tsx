@@ -22,10 +22,10 @@ import { TournamentPodium } from "./TournamentPodium";
 import { FloatingMatchBackButton, hapticTick } from "../match/sharedMatchUI";
 import { LoadingTip } from "../flavor/LoadingTip";
 
-const SIZE_META: Record<TournamentSize, { title: string; sub: string; glyph: string }> = {
-  4: { title: "Rapide", sub: "4 adversaires CPU · 2 tours", glyph: "⚡" },
-  8: { title: "Classique", sub: "8 adversaires CPU · 3 tours", glyph: "🛡️" },
-  16: { title: "Épique", sub: "16 adversaires CPU · 4 tours", glyph: "👑" },
+const SIZE_META: Record<TournamentSize, { title: string; sub: string; glyph: string; art: string }> = {
+  4:  { title: "Rapide",    sub: "4 adversaires CPU · 2 tours",  glyph: "⚡",  art: "/Icones Tournoi/ConstRankedRapide.png" },
+  8:  { title: "Classique", sub: "8 adversaires CPU · 3 tours",  glyph: "🛡️", art: "/Icones Tournoi/ConstRankedClassique.png" },
+  16: { title: "Épique",    sub: "16 adversaires CPU · 4 tours", glyph: "👑", art: "/Icones Tournoi/ConstRankedEpique.png" },
 };
 
 export function BracketPage({
@@ -305,7 +305,16 @@ function SizePicker({ onPick }: { onPick: (s: TournamentSize) => void }) {
             }}
           >
             <div className="flex items-center gap-4 px-5 py-4">
-              <span className="text-3xl drop-shadow">{meta.glyph}</span>
+              {meta.art ? (
+                <img
+                  src={meta.art}
+                  alt=""
+                  className="w-14 h-14 object-contain shrink-0 drop-shadow-[0_2px_8px_rgba(0,0,0,0.55)]"
+                  draggable={false}
+                />
+              ) : (
+                <span className="text-3xl drop-shadow">{meta.glyph}</span>
+              )}
               <div className="flex-1">
                 <div
                   className="text-lg font-extrabold text-white"
