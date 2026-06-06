@@ -606,6 +606,12 @@ function PackCardFlip({
     card.rarity === "epic"      ? "ring-violet-400 shadow-violet-500/40" :
     card.rarity === "rare"      ? "ring-sky-400 shadow-sky-500/40" :
                                   "ring-white/15";
+  const rarityHex =
+    card.rarity === "legendary" ? "#fbbf24" :
+    card.rarity === "epic"      ? "#a78bfa" :
+    card.rarity === "rare"      ? "#38bdf8" :
+                                  "#cbd5e1";
+  const isRarePlus = card.rarity !== "common";
 
   return (
     <motion.button
@@ -641,6 +647,48 @@ function PackCardFlip({
         style={{ backfaceVisibility: "hidden" }}
       >
         <CardImage id={cardId} glyphSize="text-2xl" />
+
+        {/* ── Reveal FX — play ONCE when the card flips face-up ── */}
+        {revealed && (
+          <>
+            {/* Holographic sheen sweep across the freshly-revealed art. */}
+            <motion.div
+              aria-hidden
+              initial={{ x: "-130%", opacity: 0 }}
+              animate={{ x: "130%", opacity: [0, 0.9, 0] }}
+              transition={{ duration: 0.7, delay: 0.18, ease: "easeOut" }}
+              className="absolute inset-y-0 w-2/3 -skew-x-12 z-10 pointer-events-none"
+              style={{ background: `linear-gradient(90deg, transparent, ${rarityHex}, transparent)` }}
+            />
+            {/* Rarity shockwave ring (rare and up) — a quick burst of "value". */}
+            {isRarePlus && (
+              <motion.div
+                aria-hidden
+                initial={{ opacity: 0.85, scale: 0.4 }}
+                animate={{ opacity: 0, scale: 1.8 }}
+                transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
+                className="absolute inset-0 m-auto w-3/4 h-3/4 rounded-full z-10 pointer-events-none"
+                style={{ border: `2px solid ${rarityHex}`, boxShadow: `0 0 16px ${rarityHex}` }}
+              />
+            )}
+            {/* Epic/legendary sparkle motes converging outward. */}
+            {(card.rarity === "epic" || card.rarity === "legendary") &&
+              Array.from({ length: 8 }).map((_, i) => {
+                const ang = (i / 8) * Math.PI * 2;
+                return (
+                  <motion.span
+                    key={i}
+                    aria-hidden
+                    initial={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+                    animate={{ opacity: 0, x: Math.cos(ang) * 42, y: Math.sin(ang) * 42, scale: 0.2 }}
+                    transition={{ duration: 0.7, delay: 0.25, ease: "easeOut" }}
+                    className="absolute left-1/2 top-1/2 w-1.5 h-1.5 rounded-full z-10 pointer-events-none"
+                    style={{ background: rarityHex, boxShadow: `0 0 8px ${rarityHex}` }}
+                  />
+                );
+              })}
+          </>
+        )}
         <div className="relative z-10 flex flex-col items-center gap-0.5 p-1 mt-auto">
           <span className="text-2xl">{card.glyph}</span>
           <span className="text-[8px] font-bold uppercase text-white/90 text-center leading-tight">
