@@ -147,7 +147,7 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack, onGoShop }: {
         style={{ border: "1px solid color-mix(in oklab, var(--theme-primary) 35%, transparent)" }}
       >
         <div className="flex items-center gap-2.5">
-          <span className="text-xl">🃏</span>
+          <img src="/MenuIcons/DeckGestionIcone.png" alt="" className="w-7 h-7 object-contain drop-shadow-[0_1px_4px_rgba(0,0,0,0.5)]" draggable={false} />
           <div className="text-left">
             <div className="font-bold text-sm text-ink">Gérer mon Deck</div>
             <div className="text-[10px] text-ink-faint">3 main + 3 réserve</div>
