@@ -107,12 +107,17 @@ vec3 aurora(vec2 uv, float aspect){
     float band = 0.45 + 0.16*sin(uv.x*2.2 + u_time*0.35 + fi*2.1)
                       + 0.06*sin(uv.x*4.5 - u_time*0.18 + fi);
     float d = abs(uv.y - band);
-    // Wider, softer falloff (was a thin 1/d^2 line that flashed). Steady.
-    float glow = smoothstep(0.22, 0.0, d);
-    glow = glow*glow;
-    vec3 tint = mix(vec3(0.16,0.90,0.55), vec3(0.55,0.35,0.95), fi/2.0);
-    // Gentle breathe instead of harsh sine flash.
-    col += tint * glow * (0.45 + 0.12*sin(u_time*0.5 + fi*1.7));
+    // Soft body (tighter than before so it doesn't wash the whole sky).
+    float glow = smoothstep(0.16, 0.0, d); glow = glow*glow;
+    // CRISP bright ridge along the curtain centre — gives a defined edge
+    // instead of a uniform blur.
+    float ridge = smoothstep(0.022, 0.0, d);
+    // Vertical filament streaks running through the curtain (the real
+    // "northern lights" texture) — animated, high-frequency, readable.
+    float streak = 0.55 + 0.45*sin(uv.x*70.0 + u_time*0.9 + fi*3.0);
+    vec3 tint = mix(vec3(0.16,0.95,0.55), vec3(0.55,0.35,1.0), fi/2.0);
+    col += tint * glow * streak * (0.42 + 0.12*sin(u_time*0.5 + fi*1.7));
+    col += tint * ridge * 0.85;
   }
   col += softStars(uv, aspect, 0.994, vec3(0.8,0.95,1.0)) * step(0.45, uv.y);
   return col;
@@ -168,14 +173,20 @@ vec3 galaxy(vec2 uv, float aspect){
   // Rotating 2-arm spiral.
   float spiral = a + r*3.2 - u_time*0.18;
   float arms = 0.5 + 0.5*cos(spiral*2.0);
-  arms = pow(arms, 1.9);                             // sharper, higher-contrast arms
+  arms = pow(arms, 2.6);                             // sharper, higher-contrast arms
   arms *= smoothstep(1.5, 0.05, r);                  // fade outward
   // Dust sampled in WARPED CARTESIAN space (not raw polar) so it no longer
   // bands into blocky seams along the angular grid — liquid swirl.
   vec2 warp = p*2.6 + 0.5*vec2(cos(spiral), sin(spiral));
   float dust = fbm(warp - u_time*0.06);
   vec3 col = vec3(0.012,0.013,0.045);
-  col += mix(vec3(0.26,0.11,0.55), vec3(0.16,0.55,0.92), dust) * arms * 0.8;
+  // Contrast the dust harder (was a muddy mid-mix) so the arms read crisply.
+  float dustc = smoothstep(0.35, 0.85, dust);
+  col += mix(vec3(0.20,0.08,0.50), vec3(0.30,0.70,1.0), dustc) * arms * 0.95;
+  // Bright crisp filament threading the arm crest — the defined "lane" of
+  // stars that makes the spiral legible instead of a soft smear.
+  float crest = smoothstep(0.78, 0.99, 0.5 + 0.5*cos(spiral*2.0));
+  col += vec3(0.85,0.88,1.0) * crest * smoothstep(1.3, 0.12, r) * 0.16;
   // Discreet core — a soft glow, NOT a flashy ball, kept dim so the menu cards
   // on top stay readable.
   col += vec3(0.65,0.55,0.92) * exp(-r*r*6.0) * 0.30;
@@ -197,12 +208,17 @@ vec3 holy(vec2 uv, float aspect){
     float fi = float(i);
     float x = 0.2 + fi*0.2 + 0.04*sin(u_time*0.3 + fi);
     float w = 0.06 + 0.02*sin(u_time*0.2 + fi*2.0);
-    float band = smoothstep(w, 0.0, abs(uv.x - x));
-    shaft += band;
+    float dx = abs(uv.x - x);
+    float band = smoothstep(w, 0.0, dx);          // soft volumetric body
+    float core = smoothstep(w*0.32, 0.0, dx);     // CRISP bright shaft core
+    shaft += band*0.55 + core*0.9;
   }
   shaft *= smoothstep(1.0, 0.1, uv.y);                 // top-down fade
+  // Drifting dust striations across the shafts → visible volumetric light
+  // instead of flat soft bands.
+  shaft *= 0.72 + 0.28*sin(uv.y*90.0 - u_time*1.1);
   vec3 gold = vec3(1.0, 0.82, 0.42);
-  vec3 col = base + gold * shaft * 0.30;
+  vec3 col = base + gold * shaft * 0.32;
   // Floating motes drifting up.
   vec2 mp = uv*vec2(aspect,1.0)*vec2(40.0, 18.0); mp.y += u_time*0.4;
   float mote = exp(-pow(length(fract(mp)-0.5),2.0)*40.0) * step(0.97, hash(floor(mp)));
@@ -224,6 +240,12 @@ vec3 quantum(vec2 uv, float aspect){
   v *= 0.25;
   vec3 col = mix(vec3(0.02,0.05,0.12), vec3(0.10,0.55,0.85), 0.5+0.5*v);
   col = mix(col, vec3(0.2,0.85,1.0), smoothstep(0.5,1.0, 0.5+0.5*sin(v*PI)));
+  // CRISP electric filaments — thin bright arcs traced where the plasma field
+  // crosses zero. Turns the soft blob plasma into legible energy lines.
+  float field = sin(p.x*9.0 + sin(p.y*7.0 + t)*2.2 + t)
+              + sin(p.y*8.0 - sin(p.x*6.0 - t)*2.0 - t*1.2);
+  float fil = smoothstep(0.10, 0.0, abs(field));
+  col += vec3(0.55,1.0,1.0) * fil * 0.6;
   // A few drifting energy nodes (soft bright orbs).
   for(int i=0;i<3;i++){
     float fi=float(i);
