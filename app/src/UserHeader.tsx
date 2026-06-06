@@ -72,29 +72,19 @@ export function UserHeader({ onNavigate }: { onNavigate: (p: Page) => void }) {
 
         {/* Name + rank + XP bar */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold truncate">{player.nickname}</span>
+          <div className="flex items-center gap-2 min-w-0">
+            {/* Name takes all spare room and ellipsises; the rank chip never
+                shrinks or wraps, so a long nickname can't squeeze it into a
+                broken two-line badge (the old "nom coupé/entrecoupé" bug). */}
+            <span className="flex-1 min-w-0 text-sm font-bold truncate">{player.nickname}</span>
             <span
               className={
-                "shrink-0 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full text-zinc-900 bg-gradient-to-r " +
+                "shrink-0 whitespace-nowrap text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full text-zinc-900 bg-gradient-to-r " +
                 rank.gradient
               }
             >
               {rank.emoji} {rank.label}
             </span>
-            {/* Win-streak momentum badge — appears at 2+, pulses, and shows
-                the active XP multiplier once the bonus kicks in (3+). */}
-            {(player.winStreak ?? 0) >= 2 && (
-              <motion.span
-                initial={{ scale: 0.6, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="shrink-0 text-[9px] font-black px-1.5 py-0.5 rounded-full bg-orange-500/25 text-orange-300 border border-orange-400/40"
-                title="Série de victoires"
-              >
-                🔥 {player.winStreak}
-                {(player.winStreak ?? 0) >= 5 ? " ×2" : (player.winStreak ?? 0) >= 3 ? " ×1.5" : ""}
-              </motion.span>
-            )}
           </div>
 
           {/* XP bar — the landing target for every XP gain. Taller + a slower
@@ -130,11 +120,24 @@ export function UserHeader({ onNavigate }: { onNavigate: (p: Page) => void }) {
             </AnimatePresence>
           </div>
 
-          <div className="mt-0.5 flex items-center justify-between text-[10px] text-ink-faint">
-            <span>
+          <div className="mt-0.5 flex items-center gap-2 text-[10px] text-ink-faint">
+            <span className="truncate">
               {t("sidebar.lvl")} {info.level} · {info.xpInLevel}/{info.xpForNext} {t("sidebar.xp")}
             </span>
-            <span className="text-ink-muted">
+            {/* Win-streak momentum badge — moved here (off the name row) so it
+                never steals width from the nickname. */}
+            {(player.winStreak ?? 0) >= 2 && (
+              <motion.span
+                initial={{ scale: 0.6, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="shrink-0 whitespace-nowrap text-[9px] font-black px-1.5 py-0.5 rounded-full bg-orange-500/25 text-orange-300 border border-orange-400/40"
+                title="Série de victoires"
+              >
+                🔥 {player.winStreak}
+                {(player.winStreak ?? 0) >= 5 ? " ×2" : (player.winStreak ?? 0) >= 3 ? " ×1.5" : ""}
+              </motion.span>
+            )}
+            <span className="ml-auto shrink-0 text-ink-muted whitespace-nowrap">
               {player.rankLp} {t("sidebar.lp")}
             </span>
           </div>
