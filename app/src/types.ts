@@ -3,7 +3,9 @@ import type { AiMood } from "./engine/game";
 
 export type ThemeId =
   | "violet" | "neon" | "pastel" | "sunset" | "forest"
-  | "ocean" | "ember" | "aurora" | "gold" | "cyber" | "rose" | "mono";
+  | "ocean" | "ember" | "aurora" | "gold" | "cyber" | "rose" | "mono"
+  // ── Premium palettes ──
+  | "quartz";
 
 export type PadId =
   // Fully coded, animated playmats (SVG/SMIL — no PNGs anymore).
@@ -17,6 +19,8 @@ export type PadId =
   | "aura"
   // Elemental pads matching coded backgrounds.
   | "volcanic" | "abyss"
+  // ── Premium pads ──
+  | "quartz"
   // Player's own uploaded mat (data URL on the player).
   | "custom";
 
@@ -25,6 +29,8 @@ export type BackgroundId =
   // Coded / animated WebGL backdrops (no PNG — fully procedural).
   | "nebula" | "galaxy" | "aurora" | "holy" | "quantum" | "grid" | "casino"
   | "volcanic" | "abyss"
+  // ── Premium backgrounds ──
+  | "quartz"
   // Player's own uploaded image.
   | "custom";
 
@@ -86,6 +92,16 @@ export interface Player {
   /** Craft resource. Granted from duplicate pulls in packs (more on rare
    *  cards), spent to forge a specific locked card. */
   dust?: number;
+  /** Premium currency — NEVER awarded through gameplay. Used only for the
+   *  premium cosmetics shop (animated sets, ranked exclusives). Purchased
+   *  via the App/Play Store and granted by the server post-receipt-verify.
+   *  Keeping it out of every gameplay loop is what guarantees no in-game
+   *  exploit can mint it; the only mint surface is a verified IAP receipt. */
+  stars?: number;
+  /** Premium cosmetic ids the player owns (e.g. ["quartz"]). Cosmetics are
+   *  per-set, not per-piece — owning "quartz" unlocks the background, pad,
+   *  and HUD palette together. Server-replicated like the rest of progress. */
+  ownedPremiumSets?: string[];
   /** Collection-completion thresholds the player has already claimed
    *  (5 / 10 / 15 cards). Each threshold can be claimed at most once. */
   codexClaimed?: number[];
@@ -164,6 +180,7 @@ export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: st
   aura:       { label: "Aura",           emoji: "🎨", tagline: "S'accorde à ton thème : couleurs et lueurs vivantes.", category: "styled" },
   volcanic:   { label: "Volcanic",      emoji: "🌋", tagline: "Obsidienne craquelée, veines de lave, braises montantes.", category: "styled" },
   abyss:      { label: "Abyss",         emoji: "🐙", tagline: "Abysses océaniques, méduses bioluminescentes, profondeurs.", category: "styled" },
+  quartz:     { label: "Quartz",        emoji: "💠", tagline: "Cristaux prismatiques, refractions glaciales, lumière douce.",     category: "styled" },
   custom:     { label: "Mon image",      emoji: "🖼️", tagline: "Ton propre tapis (paysage 3:2, ex. 1500×1000).",     category: "img" },
 };
 

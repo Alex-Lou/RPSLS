@@ -25,12 +25,19 @@ interface Props {
   /** When true, drop the click-affordance ring & cursor — useful when the
    *  parent button already handles the click (UserHeader avatar/name area). */
   inert?: boolean;
+  /** Force-show the ✦ stars chip even when the player has 0. Used on the
+   *  premium boutique surface so the player always sees their balance —
+   *  even when empty — and a "buy stars" CTA is implicit. Default: only
+   *  rendered when balance > 0 to avoid clutter on the main HUD. */
+  showStars?: boolean;
 }
 
-export function CurrencyBadges({ onClick, size = "compact", inert }: Props) {
+export function CurrencyBadges({ onClick, size = "compact", inert, showStars }: Props) {
   const eclats = useStore((s) => s.player.eclats ?? 0);
   const dust = useStore((s) => s.player.dust ?? 0);
+  const stars = useStore((s) => s.player.stars ?? 0);
   const canBuyPack = eclats >= PACK_COST;
+  const renderStars = showStars || stars > 0;
 
   const isFull = size === "full";
 
@@ -62,6 +69,21 @@ export function CurrencyBadges({ onClick, size = "compact", inert }: Props) {
         accent="none"
         label="Poussière"
       />
+      {renderStars && (
+        <CurrencyChip
+          icon="✦"
+          value={stars}
+          toneFrom="from-amber-400/30"
+          toneTo="to-orange-500/15"
+          ring="ring-amber-300/50"
+          text="text-amber-200"
+          big={isFull}
+          inert={inert}
+          onClick={onClick}
+          accent="none"
+          label="Étoiles"
+        />
+      )}
     </div>
   );
 }

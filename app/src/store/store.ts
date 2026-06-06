@@ -60,6 +60,8 @@ export function defaultPlayer(): Player {
     rankedDeck: ["aegis", "precision", "surge", "augur", "anchor", "second-wind"],
     eclats: 0,
     dust: 0,
+    stars: 0,
+    ownedPremiumSets: [],
     codexClaimed: [],
     cardMastery: {},
     season: { number: 1, startedAt: Date.now() },
@@ -128,6 +130,14 @@ interface AppState {
   /** Apply a server-synced progression patch to the local player. Used by
    *  bootSync and the state_loaded handler to merge server-saved data. */
   applyServerSync: (patch: Partial<Player>) => void;
+  /** SIMULATE a premium-set purchase (no real money). Debits the cost in
+   *  stars and adds the set to ownedPremiumSets. Returns `false` if the
+   *  player can't afford it or already owns the set. Production swap-in
+   *  will be a server call that verifies the IAP receipt before granting. */
+  simulatePremiumPurchase: (setId: string, costStars: number) => boolean;
+  /** Dev / test helper: credit stars directly. Wired only to the dev modal
+   *  ("+1000 ✦ test"), never exposed to players. */
+  grantStars: (n: number) => void;
 }
 
 function detectLocale(): Locale {
@@ -214,7 +224,15 @@ export const useStore = create<AppState>()(
           p.winStreak = streak;
           const bonusXp = m.outcome === "win" ? streakBonusXp(m.xpDelta, streak) : 0;
           p.xp = Math.max(0, p.xp + m.xpDelta + bonusXp);
-          p.rankLp = Math.max(0, p.rankLp + m.lpDelta);
+          // CLAMP lpDelta to ±50: a determined cheater can rebuild the client
+          // and call recordMatch({ lpDelta: 9_999_999 }) — without this clamp
+          // they could mint LP locally, triggering inflated season-rollover
+          // rewards (LP-tiered: ≤700 éclats + 200 dust). The global leaderboard
+          // is still server-authoritative (record_result in match_engine.rs
+          // hard-codes ±20/−15), so this only matters for local rewards.
+          // Real ranked LP can ONLY be granted server-side via online matches.
+          const safeLpDelta = Math.max(-50, Math.min(50, m.lpDelta | 0));
+          p.rankLp = Math.max(0, p.rankLp + safeLpDelta);
           // Soft-currency éclats earned every finished match (no forfeit).
           if (!m.forfeit) {
             p.eclats = (p.eclats ?? 0) + eclatsReward(m.mode, m.outcome);
@@ -400,6 +418,23 @@ export const useStore = create<AppState>()(
 
       applyServerSync: (patch) =>
         set((s) => ({ player: { ...s.player, ...patch } })),
+      simulatePremiumPurchase: (setId, costStars) => {
+        const p = useStore.getState().player;
+        const owned = p.ownedPremiumSets ?? [];
+        if (owned.includes(setId)) return false;
+        const stars = p.stars ?? 0;
+        if (stars < costStars) return false;
+        set((s) => ({
+          player: {
+            ...s.player,
+            stars: (s.player.stars ?? 0) - costStars,
+            ownedPremiumSets: [...(s.player.ownedPremiumSets ?? []), setId],
+          },
+        }));
+        return true;
+      },
+      grantStars: (n) =>
+        set((s) => ({ player: { ...s.player, stars: Math.max(0, (s.player.stars ?? 0) + Math.round(n)) } })),
     }),
     {
       name: "rpsls-app-state",
