@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
-import { GameMode, type PadId, type ThemeId } from "../types";
+import { GameMode, type BackgroundId, type PadId, type ThemeId } from "../types";
 import { type DailyChallenge } from "../engine/daily";
 import type { Page } from "../Sidebar";
 import { UserHeader } from "../UserHeader";
@@ -13,6 +13,7 @@ import { BracketPage } from "../ranked/BracketPage";
 import { DeckManager } from "../ranked/DeckManager";
 import { MatchPrepScreen, type Arena } from "../ranked/MatchPrepScreen";
 import { ArenaPadProvider } from "../ranked/arena";
+import { useArenaOverride } from "../ranked/arenaOverride";
 import { applyTheme } from "../theme/theme";
 import { levelFromXp } from "../engine/leveling";
 import { Game } from "./play/PlayGame";
@@ -35,16 +36,21 @@ type View =
   | { kind: "classe_bracket" }
   | { kind: "classe_match"; oppName: string; oppAvatar: string };
 
-/** Deterministic theme+pad persona for a CPU opponent, seeded by name so the
- *  same opponent always shows the same colours (used by the coin-flip arena). */
+/** Deterministic theme + pad + backdrop persona for a CPU opponent, seeded
+ *  by name so the same opponent always shows the same arena (used by the
+ *  coin-flip arena swap). Backdrops are picked from the FREE coded scenes
+ *  so a "ceding the field" never depends on the opponent owning a premium
+ *  set the player can't see. */
 const PERSONA_THEMES: ThemeId[] = ["violet", "neon", "sunset", "forest", "ocean", "ember", "aurora", "gold", "cyber", "rose"];
 const PERSONA_PADS: PadId[] = ["chalkboard", "vintage", "cosmos", "galaxy", "neon", "comics", "cyberpunk", "holy", "quantum", "casino"];
-function oppPersona(name: string): { themeId: ThemeId; padId: PadId } {
+const PERSONA_BGS: BackgroundId[] = ["nebula", "galaxy", "aurora", "holy", "quantum", "grid", "casino", "volcanic", "abyss"];
+function oppPersona(name: string): { themeId: ThemeId; padId: PadId; backgroundId: BackgroundId } {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
   return {
     themeId: PERSONA_THEMES[h % PERSONA_THEMES.length],
     padId: PERSONA_PADS[(h >> 3) % PERSONA_PADS.length],
+    backgroundId: PERSONA_BGS[(h >> 7) % PERSONA_BGS.length],
   };
 }
 
@@ -87,11 +93,18 @@ export function PlayPage({
     return () => window.removeEventListener("popstate", onPop);
   }, [view.kind]);
 
-  // Arena theme override — when the coin flip handed the duel to the
-  // opponent's colours, paint the HUD with their theme for the match only.
-  // We snapshot the LIVE CSS vars (so a background-accent override is
-  // restored faithfully, not just the player's base theme) and put them
-  // back when the match view unmounts.
+  // Arena swap — when the coin flip handed the duel to the opponent, the
+  // WHOLE arena (backdrop scene + HUD theme + pad) is replaced for the
+  // duration of the match. Previously only the pad swapped — Alex flagged
+  // that as half-baked: "after the coin flip the WHOLE theme of whoever
+  // won should apply to the duel, not just the pad". Here we now:
+  //   1. flip the global `arenaOverride.bg` store so App.tsx renders the
+  //      opponent's backdrop scene (instead of the player's),
+  //   2. apply their HUD theme via direct CSS-var mutation,
+  //   3. snapshot + restore everything on unmount so leaving the match
+  //      drops the player back into their own universe.
+  // The pad side is handled below by <ArenaPadProvider> as before.
+  const setArenaBg = useArenaOverride((s) => s.setBg);
   useEffect(() => {
     if (view.kind !== "ranked_match" || view.arena?.side !== "opp") return;
     const root = document.documentElement;
@@ -101,12 +114,14 @@ export function PlayPage({
       b: root.style.getPropertyValue("--theme-bg"),
     };
     applyTheme(view.arena.themeId);
+    setArenaBg(view.arena.backgroundId);
     return () => {
       if (snap.p) root.style.setProperty("--theme-primary", snap.p);
       if (snap.s) root.style.setProperty("--theme-secondary", snap.s);
       if (snap.b) root.style.setProperty("--theme-bg", snap.b);
+      setArenaBg(null);
     };
-  }, [view]);
+  }, [view, setArenaBg]);
 
   return (
     <div className="w-full max-w-6xl mx-auto px-3 sm:px-8 pt-0 pb-2 sm:py-4 flex-1 flex flex-col min-h-0">
@@ -209,10 +224,12 @@ export function PlayPage({
               youName={me.nickname}
               youAvatar={me.avatar}
               youThemeId={me.themeId}
+              youBackgroundId={me.backgroundId ?? "default"}
               oppName={view.oppName}
               oppAvatar={view.oppAvatar}
               oppThemeId={persona.themeId}
               oppPadId={persona.padId}
+              oppBackgroundId={persona.backgroundId}
               onBack={() => setView({ kind: "ranked_bracket" })}
               onReady={(arena) =>
                 setView({ kind: "ranked_match", oppName: view.oppName, oppAvatar: view.oppAvatar, arena })

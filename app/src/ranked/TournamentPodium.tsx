@@ -7,11 +7,12 @@
  */
 
 import { useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import { useT } from "../i18n";
 import { useStore } from "../store/store";
 import { avatarImgStyle } from "../theme/avatar";
-import { CelebrationBurst } from "../match/sharedMatchUI";
+import { CelebrationBurst, FloatingMatchBackButton } from "../match/sharedMatchUI";
 import { tournamentStandings, type Standing, type TournamentState } from "./TournamentBracket";
 
 const isImg = (a: string) => /^(data:|\/|https?:)/.test(a);
@@ -85,10 +86,11 @@ function PodiumBlock({ s, you }: { s: Standing; you: boolean }) {
 }
 
 export function TournamentPodium({
-  tournament, onContinue,
+  tournament, onContinue, onReplay,
 }: {
   tournament: TournamentState;
   onContinue: () => void;
+  onReplay?: () => void;
 }) {
   const t = useT();
   const grantXp = useStore((s) => s.grantXp);
@@ -111,31 +113,34 @@ export function TournamentPodium({
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      // Was max-w-md → screen-in-a-screen feel. Bumped to max-w-3xl so the
-      // celebration fills modern phones edge-to-edge (md+) without the dead
-      // gutters. Outer gap also grows for breathing room.
-      className="relative flex flex-col items-center gap-5 flex-1 min-h-0 overflow-y-auto py-4 px-3 sm:px-6 w-full max-w-3xl mx-auto"
+      // Layout: header + podium are pinned (shrink-0), standings table scrolls
+      // within its OWN bounded area. Floating buttons in the top corners carry
+      // the actions, so the user never has to scroll to find a CTA.
+      className="relative flex flex-col items-center gap-3 sm:gap-4 flex-1 min-h-0 py-4 px-3 sm:px-6 w-full max-w-3xl mx-auto"
     >
       <CelebrationBurst variant="fire" />
+      <FloatingMatchBackButton onClick={onContinue} label={t("lanes.backToMenu")} />
+      {onReplay && <FloatingNewRunButton onClick={onReplay} />}
 
       <div className="text-center shrink-0 w-full">
         <div className="text-xs sm:text-sm uppercase tracking-[0.35em] text-ink-faint">Tournoi terminé</div>
         <h1
-          className="text-4xl sm:text-5xl md:text-6xl font-black text-themed leading-tight mt-1"
+          className="text-3xl sm:text-4xl md:text-5xl font-black text-themed leading-tight mt-1"
           style={{ fontFamily: "var(--font-headline)" }}
         >
           {you?.place === 1 ? "🏆 Tu es Champion !" : `${tournament.champion?.name ?? "—"} remporte le tournoi`}
         </h1>
       </div>
 
-      {/* Podium 2-1-3 — gap + lift go up alongside the wider canvas. */}
-      <div className="flex items-end justify-center gap-4 sm:gap-6 w-full px-1 mt-2">
+      {/* Podium 2-1-3 — pinned. */}
+      <div className="shrink-0 flex items-end justify-center gap-4 sm:gap-6 w-full px-1 mt-2">
         {order.map((s) => <PodiumBlock key={s.player.id} s={s} you={!!s.player.isYou} />)}
       </div>
 
-      {/* Full standings — wider rows, bigger text, more vertical padding. */}
+      {/* Full standings — scrolls within its own bounded area when long.
+          Only THIS section scrolls, the rest is fixed. */}
       {rest.length > 0 && (
-        <div className="w-full mt-1 rounded-2xl bg-zinc-950/50 border border-hairline divide-y divide-white/5">
+        <div className="w-full flex-1 min-h-0 overflow-y-auto rounded-2xl bg-zinc-950/50 border border-hairline divide-y divide-white/5">
           {rest.map((s) => (
             <div
               key={s.player.id}
@@ -153,14 +158,104 @@ export function TournamentPodium({
           ))}
         </div>
       )}
-
-      <button
-        onClick={onContinue}
-        className="shrink-0 mt-3 w-full max-w-xl px-8 py-4 rounded-2xl font-black text-white text-base sm:text-lg uppercase tracking-wider bg-themed shadow-lg shadow-violet-500/30 transition hover:scale-[1.02]"
-        style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.06em" }}
-      >
-        {t("lanes.backToMenu")}
-      </button>
     </motion.div>
   );
+}
+
+/**
+ * FloatingReplayButton — top-right corner counterpart to the existing
+ * top-left back button. Themed and labelled with a refresh arrow icon so
+ * "Rejouer un tournoi" is one tap away without scrolling past the podium.
+ */
+/**
+ * FloatingNewRunButton — top-right action on the podium. Was a flat
+ * "Rejouer" pill on the global violet gradient; Alex flagged it as
+ * generic-looking and not living with the active theme. The new button:
+ *  - label switched from "Rejouer" to "Nouveau tournoi" (action-oriented,
+ *    reads as the celebratory "let's go again", not the gamey "replay")
+ *  - glass card with a strong theme-primary inner ring + theme-tinted
+ *    backdrop (color-mix of theme-primary over dark glass) so each theme
+ *    paints its own personality on the button instead of every one looking
+ *    the same violet pill
+ *  - theme-secondary leading sparkle + soft theme-coloured glow that
+ *    breathes — gives the action a "premium artifact" feel matching the
+ *    moment (the player just won/finished a tournament)
+ *  - headline font + slight tracking, so the typography also follows the
+ *    active palette's identity (cinzel for Eclipse, bebas for Rust,
+ *    orbitron for Storm, etc.)
+ */
+function FloatingNewRunButton({ onClick }: { onClick: () => void }) {
+  return createPortal(
+    <button
+      onClick={onClick}
+      aria-label="Lancer un nouveau tournoi"
+      title="Lancer un nouveau tournoi"
+      className="
+        fixed z-30 group
+        top-[max(env(safe-area-inset-top),32px)]
+        right-[max(env(safe-area-inset-right),12px)]
+        md:top-3
+        md:right-3
+        h-11 px-4 rounded-2xl
+        flex items-center gap-2
+        text-white font-black text-sm uppercase
+        transition active:scale-95 hover:scale-[1.03]
+        overflow-hidden
+      "
+      style={{
+        fontFamily: "var(--font-headline)",
+        letterSpacing: "0.08em",
+        background:
+          "linear-gradient(135deg, " +
+          "color-mix(in oklab, var(--theme-primary) 38%, rgba(12,14,22,0.86)) 0%, " +
+          "color-mix(in oklab, var(--theme-secondary) 28%, rgba(12,14,22,0.86)) 100%)",
+        boxShadow:
+          "inset 0 0 0 1px color-mix(in oklab, var(--theme-primary) 65%, transparent)," +
+          "inset 0 1px 0 rgba(255,255,255,0.18)," +
+          "0 10px 28px -10px color-mix(in oklab, var(--theme-primary) 70%, transparent)",
+      }}
+    >
+      {/* Slow sheen sweep — theme-secondary tinted, gives the button its
+          "alive" feel without burning CPU (single linear-gradient + CSS
+          keyframe). Sits behind the label so it never washes the text. */}
+      <span
+        aria-hidden
+        className="absolute inset-y-0 -left-1/2 w-1/2 pointer-events-none"
+        style={{
+          background:
+            "linear-gradient(105deg, transparent, color-mix(in oklab, var(--theme-secondary) 45%, transparent), transparent)",
+          animation: "fnrb-sheen 3.2s ease-in-out infinite",
+        }}
+      />
+      {/* Leading sparkle — theme-secondary, breathes in opacity */}
+      <svg
+        width="16" height="16" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2.2"
+        strokeLinecap="round" strokeLinejoin="round"
+        className="relative shrink-0"
+        style={{
+          color: "color-mix(in oklab, var(--theme-secondary) 80%, white)",
+          filter: "drop-shadow(0 0 6px color-mix(in oklab, var(--theme-secondary) 55%, transparent))",
+          animation: "fnrb-pulse 2.4s ease-in-out infinite",
+        }}
+      >
+        <path d="M12 2l2.39 5.79L20 8.7l-4.5 3.9L17 18.5 12 15.27 7 18.5l1.5-5.9L4 8.7l5.61-.91L12 2z" />
+      </svg>
+      <span className="relative">Nouveau tournoi</span>
+    </button>,
+    document.body,
+  );
+}
+
+// Single keyframe stylesheet for the floating-new-run button. Reused across
+// every instance so we don't insert it more than once. Pure CSS, runs on
+// the compositor so it never burns a thread.
+if (typeof document !== "undefined" && !document.getElementById("fnrb-keyframes")) {
+  const style = document.createElement("style");
+  style.id = "fnrb-keyframes";
+  style.textContent = [
+    "@keyframes fnrb-sheen { 0% { transform: translateX(-30%); } 60% { transform: translateX(280%); } 100% { transform: translateX(280%); } }",
+    "@keyframes fnrb-pulse { 0%, 100% { opacity: 0.75; transform: rotate(0); } 50% { opacity: 1; transform: rotate(8deg); } }",
+  ].join(" ");
+  document.head.appendChild(style);
 }

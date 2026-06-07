@@ -26,6 +26,7 @@ import {
   Opponent,
   Outcome,
   REWARDS,
+  classeLpDelta,
 } from "../../types";
 import { type DailyChallenge } from "../../engine/daily";
 import { eclatsReward } from "../../engine/economy";
@@ -945,7 +946,7 @@ function Countdown({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      className="bg-surface backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 p-4 sm:p-6 border border-hairline flex flex-col items-center gap-6"
+      className="bg-surface-raised rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 p-4 sm:p-6 border border-hairline flex flex-col items-center gap-6"
     >
       <div className="grid grid-cols-3 items-center w-full">
         <div className="flex flex-col items-center gap-2">
@@ -1002,7 +1003,7 @@ function RevealPanel({
       if (aWon) hapticWin();
       else if (bWon) hapticLoss();
       else hapticTap();
-    }, 600);
+    }, 280);
     return () => clearTimeout(id);
     // Effect must re-run if a different round is shown — keyed on outcome.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1023,15 +1024,19 @@ function RevealPanel({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -16 }}
       transition={{ duration: 0.3 }}
-      className="relative bg-surface backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 px-3 py-5 sm:p-12 border border-hairline flex flex-col items-center gap-6 sm:gap-8 max-w-full"
+      className="relative bg-surface-raised rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 px-3 py-5 sm:p-12 border border-hairline flex flex-col items-center gap-6 sm:gap-8 max-w-full"
     >
+      {/* Winner flash — a radial-gradient glow (NO blur filter). The old
+          w-96 h-96 blur-3xl recomposited a huge blurred area every frame over
+          the live WebGL backdrop → the reveal stutter/lag. A soft-edged radial
+          gradient reads the same but is nearly free. */}
       {!draw && (
         <motion.div
-          initial={{ opacity: 0, scale: 0.6 }}
-          animate={{ opacity: [0, 0.45, 0], scale: [0.6, 1.6, 2.2] }}
-          transition={{ duration: 0.8, delay: 0.35, ease: "easeOut" }}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-3xl pointer-events-none"
-          style={{ background: flashColor }}
+          initial={{ opacity: 0, scale: 0.7 }}
+          animate={{ opacity: [0, 0.55, 0], scale: [0.7, 1.5, 2] }}
+          transition={{ duration: 0.55, delay: 0.06, ease: "easeOut" }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full pointer-events-none"
+          style={{ background: `radial-gradient(circle, ${flashColor} 0%, transparent 66%)`, willChange: "transform, opacity" }}
         />
       )}
 
@@ -1042,7 +1047,7 @@ function RevealPanel({
           <motion.div
             initial={{ scale: 0, rotate: -45 }}
             animate={{ scale: 1, rotate: 0 }}
-            transition={{ delay: 0.2, type: "spring", stiffness: 350, damping: 16 }}
+            transition={{ delay: 0.08, type: "spring", stiffness: 380, damping: 16 }}
             className="flex flex-col items-center"
           >
             <span className="text-ink-muted uppercase tracking-[0.4em] text-sm sm:text-base font-bold">
@@ -1059,7 +1064,7 @@ function RevealPanel({
       <motion.div
         initial={{ opacity: 0, y: 10, scale: 0.9 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ delay: 0.6, type: "spring", stiffness: 260, damping: 18 }}
+        transition={{ delay: 0.3, type: "spring", stiffness: 300, damping: 18 }}
         className="text-center min-h-[3rem] relative"
       >
         {draw && <p className="text-3xl font-bold text-ink-muted">{t("match.draw")}</p>}
@@ -1080,7 +1085,7 @@ function RevealPanel({
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
+          transition={{ delay: 0.42 }}
           className="-mt-3 text-sm font-bold text-amber-300 text-center"
         >
           {atoutNote}
@@ -1090,7 +1095,7 @@ function RevealPanel({
       <motion.button
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.85 }}
+        transition={{ delay: 0.5 }}
         whileHover={{ y: -2 }}
         whileTap={{ scale: 0.97 }}
         onClick={onNext}
@@ -1126,7 +1131,7 @@ function RevealHand({
           x: [0, 0, swing, swing * 0.4],
           opacity: 1,
         }}
-        transition={{ duration: 0.7, times: [0, 0.4, 0.55, 1], ease: "easeOut" }}
+        transition={{ duration: 0.5, times: [0, 0.45, 0.62, 1], ease: "easeOut" }}
         className={
           "relative " +
           (winner && streak >= 3
@@ -1154,7 +1159,7 @@ function ParticleBurst({ color }: { color: string }) {
         return {
           dx: Math.cos(angle) * dist,
           dy: Math.sin(angle) * dist,
-          delay: 0.35 + Math.random() * 0.1,
+          delay: 0.1 + Math.random() * 0.08,
           size: 6 + Math.random() * 4,
         };
       }),
@@ -1248,7 +1253,7 @@ function AtoutPicker({
         whileTap={{ scale: 0.97 }}
         onClick={() => { hapticTick(); onConfirm(); }}
         disabled={!ready}
-        className="mt-1 w-full px-7 py-3.5 rounded-2xl font-bold text-white bg-themed shadow-lg shadow-violet-500/30 transition hover:scale-[1.01] disabled:opacity-40 disabled:pointer-events-none"
+        className="mt-1 w-full px-7 py-3.5 rounded-2xl font-bold text-white bg-themed shadow-lg shadow-themed transition hover:scale-[1.01] disabled:opacity-40 disabled:pointer-events-none"
         style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
       >
         {ready ? "Commencer →" : `Choisis encore ${remaining} atout${remaining > 1 ? "s" : ""}`}
@@ -1349,7 +1354,7 @@ function EndPanel({
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
       transition={{ type: "spring", stiffness: 220, damping: 18 }}
-      className="bg-surface backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 p-3 sm:p-8 border border-hairline flex flex-col items-center text-center"
+      className="bg-surface-raised rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 p-3 sm:p-8 border border-hairline flex flex-col items-center text-center"
     >
       {/* Cinematic match-end shared with Constellation Lanes — same trophy
           breath / wordmark pulse / quote / rematch buttons feel everywhere. */}
@@ -1365,7 +1370,10 @@ function EndPanel({
         backLabel={onMatchResult ? "Suivant →" : t("match.back")}
         reward={{
           xp: xpDelta > 0 ? xpDelta : undefined,
-          lp: lpDelta !== 0 ? lpDelta : undefined,
+          // Classé shows its OWN ladder swing (classeLp) as the "LP" line so
+          // the player sees their rank move; other modes keep their REWARDS lp
+          // (online-only, so 0 for vs-CPU casual/hotseat).
+          lp: mode === "ranked" ? classeLpDelta(outcome) : (lpDelta !== 0 ? lpDelta : undefined),
           eclats: eclatsReward(mode, outcome),
         }}
       />

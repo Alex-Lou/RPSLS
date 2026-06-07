@@ -9,7 +9,9 @@ export type ThemeId =
   // ── Eclipse set ──
   | "eclipse"
   // ── Phantom + Emberforge + Tempus + Storm ──
-  | "phantom" | "emberforge" | "tempus" | "storm";
+  | "phantom" | "emberforge" | "tempus" | "storm"
+  // ── 2026-06-07 lineup: warm/industrial/minimal/spectral/artistic/floral ──
+  | "coral" | "rust" | "void" | "prism" | "ink" | "bloom";
 
 export type PadId =
   // Fully coded, animated playmats (SVG/SMIL — no PNGs anymore).
@@ -27,6 +29,8 @@ export type PadId =
   | "eclipse" | "phantom" | "emberforge" | "tempus" | "storm"
   // ── Premium pads ──
   | "quartz"
+  // ── 2026-06-07 premium lineup ──
+  | "coral" | "rust" | "void" | "prism" | "ink" | "bloom"
   // Player's own uploaded mat (data URL on the player).
   | "custom";
 
@@ -37,6 +41,8 @@ export type BackgroundId =
   | "volcanic" | "abyss" | "eclipse" | "phantom" | "emberforge" | "tempus" | "storm"
   // ── Premium backgrounds ──
   | "quartz"
+  // ── 2026-06-07 premium lineup ──
+  | "coral" | "rust" | "void" | "prism" | "ink" | "bloom"
   // Player's own uploaded image.
   | "custom";
 
@@ -118,6 +124,17 @@ export interface Player {
    *  LP reset and a tier-based reward. Stored as a timestamp so rollover
    *  detection stays trivial across timezones. */
   season?: { number: number; startedAt: number };
+  /** Classé (classic 1 v 1) ranked ladder — LOCAL and SEPARATE from the
+   *  online-authoritative global `rankLp`. Every Classé match (quick match +
+   *  tournament) moves this, so the mode has its own "climb the ranks" loop.
+   *  Kept local (never pushed to the global leaderboard) so vs-CPU play can't
+   *  farm the un-farmable online ladder. Default 1000 = Bronze entry; reuses
+   *  the same tier thresholds as engine/rank.ts. */
+  classeLp?: number;
+  /** Lifetime Classé win/loss/draw record, shown in the Classé lobby. Kept
+   *  apart from the global `stats` so the mode reports its OWN results
+   *  ("son propre enregistrement"). */
+  classeStats?: { wins: number; losses: number; draws: number };
   /** Cosmetic background image painted behind every page. Defaults to the
    *  original radial-gradient. */
   backgroundId?: BackgroundId;
@@ -161,6 +178,12 @@ export interface Player {
    *  choosing a background applies that background's default pad; afterwards
    *  pad and background are fully independent. */
   padChosen?: boolean;
+  /** Per-premium-theme FX intensity multiplier. Keyed by `premiumSetId`
+   *  (storm / coral / bloom / …). Range 0.4 - 1.6; 1.0 = the shipping look.
+   *  Scales the visual density of the theme's defining FX — rain drops for
+   *  Storm, falling petals for Bloom, flying sparks for Rust, etc. Lives on
+   *  the player so the preference survives reinstall + sync. */
+  premiumIntensity?: Record<string, number>;
 }
 
 /** Where a pad shows up in the Profile pad picker's 3-way sub-filter.
@@ -192,6 +215,12 @@ export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: st
   tempus:     { label: "Tempus Aeternum", emoji: "⏳", tagline: "Sables du temps, engrenages antiques, sablier sépia éternel.", category: "styled", premiumSetId: "tempus" },
   storm:      { label: "Tempest Fury",  emoji: "⚡", tagline: "Foudre déchirante, rideaux de pluie, nuages d'orage grondants.",  category: "styled", premiumSetId: "storm" },
   quartz:     { label: "Quartz",        emoji: "💠", tagline: "Cristaux prismatiques, refractions glaciales, lumière douce.",     category: "styled", premiumSetId: "quartz" },
+  coral:      { label: "Coral",         emoji: "🪸", tagline: "Récif bioluminescent, anémones pulsantes, bancs de poissons.",     category: "styled", premiumSetId: "coral" },
+  rust:       { label: "Rust",          emoji: "🏭", tagline: "Déclin industriel, poutres rouillées, étincelles de soudure.",      category: "styled", premiumSetId: "rust" },
+  void:       { label: "Void",          emoji: "◼️", tagline: "Vide géométrique, lignes blanches fines, minimalisme absolu.",      category: "styled", premiumSetId: "void" },
+  prism:      { label: "Prism",         emoji: "💎", tagline: "Laboratoire de lumière, faisceaux spectraux décomposés.",          category: "styled", premiumSetId: "prism" },
+  ink:        { label: "Ink",           emoji: "🖋️", tagline: "Sumi-e vivant, encre de Chine sur papier de riz texturé.",         category: "styled", premiumSetId: "ink" },
+  bloom:      { label: "Bloom",         emoji: "🌸", tagline: "Jardin infini, pétales en spirale, lucioles, fleurs qui s'ouvrent.", category: "styled", premiumSetId: "bloom" },
   custom:     { label: "Mon image",      emoji: "🖼️", tagline: "Ton propre tapis (paysage 3:2, ex. 1500×1000).",     category: "img" },
 };
 
@@ -234,6 +263,18 @@ export const REWARDS: Record<
   ranked:   { xpWin: 30, xpLoss: 5,  xpDraw: 10, lpWin: 0,  lpLoss: 0,   lpDraw: 0 },
   hotseat:  { xpWin: 0,  xpLoss: 0,  xpDraw: 0,  lpWin: 0,  lpLoss: 0,   lpDraw: 0 },
 };
+
+/** Classé ladder (Player.classeLp) point swing per finished match. This is the
+ *  LOCAL classic-1v1 ranking — distinct from REWARDS.lp* (which stays 0 for
+ *  vs-CPU to keep the ONLINE global ladder un-farmable). A win climbs, a loss
+ *  drops, a forfeit drops a little more so bailing isn't a free escape. */
+export const CLASSE_LP = { win: 18, loss: -12, draw: 3, forfeit: -18 } as const;
+
+/** Classé LP delta for a finished (non-forfeit) outcome — shared by the store
+ *  (applies it) and the end screen (displays it) so they never drift. */
+export function classeLpDelta(outcome: Outcome): number {
+  return outcome === "win" ? CLASSE_LP.win : outcome === "loss" ? CLASSE_LP.loss : CLASSE_LP.draw;
+}
 
 export const MODE_META: Record<RecordMode, { label: string; emoji: string; tagline: string }> = {
   training:      { label: "Training",      emoji: "🤖", tagline: "Vs CPU · no XP, no risk" },

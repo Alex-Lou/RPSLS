@@ -125,15 +125,18 @@ function useServerStatus(url: string): {
       try { ac.abort(); } catch { /* ignore */ }
     }, 90_000);
 
-    fetch(healthUrl, { signal: ac.signal, cache: "no-store" })
-      .then((r) => {
+    // `mode: 'no-cors'` is required: the server keeps `/health` OUTSIDE the
+    // CORS layer (so Render's bursty probes don't trip the governor / get a
+    // 429). That means CORS preflight fails for a regular fetch, and the
+    // request errors as "Failed to fetch" inside the Tauri WebView. With
+    // no-cors we get an opaque response (status 0, body unreadable) — but a
+    // resolved promise still proves the server answered, which is all we
+    // need for the health probe.
+    fetch(healthUrl, { signal: ac.signal, cache: "no-store", mode: "no-cors" })
+      .then(() => {
         clearTimeout(wakingT);
         clearTimeout(hardT);
         if (probeRef.current !== ac) return;
-        if (!r.ok) {
-          setStatus("offline");
-          return;
-        }
         setLatencyMs(Math.round(performance.now() - t0));
         setStatus("online");
       })
@@ -968,7 +971,7 @@ export function OnlinePage() {
               </p>
               <button
                 onClick={joinQueue}
-                className="w-full py-3 rounded-xl bg-themed font-semibold text-white shadow-lg shadow-violet-500/30 active:scale-[0.98] transition"
+                className="w-full py-3 rounded-xl bg-themed font-semibold text-white shadow-lg shadow-themed active:scale-[0.98] transition"
               >
                 Find an opponent
               </button>
@@ -1442,7 +1445,7 @@ function ModePicker({
         className={
           "flex-1 py-3 rounded-xl font-semibold transition flex flex-col items-center gap-0.5 " +
           (mode === "lanes"
-            ? "bg-themed text-white shadow-lg shadow-violet-500/30"
+            ? "bg-themed text-white shadow-lg shadow-themed"
             : "bg-white/5 hover:bg-white/10 text-zinc-300")
         }
       >
@@ -1475,7 +1478,7 @@ function LanesWinToPicker({
               className={
                 "flex-1 py-2 rounded-xl font-semibold transition " +
                 (active
-                  ? "bg-violet-500/90 text-white shadow-lg shadow-violet-500/30"
+                  ? "bg-themed text-white shadow-lg shadow-themed"
                   : "bg-white/5 hover:bg-white/10 text-zinc-300")
               }
             >
@@ -1511,7 +1514,7 @@ function BestOfPicker({
               className={
                 "flex-1 py-2 rounded-xl font-semibold transition " +
                 (active
-                  ? "bg-violet-500/90 text-white shadow-lg shadow-violet-500/30"
+                  ? "bg-themed text-white shadow-lg shadow-themed"
                   : "bg-white/5 hover:bg-white/10 text-zinc-300")
               }
             >
@@ -2165,7 +2168,7 @@ function MatchEndScene({
         )}
         <button
           onClick={onBack}
-          className="flex-1 px-5 py-3 rounded-xl bg-violet-500/90 hover:bg-violet-500 font-semibold text-white shadow-lg shadow-violet-500/30 active:scale-[0.98] transition"
+          className="flex-1 px-5 py-3 rounded-xl bg-themed hover:brightness-110 font-semibold text-white shadow-lg shadow-themed active:scale-[0.98] transition"
         >
           Back to menu
         </button>

@@ -57,7 +57,7 @@ export function PrivacyPage({ onClose }: { onClose?: () => void }) {
 
         <a
           href={`mailto:${c.contactEmail}`}
-          className="self-center mt-3 px-5 py-2.5 rounded-xl text-sm font-bold bg-themed text-white shadow-lg shadow-violet-500/30 hover:scale-[1.02] transition"
+          className="self-center mt-3 px-5 py-2.5 rounded-xl text-sm font-bold bg-themed text-white shadow-lg shadow-themed hover:scale-[1.02] transition"
         >
           {c.contactEmail}
         </a>

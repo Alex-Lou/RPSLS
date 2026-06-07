@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import type { PadId, ThemeId } from "../types";
+import type { BackgroundId, PadId, ThemeId } from "../types";
 import { THEMES } from "../theme/theme";
 import { useStore } from "../store/store";
 import { isAvatarImage, avatarImgStyle } from "../theme/avatar";
@@ -25,20 +25,29 @@ export interface Arena {
   side: "you" | "opp";
   themeId: ThemeId;
   padId: PadId;
+  /** Backdrop scene used during the duel. The winning side's WHOLE LOOK
+   *  dresses the board — bg + theme + pad — so when the coin gives the
+   *  duel to the opponent the player sees the opponent's universe, not
+   *  just their pad. */
+  backgroundId: BackgroundId;
 }
 
 export function MatchPrepScreen({
-  youName, youAvatar, youThemeId,
-  oppName, oppAvatar, oppThemeId, oppPadId,
+  youName, youAvatar, youThemeId, youBackgroundId,
+  oppName, oppAvatar, oppThemeId, oppPadId, oppBackgroundId,
   onReady, onBack,
 }: {
   youName: string;
   youAvatar: string;
   youThemeId: ThemeId;
+  /** Player's CURRENT backdrop — kept on screen when their side wins. */
+  youBackgroundId: BackgroundId;
   oppName: string;
   oppAvatar: string;
   oppThemeId: ThemeId;
   oppPadId: PadId;
+  /** Opponent's persona backdrop — applied to the whole duel when "opp" wins. */
+  oppBackgroundId: BackgroundId;
   onReady: (arena: Arena) => void;
   onBack: () => void;
 }) {
@@ -93,8 +102,8 @@ export function MatchPrepScreen({
     const side = winner ?? "you";
     onReady(
       side === "you"
-        ? { side: "you", themeId: youThemeId, padId: youPadId }
-        : { side: "opp", themeId: oppThemeId, padId: oppPadId },
+        ? { side: "you", themeId: youThemeId, padId: youPadId, backgroundId: youBackgroundId }
+        : { side: "opp", themeId: oppThemeId, padId: oppPadId, backgroundId: oppBackgroundId },
     );
   }
 
@@ -182,7 +191,7 @@ export function MatchPrepScreen({
             animate={{ opacity: 1, y: 0 }}
             whileTap={{ scale: 0.97 }}
             onClick={start}
-            className="w-full max-w-xs py-3.5 rounded-2xl font-bold text-white bg-themed shadow-lg shadow-violet-500/30 hover:scale-[1.01] transition"
+            className="w-full max-w-xs py-3.5 rounded-2xl font-bold text-white bg-themed shadow-lg shadow-themed hover:scale-[1.01] transition"
             style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
           >
             Commencer le duel →

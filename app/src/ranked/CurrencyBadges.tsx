@@ -42,7 +42,7 @@ export function CurrencyBadges({ onClick, size = "compact", inert, showStars }: 
   const isFull = size === "full";
 
   return (
-    <div className={"flex items-stretch gap-1.5 " + (isFull ? "" : "shrink-0")}>
+    <div className={"flex items-stretch gap-2 " + (isFull ? "" : "w-full")}>
       <CurrencyChip
         icon="💎"
         value={eclats}
@@ -114,14 +114,18 @@ function CurrencyChip({
       title={`${label} : ${value.toLocaleString("fr-FR")}`}
       aria-label={`${label} ${value}`}
       className={
-        "relative inline-flex items-center gap-1 rounded-full ring-1 bg-gradient-to-br backdrop-blur-sm transition " +
+        // flex-1 + justify-center so the chip row fills the badge width and the
+        // three chips spread evenly instead of clustering tight in the middle.
+        // big keeps the legacy auto-width for the boutique header where the
+        // chips sit inside narrower cards.
+        "relative inline-flex items-center justify-center gap-1.5 rounded-full ring-1 bg-gradient-to-br backdrop-blur-sm transition " +
         ring + " " + toneFrom + " " + toneTo + " " +
-        (big ? "px-3 py-1.5" : "px-2 py-0.5") + " " +
+        (big ? "px-3 py-1.5" : "flex-1 px-2.5 py-1.5") + " " +
         (interactive ? "cursor-pointer hover:brightness-110" : "")
       }
     >
-      <span className={big ? "text-base" : "text-[11px]"}>{icon}</span>
-      <span className={"font-black tabular-nums " + text + " " + (big ? "text-sm" : "text-[11px]")}>
+      <span className={big ? "text-base" : "text-sm leading-none"}>{icon}</span>
+      <span className={"font-black tabular-nums " + text + " " + (big ? "text-sm" : "text-[13px] leading-none")}>
         {formatCompact(value)}
       </span>
       {accent === "ready" && (
@@ -140,11 +144,12 @@ function CurrencyChip({
   );
 }
 
-/** Pretty-print large numbers so the chip stays narrow ("1.2k" instead of
- *  "1 234"). Keeps four digits readable at a glance. */
+/** Pretty-print large numbers — show the FULL amount up to 99 999 (with thin
+ *  thousand separator so the player actually reads their balance), then fall
+ *  back to compact "100k / 1.2M" once a chip would overflow. Hiding 9 000 as
+ *  "9k" was Alex's complaint: numbers were unreadable AND cryptic. */
 function formatCompact(n: number): string {
-  if (n < 1000) return String(n);
-  if (n < 10000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "k";
+  if (n < 100_000) return n.toLocaleString("fr-FR");
   if (n < 1_000_000) return Math.round(n / 1000) + "k";
   return (n / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
 }

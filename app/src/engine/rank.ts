@@ -34,3 +34,13 @@ export function rankFromLp(lp: number): RankTier {
   const ceil = idx + 1 < TIERS.length ? TIERS[idx + 1].floor : Infinity;
   return { ...t, ceil };
 }
+
+/** Tier + fill fraction (0–1) within that tier for an LP value, and the next
+ *  tier (null at the cap). Single source of truth shared by every rank UI
+ *  (RankedLobby, ClasseLobby) so the progress math lives in exactly one place. */
+export function rankProgress(lp: number): { tier: RankTier; progress: number; next: RankTier | null } {
+  const tier = rankFromLp(lp);
+  const progress = tier.ceil === Infinity ? 1 : (lp - tier.floor) / (tier.ceil - tier.floor);
+  const next = tier.ceil === Infinity ? null : rankFromLp(tier.ceil);
+  return { tier, progress, next };
+}

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { useStore } from "../store/store";
-import { THEMES, gradientFromTheme } from "../theme/theme";
+import { THEMES } from "../theme/theme";
 import { levelFromXp } from "../engine/leveling";
 import { DIFFICULTY_META, PAD_META } from "../types";
 import type { BackgroundId, Difficulty, PadId, ThemeId } from "../types";
@@ -16,6 +16,8 @@ import { TabPicker } from "../ui/TabPicker";
 import { PremiumPurchaseModal, type PremiumSet } from "../ui/PremiumPurchaseModal";
 import { PremiumBadge } from "../ui/PremiumBadge";
 import { OwnedBadgeLongPress } from "../ui/OwnedBadgeLongPress";
+import { PlayerBadge } from "../ui/PlayerBadge";
+import type { Page } from "../Sidebar";
 import { useT } from "../i18n";
 import { hapticTap, hapticMatchStart } from "../haptic";
 import { useBackdropPeek } from "../backdrops/previewScene";
@@ -60,7 +62,9 @@ const AVATAR_PRESETS: string[] = [
 ];
 
 
-export function ProfilePage() {
+/** Page navigation callback wired by App.tsx — used by the shared PlayerBadge
+ *  (currency chips → shop) at the top of the profile. */
+export function ProfilePage({ onNavigate }: { onNavigate?: (page: Page) => void } = {}) {
   const player = useStore((s) => s.player);
   const updateProfile = useStore((s) => s.updateProfile);
   const resetProfile = useStore((s) => s.resetProfile);
@@ -244,83 +248,84 @@ export function ProfilePage() {
     >
       <h1 className="font-headline text-3xl font-extrabold tracking-tight">{t("nav.profile")}</h1>
 
-      {/* Hero card */}
-      <div className="bg-surface border border-hairline rounded-3xl p-6 flex flex-col sm:flex-row gap-6 items-center sm:items-start">
-        <div
-          className="w-28 h-28 rounded-3xl flex items-center justify-center text-6xl shrink-0 ring-2 shadow-2xl"
-          style={{
-            background: gradientFromTheme(theme),
-          }}
-        >
-          {isAvatarImage(player.avatar) ? (
-            <img
-              src={player.avatar}
-              alt=""
-              className="w-full h-full rounded-3xl object-cover"
-              style={avatarImgStyle(player.avatar)}
-            />
-          ) : (
-            <span>{player.avatar}</span>
-          )}
-        </div>
+      {/* Player summary — exactly the same badge as the persistent UserHeader
+          on the menus, so the player surface looks IDENTICAL everywhere.
+          Edit-nickname + stats live in their own row below (kept off the
+          shared badge to keep it lean and reusable). */}
+      <PlayerBadge onCurrencyTap={onNavigate ? () => onNavigate("shop") : undefined} />
 
-        <div className="flex-1 w-full">
-          {editingNick ? (
-            <div className="flex gap-2">
-              <input
-                autoFocus
-                value={nickDraft}
-                maxLength={20}
-                onChange={(e) => setNickDraft(e.currentTarget.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") saveNick();
-                  if (e.key === "Escape") { setNickDraft(player.nickname); setEditingNick(false); }
-                }}
-                className="flex-1 bg-hairline rounded-xl px-4 py-2 text-xl font-bold focus:outline-none focus:ring-2 ring-white/30"
-              />
+      {/* Editable nickname + at-a-glance stats — section dedicated to the
+          profile (the header doesn't need either). */}
+      <div className="bg-surface border border-hairline rounded-3xl p-5 flex flex-col gap-4">
+        {editingNick ? (
+          // Vertical stack on mobile so the input ALWAYS gets the full card
+          // width and the action buttons sit cleanly underneath (no more
+          // confirm chip falling off the right edge — Alex's "hors champ"
+          // complaint). Inline row on >=sm where there's room.
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <input
+              autoFocus
+              value={nickDraft}
+              maxLength={20}
+              onChange={(e) => setNickDraft(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") saveNick();
+                if (e.key === "Escape") { setNickDraft(player.nickname); setEditingNick(false); }
+              }}
+              className="min-w-0 w-full sm:flex-1 bg-hairline rounded-xl px-4 py-2.5 text-base sm:text-lg font-bold focus:outline-none transition"
+              style={{
+                boxShadow:
+                  "inset 0 0 0 1px color-mix(in oklab, var(--theme-primary) 45%, transparent)",
+              }}
+              placeholder="Pseudo (max 20)"
+            />
+            <div className="flex items-stretch gap-2 sm:shrink-0">
+              <button
+                onClick={() => { setNickDraft(player.nickname); setEditingNick(false); }}
+                aria-label="Annuler"
+                className="flex-1 sm:flex-none sm:w-11 h-11 rounded-xl bg-hairline border border-hairline hover:bg-white/[0.07] text-ink-muted font-bold flex items-center justify-center transition px-3 sm:px-0"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
               <button
                 onClick={saveNick}
-                aria-label="Save"
-                className="shrink-0 w-10 h-10 rounded-xl bg-emerald-500/40 hover:bg-emerald-500/60 text-white font-bold flex items-center justify-center transition"
+                aria-label="Enregistrer"
+                className="flex-1 sm:flex-none sm:w-auto h-11 px-4 rounded-xl text-white font-bold flex items-center justify-center gap-1.5 transition active:scale-[0.97]"
+                style={{
+                  background:
+                    "linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))",
+                  boxShadow:
+                    "0 6px 16px -6px color-mix(in oklab, var(--theme-primary) 60%, transparent)",
+                  fontFamily: "var(--font-headline)",
+                  letterSpacing: "0.05em",
+                }}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M5 12l5 5L20 7" />
                 </svg>
+                <span className="text-xs sm:text-sm uppercase">Enregistrer</span>
               </button>
             </div>
-          ) : (
-            <button
-              onClick={() => { setNickDraft(player.nickname); setEditingNick(true); }}
-              className="text-2xl font-bold hover:text-ink-muted transition"
-            >
-              {player.nickname} <span className="text-ink-faint text-sm font-normal ml-1">✎ edit</span>
-            </button>
-          )}
-
-          <div className="mt-3 flex flex-wrap gap-4 text-sm text-ink-muted">
-            <Stat label="Level"   value={info.level} accent={theme.primary} />
-            <Stat label="XP"      value={player.xp} />
-            <Stat label="Rank LP" value={player.rankLp} accent={theme.secondary} />
-            <Stat label="Games"   value={totalGames} />
-            <Stat label="Win %"   value={`${winRate.toFixed(0)}%`} />
           </div>
+        ) : (
+          <button
+            onClick={() => { setNickDraft(player.nickname); setEditingNick(true); }}
+            className="self-start text-base font-semibold text-ink-muted hover:text-ink transition flex items-center gap-2"
+          >
+            <span>Modifier le pseudo</span>
+            <span className="text-ink-faint text-xs">({player.nickname})</span>
+            <span className="text-ink-faint text-sm">✎</span>
+          </button>
+        )}
 
-          <div className="mt-4">
-            <div className="h-2 rounded-full bg-hairline overflow-hidden">
-              <div
-                className="h-full rounded-full"
-                style={{
-                  width: `${info.progress * 100}%`,
-                  background: "linear-gradient(90deg, var(--theme-primary), var(--theme-secondary))",
-                  boxShadow: "0 0 12px color-mix(in oklab, var(--theme-primary) 50%, transparent)",
-                }}
-              />
-            </div>
-            <div className="mt-1 flex justify-between text-[10px] text-ink-faint">
-              <span>{info.xpInLevel} / {info.xpForNext} XP to next level</span>
-              <span>Lvl {info.level} → {info.level + 1}</span>
-            </div>
-          </div>
+        <div className="flex flex-wrap gap-4 text-sm text-ink-muted">
+          <Stat label="Level"   value={info.level} accent={theme.primary} />
+          <Stat label="XP"      value={player.xp} />
+          <Stat label="Rank LP" value={player.rankLp} accent={theme.secondary} />
+          <Stat label="Games"   value={totalGames} />
+          <Stat label="Win %"   value={`${winRate.toFixed(0)}%`} />
         </div>
       </div>
 
@@ -794,6 +799,20 @@ export function ProfilePage() {
         )}
       </section>
 
+      {/* Premium theme — FX intensity slider. Only shown when the active
+          background is a premium scene the player owns. Lets them dial the
+          theme's signature FX (rain density for Storm, falling petals for
+          Bloom, sparks for Rust, anemone pulses for Coral…) between 0.4×
+          and 1.6× so the theme can be tuned to taste. */}
+      {currentBg?.premiumSetId &&
+       (player.ownedPremiumSets ?? []).includes(currentBg.premiumSetId) && (
+        <PremiumIntensitySlider
+          setId={currentBg.premiumSetId}
+          label={currentBg.label}
+          accent={currentBg.accent ?? null}
+        />
+      )}
+
       {/* By-move stats */}
       {totalGames > 0 && (
         <section className="bg-surface border border-hairline rounded-3xl p-4 sm:p-5">
@@ -1005,6 +1024,21 @@ export function ProfilePage() {
               // below) commits or closes.
               className="fixed inset-0 z-[9999] flex flex-col items-center justify-end pb-10 pointer-events-none"
             >
+              {/* Vertical intensity slider — Alex's ask: "le bouton de réglage
+                  d'intensité doit egalement être présent, vertical sur le côté,
+                  pres des aperçus, sinon le joueur ne sait pas qu'il peut bénéficier
+                  de ça". Only shown when the previewed bg has a premium FX scene
+                  AND the player owns it (so dragging actually changes something
+                  they can apply). Pointer-events-auto on the slider control only,
+                  so taps on the backdrop still reach the touch FX. */}
+              {currentBg?.premiumSetId &&
+               (player.ownedPremiumSets ?? []).includes(currentBg.premiumSetId) && (
+                <PeekIntensitySlider
+                  setId={currentBg.premiumSetId}
+                  accent={currentBg.accent ?? null}
+                />
+              )}
+
               <div className="flex flex-col items-center gap-3 max-w-md w-full px-6 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                 {/* Header pill: name + appliqué/aperçu state. */}
                 <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/55 backdrop-blur-md border border-white/15">
@@ -1114,6 +1148,13 @@ const PREVIEW_ACCENTS: Record<string, { from: string; to: string; bg: string; em
   tempus:     { from: "#b8956a", to: "#d4a76a", bg: "#0a0703", emoji: "⏳" },
   storm:      { from: "#4af0ff", to: "#a078ff", bg: "#060a16", emoji: "⚡" },
   quartz:     { from: "#c8aef0", to: "#f6a5b8", bg: "#1a142a", emoji: "💠" },
+  // 2026-06-07 lineup
+  coral:      { from: "#ff6b6b", to: "#4ecdc4", bg: "#0a1628", emoji: "🪸" },
+  rust:       { from: "#d2691e", to: "#8b4513", bg: "#0a0502", emoji: "🏭" },
+  void:       { from: "#ffffff", to: "#666666", bg: "#000000", emoji: "◼️" },
+  prism:      { from: "#ffffff", to: "#8b5cf6", bg: "#050510", emoji: "💎" },
+  ink:        { from: "#1a1a1a", to: "#8c8c8c", bg: "#f5f0e8", emoji: "🖋️" },
+  bloom:      { from: "#ff7eb3", to: "#81c784", bg: "#f0f4f0", emoji: "🌸" },
 };
 
 /** PremiumPreviewTile — lightweight, ZERO-WebGL preview for the purchase
@@ -1203,7 +1244,311 @@ const PREMIUM_SETS: Record<string, PremiumSet> = {
     cost: 800,
     previewArt: <PremiumPreviewTile setId="storm" />,
   },
+  // ── 2026-06-07 lineup. Prices follow the design doc:
+  //    Coral / Rust / Bloom / Prism = 700-800 (rich animation)
+  //    Void / Ink = 900 (light-mode UI work on top of the scene) ──
+  coral: {
+    id: "coral",
+    name: "Coral Reef",
+    tagline: "Récif bioluminescent, anémones pulsantes, bancs de poissons.",
+    cost: 800,
+    previewArt: <PremiumPreviewTile setId="coral" />,
+  },
+  rust: {
+    id: "rust",
+    name: "Rust",
+    tagline: "Déclin industriel, poutres rouillées, étincelles de soudure.",
+    cost: 800,
+    previewArt: <PremiumPreviewTile setId="rust" />,
+  },
+  void: {
+    id: "void",
+    name: "Void",
+    tagline: "Géométrie pure, vide absolu, l'anti-spectacle.",
+    cost: 900,
+    previewArt: <PremiumPreviewTile setId="void" />,
+  },
+  prism: {
+    id: "prism",
+    name: "Prism",
+    tagline: "Laboratoire de lumière, faisceaux spectraux décomposés.",
+    cost: 800,
+    previewArt: <PremiumPreviewTile setId="prism" />,
+  },
+  ink: {
+    id: "ink",
+    name: "Ink (Sumi-e)",
+    tagline: "Calligraphie japonaise, encre noire sur papier de riz.",
+    cost: 900,
+    previewArt: <PremiumPreviewTile setId="ink" />,
+  },
+  bloom: {
+    id: "bloom",
+    name: "Bloom Garden",
+    tagline: "Jardin infini, pétales en spirale, lucioles, fleurs qui s'ouvrent.",
+    cost: 800,
+    previewArt: <PremiumPreviewTile setId="bloom" />,
+  },
 };
+
+/**
+ * PeekIntensitySlider — VERTICAL slider mounted inside the full-screen
+ * backdrop peek overlay. Sits on the right edge so the player can dial the
+ * FX density LIVE while previewing the theme — they SEE the rain thin
+ * out, the petals slow down, the sparks pour as they drag. Alex's ask:
+ * "le bouton de réglage d'intensité doit egalement être présent, vertical
+ * sur le côté, pres des aperçus, sinon le joueur ne sait pas qu'il peut
+ * bénéficier de ça". The slider docks at right-edge, vertical, with a
+ * themed track + glassy thumb + live % readout + a tiny rotated label so
+ * the affordance is obvious without taking screen real estate.
+ *
+ * Range matches PremiumIntensitySlider (0.1 – 2.0). Both write the same
+ * `player.premiumIntensity[setId]` field so changes here persist + are
+ * picked up by every consumer (StormRain, PremiumTouchLayer, the shader
+ * uniform).
+ */
+function PeekIntensitySlider({ setId, accent }: {
+  setId: string;
+  accent: { from: string; to: string } | null;
+}) {
+  const intensity = useStore((s) => s.player.premiumIntensity?.[setId] ?? 1.0);
+  const updateProfile = useStore((s) => s.updateProfile);
+  const MIN = 0.1, MAX = 2.0;
+  const setValue = (v: number) => {
+    const clamped = Math.max(MIN, Math.min(MAX, v));
+    const current = useStore.getState().player.premiumIntensity ?? {};
+    updateProfile({ premiumIntensity: { ...current, [setId]: clamped } });
+  };
+  const fillPct = ((intensity - MIN) / (MAX - MIN)) * 100;
+  const accentGrad = accent
+    ? `linear-gradient(0deg, ${accent.from}, ${accent.to})`
+    : "linear-gradient(0deg, var(--theme-primary), var(--theme-secondary))";
+
+  // Custom pointer handler — the rotated <input type="range"> approach
+  // didn't work in the Android WebView (touch coordinates weren't being
+  // mapped through the rotation, so dragging did nothing — Alex's "le
+  // bouton ne bouge pas"). Here we own the pointer events: read the y
+  // coordinate relative to the track, invert it (top = MAX), normalise,
+  // and call setValue. setPointerCapture keeps the gesture sticky once
+  // the user starts dragging, even if the finger drifts off the track.
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const onPointerEvent = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = trackRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const yFromTop = e.clientY - rect.top;
+    // Bottom = MIN, Top = MAX. Invert: yNorm at bottom = 0, at top = 1.
+    const yNorm = 1 - Math.max(0, Math.min(1, yFromTop / rect.height));
+    setValue(MIN + yNorm * (MAX - MIN));
+  };
+
+  return (
+    // Floats independently of the bottom button column. Pointer-events-none
+    // on the wrapper so the rest of the screen stays interactive; the inner
+    // track div has pointer-events-auto.
+    <div
+      className="
+        fixed pointer-events-none flex flex-col items-center gap-1
+        right-[max(env(safe-area-inset-right),8px)]
+        top-1/2 -translate-y-1/2
+        select-none
+      "
+    >
+      <div className="text-[9px] uppercase tracking-[0.22em] font-black text-white/95 px-2 py-0.5 rounded-full bg-black/55 backdrop-blur-md border border-white/15 drop-shadow">
+        Intensité
+      </div>
+      <div
+        className="text-[10px] font-black tabular-nums px-2 py-0.5 rounded-full"
+        style={{
+          background: "color-mix(in oklab, var(--theme-primary) 80%, black 20%)",
+          color: "white",
+          boxShadow: "0 4px 12px -4px color-mix(in oklab, var(--theme-primary) 60%, transparent)",
+        }}
+      >
+        {Math.round(intensity * 100)}%
+      </div>
+
+      {/* The track — owns all pointer events. Larger hit zone (36px wide)
+          even though the visible track is 6px, so the touch target meets
+          Material's 48dp minimum guideline. */}
+      <div
+        ref={trackRef}
+        role="slider"
+        aria-label="Intensité des effets premium"
+        aria-valuemin={MIN}
+        aria-valuemax={MAX}
+        aria-valuenow={intensity}
+        className="relative pointer-events-auto touch-none cursor-pointer"
+        style={{ width: 36, height: 240 }}
+        onPointerDown={(e) => {
+          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+          onPointerEvent(e);
+        }}
+        onPointerMove={(e) => {
+          // Only update while a button is down (avoids hover-induced updates).
+          if (e.buttons === 0) return;
+          onPointerEvent(e);
+        }}
+      >
+        {/* Track background */}
+        <div
+          className="absolute left-1/2 -translate-x-1/2 top-0 h-full rounded-full pointer-events-none"
+          style={{
+            width: 6,
+            background: "rgba(0,0,0,0.55)",
+            boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.18)",
+          }}
+        />
+        {/* Filled portion */}
+        <div
+          className="absolute left-1/2 -translate-x-1/2 bottom-0 rounded-full pointer-events-none"
+          style={{
+            width: 6,
+            height: `${fillPct}%`,
+            background: accentGrad,
+            boxShadow: "0 0 14px color-mix(in oklab, var(--theme-primary) 55%, transparent)",
+          }}
+        />
+        {/* Tick marks */}
+        {[25, 50, 75].map((p) => (
+          <div
+            key={p}
+            aria-hidden
+            className="absolute left-1/2 -translate-x-1/2 w-3 h-0.5 bg-white/30 rounded-full pointer-events-none"
+            style={{ bottom: `calc(${p}% - 1px)` }}
+          />
+        ))}
+        {/* Thumb */}
+        <div
+          aria-hidden
+          className="absolute left-1/2 -translate-x-1/2 rounded-full pointer-events-none"
+          style={{
+            width: 22,
+            height: 22,
+            bottom: `calc(${fillPct}% - 11px)`,
+            background: "white",
+            boxShadow:
+              "0 4px 14px -2px color-mix(in oklab, var(--theme-primary) 55%, transparent)," +
+              "inset 0 0 0 2px color-mix(in oklab, var(--theme-primary) 35%, white)",
+          }}
+        />
+      </div>
+
+      <div className="absolute right-full mr-2 top-9 text-[9px] uppercase tracking-wider font-bold text-white/70 drop-shadow">
+        Max
+      </div>
+      <div className="absolute right-full mr-2 bottom-1 text-[9px] uppercase tracking-wider font-bold text-white/70 drop-shadow">
+        Min
+      </div>
+    </div>
+  );
+}
+
+/**
+ * PremiumIntensitySlider — discreet "thermometer" slider that adjusts the
+ * signature FX density of the active premium theme. Reads / writes
+ * `player.premiumIntensity[setId]`; the active backdrop reads the live
+ * value via `usePremiumIntensity(setId)` (see store/store.ts selector) so
+ * any drag pulses through to canvas in real time.
+ *
+ * Range 0.1 – 2.0 with step 0.05. 1.0 = the shipping look; below pours
+ * fewer raindrops / fewer petals / fewer sparks; above floods the scene.
+ */
+function PremiumIntensitySlider({ setId, label, accent }: {
+  setId: string;
+  label: string;
+  accent: { from: string; to: string } | null;
+}) {
+  const intensity = useStore((s) => s.player.premiumIntensity?.[setId] ?? 1.0);
+  const updateProfile = useStore((s) => s.updateProfile);
+  // Range widened to [0.1, 2.0] — Alex flagged that at the previous min
+  // (0.4) the rain was still pouring. 0.1 = barely-there sprinkle, 2.0 =
+  // a downpour you can't look away from. 1.0 stays the "shipping look".
+  const MIN = 0.1, MAX = 2.0;
+  const setValue = (v: number) => {
+    const clamped = Math.max(MIN, Math.min(MAX, v));
+    const current = useStore.getState().player.premiumIntensity ?? {};
+    updateProfile({ premiumIntensity: { ...current, [setId]: clamped } });
+  };
+  // Map [MIN, MAX] -> [0, 100] for the visual fill.
+  const fillPct = ((intensity - MIN) / (MAX - MIN)) * 100;
+  const accentGrad = accent
+    ? `linear-gradient(90deg, ${accent.from}, ${accent.to})`
+    : "linear-gradient(90deg, var(--theme-primary), var(--theme-secondary))";
+  return (
+    <section className="bg-surface border border-hairline rounded-3xl p-4 sm:p-5">
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-muted">
+          Intensité — {label}
+        </h2>
+        <span
+          className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full"
+          style={{
+            background: "color-mix(in oklab, var(--theme-primary) 18%, transparent)",
+            color: "var(--ink)",
+          }}
+        >
+          {Math.round(intensity * 100)}%
+        </span>
+      </div>
+      <p className="text-[11px] text-ink-faint mb-3 leading-snug">
+        Règle la densité des effets signature : pluie, pétales, étincelles, motes…
+      </p>
+      <div className="relative h-9 flex items-center">
+        {/* Track */}
+        <div
+          className="absolute inset-x-0 h-2 rounded-full"
+          style={{ background: "color-mix(in oklab, black 35%, transparent)" }}
+        />
+        {/* Filled portion (accent gradient) */}
+        <div
+          className="absolute left-0 h-2 rounded-full pointer-events-none"
+          style={{
+            width: `${fillPct}%`,
+            background: accentGrad,
+            boxShadow: "0 0 12px color-mix(in oklab, var(--theme-primary) 55%, transparent)",
+          }}
+        />
+        {/* Tick marks at 50% / 100% / 150% */}
+        {[0, 50, 100].map((p) => (
+          <div
+            key={p}
+            aria-hidden
+            className="absolute h-3 w-0.5 bg-white/25 rounded-full"
+            style={{ left: `calc(${p}% - 1px)` }}
+          />
+        ))}
+        {/* Native input — invisible, drives the value. Custom thumb via CSS. */}
+        <input
+          type="range"
+          min={MIN}
+          max={MAX}
+          step={0.05}
+          value={intensity}
+          onChange={(e) => setValue(parseFloat(e.currentTarget.value))}
+          className="relative w-full appearance-none bg-transparent z-10 cursor-pointer
+                     [&::-webkit-slider-thumb]:appearance-none
+                     [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6
+                     [&::-webkit-slider-thumb]:rounded-full
+                     [&::-webkit-slider-thumb]:bg-white
+                     [&::-webkit-slider-thumb]:shadow-lg
+                     [&::-webkit-slider-thumb]:border-2
+                     [&::-webkit-slider-thumb]:border-white/80
+                     [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6
+                     [&::-moz-range-thumb]:rounded-full
+                     [&::-moz-range-thumb]:bg-white
+                     [&::-moz-range-thumb]:border-0"
+          aria-label="Intensité des effets premium"
+        />
+      </div>
+      <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-ink-faint mt-1.5">
+        <span>Discret</span>
+        <span>Standard</span>
+        <span>Intense</span>
+      </div>
+    </section>
+  );
+}
 
 function Stat({ label, value, accent }: { label: string; value: number | string; accent?: string }) {
   return (

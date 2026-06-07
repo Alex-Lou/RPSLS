@@ -25,6 +25,8 @@ const STOPS = {
  *  mid, background) so the canvas reads as a layered crystal CLUSTER instead
  *  of six floating decals. Positions hand-tuned, not random — each shard sits
  *  in a deliberate composition triangle that doesn't crowd the HUD. */
+// Reduced 12 → 7 (Alex: "pas autant de quartz à l'écran"). Kept the 3 focal
+// hero shards + 2 mid + 2 far so the cluster still reads layered, just airier.
 const SHARDS: Array<{ cx: number; cy: number; size: number; rot: number; delay: number }> = [
   // Foreground hero shards — large, focal.
   { cx: 50, cy: 50, size: 38, rot: 8,   delay: 0.8 },
@@ -33,23 +35,15 @@ const SHARDS: Array<{ cx: number; cy: number; size: number; rot: number; delay: 
   // Mid layer — supporting crystals.
   { cx: 78, cy: 16, size: 22, rot: 22,  delay: 1.4 },
   { cx: 12, cy: 78, size: 24, rot: 18,  delay: 3.4 },
-  { cx: 64, cy: 38, size: 18, rot: -22, delay: 4.0 },
-  // Background bed — small crystals, far-field, denser refraction.
-  { cx: 32, cy: 12, size: 14, rot: 11,  delay: 2.0 },
-  { cx: 92, cy: 30, size: 12, rot: -8,  delay: 5.1 },
-  { cx: 4,  cy: 50, size: 13, rot: 36,  delay: 6.0 },
-  { cx: 40, cy: 88, size: 14, rot: -28, delay: 4.4 },
-  { cx: 70, cy: 92, size: 12, rot: 17,  delay: 5.5 },
-  { cx: 26, cy: 60, size: 11, rot: -45, delay: 3.0 },
 ];
 
 /** Four "growth seed" positions where a crystal periodically GROWS from a
  *  spark of light. Staggered so the canvas always has one forming. */
+// Cut 4 → 2 growth seeds (Alex: fewer quartz on screen) — one always forming,
+// staggered, but the canvas no longer sprouts crystals every few seconds.
 const SEEDS: Array<{ cx: number; cy: number; rot: number; begin: number }> = [
   { cx: 35, cy: 40, rot: 18,  begin: 0 },
-  { cx: 60, cy: 70, rot: -22, begin: 8 },
   { cx: 80, cy: 50, rot: 35,  begin: 16 },
-  { cx: 22, cy: 88, rot: -10, begin: 24 },
 ];
 
 /** Bokeh blobs (8) and lattice trace lines (5) — extracted as consts so the

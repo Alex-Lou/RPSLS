@@ -243,6 +243,63 @@ export const BACKGROUNDS: BackgroundDef[] = [
     accent: { from: "#c8aef0", to: "#f6a5b8" },
   },
 
+  // ── 2026-06-07 premium lineup (see docs/PREMIUM_THEMES.md). Each set has
+  //    a brand-new shader (added in ThemedBackdrop.tsx), a dedicated SVG
+  //    pad, its own HUD palette + font stack, and premium-set gating so the
+  //    picker shows a Premium ribbon + ✦ price until the player owns it.
+  //    Ink / Bloom / Void are LIGHT scenes — App.css picks up `theme-light`. ──
+  {
+    id: "coral",     label: "Coral",          emoji: "🪸",
+    src: null, scene: "coral",                defaultPadId: "coral",
+    premiumSetId: "coral",
+    skin: { fontHeadline: "playfair",     fontBody: "cormorant",    fontMono: "jetbrains" },
+    miniature: null,
+    accent: { from: "#ff6b6b", to: "#4ecdc4" },
+  },
+  {
+    id: "rust",      label: "Rust",           emoji: "🏭",
+    src: null, scene: "rust",                 defaultPadId: "rust",
+    premiumSetId: "rust",
+    skin: { fontHeadline: "bebas",        fontBody: "rajdhani",     fontMono: "shareTech" },
+    miniature: null,
+    accent: { from: "#d2691e", to: "#8b4513" },
+  },
+  {
+    id: "void",      label: "Void",           emoji: "◼️",
+    src: null, scene: "void",                 defaultPadId: "void",
+    premiumSetId: "void",
+    skin: { fontHeadline: "jetbrains",    fontBody: "jetbrains",    fontMono: "jetbrains" },
+    miniature: null,
+    accent: { from: "#ffffff", to: "#666666" },
+  },
+  {
+    id: "prism",     label: "Prism",          emoji: "💎",
+    src: null, scene: "prism",                defaultPadId: "prism",
+    premiumSetId: "prism",
+    flashy: true,
+    skin: { fontHeadline: "spaceGrotesk", fontBody: "inter",        fontMono: "jetbrains" },
+    miniature: null,
+    accent: { from: "#ffffff", to: "#8b5cf6" },
+  },
+  {
+    id: "ink",       label: "Ink",            emoji: "🖋️",
+    src: null, scene: "ink",                  defaultPadId: "ink",
+    premiumSetId: "ink",
+    light: true,
+    skin: { fontHeadline: "ebGaramond",   fontBody: "cormorant",    fontMono: "jetbrains" },
+    miniature: null,
+    accent: { from: "#1a1a1a", to: "#8c8c8c" },
+  },
+  {
+    id: "bloom",     label: "Bloom",          emoji: "🌸",
+    src: null, scene: "bloom",                defaultPadId: "bloom",
+    premiumSetId: "bloom",
+    light: true,
+    skin: { fontHeadline: "playfair",     fontBody: "inter",        fontMono: "jetbrains" },
+    miniature: null,
+    accent: { from: "#ff7eb3", to: "#81c784" },
+  },
+
   // Player's OWN image — uploaded in Profile, stored as a data URL. The
   // recommended format is shown in the picker (portrait 9:16, cover-fit).
   {
@@ -291,4 +348,10 @@ export const BG_DEFAULT_THEME: Partial<Record<BackgroundId, ThemeId>> = {
   tempus:     "tempus",
   storm:      "storm",
   quartz:     "quartz",
+  coral:      "coral",
+  rust:       "rust",
+  void:       "void",
+  prism:      "prism",
+  ink:        "ink",
+  bloom:      "bloom",
 };

@@ -571,7 +571,7 @@ function PickStage({
         className={
           "shrink-0 mt-1 px-7 py-3 rounded-2xl font-bold text-white transition " +
           (allFilled
-            ? "bg-themed shadow-lg shadow-violet-500/30 hover:scale-[1.02]"
+            ? "bg-themed shadow-lg shadow-themed hover:scale-[1.02]"
             : "bg-hairline text-ink-faint cursor-not-allowed")
         }
       >
@@ -1394,7 +1394,7 @@ function HelpModal({ target, onClose }: { target: number; onClose: () => void })
 
         <button
           onClick={onClose}
-          className="mt-6 w-full px-6 py-3 rounded-2xl font-bold text-white bg-themed shadow-lg shadow-violet-500/30 transition hover:scale-[1.02]"
+          className="mt-6 w-full px-6 py-3 rounded-2xl font-bold text-white bg-themed shadow-lg shadow-themed transition hover:scale-[1.02]"
         >
           {t("lanes.help.close")}
         </button>

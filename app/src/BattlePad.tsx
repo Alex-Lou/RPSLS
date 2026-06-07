@@ -25,6 +25,12 @@ import { PhantomPad } from "./battlepads/PhantomPad";
 import { EmberforgePad } from "./battlepads/EmberforgePad";
 import { TempusPad } from "./battlepads/TempusPad";
 import { StormPad } from "./battlepads/StormPad";
+import { CoralReefPad } from "./battlepads/CoralReefPad";
+import { RustPad } from "./battlepads/RustPad";
+import { VoidPad } from "./battlepads/VoidPad";
+import { PrismPad } from "./battlepads/PrismPad";
+import { InkPad } from "./battlepads/InkPad";
+import { BloomPad } from "./battlepads/BloomPad";
 
 export function BattlePad({
   padId,
@@ -100,6 +106,12 @@ export function BattlePad({
     case "tempus":     return <TempusPad {...common} compact={compact} />;
     case "storm":      return <StormPad {...common} compact={compact} />;
     case "quartz":     return <QuartzPad {...common} compact={compact} />;
+    case "coral":      return <CoralReefPad {...common} compact={compact} />;
+    case "rust":       return <RustPad {...common} compact={compact} />;
+    case "void":       return <VoidPad {...common} compact={compact} />;
+    case "prism":      return <PrismPad {...common} compact={compact} />;
+    case "ink":        return <InkPad {...common} compact={compact} />;
+    case "bloom":      return <BloomPad {...common} compact={compact} />;
     case "custom":
       return customPadUrl
         ? <ImagePad src={customPadUrl} {...common} />

@@ -13,6 +13,7 @@
  */
 
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { useT } from "../i18n";
 import { useStore } from "../store/store";
@@ -259,7 +260,13 @@ export const FloatingMatchBackButton = forwardRef<
       else onClick();
     },
   }), [confirm, onClick]);
-  return (
+  // Render in a portal anchored to document.body so the button (position:
+  // fixed) escapes any ancestor `transform` — Motion animates parents with
+  // `transform: translate(...)`, which silently re-roots `position: fixed`
+  // to that transformed ancestor instead of the viewport. The visible bug
+  // was the back arrow drifting from mid-screen into its corner on every
+  // view enter.
+  return createPortal(
     <>
       <button
         onClick={handleClick}
@@ -311,7 +318,7 @@ export const FloatingMatchBackButton = forwardRef<
                     "flex-1 py-2.5 rounded-2xl font-bold text-sm text-white shadow-lg transition active:scale-[0.97] " +
                     (confirm.severity === "danger"
                       ? "bg-gradient-to-r from-rose-500 to-red-600 shadow-rose-500/30"
-                      : "bg-themed shadow-violet-500/30")
+                      : "bg-themed shadow-themed")
                   }
                 >
                   {confirm.confirmLabel ?? "Quitter"}
@@ -321,7 +328,8 @@ export const FloatingMatchBackButton = forwardRef<
           </motion.div>
         )}
       </AnimatePresence>
-    </>
+    </>,
+    document.body,
   );
 });
 

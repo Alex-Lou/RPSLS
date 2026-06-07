@@ -5,7 +5,8 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { useStore } from "../store/store";
-import { rankFromLp } from "../engine/rank";
+import { rankProgress } from "../engine/rank";
+import { LpBar } from "./LpBar";
 import { levelFromXp } from "../engine/leveling";
 import { ALL_CARD_IDS, CARDS, RARITY_COLOR, RARITY_ORDER } from "./cards";
 import { CRAFT_COST } from "../engine/economy";
@@ -29,16 +30,12 @@ const HIW_ICONS = {
 export function RankedLobby({ onViewBracket, onManageDeck, onBack, onGoShop }: { onViewBracket: () => void; onManageDeck: () => void; onBack?: () => void; onGoShop?: () => void }) {
   const t = useT();
   const player = useStore((s) => s.player);
-  const tier = rankFromLp(player.rankLp);
+  const { tier, progress: lpProgress } = rankProgress(player.rankLp);
   const lvl = levelFromXp(player.xp);
   const totalGames = player.stats.wins + player.stats.losses + player.stats.draws;
   const winrate = player.stats.wins + player.stats.losses > 0
     ? Math.round((player.stats.wins / (player.stats.wins + player.stats.losses)) * 100)
     : 0;
-  const lpProgress = tier.ceil === Infinity
-    ? 1
-    : (player.rankLp - tier.floor) / (tier.ceil - tier.floor);
-
   const [rulesOpen, setRulesOpen] = useState(false);
   const countdown = useCountdown(30);
 
@@ -117,14 +114,7 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack, onGoShop }: {
             </div>
             <span className="tabular-nums">{player.rankLp} {tier.ceil !== Infinity && `/ ${tier.ceil}`}</span>
           </div>
-          <div className="h-2 rounded-full bg-hairline overflow-hidden">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${(lpProgress * 100).toFixed(1)}%` }}
-              transition={{ duration: 0.8, type: "spring", stiffness: 120, damping: 20 }}
-              className="h-full rounded-full bg-themed"
-            />
-          </div>
+          <LpBar progress={lpProgress} />
         </div>
         <div className="grid grid-cols-3 gap-2">
           <StatCell label={t("profile.stat.games")} value={String(totalGames)} color="text-ink" />
@@ -154,7 +144,7 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack, onGoShop }: {
             <div className="text-[10px] text-ink-faint">3 main + 3 réserve</div>
           </div>
         </div>
-        <span className="text-violet-300">›</span>
+        <span style={{ color: "var(--theme-secondary)" }}>›</span>
       </motion.button>
 
       {/* Main CTA — go to tournament bracket */}
@@ -164,8 +154,9 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack, onGoShop }: {
         className="w-full rounded-2xl px-4 py-4 flex items-center justify-between transition hover:brightness-110"
         style={{
           background:
-            "linear-gradient(135deg, color-mix(in oklab, var(--theme-primary) 22%, transparent), color-mix(in oklab, var(--theme-secondary) 22%, transparent))",
-          border: "1px solid color-mix(in oklab, var(--theme-primary) 40%, transparent)",
+            "linear-gradient(135deg, color-mix(in oklab, var(--theme-primary) 55%, rgba(10,12,20,0.85)), color-mix(in oklab, var(--theme-secondary) 45%, rgba(10,12,20,0.85)))",
+          border: "1px solid color-mix(in oklab, var(--theme-primary) 60%, transparent)",
+          boxShadow: "0 6px 20px -6px color-mix(in oklab, var(--theme-primary) 45%, transparent)",
         }}
       >
         <div className="flex items-center gap-3">

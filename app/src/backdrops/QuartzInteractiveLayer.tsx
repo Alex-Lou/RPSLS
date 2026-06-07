@@ -50,12 +50,18 @@ interface Bubble {
   y: number;
 }
 
-const MAX_CRYSTALS = 20;
-const MAX_BUBBLES = 40;
-const CRYSTAL_TTL_MS = 6000;
-const BUBBLE_TTL_MS = 1700;
+// Density caps cut HARD (Alex: still too many — "limite leur nombre ET temps").
+// A handful of crystals max, a short bubble trail → tasteful sparkle, never a
+// screen full of shards even when hammering the screen.
+const MAX_CRYSTALS = 6;
+const MAX_BUBBLES = 12;
+// Mini-crystals leave quickly (was 6s) so they can't pile up — exit stays a
+// smooth fade (see CrystalMark exit), just brief.
+const CRYSTAL_TTL_MS = 2200;
+const BUBBLE_TTL_MS = 800;
 const HOLD_BLOOM_MS = 350;
-const BUBBLE_THROTTLE_MS = 70;
+// Throttle the slide-trail harder so a fast swirl doesn't spray bubbles.
+const BUBBLE_THROTTLE_MS = 120;
 const SHATTER_HIT_RADIUS_PCT = 6;
 
 /**
@@ -333,7 +339,10 @@ function CrystalMark({ c }: { c: Crystal }) {
       aria-hidden
       initial={{ opacity: 0, scale: 0.2 }}
       animate={variants}
-      exit={{ opacity: 0 }}
+      // Smooth-but-quick disappearance: a soft fade + slight shrink over 0.4s
+      // (was inheriting the 0.85s spawn curve) so crystals clear the screen
+      // promptly without a hard pop.
+      exit={{ opacity: 0, scale: 0.55, transition: { duration: 0.4, ease: "easeOut" } }}
       transition={{ duration: dur, ease: c.shattering ? "easeIn" : [0.16, 1, 0.3, 1] }}
       className="absolute pointer-events-none"
       style={{

@@ -1,12 +1,15 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store/store";
+import { useArenaOverride } from "./ranked/arenaOverride";
 import { applyTheme, THEMES } from "./theme/theme";
 import { BACKGROUNDS_BY_ID, resolveFontFamily } from "./theme/themes";
 import { RTL_LOCALES } from "./i18n";
 import { SplashShader } from "./fx/SplashShader";
 import { ThemedBackdrop } from "./backdrops/ThemedBackdrop";
 import { QuartzBackdropWithLayer } from "./backdrops/QuartzBackdrop";
+import { PremiumTouchLayer, isPremiumFxScene } from "./backdrops/PremiumTouchLayer";
+import { StormRain } from "./backdrops/StormRain";
 import { useBackdropPeek } from "./backdrops/previewScene";
 import { ThemeTouchFX } from "./fx/ThemeTouchFX";
 import { Sidebar, MobileShell, type Page } from "./Sidebar";
@@ -44,7 +47,14 @@ type Stage = "splash" | "welcome" | "shell";
 
 export default function App() {
   const themeId = useStore((s) => s.player.themeId);
-  const backgroundId = useStore((s) => s.player.backgroundId ?? "default");
+  // Match-scoped arena override (set by PlayPage when the coin flip handed
+  // the duel to the opponent's full look). When non-null, this REPLACES the
+  // player's own backgroundId for the duration of the match — backdrop +
+  // scrim + light/flashy/data-premium flags all switch to the opponent's
+  // universe. Cleared automatically when the match unmounts.
+  const arenaBg = useArenaOverride((s) => s.bg);
+  const playerBg = useStore((s) => s.player.backgroundId ?? "default");
+  const backgroundId = arenaBg ?? playerBg;
   const onboarded = useStore((s) => s.onboarded);
   const locale = useStore((s) => s.locale);
   const hapticEnabled  = useStore((s) => s.player.hapticEnabled ?? true);
@@ -199,21 +209,45 @@ export default function App() {
   const premiumScene = activeBg?.premiumScene;
   const isLightBg = activeBg?.light === true;
   const isFlashyBg = activeBg?.flashy === true;
+  const premiumSetId = activeBg?.premiumSetId;
 
-  // Toggle the global `theme-light` / `theme-flashy` classes on <html> so
-  // App.css can darken text + thicken surfaces when a pastel backdrop
-  // (Quartz) or a high-contrast flashy backdrop (Storm, Aurora, Galaxy,
-  // Holy, Casino, Neon Grid) is active. Pure CSS swap — no React re-render
-  // on every menu page.
+  // Toggle the global `theme-light` / `theme-flashy` classes and the
+  // `data-premium` attribute on <html> so App.css can:
+  //  - darken text + thicken surfaces for pastel / flashy backdrops
+  //  - apply per-set frame identity (border colour, shadow, radius,
+  //    typography) via [data-premium="…"] selectors
   useEffect(() => {
-    document.documentElement.classList.toggle("theme-light", isLightBg);
-    document.documentElement.classList.toggle("theme-flashy", isFlashyBg);
-  }, [isLightBg, isFlashyBg]);
+    const root = document.documentElement;
+    root.classList.toggle("theme-light", isLightBg);
+    root.classList.toggle("theme-flashy", isFlashyBg);
+    if (premiumSetId) {
+      root.dataset.premium = premiumSetId;
+    } else {
+      delete root.dataset.premium;
+    }
+  }, [isLightBg, isFlashyBg, premiumSetId]);
 
   return (
     <div className="h-full w-full select-none overflow-hidden">
+      {/* Backdrop stays gated on `stage !== "splash"` — Splash already mounts
+          its own ThemedBackdrop via SplashShader, doubling it would render two
+          WebGL canvases at z-0 and waste a context. */}
       {activeScene && stage !== "splash" && <ThemedBackdrop scene={activeScene} />}
-      {premiumScene === "quartz" && stage !== "splash" && (
+      {/* Per-theme touch/slide FX for the coded premium scenes (storm/tempus/
+          emberforge/phantom/eclipse) — each reacts in its own voice. Passive in
+          menus (taps still reach the UI), active during the full-screen peek.
+          Quartz has its own bespoke layer just below. Active from splash
+          onwards so the opening already has its theme signature (Alex: "if
+          something is meant to be shown, it must be visible from the start"). */}
+      {activeScene && isPremiumFxScene(activeScene) && (
+        <PremiumTouchLayer scene={activeScene} active />
+      )}
+      {/* Tempest = a REAL gravity-driven downpour over the storm backdrop.
+          Mounted during splash too: the rain IS the theme — hiding it on
+          opening means the splash looks dead for a beat. Performance: one
+          canvas + rAF, runs alongside the cosmic shader without contention. */}
+      {activeScene === "storm" && <StormRain />}
+      {premiumScene === "quartz" && (
         // Interactive layer is wired ONLY during peek (full-screen preview):
         // outside peek the regular UI taps must keep reaching their buttons.
         // The wrapper switches `pointerEvents` inline so the same component
@@ -225,8 +259,11 @@ export default function App() {
       {/* Readability scrim over a player's OWN uploaded image — coded scenes
           already ship their own vignette, but a raw photo can be bright/busy
           enough to drown menu text. A very light dark wash keeps every page
-          legible without hiding the chosen picture. */}
-      {stage !== "splash" && !peek && backgroundId === "custom" && customBgUrl && (
+          legible without hiding the chosen picture. ALSO shows during peek:
+          the preview MUST match the final rendering exactly, otherwise the
+          player buys/picks a look that turns out brighter in use than what
+          they saw in the picker. */}
+      {backgroundId === "custom" && customBgUrl && (
         <div
           className="fixed inset-0 z-0 pointer-events-none"
           style={{
@@ -237,9 +274,9 @@ export default function App() {
       )}
       {/* Coded scenes ship their own vignette, but the flashy ones (aurora,
           casino, grid…) can still drown menu text. A lighter top/bottom-weighted
-          wash keeps titles + nav legible while leaving the scene visible.
-          Dropped during a full-screen peek so the pure backdrop shows. */}
-      {stage !== "splash" && !peek && backgroundId !== "custom" && activeScene && (
+          wash keeps titles + nav legible while leaving the scene visible. Also
+          rendered during peek — preview = exact rendering, see comment above. */}
+      {backgroundId !== "custom" && activeScene && (
         <div
           className="fixed inset-0 z-0 pointer-events-none"
           style={{
@@ -305,9 +342,12 @@ export default function App() {
                   vertical space instead of floating with big top/bottom voids. */}
               <main className="flex-1 flex flex-col min-h-0 overflow-x-hidden overflow-y-auto pt-12 pb-4 md:pt-0 md:pb-0 [@media(max-height:540px)]:pt-2 [@media(max-height:540px)]:pb-1">
                 {/* Persistent player header — shown on every menu page, never on
-                    a match surface (Play / Online own internal match states). Its
-                    XP bar is where quest/match XP gains visibly land. */}
-                {page !== "play" && page !== "online" && (
+                    a match surface (Play / Online own internal match states),
+                    and never on Profile (which mounts the SAME PlayerBadge as
+                    its hero — rendering both would duplicate the badge stack,
+                    the bug Alex flagged). Its XP bar is where quest/match XP
+                    gains visibly land. */}
+                {page !== "play" && page !== "online" && page !== "profile" && (
                   <UserHeader onNavigate={navigateTo} />
                 )}
                 <AnimatePresence mode="wait">
@@ -319,7 +359,7 @@ export default function App() {
                       {page === "shop"    && <PageWrap key="shop"><ShopPage /></PageWrap>}
                       {page === "quests"  && <PageWrap key="quests"><QuestsPage /></PageWrap>}
                       {page === "packs"   && <PageWrap key="packs"><PacksPage /></PageWrap>}
-                      {page === "profile" && <PageWrap key="profile"><ProfilePage /></PageWrap>}
+                      {page === "profile" && <PageWrap key="profile"><ProfilePage onNavigate={navigateTo} /></PageWrap>}
                       {page === "history" && <PageWrap key="history"><HistoryPage /></PageWrap>}
                       {page === "about"   && <PageWrap key="about"><AboutPage /></PageWrap>}
                       {page === "contact" && <PageWrap key="contact"><ContactPage /></PageWrap>}

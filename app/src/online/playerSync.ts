@@ -10,7 +10,7 @@
  * the app calls `pushPlayerState()` to persist the update server-side.
  */
 
-import type { BackgroundId, PadId, Player, ThemeId } from "../types";
+import type { BackgroundId, Difficulty, PadId, Player, ThemeId } from "../types";
 import { PAD_META } from "../types";
 import type { OnlineClient, PlayerProgress } from "./online";
 import { useStore } from "../store/store";
@@ -25,17 +25,24 @@ export function buildProgressFromPlayer(player: Player): PlayerProgress {
     rankLp: player.rankLp ?? 0,
     eclats: player.eclats ?? 0,
     dust: player.dust ?? 0,
+    stars: player.stars ?? 0,
     wins: player.stats?.wins ?? 0,
     losses: player.stats?.losses ?? 0,
     draws: player.stats?.draws ?? 0,
     cardCollection: player.cardCollection ?? [],
     cardMastery: player.cardMastery ?? {},
     codexClaimed: player.codexClaimed ?? [],
+    claimedQuests: player.claimedQuests ?? [],
     rankedDeck: player.rankedDeck ?? [],
     ownedPremiumSets: player.ownedPremiumSets ?? [],
     seasonNumber: player.season?.number ?? 1,
     seasonStartedAt: player.season?.startedAt ?? Date.now(),
     winStreak: player.winStreak ?? 0,
+    // Classé own ladder + record — cloud-saved like rankLp/stats.
+    classeLp: player.classeLp ?? 1000,
+    classeWins: player.classeStats?.wins ?? 0,
+    classeLosses: player.classeStats?.losses ?? 0,
+    classeDraws: player.classeStats?.draws ?? 0,
     updatedAt: Date.now(),
     // Cosmetics — small prefs so a reinstall restores the look. The avatar is
     // synced only when it's a preset path / emoji; custom uploaded data: URLs
@@ -45,6 +52,9 @@ export function buildProgressFromPlayer(player: Player): PlayerProgress {
     padId: player.padId,
     avatar: player.avatar && !player.avatar.startsWith("data:") ? player.avatar : undefined,
     nickname: player.nickname,
+    difficulty: player.difficulty,
+    fontScale: player.fontScale,
+    padChosen: player.padChosen,
   };
 }
 
@@ -61,6 +71,8 @@ export function mergeServerState(
   if (server.rankLp > (local.rankLp ?? 0)) patch.rankLp = server.rankLp;
   if (server.eclats > (local.eclats ?? 0)) patch.eclats = server.eclats;
   if (server.dust > (local.dust ?? 0)) patch.dust = server.dust;
+  // Premium currency — take max (never lose paid ✦; same model as eclats/dust).
+  if (server.stars != null && server.stars > (local.stars ?? 0)) patch.stars = server.stars;
 
   // Stats — take max per field
   const localStats = local.stats ?? { wins: 0, losses: 0, draws: 0, byMove: {} };
@@ -109,6 +121,16 @@ export function mergeServerState(
   }
   if (codexChanged) patch.codexClaimed = Array.from(localCodex);
 
+  // Claimed quests — union (a one-time reward stays claimed across devices, and
+  // can't be re-collected after a reinstall).
+  const localQuests = new Set(local.claimedQuests ?? []);
+  const serverQuests = server.claimedQuests ?? [];
+  let questsChanged = false;
+  for (const q of serverQuests) {
+    if (!localQuests.has(q)) { localQuests.add(q); questsChanged = true; }
+  }
+  if (questsChanged) patch.claimedQuests = Array.from(localQuests);
+
   // Ranked deck — take server's if local is default and server has one
   if (server.rankedDeck?.length > 0 && (!local.rankedDeck || local.rankedDeck.length === 0)) {
     patch.rankedDeck = server.rankedDeck;
@@ -135,6 +157,24 @@ export function mergeServerState(
     patch.winStreak = server.winStreak;
   }
 
+  // Classé own ladder — take max (same model as rankLp: the saved cloud value
+  // seeds a fresh/wiped install and never silently loses rank). Optional on the
+  // wire, so guard against an older server build that omits it.
+  if (server.classeLp != null && server.classeLp > (local.classeLp ?? 1000)) {
+    patch.classeLp = server.classeLp;
+  }
+  // Classé record — W/L/D are monotonic, so max-per-field is correct (same as
+  // the global stats merge above).
+  const localCs = local.classeStats ?? { wins: 0, losses: 0, draws: 0 };
+  const sW = server.classeWins ?? 0, sL = server.classeLosses ?? 0, sD = server.classeDraws ?? 0;
+  if (sW > localCs.wins || sL > localCs.losses || sD > localCs.draws) {
+    patch.classeStats = {
+      wins: Math.max(localCs.wins, sW),
+      losses: Math.max(localCs.losses, sL),
+      draws: Math.max(localCs.draws, sD),
+    };
+  }
+
   // Cosmetics — the LOCAL choice is the stable source of truth on every boot.
   // The server copy is a BACKUP that only seeds a fresh/wiped install — it must
   // NEVER override a look the player already has locally, otherwise the theme
@@ -155,6 +195,13 @@ export function mergeServerState(
     if (server.padId && server.padId in PAD_META) patch.padId = server.padId as PadId;
     if (server.avatar && isAvatarImage(server.avatar)) patch.avatar = server.avatar;
     if (server.nickname && server.nickname.trim().length > 0) patch.nickname = server.nickname.slice(0, 24);
+    // Gameplay / accessibility prefs — same reinstall-recovery gate. Only adopt
+    // values that are actually set & valid (server sends "" / 0 when unset).
+    if (server.difficulty && ["easy", "normal", "hard"].includes(server.difficulty)) {
+      patch.difficulty = server.difficulty as Difficulty;
+    }
+    if (server.fontScale && server.fontScale >= 1) patch.fontScale = server.fontScale;
+    if (server.padChosen) patch.padChosen = true;
   }
 
   return patch;
@@ -207,10 +254,13 @@ export function setActiveClient(client: OnlineClient | null) {
  *  we push state to the server. */
 function syncFingerprint(p: Player): string {
   return [
-    p.xp, p.rankLp, p.eclats, p.dust, p.stats?.wins, p.stats?.losses,
-    (p.cardCollection ?? []).length, p.winStreak ?? 0,
-    // Cosmetics — so picking a theme/background/pad/avatar pushes too.
+    p.xp, p.rankLp, p.eclats, p.dust, p.stars ?? 0, p.stats?.wins, p.stats?.losses,
+    (p.cardCollection ?? []).length, (p.claimedQuests ?? []).length, p.winStreak ?? 0,
+    // Classé own ladder + record — so a Classé match pushes to the cloud too.
+    p.classeLp ?? 1000, p.classeStats?.wins ?? 0, p.classeStats?.losses ?? 0,
+    // Cosmetics + prefs — so picking a theme/background/pad/avatar/difficulty pushes too.
     p.themeId, p.backgroundId, p.padId, p.avatar, p.nickname,
+    p.difficulty, p.fontScale ?? 1, p.padChosen ?? false,
   ].join("|");
 }
 

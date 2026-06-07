@@ -52,7 +52,9 @@ export function ThemedXpBar({
   }, [gainPulse]);
 
   const isLp = variant === "lp";
-  const heightClass = isLp ? "h-4" : "h-5";
+  // xp bar is now full-width in the header → make it tall enough to be a real,
+  // legible bar (Alex: the old cramped one was too small). lp stays slimmer.
+  const heightClass = isLp ? "h-4" : "h-6";
 
   return (
     <div className={"relative w-full " + className}>
@@ -70,31 +72,39 @@ export function ThemedXpBar({
       <div
         className={
           "relative w-full " + heightClass + " rounded-full overflow-hidden " +
-          "bg-black/40 ring-1 ring-white/8 " +
-          "shadow-[inset_0_1px_2px_rgba(0,0,0,0.6),inset_0_-1px_0_rgba(255,255,255,0.05)]"
+          // Thin hairline rim + a soft inner groove so the empty track reads as
+          // carved depth, not a flat grey pill. No tick marks (removed — they
+          // chopped the bar visually for no real signal).
+          "bg-black/35 ring-1 ring-white/10 " +
+          "shadow-[inset_0_1px_3px_rgba(0,0,0,0.55),inset_0_-1px_0_rgba(255,255,255,0.06)]"
         }
       >
-        {/* Milestone ticks: 25/50/75% — show the structure. */}
-        {[0.25, 0.5, 0.75].map((p) => (
-          <span key={p} aria-hidden
-            className="absolute top-1 bottom-1 w-px bg-white/15"
-            style={{ left: `${p * 100}%` }}
-          />
-        ))}
-
-        {/* Fill — theme-coloured gradient. */}
+        {/* Fill — clean theme gradient that grows L→R. NO rounded-full on the
+            fill: at low progress a rounded fill renders as a "ball/nub" (the
+            thing Alex flagged). The track is rounded + overflow-hidden, so it
+            clips the fill's left end round and the right end stays a crisp
+            vertical edge — a modern AAA progress fill, no knob, no leading dot. */}
         <motion.div
-          className="absolute inset-y-0 left-0 rounded-full"
+          className="absolute inset-y-0 left-0"
           animate={{ width: `${progress * 100}%` }}
           transition={{ width: { duration: 0.9, ease: [0.22, 1, 0.36, 1] } }}
           style={{
             background:
-              "linear-gradient(90deg, var(--theme-primary), color-mix(in oklab, var(--theme-primary) 30%, var(--theme-secondary)), var(--theme-secondary))",
+              "linear-gradient(90deg, var(--theme-primary), color-mix(in oklab, var(--theme-primary) 35%, var(--theme-secondary)), var(--theme-secondary))",
             boxShadow:
-              "inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -1px 0 rgba(0,0,0,0.3)",
+              "inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -1px 0 rgba(0,0,0,0.3)",
           }}
         >
-          {/* Idle gloss sweep — slow diagonal highlight. */}
+          {/* Subtle top sheen band (rectangular → never reads as a blob). */}
+          <span
+            aria-hidden
+            className="absolute inset-x-0 top-0 h-1/2"
+            style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.28), transparent)" }}
+          />
+          {/* Fast white gloss sweep — the AAA "shine" Alex always asks for.
+              115deg/100deg keeps it diagonal so it's distinguishable from the
+              flat sheen above. mix-blend screen so it brightens the fill
+              instead of washing it grey. */}
           {progress > 0 && (
             <span
               aria-hidden
@@ -102,9 +112,43 @@ export function ThemedXpBar({
               style={{
                 background:
                   "linear-gradient(" + (isLp ? "100deg" : "115deg") +
-                  ", transparent 35%, rgba(255,255,255,0.45) 50%, transparent 65%)",
+                  ", transparent 35%, rgba(255,255,255,0.4) 50%, transparent 65%)",
                 backgroundSize: "240% 100%",
                 animation: "xpbar-gloss 5.4s linear infinite",
+                mixBlendMode: "screen",
+              }}
+            />
+          )}
+          {/* Theme-tinted slow counter-sweep — uses --theme-secondary so the
+              animation gets a different colour signature for each theme. Going
+              the OTHER way at a slower cadence layers a richer motion without
+              new DOM weight. Cheap: just background-position keyframes. */}
+          {progress > 0 && (
+            <span
+              aria-hidden
+              className="absolute inset-0 opacity-70"
+              style={{
+                background:
+                  "linear-gradient(" + (isLp ? "-80deg" : "-65deg") +
+                  ", transparent 30%, color-mix(in oklab, var(--theme-secondary) 70%, white) 50%, transparent 70%)",
+                backgroundSize: "300% 100%",
+                animation: "xpbar-counter 9.2s linear infinite",
+                mixBlendMode: "overlay",
+              }}
+            />
+          )}
+          {/* Leading-edge glow — a soft theme-coloured pulse on the right edge
+              of the fill. Reads as "energy" without burning frames (single
+              opacity keyframe). */}
+          {progress > 0 && progress < 1 && (
+            <span
+              aria-hidden
+              className="absolute right-0 top-0 bottom-0 w-3"
+              style={{
+                background:
+                  "linear-gradient(90deg, transparent, color-mix(in oklab, var(--theme-secondary) 80%, white))",
+                animation: "xpbar-edge 2.4s ease-in-out infinite",
+                filter: "blur(1.5px)",
                 mixBlendMode: "screen",
               }}
             />
@@ -177,11 +221,17 @@ export function ThemedXpBar({
   );
 }
 
-// Single keyframe injected once for the gloss sweep — used by every instance.
+// Keyframes injected once — shared by every instance.
+//   xpbar-gloss   white sheen sweeping L→R
+//   xpbar-counter theme-tinted sheen drifting the other way at half speed
+//   xpbar-edge    leading-edge glow pulsing in opacity
 if (typeof document !== "undefined" && !document.getElementById("themed-xpbar-keyframes")) {
   const style = document.createElement("style");
   style.id = "themed-xpbar-keyframes";
-  style.textContent =
-    "@keyframes xpbar-gloss { 0% { background-position: 240% 0; } 100% { background-position: -120% 0; } }";
+  style.textContent = [
+    "@keyframes xpbar-gloss { 0% { background-position: 240% 0; } 100% { background-position: -120% 0; } }",
+    "@keyframes xpbar-counter { 0% { background-position: -120% 0; } 100% { background-position: 240% 0; } }",
+    "@keyframes xpbar-edge { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.95; } }",
+  ].join(" ");
   document.head.appendChild(style);
 }

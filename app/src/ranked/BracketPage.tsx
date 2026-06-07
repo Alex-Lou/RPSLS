@@ -88,7 +88,21 @@ export function BracketPage({
 
   // Tournament over → celebratory podium takeover.
   if (tournament.phase === "complete") {
-    return <TournamentPodium tournament={tournament} onContinue={onBack} />;
+    return (
+      <TournamentPodium
+        tournament={tournament}
+        onContinue={onBack}
+        onReplay={() => {
+          setTournament((t) => ({
+            ...t,
+            rounds: [],
+            champion: null,
+            phase: "select" as const,
+          }));
+          setJoined(false);
+        }}
+      />
+    );
   }
 
   return (
@@ -149,14 +163,15 @@ export function BracketPage({
           animate={{ opacity: 1, y: 0 }}
           whileTap={{ scale: 0.97 }}
           onClick={handleJoin}
-          className="mx-auto px-8 py-3.5 rounded-2xl font-bold text-white shadow-lg shadow-violet-500/30 transition hover:scale-[1.02]"
+          className="mx-auto px-8 py-3.5 rounded-2xl font-bold text-white shadow-lg transition hover:scale-[1.02]"
           style={{
             background: "linear-gradient(to right, var(--theme-primary), var(--theme-secondary))",
+            boxShadow: "0 8px 24px -6px color-mix(in oklab, var(--theme-primary) 55%, transparent)",
             fontFamily: "var(--font-headline)",
             letterSpacing: "0.04em",
           }}
         >
-          🙋 Intégrer le tournoi
+          Intégrer le tournoi
         </motion.button>
       )}
 
@@ -182,12 +197,32 @@ export function BracketPage({
           <div className="text-center text-sm font-semibold text-ink-muted">
             Tu as été éliminé. Regarde la suite !
           </div>
-          <button
-            onClick={onBack}
-            className="px-6 py-2.5 rounded-2xl bg-hairline hover:bg-hairline border border-hairline text-sm font-semibold transition"
-          >
-            Quitter
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setTournament((t) => ({
+                  ...t,
+                  rounds: [],
+                  champion: null,
+                  phase: "select" as const,
+                }));
+                setJoined(false);
+              }}
+              className="px-5 py-2.5 rounded-2xl text-sm font-bold text-white bg-themed shadow-themed transition"
+            >
+              Nouveau tournoi
+            </button>
+            <button
+              onClick={onBack}
+              className="px-5 py-2.5 rounded-2xl text-sm font-semibold transition"
+              style={{
+                background: "color-mix(in oklab, var(--theme-primary) 18%, rgba(10,12,20,0.85))",
+                border: "1px solid color-mix(in oklab, var(--theme-primary) 35%, transparent)",
+              }}
+            >
+              Quitter
+            </button>
+          </div>
         </motion.div>
       )}
 
@@ -244,19 +279,24 @@ function TournamentPreparingOverlay({ onDone }: { onDone: () => void }) {
         <motion.div
           animate={{ scale: [1, 1.08, 1], rotate: [0, -3, 3, 0] }}
           transition={{ duration: 1.7, repeat: Infinity }}
-          className="text-7xl drop-shadow-[0_4px_20px_rgba(251,191,36,0.45)]"
+          className="text-7xl"
+          style={{ filter: "drop-shadow(0 4px 20px color-mix(in oklab, var(--theme-primary) 55%, transparent))" }}
         >
           🏆
         </motion.div>
         <motion.h2
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-2xl font-black bg-gradient-to-r from-amber-300 to-orange-400 bg-clip-text text-transparent"
-          style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.05em" }}
+          className="text-2xl font-black bg-clip-text text-transparent"
+          style={{
+            fontFamily: "var(--font-headline)",
+            letterSpacing: "0.05em",
+            backgroundImage: "linear-gradient(90deg, var(--theme-primary), var(--theme-secondary))",
+          }}
         >
           Le tournoi se prépare…
         </motion.h2>
-        <p className="text-[12px] text-zinc-400 max-w-xs leading-snug px-6">
+        <p className="text-[12px] text-ink-faint max-w-xs leading-snug px-6">
           Les 8 challengers prennent place sur leur estrade. Premier coup d'envoi imminent.
         </p>
         <motion.div
@@ -265,7 +305,11 @@ function TournamentPreparingOverlay({ onDone }: { onDone: () => void }) {
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 1.4, opacity: 0 }}
           transition={{ type: "spring", stiffness: 280, damping: 18 }}
-          className="text-6xl font-black tabular-nums text-amber-200 drop-shadow-[0_2px_12px_rgba(251,191,36,0.65)]"
+          className="text-6xl font-black tabular-nums"
+          style={{
+            color: "color-mix(in oklab, var(--theme-secondary) 80%, white)",
+            filter: "drop-shadow(0 2px 12px color-mix(in oklab, var(--theme-primary) 60%, transparent))",
+          }}
         >
           {beat > 0 ? beat : "GO !"}
         </motion.div>

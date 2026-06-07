@@ -38,18 +38,32 @@ export interface PlayerProgress {
   rankLp: number;
   eclats: number;
   dust: number;
+  /** Premium currency balance (✦). Synced so unspent stars survive a reinstall
+   *  — not just the owned sets. Optional for back-compat with older saves. */
+  stars?: number;
   wins: number;
   losses: number;
   draws: number;
   cardCollection: string[];
   cardMastery: Record<string, number>;
   codexClaimed: number[];
+  /** One-time quest claims (union-merged) so rewards can't be re-claimed after
+   *  a reinstall. Optional for back-compat. */
+  claimedQuests?: string[];
   rankedDeck: string[];
   /** Purchased premium sets — synced (union) so paid sets survive a reinstall. */
   ownedPremiumSets?: string[];
   seasonNumber: number;
   seasonStartedAt: number;
   winStreak: number;
+  /** Classé (classic 1v1) own ladder + record — cloud-saved like the rest of
+   *  the progression so it survives reinstall and follows the player across
+   *  devices. Optional for back-compat with a server build that predates them
+   *  (it simply omits the fields → client falls back to local). */
+  classeLp?: number;
+  classeWins?: number;
+  classeLosses?: number;
+  classeDraws?: number;
   updatedAt: number;
   // Cosmetic preferences (small) — synced so a reinstall restores the chosen
   // look. Optional for back-compat with older saves that lack them.
@@ -58,6 +72,11 @@ export interface PlayerProgress {
   padId?: string;
   avatar?: string;
   nickname?: string;
+  // Gameplay / accessibility prefs — restored on a fresh install (adopted under
+  // the same "vierge" gate as cosmetics). Optional for back-compat.
+  difficulty?: string;
+  fontScale?: number;
+  padChosen?: boolean;
 }
 
 /* Client → Server */

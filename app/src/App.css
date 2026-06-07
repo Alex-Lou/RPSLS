@@ -61,6 +61,13 @@
   --warning-soft: color-mix(in oklab, #f59e0b 18%, transparent);
   --info:         #38bdf8;
   --info-soft:    color-mix(in oklab, #0ea5e9 18%, transparent);
+
+  /* Premium frame defaults — overridden per-set via [data-premium].
+     Use zero-radius transparent shadows (not `none`) so the comma-
+     separated box-shadow: var(--frame-shadow), var(--frame-inset)
+     stays valid CSS even when one layer is inactive. */
+  --frame-shadow: 0 0 0 transparent;
+  --frame-inset:  0 0 0 transparent;
 }
 
 /* Override pack for light / pastel backdrops (Quartz). App.tsx toggles the
@@ -79,6 +86,64 @@
   --ink:        #f7f5fb;
   --ink-muted:  #d6d2e5;
   --ink-faint:  color-mix(in oklab, #b6b1c8 70%, var(--theme-primary) 30%);
+}
+
+/* Bloom and Ink are LIGHT scenes whose backgrounds are PALE (sky / paper):
+   the default theme-light ink colours (whiteish) become invisible against
+   them. Override with a dark ink stack + bumped surface opacity so cards
+   read like printed paper instead of ghost text. */
+:root.theme-light[data-premium="bloom"],
+:root.theme-light[data-premium="ink"] {
+  --ink:        #1a1a1a;
+  --ink-muted:  #4a4a4a;
+  --ink-faint:  #6a6a6a;
+  /* Cards painted slightly opaque-white over the scene so the backdrop
+     tints them without bleeding through enough to drown text. */
+  --surface:        color-mix(in oklab, white 80%, var(--theme-bg) 20%);
+  --surface-2:      color-mix(in oklab, white 84%, var(--theme-primary) 16%);
+  --surface-raised: color-mix(in oklab, white 90%, var(--theme-primary) 10%);
+  --hairline:        color-mix(in oklab, black 20%, transparent);
+  --hairline-strong: color-mix(in oklab, black 35%, transparent);
+  color: #1a1a1a;
+}
+
+/* THE WHOLE APP needs to wear dark fonts on Bloom/Ink — Alex's complaint
+   was that LOTS of components hardcode `text-white`, `text-zinc-200..400`
+   or similar Tailwind utilities, none of which read `--ink`. Without a
+   sweep, you get patches of unreadable ghost text scattered across the
+   menus. These rules force every common "light text" utility to fall back
+   to dark on these two scenes. Specificity has to beat the Tailwind
+   utility classes, so we use !important — the cost is acceptable: scoped
+   to two premium scenes that DEMAND dark text. */
+:root.theme-light[data-premium="bloom"] .text-white,
+:root.theme-light[data-premium="bloom"] [class*="text-zinc-1"],
+:root.theme-light[data-premium="bloom"] [class*="text-zinc-2"],
+:root.theme-light[data-premium="bloom"] [class*="text-zinc-3"],
+:root.theme-light[data-premium="bloom"] [class*="text-zinc-4"],
+:root.theme-light[data-premium="ink"]   .text-white,
+:root.theme-light[data-premium="ink"]   [class*="text-zinc-1"],
+:root.theme-light[data-premium="ink"]   [class*="text-zinc-2"],
+:root.theme-light[data-premium="ink"]   [class*="text-zinc-3"],
+:root.theme-light[data-premium="ink"]   [class*="text-zinc-4"] {
+  color: #1a1a1a !important;
+}
+/* Ink chips and headers that wear `text-themed` get a darkened gradient so
+   the bright theme accent doesn't turn into invisible pink on white. */
+:root.theme-light[data-premium="bloom"] .text-themed,
+:root.theme-light[data-premium="ink"]   .text-themed {
+  background-image: linear-gradient(135deg,
+    color-mix(in oklab, var(--theme-primary) 60%, black 40%),
+    color-mix(in oklab, var(--theme-secondary) 60%, black 40%));
+}
+/* Themed button text (white-on-themed gradient) keeps the contrast it had
+   originally — buttons painted with `bg-themed` are dark enough. */
+:root.theme-light[data-premium="bloom"] .bg-themed,
+:root.theme-light[data-premium="ink"]   .bg-themed {
+  color: white;
+}
+:root.theme-light[data-premium="bloom"] .bg-themed *,
+:root.theme-light[data-premium="ink"]   .bg-themed * {
+  color: inherit !important;
 }
 
 /* Override pack for FLASHY backdrops (Storm, Aurora, Galaxy, Holy, Casino,
@@ -113,12 +178,143 @@
 :root.theme-flashy h2,
 :root.theme-flashy h3 {
   font-weight: 800;
-  letter-spacing: 0.01em;
+  letter-spacing: var(--typo-headline-spacing, 0.01em);
   /* Subtle dark halo so titles stay readable when a flash whitens the bg. */
   text-shadow: 0 1px 2px rgba(0,0,0,0.45), 0 0 8px rgba(0,0,0,0.30);
 }
 :root.theme-flashy button {
   font-weight: 700;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PREMIUM FRAME SYSTEM
+   Each premium set owns a distinct border identity. App.tsx sets
+   data-premium="<setId>" on <html> when a premium background is active.
+
+   The cascade layers:
+     1. --hairline / --hairline-strong → border colour (global, automatic)
+     2. --frame-shadow + --frame-inset → ambient glow on card containers
+     3. border-radius overrides       → per-set corner personality
+     4. --typo-headline-*             → headline composition (read by
+        .font-headline further below)
+
+   Specificity is :root[data-premium] (0-2-0), equal to :root.theme-flashy.
+   Rules are placed AFTER .theme-flashy so premium wins when both apply.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Eclipse — solennel, sacré, doré sur noir. Arcs Art Déco. ────────── */
+:root[data-premium="eclipse"] {
+  --hairline:        rgba(212, 167, 69, 0.22);
+  --hairline-strong: rgba(212, 167, 69, 0.45);
+  --frame-shadow:    0 0 16px rgba(212, 167, 69, 0.10);
+  --frame-inset:     inset 0 0 0 1px rgba(212, 167, 69, 0.06);
+  --typo-headline-spacing:   0.06em;
+  --typo-headline-transform: uppercase;
+}
+
+/* ── Phantom — éthéré, inquiétant, froid. Bordures brumeuses. ────────── */
+:root[data-premium="phantom"] {
+  --hairline:        rgba(138, 155, 181, 0.16);
+  --hairline-strong: rgba(138, 155, 181, 0.32);
+  --frame-shadow:    0 0 24px rgba(138, 155, 181, 0.08), 0 0 48px rgba(90, 122, 154, 0.04);
+  --frame-inset:     0 0 0 transparent;
+  --typo-headline-spacing:   0.10em;
+  --typo-headline-transform: uppercase;
+}
+
+/* ── Emberforge ⭐ — industriel, chaud, puissant. Rivets de métal. ───── */
+:root[data-premium="emberforge"] {
+  --hairline:        rgba(255, 106, 20, 0.20);
+  --hairline-strong: rgba(255, 148, 38, 0.40);
+  --frame-shadow:    0 1px 0 rgba(255, 148, 38, 0.12), 0 0 12px rgba(255, 106, 20, 0.08);
+  --frame-inset:     inset 0 1px 0 rgba(255, 200, 100, 0.06);
+  --typo-headline-spacing:   0.04em;
+  --typo-headline-transform: uppercase;
+}
+
+/* ── Tempus — ancien, mécanique, sépia. Cadres à rouages. ────────────── */
+:root[data-premium="tempus"] {
+  --hairline:        rgba(184, 149, 106, 0.20);
+  --hairline-strong: rgba(212, 167, 106, 0.38);
+  --frame-shadow:    0 0 10px rgba(184, 149, 106, 0.08);
+  --frame-inset:     inset 0 0 0 2px rgba(184, 149, 106, 0.05);
+  --typo-headline-spacing:   0.05em;
+  --typo-headline-variant:   small-caps;
+}
+
+/* ── Storm — électrique, déchaîné, cyan/violet. Angles vifs. ─────────── */
+:root[data-premium="storm"] {
+  --hairline:        rgba(74, 240, 255, 0.16);
+  --hairline-strong: rgba(74, 240, 255, 0.38);
+  --frame-shadow:    0 0 10px rgba(74, 240, 255, 0.08), 0 0 20px rgba(160, 120, 255, 0.05);
+  --frame-inset:     0 0 0 transparent;
+  --typo-headline-spacing:   0.10em;
+  --typo-headline-transform: uppercase;
+}
+
+/* ── Quartz — glacial, prismatique, luxe doux. ───────────────────────── */
+:root[data-premium="quartz"] {
+  --hairline:        rgba(200, 174, 240, 0.25);
+  --hairline-strong: rgba(246, 165, 184, 0.40);
+  --frame-shadow:    0 0 14px rgba(200, 174, 240, 0.08), 0 0 8px rgba(246, 165, 184, 0.05);
+  --frame-inset:     0 0 0 transparent;
+  --typo-headline-spacing:   0.04em;
+}
+
+/* ── Frame application: shadow + glow on card containers ─────────────
+   Card containers use rounded-2xl/3xl + border. The hairline colour
+   change is automatic (via --hairline var); the ambient glow needs
+   explicit box-shadow. Transition smooths switches between sets. */
+html[data-premium] .rounded-2xl.border,
+html[data-premium] .rounded-3xl.border {
+  box-shadow: var(--frame-shadow), var(--frame-inset);
+  transition: box-shadow 0.35s ease, border-color 0.35s ease;
+}
+
+/* ── Per-set corner personality ────────────────────────────────────── */
+
+/* Storm: sharper, more angular — electric precision */
+html[data-premium="storm"] .rounded-2xl { border-radius: 0.5rem; }
+html[data-premium="storm"] .rounded-3xl { border-radius: 0.75rem; }
+
+/* Eclipse: crisp Art Deco — defined, geometric */
+html[data-premium="eclipse"] .rounded-2xl { border-radius: 0.375rem; }
+html[data-premium="eclipse"] .rounded-3xl { border-radius: 0.5rem; }
+
+/* Phantom: softer, organic — ethereal blobs */
+html[data-premium="phantom"] .rounded-2xl { border-radius: 1.25rem; }
+html[data-premium="phantom"] .rounded-3xl { border-radius: 1.5rem; }
+
+/* Emberforge: sturdy, defined — forged metal */
+html[data-premium="emberforge"] .rounded-2xl { border-radius: 0.625rem; }
+html[data-premium="emberforge"] .rounded-3xl { border-radius: 0.75rem; }
+
+/* Emberforge: thicker border — riveted metal feel */
+html[data-premium="emberforge"] .border { border-width: 1.5px; }
+
+/* Tempus: double-border via outline — clockwork rings */
+html[data-premium="tempus"] .rounded-2xl.border,
+html[data-premium="tempus"] .rounded-3xl.border {
+  outline: 1px solid rgba(184, 149, 106, 0.08);
+  outline-offset: 3px;
+}
+
+/* ── Premium headline typography ───────────────────────────────────
+   Apply the per-set letter-spacing / text-transform / font-variant
+   to ALL headlines (h1-h3, .font-headline). Needs higher specificity
+   than :root.theme-flashy (0-2-1), so we compound the selectors.
+   For non-flashy premiums the simpler :root[data-premium] suffices. */
+:root.theme-flashy[data-premium] h1,
+:root.theme-flashy[data-premium] h2,
+:root.theme-flashy[data-premium] h3,
+:root.theme-flashy[data-premium] .font-headline,
+:root[data-premium] h1,
+:root[data-premium] h2,
+:root[data-premium] h3,
+:root[data-premium] .font-headline {
+  letter-spacing: var(--typo-headline-spacing, normal);
+  text-transform: var(--typo-headline-transform, none);
+  font-variant: var(--typo-headline-variant, normal);
 }
 
 /* Expose the semantic tokens as Tailwind utilities. `inline` means Tailwind
@@ -190,6 +386,9 @@ html, body, #root {
    or monospace family should override the body font. */
 .font-headline {
   font-family: var(--font-headline, var(--font-body, Inter, sans-serif));
+  letter-spacing: var(--typo-headline-spacing, normal);
+  text-transform: var(--typo-headline-transform, none);
+  font-variant: var(--typo-headline-variant, normal);
 }
 .font-mono {
   font-family: var(--font-mono, "JetBrains Mono", Consolas, monospace);
@@ -285,6 +484,10 @@ body::-webkit-scrollbar,
 /* Diagonal variant for larger surfaces. */
 .bg-themed-br {
   background-image: linear-gradient(135deg, var(--theme-primary), var(--theme-secondary));
+}
+
+.shadow-themed {
+  box-shadow: 0 10px 24px -8px color-mix(in oklab, var(--theme-primary) 50%, transparent);
 }
 
 /* ─────────── Global button baseline ───────────

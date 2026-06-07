@@ -90,11 +90,13 @@ function SidebarBody({
       {/* XP bar */}
       <div className="mt-3">
         <div className="h-2 rounded-full bg-hairline overflow-hidden">
+          {/* No rounded-full on the fill — the track clips it, so low progress
+              shows a clean sliver, not a rounded "ball" nub. */}
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${info.progress * 100}%` }}
             transition={{ type: "spring", stiffness: 120, damping: 20 }}
-            className="h-full rounded-full"
+            className="h-full"
             style={{
               background: "linear-gradient(90deg, var(--theme-primary), var(--theme-secondary))",
               boxShadow: "0 0 12px color-mix(in oklab, var(--theme-primary) 50%, transparent)",

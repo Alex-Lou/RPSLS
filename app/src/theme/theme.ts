@@ -40,6 +40,17 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
   emberforge: { id: "emberforge", label: "Emberforge", emoji: "🔥", primary: "#ff6a14", secondary: "#ff9426", bg: "#0a0503", fontHeadline: "bebas",       fontBody: "rajdhani",  fontMono: "jetbrains" },
   tempus: { id: "tempus", label: "Tempus", emoji: "⏳", primary: "#b8956a", secondary: "#d4a76a", bg: "#0a0703", fontHeadline: "cinzel",       fontBody: "cormorant", fontMono: "jetbrains" },
   storm: { id: "storm", label: "Storm", emoji: "⚡", primary: "#4af0ff", secondary: "#a078ff", bg: "#060a16", fontHeadline: "orbitron",     fontBody: "rajdhani",  fontMono: "jetbrains" },
+  // ── 2026-06-07 premium lineup. Fonts chosen to reinforce the theme's
+  //    identity: Coral = elegant (Playfair/Cormorant), Rust = industrial
+  //    (Bebas/Rajdhani), Void = mono (JetBrains), Prism = scientific (Inter/
+  //    SpaceGrotesk), Ink = classic (EBGaramond/Cormorant), Bloom = floral
+  //    (Playfair/Inter). See docs/PREMIUM_THEMES.md for the design intent. ──
+  coral:  { id: "coral",  label: "Coral",  emoji: "🪸", primary: "#ff6b6b", secondary: "#4ecdc4", bg: "#0a1628", fontHeadline: "playfair",     fontBody: "cormorant",  fontMono: "jetbrains" },
+  rust:   { id: "rust",   label: "Rust",   emoji: "🏭", primary: "#d2691e", secondary: "#8b4513", bg: "#0a0502", fontHeadline: "bebas",        fontBody: "rajdhani",   fontMono: "shareTech" },
+  void:   { id: "void",   label: "Void",   emoji: "◼️", primary: "#ffffff", secondary: "#666666", bg: "#000000", fontHeadline: "jetbrains",    fontBody: "jetbrains",  fontMono: "jetbrains" },
+  prism:  { id: "prism",  label: "Prism",  emoji: "💎", primary: "#ffffff", secondary: "#8b5cf6", bg: "#050510", fontHeadline: "spaceGrotesk", fontBody: "inter",      fontMono: "jetbrains" },
+  ink:    { id: "ink",    label: "Ink",    emoji: "🖋️", primary: "#1a1a1a", secondary: "#8c8c8c", bg: "#f5f0e8", fontHeadline: "ebGaramond",   fontBody: "cormorant",  fontMono: "jetbrains" },
+  bloom:  { id: "bloom",  label: "Bloom",  emoji: "🌸", primary: "#ff7eb3", secondary: "#81c784", bg: "#f0f4f0", fontHeadline: "playfair",     fontBody: "inter",      fontMono: "jetbrains" },
 };
 
 export function applyTheme(themeId: ThemeId) {

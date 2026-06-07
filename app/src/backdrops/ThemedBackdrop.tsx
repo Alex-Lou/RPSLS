@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { menuFxSuppressed } from "../fx/menuFx";
+import { useStore } from "../store/store";
 
 /**
  * ThemedBackdrop — live, hand-coded animated backgrounds on a full-screen
@@ -22,12 +23,15 @@ import { menuFxSuppressed } from "../fx/menuFx";
 export type BackdropScene =
   | "nebula" | "aurora" | "grid" | "galaxy" | "holy" | "quantum" | "casino"
   | "volcanic" | "abyss" | "eclipse" | "phantom" | "emberforge"
-  | "tempus" | "storm";
+  | "tempus" | "storm"
+  // ── 2026-06-07 premium lineup (docs/PREMIUM_THEMES.md) ──
+  | "coral" | "rust" | "void" | "prism" | "ink" | "bloom";
 
 const SCENE_INDEX: Record<BackdropScene, number> = {
   nebula: 0, aurora: 1, grid: 2, galaxy: 3, holy: 4, quantum: 5, casino: 6,
   volcanic: 7, abyss: 8, eclipse: 9, phantom: 10, emberforge: 11,
   tempus: 12, storm: 13,
+  coral: 14, rust: 15, void: 16, prism: 17, ink: 18, bloom: 19,
 };
 
 const VERT = `attribute vec2 a; void main(){ gl_Position = vec4(a, 0.0, 1.0); }`;
@@ -42,6 +46,7 @@ uniform float u_touchAge;  // seconds since the last tap → fades the ripple
 uniform float u_hold;      // eased press duration 0..~1.2 (0 = released)
 uniform float u_swipeMag;  // 0..1 normalised magnitude of last horizontal swipe
 uniform float u_swipeAge;  // seconds since the last horizontal swipe ended
+uniform float u_intensity; // per-theme FX intensity multiplier (0.4 .. 1.6); 1.0 = shipping look
 
 const float PI = 3.14159265;
 
@@ -955,6 +960,586 @@ vec3 abyss(vec2 uv, float aspect){
   return col;
 }
 
+// ── 14 CORAL — bioluminescent reef: warm radial gradient (turquoise top
+//   → coral-red bottom), domain-warped organic coral shapes, pulsating
+//   anemones, schools of bright micro-fish (motes) sweeping across, slow
+//   rising bubbles. The WARMEST scene of the catalogue. ──
+vec3 coral(vec2 uv, float aspect){
+  float t = u_time * 0.08;
+  vec2 p = uv * vec2(aspect, 1.0) * 2.0;
+
+  // Water depth gradient — turquoise deep at the top, coral-warm shallows
+  // at the bottom. Inverted from usual ocean palettes so the warmth reads.
+  vec3 col = mix(vec3(0.04, 0.085, 0.155), vec3(0.10, 0.025, 0.04),
+                 smoothstep(0.0, 1.0, uv.y));
+
+  // Caustic-light shimmer: cheap two-octave noise drifting in opposite
+  // directions, lit teal where the field swells.
+  float causticA = fbm(p*1.6 + vec2(t*0.6, 0.0));
+  float causticB = fbm(p*1.2 + vec2(-t*0.4, t*0.3));
+  float caustic = (causticA + causticB) * 0.5;
+  col += vec3(0.20, 0.78, 0.72) * smoothstep(0.45, 0.85, caustic) * 0.18;
+
+  // Domain-warped coral colony — FBM-of-FBM gives the gnarled organic
+  // outline. Painted coral-pink → orange where the field is densest.
+  vec2 q1 = vec2(fbm(p + vec2(t, 0.0)), fbm(p + vec2(5.2, 1.3) - vec2(0.0, t*0.5)));
+  vec2 q2 = vec2(fbm(p + 3.0*q1 + vec2(1.7, 9.2) + t*0.3),
+                 fbm(p + 3.0*q1 + vec2(8.3, 2.8) - t*0.3));
+  float reef = fbm(p + 3.5*q2);
+  // Coral mostly in the lower half — they grow from the floor up.
+  float reefMask = reef * smoothstep(0.05, 0.65, uv.y);
+  col += vec3(1.0, 0.42, 0.42) * smoothstep(0.55, 0.95, reefMask) * 0.50;
+  col += vec3(1.0, 0.62, 0.30) * smoothstep(0.70, 1.05, reefMask) * 0.35;
+  // Coral CRESTS — bright edges where the FBM peaks.
+  float reefCrest = smoothstep(0.86, 1.0, reefMask);
+  col += vec3(1.0, 0.88, 0.65) * reefCrest * 0.30;
+
+  // 5 bioluminescent anemones — pulsing cyan-green discs anchored on the
+  // reef field. Pulse periods staggered so the scene never blinks in unison.
+  for(int i=0;i<5;i++){
+    float fi = float(i);
+    vec2 ac = vec2(0.18 + fi*0.165 + 0.02*sin(t*0.6 + fi),
+                   0.42 + 0.20*sin(t*0.4 + fi*1.3));
+    float ad = distance(uv, ac);
+    float pulse = 0.5 + 0.5*sin(u_time*(0.9 + fi*0.13) + fi*1.7);
+    float anemone = exp(-ad*ad*900.0);
+    float halo = exp(-ad*ad*140.0);
+    col += vec3(0.30, 1.0, 0.80) * anemone * pulse * 0.65;
+    col += vec3(0.10, 0.65, 0.55) * halo * pulse * 0.18;
+  }
+
+  // SCHOOLS of fish — bright micro-motes that move TOGETHER in waves.
+  // Two schools moving in opposite directions, both with a slow vertical
+  // wobble so they "swim" rather than slide.
+  for(int s=0;s<2;s++){
+    float fs = float(s);
+    float drift = fract(t*(0.35 + fs*0.15) + fs*0.5);
+    vec2 sp = uv*vec2(aspect,1.0)*vec2(70.0,36.0);
+    sp.x -= drift*4.0 - fs*2.0;
+    sp.y += sin(u_time*1.2 + sp.x*0.3 + fs*2.0)*0.08;
+    float fishSeed = hash(floor(sp));
+    float fish = exp(-pow(length(fract(sp)-0.5),2.0)*55.0) *
+                 step(0.985, fishSeed);
+    float fTw = 0.5 + 0.5*sin(u_time*3.0 + fishSeed*30.0);
+    vec3 fishCol = mix(vec3(1.0, 0.85, 0.55), vec3(0.55, 1.0, 0.85), fs);
+    col += fishCol * fish * fTw * 0.85;
+  }
+
+  // Rising BUBBLES — slow vertical drift, sparse so they read as bubbles
+  // not noise. Slight horizontal sway from a sin offset.
+  vec2 bp = uv*vec2(aspect,1.0)*vec2(28.0,55.0);
+  bp.y -= t*3.5;
+  bp.x += sin(bp.y*0.25 + t*1.5)*0.08;
+  float bubbleSeed = hash(floor(bp));
+  float bubble = smoothstep(0.45,0.42, length(fract(bp)-0.5)) *
+                 step(0.992, bubbleSeed);
+  col += vec3(0.55, 0.92, 0.95) * bubble * 0.30;
+
+  // SOFT GOD-RAYS from the surface — gentle vertical shafts to sell depth.
+  for(int i=0;i<3;i++){
+    float fi = float(i);
+    float rx = 0.25 + fi*0.25 + 0.03*sin(t*0.4 + fi);
+    float dx = abs(uv.x - rx);
+    float ray = exp(-dx*aspect*7.0) * smoothstep(1.0, 0.2, uv.y);
+    col += vec3(0.25, 0.55, 0.60) * ray * 0.10;
+  }
+
+  // Vignette — deeper edges, like looking through a window into the reef.
+  float r = length((uv - 0.5) * vec2(aspect, 1.0));
+  col -= vec3(0.04, 0.03, 0.04) * smoothstep(0.55, 1.05, r);
+  return col;
+}
+
+// ── 15 RUST — industrial decay: vertical sooty gradient, irregular dark
+//   beams arranged in a sparse lattice, rivets along the joints, sporadic
+//   white-hot sparks flying upward, fine dust grain over the whole frame,
+//   slow flicker from a broken overhead light. Monochrome warm. ──
+vec3 rust(vec2 uv, float aspect){
+  float t = u_time * 0.08;
+  // Base: very dark warm umbra, slightly lighter at the bottom (floor lit
+  // by the faint flicker above).
+  vec3 col = mix(vec3(0.025, 0.018, 0.012), vec3(0.06, 0.035, 0.020),
+                 smoothstep(1.0, 0.0, uv.y));
+
+  // Broken-light flicker — slow random brightness shift on the whole frame
+  // (sin × hashed step gives a "spotty" flicker, not a smooth sine).
+  float flicker = 0.85 + 0.15*sin(u_time*1.7) * step(0.55, hash(vec2(floor(u_time*3.0), 0.0)));
+  col *= flicker;
+
+  // Rusty patina noise across the whole field — high-frequency oxide
+  // pattern in burnt-orange that breaks the flat darkness.
+  float patina = fbm(uv*vec2(aspect,1.0)*9.0);
+  col += vec3(0.55, 0.28, 0.09) * smoothstep(0.50, 0.90, patina) * 0.22;
+  col += vec3(0.42, 0.17, 0.05) * smoothstep(0.65, 1.0, patina) * 0.15;
+
+  // 4 vertical metal BEAMS — irregular edges from sin perturbation. Each
+  // beam has a rust outline + dark body so they read as STRUCTURE, not
+  // bands.
+  for(int i=0;i<4;i++){
+    float fi = float(i);
+    float bx = 0.12 + fi*0.26;
+    float perturb = 0.012*sin(uv.y*22.0 + fi*3.7);
+    float dx = abs(uv.x - bx - perturb);
+    float beamBody = smoothstep(0.035, 0.025, dx);
+    float beamEdge = smoothstep(0.055, 0.035, dx) - beamBody;
+    // Dark beam body (subtract from the base).
+    col *= mix(vec3(1.0), vec3(0.10, 0.075, 0.045), beamBody);
+    // Rust edge along the beam.
+    col += vec3(0.82, 0.40, 0.10) * beamEdge * 0.50;
+    // RIVETS — 5 round bolts along each beam.
+    for(int r=0;r<5;r++){
+      float fr = float(r);
+      float ry = 0.10 + fr*0.21;
+      float rd = sqrt((uv.x - bx - perturb)*(uv.x - bx - perturb) * aspect*aspect +
+                       (uv.y - ry)*(uv.y - ry));
+      float rivet = smoothstep(0.012, 0.0, rd);
+      // Bright rivet head with darker shadow ring.
+      col += vec3(0.65, 0.42, 0.20) * rivet * 0.55;
+      col += vec3(0.85, 0.55, 0.25) * smoothstep(0.004, 0.0, rd) * 0.45;
+    }
+  }
+
+  // Horizontal CROSS-BEAMS — two heavy bands at fixed heights with rust
+  // texture along their edge. Industrial scaffolding feel.
+  float crossA = smoothstep(0.022, 0.015, abs(uv.y - 0.32));
+  float crossB = smoothstep(0.022, 0.015, abs(uv.y - 0.78));
+  col *= mix(vec3(1.0), vec3(0.10, 0.075, 0.045), crossA + crossB);
+  col += vec3(0.78, 0.36, 0.08) * (smoothstep(0.030, 0.022, abs(uv.y - 0.32)) - crossA) * 0.45;
+  col += vec3(0.78, 0.36, 0.08) * (smoothstep(0.030, 0.022, abs(uv.y - 0.78)) - crossB) * 0.45;
+
+  // WELDING SPARKS — sporadic bright motes that appear and rise. The hash
+  // gate on a moving grid makes them feel like one-shot events, not motes.
+  vec2 sp = uv*vec2(aspect,1.0)*vec2(40.0, 30.0);
+  sp.y -= u_time*4.5;
+  float sparkSeed = hash(floor(sp + vec2(floor(u_time*0.3), 0.0)));
+  float spark = exp(-pow(length(fract(sp)-0.5), 2.0)*120.0) *
+                step(0.992, sparkSeed);
+  float sparkTw = 0.4 + 0.6*sin(u_time*8.0 + sparkSeed*40.0);
+  col += vec3(1.0, 0.95, 0.75) * spark * sparkTw * 1.2;
+  col += vec3(1.0, 0.55, 0.18) * spark * sparkTw * 0.55;
+
+  // Fine DUST GRAIN — high-frequency hash adds grit, mandatory for the
+  // industrial-decay vibe. Anything cleaner reads as a stage set.
+  float grain = (hash(uv * 2800.0) - 0.5) * 0.035;
+  col += vec3(grain);
+
+  // FLOATING DUST PARTICLES drifting in the slow flicker light.
+  vec2 dp = uv*vec2(aspect,1.0)*vec2(60.0, 36.0);
+  dp.y -= t*0.5;
+  float dustMote = exp(-pow(length(fract(dp)-0.5),2.0)*40.0) *
+                   step(0.991, hash(floor(dp)));
+  col += vec3(0.55, 0.38, 0.20) * dustMote * 0.30;
+
+  // Heavy vignette — this is a decaying space, the eye should be pulled
+  // toward the centre.
+  float r = length((uv - 0.5) * vec2(aspect, 1.0));
+  col -= vec3(0.05, 0.03, 0.015) * smoothstep(0.4, 1.0, r);
+  return col;
+}
+
+// ── 16 VOID — geometric minimalism: pure black, fine white wireframe
+//   shapes (triangles / squares / circles) appearing and dissolving on a
+//   long cycle (4-6s lifespan, max 3 visible at once), with a single
+//   slowly-rotating central reticule that always reads. The ANTI-spectacle. ──
+vec3 void_scene(vec2 uv, float aspect){
+  float t = u_time;
+  vec3 col = vec3(0.0);
+
+  vec2 q = (uv - 0.5) * vec2(aspect, 1.0);
+  float r = length(q);
+  float ang = atan(q.y, q.x);
+
+  // Central reticule — a faint thin ring with 8 small ticks, slowly
+  // rotating. The only PERSISTENT element so the scene never reads as
+  // "is the canvas dead?".
+  float reticule = smoothstep(0.0015, 0.0005, abs(r - 0.12));
+  col += vec3(0.50) * reticule;
+  // 8 tick marks every 45°.
+  float tickAng = mod(ang + t*0.04, 0.7854);
+  float tick = smoothstep(0.025, 0.020, abs(tickAng - 0.39))
+             * smoothstep(0.015, 0.013, abs(r - 0.115));
+  col += vec3(0.85) * tick;
+
+  // 3 emergent shapes — each shape has its own slow cycle, never overlaps
+  // with another in time. Position and type pseudo-random per cycle.
+  for(int i=0;i<3;i++){
+    float fi = float(i);
+    // Cycle period 5 + i*0.7 seconds, offset so they don't sync.
+    float cycle = mod(t/(5.0 + fi*0.7) + fi*0.3, 1.0);
+    // Lifespan window: visible 0.15–0.85 of the cycle (faded in/out).
+    float vis = smoothstep(0.15, 0.30, cycle) * smoothstep(0.85, 0.70, cycle);
+    if(vis < 0.001) continue;
+    // Pseudo-random position per cycle.
+    float seed = hash(vec2(fi*7.3, floor(t/(5.0 + fi*0.7))));
+    vec2 cpos = vec2(0.5 + (seed - 0.5)*1.4,
+                      0.5 + (hash(vec2(seed, fi)) - 0.5)*1.4);
+    // Shape type: triangle / circle / line based on seed bucket.
+    vec2 d = (uv - cpos) * vec2(aspect, 1.0);
+    float dd = length(d);
+    float shapeAng = atan(d.y, d.x);
+    float shape = 0.0;
+    if(seed < 0.33){
+      // CIRCLE outline — pulses once.
+      float ringR = 0.06 + cycle*0.06;
+      shape = smoothstep(0.002, 0.001, abs(dd - ringR));
+    } else if(seed < 0.66){
+      // EQUILATERAL TRIANGLE outline — rotating slowly.
+      float side = 0.08;
+      float a3 = mod(shapeAng + cycle*1.2 + 1.57, 6.2832);
+      float seg = mod(a3, 2.094);
+      float distToEdge = abs(dd * cos(seg - 1.047) - side*0.866);
+      shape = smoothstep(0.002, 0.001, distToEdge) *
+              step(dd, side*1.05);
+    } else {
+      // HORIZONTAL LINE that draws itself across.
+      float lineY = cpos.y;
+      float lineProgress = smoothstep(0.15, 0.45, cycle) - smoothstep(0.55, 0.85, cycle);
+      shape = smoothstep(0.0015, 0.0005, abs(uv.y - lineY)) *
+              step(uv.x, cpos.x + lineProgress*0.4) *
+              step(cpos.x - lineProgress*0.4, uv.x);
+    }
+    col += vec3(0.95) * shape * vis;
+  }
+
+  // Very subtle scan line across the whole canvas every ~9s — reminds the
+  // viewer that this isn't a static black rectangle.
+  float scan = smoothstep(0.002, 0.0, abs(uv.y - fract(t*0.11)));
+  col += vec3(0.15) * scan;
+
+  return col;
+}
+
+// ── 17 PRISM — laboratory of light: deep almost-black with a tiny radial
+//   bloom at the centre (light source), 3-4 rays radiating outward and
+//   SPLITTING into spectral bands (red→orange→yellow→green→blue→violet)
+//   along their length, slow rotation, scientific feel. ──
+vec3 prism(vec2 uv, float aspect){
+  float t = u_time * 0.05;
+  vec2 q = (uv - 0.5) * vec2(aspect, 1.0);
+  float r = length(q);
+  float ang = atan(q.y, q.x);
+
+  // Almost-black backdrop with a barely-perceptible bluish bias.
+  vec3 col = mix(vec3(0.015, 0.018, 0.030), vec3(0.005, 0.005, 0.012),
+                 smoothstep(0.0, 1.0, r));
+
+  // CENTRAL LIGHT SOURCE — bright white-hot point with soft outer halo.
+  float source = exp(-r*r*420.0);
+  float halo = exp(-r*r*22.0);
+  col += vec3(1.0) * source * 0.95;
+  col += vec3(0.85, 0.88, 1.0) * halo * 0.28;
+
+  // 4 SPECTRAL RAYS at 90° spacings, slowly rotating. Each ray is a thin
+  // angular wedge; ALONG the ray we sample a "wavelength" that selects a
+  // colour from the visible spectrum so the ray fades through R→V as it
+  // travels outward.
+  for(int i=0;i<4;i++){
+    float fi = float(i);
+    float rayAng = fi * 1.5708 + t*0.5;
+    float aDelta = abs(mod(ang - rayAng + 3.14159, 6.28318) - 3.14159);
+    // Tight angular window: only the ray's narrow wedge lights up.
+    float angBand = exp(-aDelta*aDelta*1800.0);
+    // Wavelength normalised along the ray (0 = source, 1 = far edge).
+    float wl = clamp(r / 0.55, 0.0, 1.0);
+    // Spectral lookup — 6 stops blended for the rainbow split.
+    vec3 spectrum;
+    if(wl < 0.18) spectrum = mix(vec3(1.0), vec3(1.0, 0.20, 0.20), wl/0.18);
+    else if(wl < 0.36) spectrum = mix(vec3(1.0, 0.20, 0.20), vec3(1.0, 0.55, 0.0), (wl-0.18)/0.18);
+    else if(wl < 0.54) spectrum = mix(vec3(1.0, 0.55, 0.0), vec3(1.0, 1.0, 0.0), (wl-0.36)/0.18);
+    else if(wl < 0.72) spectrum = mix(vec3(1.0, 1.0, 0.0), vec3(0.20, 1.0, 0.30), (wl-0.54)/0.18);
+    else if(wl < 0.90) spectrum = mix(vec3(0.20, 1.0, 0.30), vec3(0.20, 0.45, 1.0), (wl-0.72)/0.18);
+    else spectrum = mix(vec3(0.20, 0.45, 1.0), vec3(0.65, 0.20, 1.0), (wl-0.90)/0.10);
+    // Brightness fades along the ray (the source is the hottest spot).
+    float bright = exp(-wl*1.8);
+    col += spectrum * angBand * bright * 0.95;
+  }
+
+  // PHOTON BEADS — small bright dots that travel ALONG each ray outward,
+  // staggered so the eye reads them as flowing particles.
+  for(int i=0;i<4;i++){
+    float fi = float(i);
+    float rayAng = fi * 1.5708 + t*0.5;
+    vec2 rayDir = vec2(cos(rayAng), sin(rayAng));
+    // 3 photons per ray, staggered phase.
+    for(int p=0;p<3;p++){
+      float fp = float(p);
+      float ph = fract(u_time*0.5 + fp*0.33 + fi*0.17);
+      vec2 pPos = rayDir * ph * 0.55;
+      float pd = distance(q, pPos);
+      col += vec3(1.0) * exp(-pd*pd*1200.0) * 0.85;
+    }
+  }
+
+  // Outer FAINT SPECTRAL HALO around the source so the splitting reads
+  // even at low brightness.
+  float farHalo = smoothstep(0.55, 0.20, r);
+  col += vec3(0.20, 0.18, 0.45) * farHalo * 0.06;
+
+  return col;
+}
+
+// ── 18 INK — sumi-e: warm bone-paper background with grain + fibre, a few
+//   broad black brush strokes appearing and slowly fading, faint ink bleed
+//   where strokes settle, a small red seal in the bottom-right corner that
+//   stays visible. CLAIR scene — text rendered on a paper-tone backdrop. ──
+vec3 ink(vec2 uv, float aspect){
+  float t = u_time * 0.18;
+  // Paper background — warm bone with a fibre texture and faint cloud
+  // shading so it never reads as a flat white rectangle.
+  vec3 paper = vec3(0.96, 0.93, 0.85);
+  // Paper fibre — long shallow horizontal scratches at low opacity.
+  float fibre = sin(uv.y*180.0 + sin(uv.x*30.0)*0.5) * 0.025;
+  paper -= vec3(fibre);
+  // Subtle vignette and cloud shading from large-scale FBM.
+  float cloud = fbm(uv*vec2(aspect,1.0)*2.5);
+  paper -= vec3(0.04, 0.05, 0.06) * smoothstep(0.40, 0.85, cloud);
+  // Paper grain — fine speckle.
+  float grain = (hash(uv * 1500.0) - 0.5) * 0.025;
+  paper += vec3(grain);
+
+  vec3 col = paper;
+
+  // 3 brush strokes — each has a cycle ~6s, fades in (wet) then dries +
+  // fades out (slowly absorbed). Strokes are gently curving paths with
+  // pressure (thickness) variation along the length.
+  for(int i=0;i<3;i++){
+    float fi = float(i);
+    float cycle = mod(u_time/6.5 + fi*0.42, 1.0);
+    float wet = smoothstep(0.0, 0.18, cycle);
+    float dry = smoothstep(0.55, 1.0, cycle);
+    float life = wet * (1.0 - dry);
+    if(life < 0.005) continue;
+    // Stroke baseline — a slow sine curve across the canvas.
+    float strokeY = 0.22 + fi*0.30;
+    float curveX = uv.x;
+    float baseY = strokeY + 0.06*sin(curveX*6.0 + fi*1.7);
+    float dist = abs(uv.y - baseY);
+    // Pressure: thicker in the middle, thinner at the ends.
+    float pressure = sin(curveX * 3.14159) * 0.7 + 0.3;
+    // Stroke draws itself L-to-R as wet rises (0..1).
+    float draw = step(curveX, wet*1.05);
+    float thickness = pressure * 0.022 * life * draw;
+    float stroke = smoothstep(thickness, thickness*0.55, dist);
+    // INK BLEED — a soft halo around the stroke (the paper drinking).
+    float bleed = smoothstep(thickness*3.5, thickness*1.5, dist) - stroke;
+    col = mix(col, vec3(0.06, 0.04, 0.05), stroke * 0.92);
+    col = mix(col, vec3(0.20, 0.16, 0.18), bleed * 0.30 * life);
+  }
+
+  // RED SEAL in the bottom-right — small square with rounded glyph
+  // strokes. Always present (the artist signed the piece).
+  vec2 sealC = vec2(0.88, 0.08);
+  vec2 sd = (uv - sealC) * vec2(aspect, 1.0);
+  float seal = step(abs(sd.x), 0.035) * step(abs(sd.y), 0.035);
+  // Glyph: a simple cross inside the seal.
+  float glyphV = step(abs(sd.x), 0.005) * step(abs(sd.y), 0.025);
+  float glyphH = step(abs(sd.y), 0.005) * step(abs(sd.x), 0.025);
+  float sealShape = seal - (glyphV + glyphH);
+  col = mix(col, vec3(0.80, 0.10, 0.10), sealShape * 0.95);
+
+  // Faint ageing — corner darkening like an old scroll.
+  float r = length((uv - 0.5) * vec2(aspect, 1.0));
+  col -= vec3(0.04, 0.05, 0.06) * smoothstep(0.55, 1.05, r);
+
+  // Reference t so the uniform isn't dead-stripped (animation comes from
+  // the wet-stroke cycle that already uses u_time directly).
+  col += vec3(0.0) * t;
+  return col;
+}
+
+// ── 19 BLOOM — infinite garden. Fully rewritten for CRISP, REALISTIC
+//   flowers: petal width follows sin(u*PI) so tips taper to zero naturally
+//   (no hard cutoff = no "coupees"). All edges are smoothstep (no gaussian
+//   blur). Extra atmospheric layers: cloud wisps, grass, dappled sunlight.
+//   GLSL ES 1.00 safe: no continue, no float ternaries, no exponent
+//   literals, constant loop bounds only. ──
+vec3 bloom(vec2 uv, float aspect){
+  float t = u_time;
+  float intensityK = clamp(u_intensity, 0.0, 2.0);
+
+  // ── SKY-TO-MEADOW ── warm pastel gradient, clean, no banding.
+  vec3 col = mix(vec3(0.72, 0.84, 0.94), vec3(0.82, 0.92, 0.80),
+                 smoothstep(0.0, 1.0, uv.y));
+
+  // Warm sun glow upper-right.
+  float sd = length((uv - vec2(0.78, 0.14)) * vec2(aspect, 1.0));
+  col += vec3(1.0, 0.97, 0.82) * exp(-sd*sd*5.5) * 0.20;
+
+  // ── CLOUD WISPS ── elongated ellipses drifting slowly.
+  for(int i=0; i<2; i++){
+    float fi = float(i);
+    float cx = fract(0.22 + fi*0.45 + t*0.006*(1.0 + fi*0.5));
+    float cy = 0.10 + fi*0.06;
+    vec2 cd = (uv - vec2(cx, cy)) * vec2(aspect, 1.0);
+    float cloud = smoothstep(0.14, 0.0, abs(cd.x))
+                * smoothstep(0.013, 0.0, abs(cd.y));
+    col = mix(col, vec3(1.0, 1.0, 0.98), cloud * 0.28);
+  }
+
+  // ── GRASS ── wavy top edge, darker base for depth.
+  float grassTop = 0.86 + 0.018*sin(uv.x*35.0 + t*0.2)
+                        + 0.010*sin(uv.x*58.0 - t*0.15);
+  float grassMask = smoothstep(grassTop + 0.015, grassTop - 0.005, uv.y);
+  col = mix(col, vec3(0.42, 0.66, 0.36), grassMask * 0.50);
+  col = mix(col, vec3(0.30, 0.52, 0.26),
+            smoothstep(0.94, 1.0, uv.y) * grassMask * 0.50);
+
+  // ── FIVE VINES with crisp realistic flowers (BloomPad quality) ──
+  for(int i=0; i<5; i++){
+    float fi = float(i);
+    float vx = 0.10 + fi*0.195;
+    float growH = 0.38 + 0.10*sin(t*0.08 + fi*1.3) + fi*0.018;
+
+    // Early-out guard: only process pixels near the vine.
+    if(uv.y <= growH + 0.06){
+
+      // ── STEM: crisp two-tone line with gentle sway ──
+      float sway = 0.030*sin(uv.y*6.0 + fi*1.8 + t*0.12);
+      float stemX = vx + sway;
+      float stemDx = abs(uv.x - stemX) * aspect;
+      float stemFade = smoothstep(growH + 0.002, growH - 0.02, uv.y)
+                     * smoothstep(1.01, 0.94, uv.y);
+      // Smoothstep edges (NOT gaussian blur).
+      float stemO = smoothstep(0.0045, 0.0025, stemDx);
+      float stemI = smoothstep(0.0020, 0.0008, stemDx);
+      col = mix(col, vec3(0.34, 0.58, 0.32), stemO * stemFade * 0.65);
+      col = mix(col, vec3(0.24, 0.46, 0.26), stemI * stemFade * 0.80);
+
+      // ── LEAVES: 2 per vine, with central vein highlight ──
+      for(int l=0; l<2; l++){
+        float fl = float(l);
+        float ly = growH + (1.0 - growH) * (0.30 + fl*0.30);
+        float leafVis = smoothstep(growH + 0.005, growH - 0.01, ly);
+        if(leafVis > 0.01){
+          float side = sign(mod(fl + fi, 2.0) - 0.5);
+          float lx = stemX + side * 0.025;
+          vec2 ld = (uv - vec2(lx, ly)) * vec2(aspect, 1.0);
+          float tiltA = side * 0.65;
+          float cs = cos(tiltA);
+          float sn = sin(tiltA);
+          float rx = ld.x*cs - ld.y*sn;
+          float ry = ld.x*sn + ld.y*cs;
+          // Teardrop leaf with crisp smoothstep edge.
+          float leafR = rx*rx*1000.0 + ry*ry*4500.0;
+          float leaf = smoothstep(1.3, 0.5, leafR);
+          col = mix(col, vec3(0.38, 0.64, 0.34), leaf * 0.78 * leafVis);
+          // Central vein highlight.
+          float vein = smoothstep(0.004, 0.001, abs(ry))
+                     * smoothstep(-0.002, 0.005, rx)
+                     * smoothstep(0.030, 0.018, rx);
+          col = mix(col, vec3(0.52, 0.76, 0.44),
+                    vein * leaf * leafVis * 0.40);
+        }
+      }
+
+      // ── FLOWER: 5 teardrop petals, ZERO halo, crisp edges ──
+      vec2 fc = vec2(stemX, growH);
+      vec2 fd = (uv - fc) * vec2(aspect, 1.0);
+      float fdist = length(fd);
+      float bPulse = 0.92 + 0.08*sin(u_time*0.7 + fi*1.6);
+
+      // Per-vine petal colour (if/else — no float ternaries).
+      vec3 pCol = vec3(1.0, 0.55, 0.72);
+      if(fi < 0.5){
+        pCol = vec3(1.0, 0.50, 0.68);
+      } else if(fi < 1.5){
+        pCol = vec3(1.0, 0.72, 0.58);
+      } else if(fi < 2.5){
+        pCol = vec3(0.96, 0.68, 0.86);
+      } else if(fi < 3.5){
+        pCol = vec3(1.0, 0.82, 0.48);
+      }
+
+      // Five petals — width = sin(uu*PI) tapers to ZERO at tip.
+      // No hard cutoff needed: the width naturally rounds the tip.
+      float petalMask = 0.0;
+      for(int k=0; k<5; k++){
+        float fk = float(k);
+        float pang = fk * 1.2566 + fi * 0.52 + 1.5708;
+        vec2 pdir = vec2(cos(pang), sin(pang));
+        vec2 perp = vec2(-pdir.y, pdir.x);
+        float along = dot(fd, pdir);
+        float across = dot(fd, perp);
+
+        // Petal SDF: teardrop shape.
+        float pLen = 0.050;
+        float uu = clamp(along / pLen, 0.0, 1.0);
+        // sin(uu*PI): 0 at base, 1 at mid, 0 at tip.
+        // (1-0.22*uu) narrows the tip for a teardrop look.
+        float halfW = pLen*0.30 * sin(uu*PI) * (1.0 - 0.22*uu);
+
+        // Crisp smoothstep edge (NOT gaussian blur).
+        float inP = smoothstep(halfW + 0.0028, halfW - 0.0005, abs(across))
+                  * smoothstep(-0.002, 0.005, along);
+        petalMask = max(petalMask, inP);
+      }
+
+      // Apply petals — flat colour + subtle surface sheen.
+      col = mix(col, pCol, petalMask * 0.93 * bPulse);
+      col += vec3(1.0, 0.98, 0.94) * petalMask*petalMask * 0.16;
+
+      // Yellow centre disc (crisp smoothstep, not a gaussian blob).
+      float cDisc = smoothstep(0.014, 0.010, fdist) * bPulse;
+      col = mix(col, vec3(1.0, 0.88, 0.38), cDisc * 0.95);
+      // Stamen ring — darker annulus around centre.
+      float stRing = smoothstep(0.013, 0.011, fdist)
+                   * smoothstep(0.007, 0.009, fdist);
+      col = mix(col, vec3(0.58, 0.40, 0.16), stRing * 0.40);
+      // Pistil — dark centre dot.
+      float pistil = smoothstep(0.005, 0.003, fdist);
+      col = mix(col, vec3(0.42, 0.28, 0.10), pistil * 0.50);
+    }
+  }
+
+  // ── FALLING PETALS — crisp spinning ellipses ──
+  for(int i=0; i<14; i++){
+    float fi = float(i);
+    if(fi <= intensityK * 9.0){
+      float lane = fract(fi*0.137 + sin(fi*1.7)*0.21);
+      float phase = fract(u_time*0.07 + fi*0.18);
+      float px = lane + 0.07*sin(phase*6.28 + fi);
+      float py = 1.0 - phase * 1.14;
+      vec2 pp = (uv - vec2(px, py)) * vec2(aspect, 1.0);
+      float spinAng = phase * 9.0 + fi;
+      float cs = cos(spinAng);
+      float sn = sin(spinAng);
+      float rx = pp.x*cs - pp.y*sn;
+      float ry = pp.x*sn + pp.y*cs;
+      // Crisp mini-petal with smoothstep (not gaussian).
+      float petalR = rx*rx*2600.0 + ry*ry*7000.0;
+      float petal = smoothstep(1.4, 0.4, petalR);
+      vec3 fpc = mix(vec3(1.0, 0.58, 0.72), vec3(1.0, 0.84, 0.90), lane);
+      col = mix(col, fpc, petal * 0.72);
+    }
+  }
+
+  // ── FIREFLIES — sharp bright core, tiny warm glow ──
+  for(int i=0; i<8; i++){
+    float fi = float(i);
+    float fx = 0.10 + fi*0.105 + 0.04*sin(u_time*0.55 + fi*1.3);
+    float fy = 0.20 + 0.42*(fi/8.0) + 0.035*cos(u_time*0.75 + fi*2.1);
+    vec2 ffd = (uv - vec2(fx, fy)) * vec2(aspect, 1.0);
+    float ffdist = length(ffd);
+    float ffP = max(0.45 + 0.55*sin(u_time*1.9 + fi*4.7), 0.0);
+    float core = smoothstep(0.004, 0.002, ffdist);
+    float glow = exp(-ffdist*ffdist*10000.0);
+    col += vec3(1.0, 0.93, 0.50) * (core*0.80 + glow*0.30) * ffP;
+  }
+
+  // ── DAPPLED SUNLIGHT on grass ──
+  for(int i=0; i<3; i++){
+    float fi = float(i);
+    float dx = 0.15 + fi*0.28 + 0.03*sin(t*0.08 + fi*2.2);
+    float dy = 0.92 + 0.025*sin(fi*3.1);
+    vec2 dd = (uv - vec2(dx, dy)) * vec2(aspect, 1.0);
+    float spk = exp(-dot(dd,dd)*800.0);
+    float flk = 0.55 + 0.45*sin(t*0.3 + fi*1.8);
+    col += vec3(1.0, 0.98, 0.80) * spk * flk * 0.10 * grassMask;
+  }
+
+  return col;
+}
+
 void main(){
   vec2 uv = gl_FragCoord.xy/u_res;
   float aspect = u_res.x/u_res.y;
@@ -972,6 +1557,12 @@ void main(){
   else if(u_scene==11) col = emberforge(uv, aspect);
   else if(u_scene==12) col = tempus(uv, aspect);
   else if(u_scene==13) col = storm(uv, aspect);
+  else if(u_scene==14) col = coral(uv, aspect);
+  else if(u_scene==15) col = rust(uv, aspect);
+  else if(u_scene==16) col = void_scene(uv, aspect);
+  else if(u_scene==17) col = prism(uv, aspect);
+  else if(u_scene==18) col = ink(uv, aspect);
+  else if(u_scene==19) col = bloom(uv, aspect);
   else col = nebula(uv, aspect);
 
   // ── Per-scene touch interaction ──────────────────────────────────────
@@ -1088,6 +1679,145 @@ void main(){
       float windBand = exp(-abs(uv.y - tuv.y)*aspect*5.0);
       col += vec3(0.55,0.70,0.95) * windBand * smoothstep(0.0,0.4,u_swipeMag) *
              exp(-u_swipeAge*1.3) * 0.22;
+    } else if (u_scene == 14) {
+      // Coral → TAP: anemone-style pulsing ring at the touch + tiny brightening.
+      //   LONG-PRESS: a glowing anemone GROWS under the finger (bioluminescent
+      //   focal point you "wake up" by holding).
+      //   SWIPE: school of fish DARTS in the direction (bright wake band).
+      float h14 = clamp(u_hold, 0.0, 1.0);
+      // Tap: bright cyan-green focal point.
+      col += vec3(0.30,1.0,0.80) * exp(-td*td*220.0) * exp(-age*2.5) * 0.85;
+      // Tap: expanding ring pulse.
+      float coralRing = smoothstep(0.012, 0.0, abs(td - 0.04 - age*0.18));
+      col += vec3(0.70,1.0,0.92) * coralRing * exp(-age*1.6) * 0.55;
+      // Hold: growing anemone with petals.
+      float anR = 0.04 + h14*0.10;
+      float anemone = exp(-td*td / (anR*anR));
+      col += vec3(0.30,1.0,0.80) * anemone * h14 * (0.55 + 0.25*sin(u_time*3.5)) * 0.60;
+      // Hold: 8 angular petals around the held centre.
+      float ang14 = atan(uv.y - tuv.y, (uv.x - tuv.x)*aspect);
+      float petalLobes = 0.55 + 0.45*cos(ang14*8.0);
+      float anHalo = exp(-td*td*60.0) * petalLobes;
+      col += vec3(1.0,0.45,0.45) * anHalo * h14 * 0.35;
+      // Swipe: bright horizontal wake — fish school darting through.
+      float fishWake = exp(-abs(uv.y - tuv.y)*aspect*9.0);
+      col += vec3(1.0,0.92,0.65) * fishWake * smoothstep(0.0,0.4,u_swipeMag) *
+             exp(-u_swipeAge*1.5) * 0.30;
+    } else if (u_scene == 15) {
+      // Rust → TAP: a bright welding flash + hot ember at touch.
+      //   LONG-PRESS: a forge mouth GLOWS under the finger (you "stoke" it).
+      //   SWIPE: a shower of sparks streaks across following the swipe.
+      float h15 = clamp(u_hold, 0.0, 1.0);
+      // Tap: hot orange flash.
+      col += vec3(1.0,0.55,0.10) * exp(-td*td*85.0) * exp(-age*3.0) * 0.85;
+      // Tap: white-hot bead at the centre.
+      col += vec3(1.0,0.95,0.78) * exp(-td*td*420.0) * exp(-age*2.5) * 0.95;
+      // Hold: rusty glow growing.
+      float forgeR15 = 0.05 + h15*0.13;
+      float forge15 = exp(-td*td / (forgeR15*forgeR15));
+      col += vec3(0.95,0.45,0.10) * forge15 * h15 * (0.55 + 0.20*sin(u_time*5.0)) * 0.55;
+      // Hold: bright inner glow.
+      col += vec3(1.0,0.85,0.45) * exp(-td*td*250.0) * h15 * 0.45;
+      // Swipe: shower of orange-amber particles along the swipe band.
+      float sparkBand = exp(-abs(uv.y - tuv.y)*aspect*8.0);
+      // Modulate by a high-frequency sin so the band reads as discrete sparks.
+      sparkBand *= 0.5 + 0.5*sin(uv.x*aspect*60.0 + u_time*8.0);
+      col += vec3(1.0,0.70,0.20) * sparkBand * smoothstep(0.0,0.4,u_swipeMag) *
+             exp(-u_swipeAge*1.6) * 0.45;
+    } else if (u_scene == 16) {
+      // Void → TAP: a clean white reticule expands and fades (direct
+      //   "interaction with motifs" Alex asked for — touching the void leaves
+      //   a precise geometric trace).
+      //   LONG-PRESS: a hexagram materialises around the finger, intensifying.
+      //   SWIPE: a sharp white line traces the swipe path.
+      float h16 = clamp(u_hold, 0.0, 1.0);
+      // Tap: small bright dot.
+      col += vec3(1.0) * exp(-td*td*1200.0) * exp(-age*3.5) * 1.0;
+      // Tap: expanding crosshair lines (NS + EW).
+      float reticule16 = smoothstep(0.001, 0.0, abs(td - 0.025 - age*0.08));
+      col += vec3(1.0) * reticule16 * exp(-age*1.8) * 0.85;
+      // Hold: 6-pointed star polygon around the finger.
+      float angV = atan(uv.y - tuv.y, (uv.x - tuv.x)*aspect);
+      float starWedge = abs(sin(angV*3.0));
+      float starR = 0.06 + h16*0.10;
+      float starLine = smoothstep(0.001, 0.0, abs(td - starR*starWedge));
+      col += vec3(1.0) * starLine * h16 * 0.95;
+      // Hold: pure white inner bead.
+      col += vec3(1.0) * exp(-td*td*600.0) * h16 * 0.55;
+      // Swipe: sharp horizontal line through the finger Y.
+      float swipeLine = smoothstep(0.001, 0.0, abs(uv.y - tuv.y));
+      col += vec3(1.0) * swipeLine * smoothstep(0.0,0.3,u_swipeMag) *
+             exp(-u_swipeAge*1.4) * 0.85;
+    } else if (u_scene == 17) {
+      // Prism → TAP: a quick spectral burst at the touch (light prism flash).
+      //   LONG-PRESS: a rainbow ring grows around the finger.
+      //   SWIPE: a spectral trail (rainbow band) follows.
+      float h17 = clamp(u_hold, 0.0, 1.0);
+      // Tap: white-hot bead.
+      col += vec3(1.0) * exp(-td*td*1100.0) * exp(-age*2.5) * 1.0;
+      // Tap: small rainbow halo around it.
+      float prismAng = atan(uv.y - tuv.y, (uv.x - tuv.x)*aspect);
+      float halo17 = exp(-td*td*200.0) * exp(-age*1.5);
+      vec3 rb = vec3(0.5 + 0.5*sin(prismAng*3.0 + 0.0),
+                     0.5 + 0.5*sin(prismAng*3.0 + 2.09),
+                     0.5 + 0.5*sin(prismAng*3.0 + 4.18));
+      col += rb * halo17 * 0.85;
+      // Hold: a spectral ring at constant radius (the prism ring "wakes").
+      float spRingR = 0.10 + h17*0.06;
+      float spRing = exp(-pow((td - spRingR)*28.0, 2.0));
+      col += rb * spRing * h17 * 0.85;
+      // Swipe: rainbow trail along the swipe axis.
+      float prismBand = exp(-abs(uv.y - tuv.y)*aspect*7.0);
+      // Modulate along x with spectral hue cycling for "rainbow band" reading.
+      vec3 trailRB = vec3(0.5 + 0.5*sin(uv.x*aspect*22.0 + 0.0),
+                          0.5 + 0.5*sin(uv.x*aspect*22.0 + 2.09),
+                          0.5 + 0.5*sin(uv.x*aspect*22.0 + 4.18));
+      col += trailRB * prismBand * smoothstep(0.0,0.35,u_swipeMag) *
+             exp(-u_swipeAge*1.4) * 0.45;
+    } else if (u_scene == 18) {
+      // Ink → TAP: a black ink blot lands and bleeds outward.
+      //   LONG-PRESS: a stroke "draws itself" outward from the finger.
+      //   SWIPE: an ink stroke trail along the swipe path.
+      float h18 = clamp(u_hold, 0.0, 1.0);
+      // Tap: dark central drop.
+      col = mix(col, vec3(0.06, 0.04, 0.05), exp(-td*td*350.0) * exp(-age*1.8) * 0.85);
+      // Tap: paper-soak halo (lighter ink around the drop).
+      col = mix(col, vec3(0.30, 0.25, 0.28), exp(-td*td*60.0) * exp(-age*1.2) * 0.18);
+      // Hold: stroke ring grows.
+      float strokeR18 = 0.03 + h18*0.10;
+      float stroke18 = smoothstep(0.006, 0.0, abs(td - strokeR18));
+      col = mix(col, vec3(0.05, 0.03, 0.04), stroke18 * h18 * 0.85);
+      // Swipe: ink trail along the swipe axis.
+      float inkBand = smoothstep(0.012, 0.0, abs(uv.y - tuv.y));
+      col = mix(col, vec3(0.06, 0.04, 0.05),
+                inkBand * smoothstep(0.0,0.3,u_swipeMag) * exp(-u_swipeAge*1.5) * 0.85);
+    } else if (u_scene == 19) {
+      // Bloom → TAP: a 5-petal flower blooms briefly at the finger (the
+      //   shader companion to the PremiumTouchLayer's draggable petal — the
+      //   petal floats above this bloom).
+      //   LONG-PRESS: the flower stays open and pulses with the held finger.
+      //   SWIPE: pollen / petal trail follows the swipe.
+      float h19 = clamp(u_hold, 0.0, 1.0);
+      // Bloom flower: 5-petal lobes around the touch.
+      float angB = atan(uv.y - tuv.y, (uv.x - tuv.x)*aspect);
+      float lobesB = 0.55 + 0.45*cos(angB*5.0);
+      float bloomR = 0.07 + h19*0.06;
+      float bloomFlower = smoothstep(bloomR, bloomR*0.35, td) * lobesB;
+      // Colour cycles slowly so consecutive taps feel varied.
+      float hueT = u_time*0.4;
+      vec3 bloomCol = vec3(0.5 + 0.5*sin(hueT + 0.0),
+                           0.5 + 0.5*sin(hueT + 2.09),
+                           0.5 + 0.5*sin(hueT + 4.18));
+      // Saturated petal pink — clamp the bloomCol mix toward warm pink.
+      bloomCol = mix(vec3(1.0, 0.55, 0.75), bloomCol, 0.4);
+      col = mix(col, bloomCol, bloomFlower * exp(-age*1.2) * (0.85 + h19*0.15));
+      // Bright yellow centre.
+      col = mix(col, vec3(1.0, 0.92, 0.40), exp(-td*td*1800.0) * (exp(-age*1.5) + h19*0.5) * 0.95);
+      // Swipe: pollen trail (yellow dotted band).
+      float pollenBand = exp(-abs(uv.y - tuv.y)*aspect*6.0);
+      pollenBand *= 0.4 + 0.6*sin(uv.x*aspect*45.0 + u_time*3.0);
+      col += vec3(1.0, 0.85, 0.45) * pollenBand * smoothstep(0.0,0.35,u_swipeMag) *
+             exp(-u_swipeAge*1.4) * 0.32;
     } else {
       // Galaxy / Nebula / Aurora / Casino → a soft universal ripple.
       col += vec3(0.80,0.85,1.0) * sin(td*26.0 - age*7.0) * exp(-td*4.8) * exp(-age*2.6) * 0.35;
@@ -1095,7 +1825,14 @@ void main(){
   }
 
   float vig = distance(uv, vec2(0.5));
-  col *= mix(1.04, 0.58, smoothstep(0.2,0.95,vig));
+  // Light scenes (ink, bloom, void) don't get the heavy edge darkening —
+  // it greys out paper / sky / the deliberate void in a way that fights
+  // the theme's identity. They already paint their own subtler ambience.
+  if (u_scene == 16 || u_scene == 18 || u_scene == 19) {
+    col *= mix(1.0, 0.92, smoothstep(0.4, 0.95, vig));
+  } else {
+    col *= mix(1.04, 0.58, smoothstep(0.2,0.95,vig));
+  }
   gl_FragColor = vec4(pow(max(col, 0.0), vec3(0.92)), 1.0);
 }
 `;
@@ -1111,6 +1848,12 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
   // Live GL handles so the scene-change effect can poke the uniform directly.
   const glRef = useRef<WebGLRenderingContext | null>(null);
   const uSceneRef = useRef<WebGLUniformLocation | null>(null);
+  // Player intensity for the active scene's premium set (storm/coral/…).
+  // Lives in a ref so the frame loop reads the live value without re-running
+  // the GL setup effect on every slider tick.
+  const intensity = useStore((s) => s.player.premiumIntensity?.[scene] ?? 1.0);
+  const intensityRef = useRef(intensity);
+  intensityRef.current = intensity;
 
   // GL setup runs ONCE per mount (deps: []). It used to depend on [scene],
   // so every theme change tore the context down (loseContext) and then
@@ -1136,6 +1879,7 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
     let uHold: WebGLUniformLocation | null = null;
     let uSwipeMag: WebGLUniformLocation | null = null;
     let uSwipeAge: WebGLUniformLocation | null = null;
+    let uIntensity: WebGLUniformLocation | null = null;
     let running = false;
     let start = performance.now();
     let last = 0;
@@ -1201,6 +1945,7 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
       uHold = gl.getUniformLocation(prog, "u_hold");
       uSwipeMag = gl.getUniformLocation(prog, "u_swipeMag");
       uSwipeAge = gl.getUniformLocation(prog, "u_swipeAge");
+      uIntensity = gl.getUniformLocation(prog, "u_intensity");
       const uScene = gl.getUniformLocation(prog, "u_scene");
       uSceneRef.current = uScene;
       gl.uniform1i(uScene, SCENE_INDEX[sceneRef.current]);
@@ -1228,6 +1973,7 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
         gl.uniform1f(uHold, hold);
         gl.uniform1f(uSwipeMag, swipeMag);
         gl.uniform1f(uSwipeAge, (now - swipeEndedAt) / 1000);
+        gl.uniform1f(uIntensity, intensityRef.current);
         // Swipe magnitude fades to zero gradually so the trail tail dies out.
         swipeMag = Math.max(0, swipeMag - dt * 1.2);
         gl.drawArrays(gl.TRIANGLES, 0, 3);

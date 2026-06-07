@@ -70,10 +70,14 @@ export function BracketTree({ tournament }: { tournament: TournamentState }) {
         w-full flex-1 min-h-0
         overflow-auto py-3 px-2
         rounded-2xl
-        bg-surface border border-hairline
-        shadow-inner shadow-black/30
+        bg-surface border
         flex flex-col
       "
+      style={{
+        borderColor: "color-mix(in oklab, var(--theme-primary) 25%, rgba(255,255,255,0.08))",
+        boxShadow:
+          "inset 0 2px 8px color-mix(in oklab, var(--theme-primary) 12%, rgba(0,0,0,0.3))",
+      }}
     >
       <div className="flex items-stretch gap-2 min-w-max m-auto" style={{ height }}>
         {t.rounds.map((round, ri) => (
@@ -104,13 +108,22 @@ export function BracketTree({ tournament }: { tournament: TournamentState }) {
 function ChampionCol({ champion }: { champion: BracketPlayer | null }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-3 shrink-0">
-      <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300 font-extrabold">
+      <div
+        className="text-[10px] uppercase tracking-[0.2em] font-extrabold"
+        style={{ color: "color-mix(in oklab, var(--theme-secondary) 80%, white)" }}
+      >
         Champion
       </div>
       {champion ? (
         <PlayerChip player={champion} size="lg" />
       ) : (
-        <div className="w-14 h-14 rounded-full border-2 border-dashed border-amber-400/40 flex items-center justify-center text-2xl bg-amber-500/5">
+        <div
+          className="w-14 h-14 rounded-full border-2 border-dashed flex items-center justify-center text-2xl"
+          style={{
+            borderColor: "color-mix(in oklab, var(--theme-primary) 45%, transparent)",
+            background: "color-mix(in oklab, var(--theme-primary) 8%, transparent)",
+          }}
+        >
           🏆
         </div>
       )}
@@ -148,11 +161,18 @@ function MatchCard({ match, round, idx, primary, compact, playingRef }: {
       className={
         "flex flex-col gap-0.5 rounded-xl border p-1 transition " +
         (playing
-          ? "border-amber-300/80 bg-amber-500/15 shadow-lg shadow-amber-500/30 ring-2 ring-amber-400/40"
+          ? ""
           : done
           ? "border-hairline bg-zinc-900/55"
           : "border-hairline bg-zinc-900/40")
       }
+      style={playing ? {
+        borderColor: "color-mix(in oklab, var(--theme-primary) 70%, white)",
+        background: "color-mix(in oklab, var(--theme-primary) 18%, rgba(10,12,20,0.8))",
+        boxShadow:
+          "0 0 0 2px color-mix(in oklab, var(--theme-primary) 50%, transparent)," +
+          "0 4px 20px -4px color-mix(in oklab, var(--theme-primary) 55%, transparent)",
+      } : undefined}
     >
       <SlotRow
         player={match.p1}
@@ -219,8 +239,17 @@ function PlayerChip({ player, size, dimmed = false, won = false, compact = false
     : player.isYou
     ? "bg-emerald-500/30 text-emerald-100 ring-1 ring-emerald-300/60 font-bold"
     : won
-    ? "bg-amber-500/25 text-amber-100 ring-1 ring-amber-400/50"
+    ? "text-white/90"
     : "text-ink";
+  const wonStyle = won && !dimmed && !player.isYou ? {
+    background: "color-mix(in oklab, var(--theme-primary) 25%, rgba(10,12,20,0.6))",
+    boxShadow: "inset 0 0 0 1px color-mix(in oklab, var(--theme-primary) 50%, transparent)",
+  } : undefined;
+  const lgStyle = lg ? {
+    boxShadow:
+      "0 0 0 2px color-mix(in oklab, var(--theme-secondary) 75%, white)," +
+      "0 4px 16px -2px color-mix(in oklab, var(--theme-primary) 55%, transparent)",
+  } : undefined;
   return (
     <motion.div
       layoutId={`player-${player.id}`}
@@ -229,9 +258,9 @@ function PlayerChip({ player, size, dimmed = false, won = false, compact = false
         (lg ? "w-14 h-14 rounded-full" : w + " h-7 rounded-md") +
         " flex items-center gap-1.5 overflow-hidden transition " +
         (lg ? "justify-center " : "px-1.5 ") +
-        color +
-        (lg ? " ring-2 ring-amber-300/80 shadow-lg shadow-amber-500/40" : "")
+        color
       }
+      style={{ ...wonStyle, ...lgStyle }}
     >
       {isPhoto ? (
         <img src={player.avatar} alt="" className={lg ? "w-full h-full object-cover" : "shrink-0 w-5 h-5 rounded-full object-cover"} />
@@ -252,12 +281,13 @@ function PlayerChip({ player, size, dimmed = false, won = false, compact = false
  *  left. Shares the parent height + justify-around so the elbows line up with
  *  the matches at any bracket size. */
 function Connectors({ count }: { count: number }) {
+  const bc = "color-mix(in oklab, var(--theme-primary) 45%, rgba(255,255,255,0.18))";
   return (
     <div className="flex flex-col justify-around shrink-0 w-5 sm:w-7 h-full pt-5">
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className="flex flex-col flex-1 py-0.5">
-          <div className="flex-1 border-t-2 border-r-2 border-white/25 rounded-tr-md" />
-          <div className="flex-1 border-b-2 border-r-2 border-white/25 rounded-br-md" />
+          <div className="flex-1 border-t-2 border-r-2 rounded-tr-md" style={{ borderColor: bc }} />
+          <div className="flex-1 border-b-2 border-r-2 rounded-br-md" style={{ borderColor: bc }} />
         </div>
       ))}
     </div>

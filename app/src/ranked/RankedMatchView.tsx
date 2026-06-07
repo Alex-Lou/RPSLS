@@ -185,9 +185,43 @@ export function RankedMatchView({
         caption={t("lanes.scoreCaption", { round: round?.no ?? 1, target: match.winTo })}
       />
 
-      {/* ScaleToFit guarantees the whole phase (board + cards + picker + LOCK)
-          always fits the available height — the player NEVER scrolls to reach
-          the Lock button; it shrinks uniformly on short screens instead. */}
+      {/* Match-end is rendered FULL-BLEED (no ScaleToFit). The cinematic +
+          cards recap don't compete with a Lock button for vertical space —
+          they're the climax of the screen and need the entire viewport to
+          breathe. ScaleToFit's `transform: scale(<1)` was the cause of the
+          "rectangle inside a rectangle" framing Alex flagged: when the
+          content overran height, the WHOLE subtree shrank uniformly and
+          read as a small floating card instead of a full-screen celebration. */}
+      {phase === "match-end" && end && (
+        <div className="flex-1 min-h-0 w-full flex flex-col items-center overflow-y-auto py-1">
+          <CinematicMatchEnd
+            outcome={
+              end.roundWinsYou > end.roundWinsOpp ? "win" :
+              end.roundWinsYou < end.roundWinsOpp ? "loss" : "draw"
+            }
+            forfeit={end.forfeit}
+            forfeitByYou={end.forfeit && end.winner === "b"}
+            scoreLine={`${end.roundWinsYou} — ${end.roundWinsOpp}`}
+            youScore={end.roundWinsYou}
+            oppScore={end.roundWinsOpp}
+            bestOf={match.winTo * 2 - 1}
+            onRematch={onNext ? undefined : onRematch}
+            onBack={onNext ? onNext : onLeave!}
+            backLabel={onNext ? "Suivant →" : undefined}
+            reward={{ xp: end.xpGained, eclats: end.eclatsGained }}
+          />
+          <MatchCardsRecap
+            youCards={end.youCardsPlayed ?? []}
+            oppCards={end.oppCardsPlayed ?? []}
+          />
+        </div>
+      )}
+
+      {/* ScaleToFit guarantees the IN-MATCH phases (board + cards + picker +
+          LOCK) always fit the available height — the player NEVER scrolls to
+          reach the Lock button; it shrinks uniformly on short screens
+          instead. Only mounted during the active gameplay phases. */}
+      {phase !== "match-end" && (
       <ScaleToFit className="relative">
         <div className="w-full flex flex-col items-center py-1">
         {phase === "matched" && !showSplash && (
@@ -241,33 +275,9 @@ export function RankedMatchView({
             oppHandSize={oppHandSize}
           />
         )}
-
-        {phase === "match-end" && end && (
-          <>
-            <CinematicMatchEnd
-              outcome={
-                end.roundWinsYou > end.roundWinsOpp ? "win" :
-                end.roundWinsYou < end.roundWinsOpp ? "loss" : "draw"
-              }
-              forfeit={end.forfeit}
-              forfeitByYou={end.forfeit && end.winner === "b"}
-              scoreLine={`${end.roundWinsYou} — ${end.roundWinsOpp}`}
-              youScore={end.roundWinsYou}
-              oppScore={end.roundWinsOpp}
-              bestOf={match.winTo * 2 - 1}
-              onRematch={onNext ? undefined : onRematch}
-              onBack={onNext ? onNext : onLeave!}
-              backLabel={onNext ? "Suivant →" : undefined}
-              reward={{ xp: end.xpGained, eclats: end.eclatsGained }}
-            />
-            <MatchCardsRecap
-              youCards={end.youCardsPlayed ?? []}
-              oppCards={end.oppCardsPlayed ?? []}
-            />
-          </>
-        )}
         </div>
       </ScaleToFit>
+      )}
     </div>
   );
 }
@@ -292,7 +302,7 @@ function MatchCardsRecap({ youCards, oppCards }: { youCards: CardId[]; oppCards:
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 1.4, duration: 0.35 }}
-      className="mt-3 w-full max-w-md mx-auto rounded-2xl bg-surface border border-hairline p-3"
+      className="mt-3 w-full max-w-2xl mx-auto rounded-2xl bg-surface border border-hairline p-3 sm:p-4"
     >
       <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-ink-faint text-center mb-2">
         Cartes utilisées

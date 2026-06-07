@@ -3,6 +3,9 @@ import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../../store/store";
 import { GameMode, MODE_META, REWARDS, type Difficulty } from "../../types";
 import { THEMES, gradientFromTheme } from "../../theme/theme";
+import { rankProgress } from "../../engine/rank";
+import { LpBar } from "../../ranked/LpBar";
+import { CurrencyBadges } from "../../ranked/CurrencyBadges";
 import {
   todayDailyQuests,
   matchesToday,
@@ -44,15 +47,39 @@ const MODE_ICONS: Record<ModeCardId, string> = {
 /** Per-mode accent for the two tiles that otherwise fell through to the plain
  *  generic style (Entraînement, Classé) — every menu card now has its own
  *  coloured identity. Fixed hues (not theme tokens) on purpose: each mode must
- *  be recognisable at a glance, like online/constellation already are. */
+ *  be recognisable at a glance, like online/constellation already are.
+ *
+ *  ⚠️ Each accent string is layered ON TOP of TILE_BASE (an opaque, theme-aware
+ *  `bg-surface` substrate). Without that base the faint /15-/22 tint sat
+ *  directly over the animated WebGL backdrop → titles drowned mid-flash. With
+ *  it, the colour reads as a tasteful wash over a readable panel. */
 const TILE_ACCENT: Partial<Record<ModeCardId, string>> = {
   training:
-    "border-emerald-400/30 bg-gradient-to-br from-emerald-500/15 via-teal-500/10 to-cyan-500/15 " +
-    "hover:from-emerald-500/25 hover:via-teal-500/20 hover:to-cyan-500/25 hover:border-emerald-400/60 shadow-lg shadow-emerald-500/10",
+    "border-emerald-400/30 from-emerald-500/22 via-teal-500/14 to-cyan-500/22 " +
+    "hover:from-emerald-500/32 hover:via-teal-500/24 hover:to-cyan-500/32 hover:border-emerald-400/60 shadow-lg shadow-emerald-500/10",
   ranked:
-    "border-sky-400/30 bg-gradient-to-br from-sky-500/15 via-indigo-500/10 to-blue-500/15 " +
-    "hover:from-sky-500/25 hover:via-indigo-500/20 hover:to-blue-500/25 hover:border-sky-400/60 shadow-lg shadow-sky-500/10",
+    "border-sky-400/30 from-sky-500/22 via-indigo-500/14 to-blue-500/22 " +
+    "hover:from-sky-500/32 hover:via-indigo-500/24 hover:to-blue-500/32 hover:border-sky-400/60 shadow-lg shadow-sky-500/10",
 };
+
+/** Readable substrate shared by every menu tile. `bg-surface-raised` is the
+ *  most opaque semantic theme token (App.css): ~90 % on calm backgrounds, 94 %
+ *  under `.theme-flashy`, 96 % under `.theme-light`. We pick the raised tier (not
+ *  plain `bg-surface`, ~72 % on calm) on purpose: several animated scenes are
+ *  bright yet NOT flagged `flashy` (volcanic lava, quantum filaments, Emberforge
+ *  embers), so they'd keep the 72 % base — and at 72 % a full-screen flash drags
+ *  small muted descriptions below AA contrast. 90 %+ everywhere guarantees the
+ *  titles/descriptions stay legible over ANY backdrop, flagged or not, while the
+ *  ~6-10 % bleed + the colour tint keep the cards from going flat ("équilibre").
+ *
+ *  The per-card colour gradient is painted on top via `bg-gradient-to-br` (a
+ *  background-IMAGE, so it composites over this background-COLOR base without
+ *  fighting it).
+ *
+ *  No `backdrop-blur` on purpose: with a 90 %+ base the blur buys almost no
+ *  readability while costing a GPU filter pass per tile — 60 fps is
+ *  non-negotiable on device. */
+const TILE_BASE = "bg-surface-raised bg-gradient-to-br";
 
 /** Renders the mode tile icon — a PNG from /MenuIcons, sized to match the
  *  emoji it replaced (~36px, with breathing margins for the tile). */
@@ -98,19 +125,24 @@ export function ModeSelect({
     >
       <div className="text-center">
         <h1
-          // Refined title: lighter weight (semibold instead of black), slight
-          // tracking spread, dropped one size step so the title doesn't
-          // dominate the page anymore. The colours stay theme-driven so the
-          // header still belongs to whichever background is active.
-          className="text-2xl sm:text-4xl font-semibold bg-clip-text text-transparent leading-[1.1]"
+          // AAA title treatment — heavy weight + uppercase + theme tracking, a
+          // punchy 3-stop theme gradient, and a theme-COLOURED glow halo so the
+          // title belongs to the active bundle (default theme = violet until the
+          // user picks one). Font stays --font-headline (per-theme, with the
+          // default baked into THEMES); bespoke per-theme title fonts land in
+          // the theme-bundle pass.
+          className="text-3xl sm:text-5xl font-black uppercase bg-clip-text text-transparent leading-[1.04]"
           style={{
             backgroundImage:
-              "linear-gradient(135deg, color-mix(in oklab, var(--theme-primary) 85%, #fff) 0%, color-mix(in oklab, var(--theme-secondary) 85%, #fff) 100%)",
+              "linear-gradient(135deg, color-mix(in oklab, var(--theme-primary) 70%, #fff) 0%, #ffffff 48%, color-mix(in oklab, var(--theme-secondary) 70%, #fff) 100%)",
             fontFamily: "var(--font-headline)",
-            letterSpacing: "0.01em",
-            // drop-shadow (not text-shadow) works on bg-clip-text gradients —
-            // keeps the title readable over bright/flashy backdrops.
-            filter: "drop-shadow(0 2px 10px rgba(0,0,0,0.6))",
+            // Per-theme tracking (premium sets override --typo-headline-spacing);
+            // sensible default for everyone else.
+            letterSpacing: "var(--typo-headline-spacing, 0.05em)",
+            // drop-shadow (not text-shadow) works on bg-clip-text gradients:
+            // dark shadow for legibility over flash + a theme-tinted aura.
+            filter:
+              "drop-shadow(0 2px 10px rgba(0,0,0,0.6)) drop-shadow(0 0 16px color-mix(in oklab, var(--theme-primary) 45%, transparent))",
           }}
         >
           {t("play.title")}
@@ -141,8 +173,8 @@ export function ModeSelect({
                 disabled={!onGoOnline}
                 className={
                   "text-left p-2.5 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1.5 relative overflow-hidden min-h-[124px] " +
-                  "border-violet-400/30 bg-gradient-to-br from-violet-500/15 via-fuchsia-500/10 to-cyan-500/15 " +
-                  "hover:from-violet-500/25 hover:via-fuchsia-500/20 hover:to-cyan-500/25 hover:border-violet-400/60 " +
+                  TILE_BASE + " border-violet-400/30 from-violet-500/22 via-fuchsia-500/14 to-cyan-500/22 " +
+                  "hover:from-violet-500/32 hover:via-fuchsia-500/26 hover:to-cyan-500/32 hover:border-violet-400/60 " +
                   "shadow-lg shadow-violet-500/10"
                 }
               >
@@ -172,8 +204,8 @@ export function ModeSelect({
                 disabled={!onGoConstellationMenu}
                 className={
                   "text-left p-2.5 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1.5 relative overflow-hidden min-h-[124px] " +
-                  "border-fuchsia-400/30 bg-gradient-to-br from-fuchsia-500/15 via-violet-500/10 to-amber-500/15 " +
-                  "hover:from-fuchsia-500/25 hover:via-violet-500/20 hover:to-amber-500/25 hover:border-fuchsia-400/60 " +
+                  TILE_BASE + " border-fuchsia-400/30 from-fuchsia-500/22 via-violet-500/14 to-amber-500/22 " +
+                  "hover:from-fuchsia-500/32 hover:via-violet-500/26 hover:to-amber-500/32 hover:border-fuchsia-400/60 " +
                   "shadow-lg shadow-fuchsia-500/10"
                 }
               >
@@ -205,8 +237,8 @@ export function ModeSelect({
                 disabled={!onGoRanked}
                 className={
                   "text-left p-2.5 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1.5 relative overflow-hidden min-h-[124px] " +
-                  "border-amber-400/40 bg-gradient-to-br from-amber-500/15 via-rose-500/10 to-fuchsia-500/15 " +
-                  "hover:from-amber-500/25 hover:via-rose-500/20 hover:to-fuchsia-500/25 hover:border-amber-400/70 " +
+                  TILE_BASE + " border-amber-400/40 from-amber-500/22 via-rose-500/14 to-fuchsia-500/22 " +
+                  "hover:from-amber-500/32 hover:via-rose-500/26 hover:to-fuchsia-500/32 hover:border-amber-400/70 " +
                   "shadow-lg shadow-amber-500/10"
                 }
               >
@@ -246,7 +278,9 @@ export function ModeSelect({
               }}
               className={
                 "p-2.5 sm:p-4 rounded-2xl border transition flex flex-col gap-1.5 min-h-[124px] " +
-                (TILE_ACCENT[m] ?? "border-hairline bg-hairline hover:border-white/20") + " " +
+                (TILE_ACCENT[m]
+                  ? TILE_BASE + " " + TILE_ACCENT[m]
+                  : "border-hairline bg-surface hover:border-white/20") + " " +
                 // Wide tile (hot-seat) spans both columns, so left-aligning
                 // its content leaves an ugly empty right half. Center it.
                 (wide ? "col-span-2 items-center text-center justify-center" : "text-left items-start")
@@ -458,8 +492,8 @@ export function SandboxView({
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={play}
-          className="w-full px-7 py-3.5 rounded-2xl font-bold text-white bg-themed shadow-lg shadow-violet-500/30 transition hover:scale-[1.01]"
-          style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
+          className="w-full px-7 py-3.5 rounded-2xl font-bold text-white shadow-lg transition hover:scale-[1.01]"
+          style={{ background: "linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))", boxShadow: "0 8px 24px -6px color-mix(in oklab, var(--theme-primary) 55%, transparent)", fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
         >
           {mode === "cards" ? "Ouvrir le lobby Cartes →" : "Jouer →"}
         </motion.button>
@@ -574,8 +608,8 @@ export function ConstellationLobby({
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={() => { hapticTick(); onPlay(winTo); }}
-          className="w-full px-7 py-3.5 rounded-2xl font-bold text-white bg-themed shadow-lg shadow-violet-500/30 transition hover:scale-[1.01]"
-          style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
+          className="w-full px-7 py-3.5 rounded-2xl font-bold text-white shadow-lg transition hover:scale-[1.01]"
+          style={{ background: "linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))", boxShadow: "0 8px 24px -6px color-mix(in oklab, var(--theme-primary) 55%, transparent)", fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
         >
           Jouer →
         </motion.button>
@@ -594,22 +628,65 @@ export function ClasseLobby({
   onViewBracket: () => void;
 }) {
   useAndroidBackPrompt(onBack);
+
+  // Classé runs its OWN local ladder (classeLp), separate from the online
+  // global rankLp — so the mode shows its own rank, record and rewards.
+  const classeLp = useStore((s) => s.player.classeLp ?? 1000);
+  const cs = useStore((s) => s.player.classeStats) ?? { wins: 0, losses: 0, draws: 0 };
+  const { tier, progress: lpProgress, next: nextTier } = rankProgress(classeLp);
+  const decided = cs.wins + cs.losses;
+  const winrate = decided > 0 ? Math.round((cs.wins / decided) * 100) : 0;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -16 }}
       transition={{ duration: 0.3 }}
-      className="flex flex-col gap-5 flex-1 py-2 px-1 max-w-lg mx-auto w-full overflow-y-auto"
+      className="flex flex-col gap-4 flex-1 py-2 px-1 max-w-lg mx-auto w-full overflow-y-auto"
     >
       <FloatingMatchBackButton onClick={onBack} label="Retour" />
 
-      <div className="text-center mt-8">
+      <div className="text-center mt-6">
         <div className="text-5xl mb-1">🏆</div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-themed leading-tight" style={{ fontFamily: "var(--font-headline)" }}>
           Classé
         </h1>
-        <p className="text-[11px] text-ink-faint mt-1">Duel 1 v 1 classique vs IA · gagne de l'XP</p>
+        <p className="text-[11px] text-ink-faint mt-1">Duel 1 v 1 classé · grimpe au classement &amp; gagne des récompenses</p>
+      </div>
+
+      {/* Rank · record · rewards card — its own classement (classeLp), its own
+          win/loss record (classeStats) and the éclats/poussière it pays out. */}
+      <div className="bg-surface border border-hairline rounded-3xl p-4 flex flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <div
+            className={"w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-lg shrink-0 bg-gradient-to-br " + tier.gradient}
+          >
+            {tier.emoji}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-2">
+              <span className="font-black text-lg leading-none">{tier.label}</span>
+              <span className="text-[11px] text-ink-muted tabular-nums">{classeLp.toLocaleString("fr-FR")} PR</span>
+            </div>
+            <LpBar progress={lpProgress} className="mt-1.5" />
+            <div className="mt-1 text-[10px] text-ink-faint">
+              {nextTier
+                ? `${(tier.ceil - classeLp).toLocaleString("fr-FR")} PR avant ${nextTier.label} ${nextTier.emoji}`
+                : "Palier maximum atteint"}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2.5 text-[12px] font-bold tabular-nums">
+            <span className="text-emerald-300">{cs.wins} V</span>
+            <span className="text-rose-300">{cs.losses} D</span>
+            {cs.draws > 0 && <span className="text-ink-muted">{cs.draws} N</span>}
+            <span className="text-ink-faint font-normal">· {winrate}% de victoires</span>
+          </div>
+          <CurrencyBadges inert />
+        </div>
       </div>
 
       <motion.button
@@ -617,17 +694,18 @@ export function ClasseLobby({
         onClick={() => { hapticTick(); onQuickMatch(); }}
         className="rounded-2xl p-4 text-left transition hover:brightness-110"
         style={{
-          background: "linear-gradient(150deg, color-mix(in oklab, var(--theme-primary) 24%, transparent), color-mix(in oklab, var(--theme-secondary) 16%, transparent))",
-          border: "1px solid color-mix(in oklab, var(--theme-primary) 42%, transparent)",
+          background: "linear-gradient(135deg, color-mix(in oklab, var(--theme-primary) 55%, rgba(10,12,20,0.85)), color-mix(in oklab, var(--theme-secondary) 40%, rgba(10,12,20,0.85)))",
+          border: "1px solid color-mix(in oklab, var(--theme-primary) 60%, transparent)",
+          boxShadow: "0 4px 16px -4px color-mix(in oklab, var(--theme-primary) 40%, transparent)",
         }}
       >
         <div className="flex items-center gap-3">
           <img src="/Icones Tournoi/ConstRankedRapide.png" alt="" className="w-12 h-12 object-contain shrink-0 drop-shadow-[0_2px_8px_rgba(0,0,0,0.55)]" draggable={false} />
           <div className="min-w-0">
             <div className="font-bold text-base">Match rapide</div>
-            <div className="text-[11px] text-zinc-300/80">Un duel immédiat contre l'IA (Best of 5).</div>
+            <div className="text-[11px] text-zinc-300/80">Un duel classé immédiat (Best of 5) · PR en jeu.</div>
           </div>
-          <span className="ml-auto text-xl text-ink-muted">→</span>
+          <span className="ml-auto text-xl" style={{ color: "var(--theme-secondary)" }}>→</span>
         </div>
       </motion.button>
 
@@ -636,8 +714,9 @@ export function ClasseLobby({
         onClick={() => { hapticTick(); onViewBracket(); }}
         className="rounded-2xl p-4 text-left transition hover:brightness-110"
         style={{
-          background: "linear-gradient(150deg, color-mix(in oklab, var(--theme-secondary) 24%, transparent), color-mix(in oklab, var(--theme-primary) 16%, transparent))",
-          border: "1px solid color-mix(in oklab, var(--theme-secondary) 42%, transparent)",
+          background: "linear-gradient(135deg, color-mix(in oklab, var(--theme-secondary) 55%, rgba(10,12,20,0.85)), color-mix(in oklab, var(--theme-primary) 40%, rgba(10,12,20,0.85)))",
+          border: "1px solid color-mix(in oklab, var(--theme-secondary) 60%, transparent)",
+          boxShadow: "0 4px 16px -4px color-mix(in oklab, var(--theme-secondary) 40%, transparent)",
         }}
       >
         <div className="flex items-center gap-3">
@@ -645,11 +724,11 @@ export function ClasseLobby({
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="font-bold text-base">Tournoi</span>
-              <span className="text-[9px] uppercase tracking-wider px-1 rounded-full" style={{ color: "var(--theme-secondary)", background: "color-mix(in oklab, var(--theme-primary) 25%, transparent)" }}>Bracket</span>
+              <span className="text-[9px] uppercase tracking-wider px-1 rounded-full" style={{ color: "var(--theme-secondary)", background: "color-mix(in oklab, var(--theme-primary) 35%, transparent)" }}>Bracket</span>
             </div>
-            <div className="text-[11px] text-zinc-300/80">Gravis un tableau d'adversaires IA jusqu'au podium.</div>
+            <div className="text-[11px] text-zinc-300/80">Gravis un tableau d'adversaires jusqu'au podium.</div>
           </div>
-          <span className="ml-auto text-xl text-ink-muted">→</span>
+          <span className="ml-auto text-xl" style={{ color: "var(--theme-primary)" }}>→</span>
         </div>
       </motion.button>
     </motion.div>
@@ -810,7 +889,7 @@ function DailyChallengesPanel({
         animate={{ opacity: 1, y: 0 }}
         whileTap={{ scale: 0.99 }}
         onClick={() => setOpen(true)}
-        className="rounded-xl p-2.5 sm:p-4 border flex items-center gap-3 text-left bg-gradient-to-br from-amber-500/20 via-orange-500/10 to-transparent border-amber-400/50 shadow-md shadow-amber-900/20"
+        className="rounded-xl p-2.5 sm:p-4 border flex items-center gap-3 text-left bg-surface-raised bg-gradient-to-br from-amber-500/25 via-orange-500/14 to-transparent border-amber-400/50 shadow-md shadow-amber-900/20"
       >
         <div className="text-xl sm:text-3xl shrink-0">🎯</div>
         <div className="flex-1 min-w-0">

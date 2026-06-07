@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Move } from "../engine/game";
 import type { MatchRecord, Player } from "../types";
+import { CLASSE_LP, classeLpDelta } from "../types";
 import type { Locale } from "../i18n";
 import { todayDateKey } from "../engine/daily";
 import { sanitisePersisted } from "./storeMigrationGuard";
@@ -65,6 +66,8 @@ export function defaultPlayer(): Player {
     codexClaimed: [],
     cardMastery: {},
     season: { number: 1, startedAt: Date.now() },
+    classeLp: 1000,
+    classeStats: { wins: 0, losses: 0, draws: 0 },
     backgroundId: "default",
     customBgs: [],
     customPads: [],
@@ -88,7 +91,7 @@ interface AppState {
   locale: Locale;
   serverConfig: ServerConfig;
 
-  updateProfile: (patch: Partial<Pick<Player, "nickname" | "avatar" | "themeId" | "padId" | "difficulty" | "hapticEnabled" | "hapticIntensity" | "backgroundId" | "crashReports" | "fontScale" | "customBgUrl" | "customPadUrl" | "customBgs" | "customPads" | "padChosen">>) => void;
+  updateProfile: (patch: Partial<Pick<Player, "nickname" | "avatar" | "themeId" | "padId" | "difficulty" | "hapticEnabled" | "hapticIntensity" | "backgroundId" | "crashReports" | "fontScale" | "customBgUrl" | "customPadUrl" | "customBgs" | "customPads" | "padChosen" | "premiumIntensity">>) => void;
   recordMatch: (m: MatchRecord) => void;
   /** Grant a flat XP bonus (e.g. tournament placement reward). */
   grantXp: (amount: number) => void;
@@ -240,6 +243,22 @@ export const useStore = create<AppState>()(
           // Soft-currency éclats earned every finished match (no forfeit).
           if (!m.forfeit) {
             p.eclats = (p.eclats ?? 0) + eclatsReward(m.mode, m.outcome);
+          }
+          // Classé (classic 1v1) local ladder — its OWN classement, separate
+          // from the online-only rankLp above. Quick match + tournament both
+          // record mode "ranked", so every Classé result climbs/drops here. A
+          // forfeit takes the dedicated forfeit penalty (and is NOT counted in
+          // the win/loss record, matching how the global stats skip it).
+          if (m.mode === "ranked") {
+            const dLp = m.forfeit ? CLASSE_LP.forfeit : classeLpDelta(m.outcome);
+            p.classeLp = Math.max(0, (p.classeLp ?? 1000) + dLp);
+            if (!m.forfeit) {
+              const cs = p.classeStats ?? { wins: 0, losses: 0, draws: 0 };
+              if (m.outcome === "win") cs.wins++;
+              else if (m.outcome === "loss") cs.losses++;
+              else cs.draws++;
+              p.classeStats = cs;
+            }
           }
           if (m.outcome === "win") p.stats.wins++;
           else if (m.outcome === "loss") p.stats.losses++;
@@ -449,7 +468,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "rpsls-app-state",
-      version: 20,
+      version: 22,
       migrate: (persisted: unknown, version: number): AppState => {
         const state = persisted as {
           player?: Partial<Player> & { customVariants?: unknown };
@@ -553,6 +572,24 @@ export const useStore = create<AppState>()(
         if (version < 20 && state?.player) {
           if (state.player.season === undefined) {
             state.player.season = { number: 1, startedAt: Date.now() };
+          }
+        }
+        // v21: Classé (classic 1v1) gets its OWN local ranked ladder. Seed at
+        // the 1000 Bronze entry and a fresh win/loss record so the new mode
+        // starts everyone level — past vs-CPU wins don't retroactively rank.
+        if (version < 21 && state?.player) {
+          if (state.player.classeLp === undefined) state.player.classeLp = 1000;
+          if (state.player.classeStats === undefined) {
+            state.player.classeStats = { wins: 0, losses: 0, draws: 0 };
+          }
+        }
+        // v22: per-premium-theme intensity slider. Default 1.0 = the
+        // shipping look. The Profile UI lets the player dial each premium
+        // theme up to 1.6 (denser FX) or down to 0.4 (subtler) so they can
+        // tune the rain / petal / spark density to taste.
+        if (version < 22 && state?.player) {
+          if (state.player.premiumIntensity === undefined) {
+            state.player.premiumIntensity = {};
           }
         }
         // Final pass — sanitise the persisted shape so a tampered
