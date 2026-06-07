@@ -20,6 +20,11 @@ import { AuraPad } from "./battlepads/AuraPad";
 import { VolcanicPad } from "./battlepads/VolcanicPad";
 import { QuartzPad } from "./battlepads/QuartzPad";
 import { AbyssPad } from "./battlepads/AbyssPad";
+import { EclipsePad } from "./battlepads/EclipsePad";
+import { PhantomPad } from "./battlepads/PhantomPad";
+import { EmberforgePad } from "./battlepads/EmberforgePad";
+import { TempusPad } from "./battlepads/TempusPad";
+import { StormPad } from "./battlepads/StormPad";
 
 export function BattlePad({
   padId,
@@ -89,6 +94,11 @@ export function BattlePad({
     case "aura":       return <AuraPad {...common} compact={compact} />;
     case "volcanic":   return <VolcanicPad {...common} compact={compact} />;
     case "abyss":      return <AbyssPad {...common} compact={compact} />;
+    case "eclipse":    return <EclipsePad {...common} compact={compact} />;
+    case "phantom":    return <PhantomPad {...common} compact={compact} />;
+    case "emberforge": return <EmberforgePad {...common} compact={compact} />;
+    case "tempus":     return <TempusPad {...common} compact={compact} />;
+    case "storm":      return <StormPad {...common} compact={compact} />;
     case "quartz":     return <QuartzPad {...common} compact={compact} />;
     case "custom":
       return customPadUrl

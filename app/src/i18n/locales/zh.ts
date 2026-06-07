@@ -45,6 +45,17 @@ const zh: Record<string, string> = {
   "diff.hard": "困难",
   "match.quit": "退出对战",
   "match.quitConfirm": "确定吗?将记为认输。",
+
+  "theme.violet": "紫罗兰",
+  "theme.neon": "霓虹",
+  "theme.pastel": "柔和",
+  "theme.sunset": "日落",
+  "theme.forest": "森林",
+  "theme.eclipse": "日蚀",
+  "theme.phantom": "幽灵",
+  "theme.emberforge": "熔炉",
+  "theme.tempus": "时光",
+  "theme.storm": "暴风",
 };
 
 /* ════════════ 日本語 ════════════ */

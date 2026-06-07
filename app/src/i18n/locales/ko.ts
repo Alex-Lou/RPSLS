@@ -45,6 +45,17 @@ const ko: Record<string, string> = {
   "diff.hard": "어려움",
   "match.quit": "경기 종료",
   "match.quitConfirm": "정말요? 기권으로 처리됩니다.",
+
+  "theme.violet": "바이올렛",
+  "theme.neon": "네온",
+  "theme.pastel": "파스텔",
+  "theme.sunset": "노을",
+  "theme.forest": "숲",
+  "theme.eclipse": "이클립스",
+  "theme.phantom": "유령",
+  "theme.emberforge": "대장간",
+  "theme.tempus": "템푸스",
+  "theme.storm": "폭풍",
 };
 
 /* ════════════ हिन्दी ════════════ */

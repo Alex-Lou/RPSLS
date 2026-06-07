@@ -45,6 +45,17 @@ const hi: Record<string, string> = {
   "diff.hard": "कठिन",
   "match.quit": "मैच छोड़ें",
   "match.quitConfirm": "पक्का? यह आत्मसमर्पण माना जाएगा।",
+
+  "theme.violet": "बैंगनी",
+  "theme.neon": "निऑन",
+  "theme.pastel": "पेस्टल",
+  "theme.sunset": "सूर्यास्त",
+  "theme.forest": "जंगल",
+  "theme.eclipse": "ग्रहण",
+  "theme.phantom": "प्रेत",
+  "theme.emberforge": "अंगार भट्टी",
+  "theme.tempus": "टेम्पस",
+  "theme.storm": "तूफ़ान",
 };
 
 /* ════════════ TÜRKÇE ════════════ */

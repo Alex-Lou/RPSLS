@@ -45,6 +45,17 @@ const ar: Record<string, string> = {
   "diff.hard": "صعب",
   "match.quit": "إنهاء المباراة",
   "match.quitConfirm": "متأكد؟ سيُحتسب انسحابًا.",
+
+  "theme.violet": "بنفسجي",
+  "theme.neon": "نيون",
+  "theme.pastel": "باستيل",
+  "theme.sunset": "غروب",
+  "theme.forest": "غابة",
+  "theme.eclipse": "كسوف",
+  "theme.phantom": "شبح",
+  "theme.emberforge": "مسبك جمر",
+  "theme.tempus": "تيمبوس",
+  "theme.storm": "عاصفة",
 };
 
 /* ════════════ 한국어 ════════════ */

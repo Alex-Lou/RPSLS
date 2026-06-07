@@ -45,6 +45,17 @@ const nl: Record<string, string> = {
   "diff.hard": "Moeilijk",
   "match.quit": "Match verlaten",
   "match.quitConfirm": "Zeker weten? Dit telt als opgave.",
+
+  "theme.violet": "Violet",
+  "theme.neon": "Neon",
+  "theme.pastel": "Pastel",
+  "theme.sunset": "Zonsondergang",
+  "theme.forest": "Woud",
+  "theme.eclipse": "Eclips",
+  "theme.phantom": "Spook",
+  "theme.emberforge": "Gloedsmederij",
+  "theme.tempus": "Tempus",
+  "theme.storm": "Storm",
 };
 
 export default nl;

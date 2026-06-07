@@ -45,6 +45,17 @@ const ja: Record<string, string> = {
   "diff.hard": "難しい",
   "match.quit": "対戦を終了",
   "match.quitConfirm": "本当に?降参扱いになります。",
+
+  "theme.violet": "バイオレット",
+  "theme.neon": "ネオン",
+  "theme.pastel": "パステル",
+  "theme.sunset": "夕暮れ",
+  "theme.forest": "森",
+  "theme.eclipse": "エクリプス",
+  "theme.phantom": "ファントム",
+  "theme.emberforge": "鍛冶場",
+  "theme.tempus": "テンプス",
+  "theme.storm": "嵐",
 };
 
 /* ════════════ РУССКИЙ ════════════ */

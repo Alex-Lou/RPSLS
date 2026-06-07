@@ -33,6 +33,13 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
   mono:   { id: "mono",   label: "Mono",    emoji: "🪐", primary: "#e5e7eb", secondary: "#9ca3af", bg: "#0b0d12", fontHeadline: "ibmPlex",      fontBody: "inter",   fontMono: "jetbrains" },
   // ── Premium palettes ──
   quartz: { id: "quartz", label: "Quartz",  emoji: "💠", primary: "#c8aef0", secondary: "#f6a5b8", bg: "#1a142a", fontHeadline: "cinzel",       fontBody: "cormorant", fontMono: "spaceMono" },
+  // ── Eclipse set ──
+  eclipse: { id: "eclipse", label: "Eclipse", emoji: "🌑", primary: "#d4a745", secondary: "#8b7fcf", bg: "#06050e", fontHeadline: "cinzel",       fontBody: "cormorant", fontMono: "jetbrains" },
+  // ── Phantom + Emberforge ──
+  phantom: { id: "phantom", label: "Phantom", emoji: "👻", primary: "#5a7a9a", secondary: "#8a9bb5", bg: "#0c0e14", fontHeadline: "cinzel",       fontBody: "cormorant", fontMono: "jetbrains" },
+  emberforge: { id: "emberforge", label: "Emberforge", emoji: "🔥", primary: "#ff6a14", secondary: "#ff9426", bg: "#0a0503", fontHeadline: "bebas",       fontBody: "rajdhani",  fontMono: "jetbrains" },
+  tempus: { id: "tempus", label: "Tempus", emoji: "⏳", primary: "#b8956a", secondary: "#d4a76a", bg: "#0a0703", fontHeadline: "cinzel",       fontBody: "cormorant", fontMono: "jetbrains" },
+  storm: { id: "storm", label: "Storm", emoji: "⚡", primary: "#4af0ff", secondary: "#a078ff", bg: "#060a16", fontHeadline: "orbitron",     fontBody: "rajdhani",  fontMono: "jetbrains" },
 };
 
 export function applyTheme(themeId: ThemeId) {

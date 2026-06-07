@@ -45,6 +45,17 @@ const pl: Record<string, string> = {
   "diff.hard": "Trudny",
   "match.quit": "Opuść mecz",
   "match.quitConfirm": "Na pewno? To liczy się jako poddanie.",
+
+  "theme.violet": "Fioletowy",
+  "theme.neon": "Neon",
+  "theme.pastel": "Pastel",
+  "theme.sunset": "Zachód",
+  "theme.forest": "Las",
+  "theme.eclipse": "Zaćmienie",
+  "theme.phantom": "Upiór",
+  "theme.emberforge": "Kuźnia Żaru",
+  "theme.tempus": "Tempus",
+  "theme.storm": "Burza",
 };
 
 /* ════════════ NEDERLANDS ════════════ */
