@@ -71,6 +71,11 @@ pub enum ClientMessage {
 
     /// Push player progression state to the server for persistence.
     SyncState { state: PlayerProgress },
+
+    /// Lanes pre-match: this player confirms they're ready for the coin flip.
+    /// Server tracks both sides and only triggers the coin flip when BOTH have
+    /// confirmed. Idempotent — clicking twice doesn't reset anything.
+    PrepReady,
 }
 
 /* ──────────── Server → Client ──────────── */
@@ -178,6 +183,19 @@ pub enum ServerMessage {
         #[serde(skip_serializing_if = "Option::is_none")]
         claim_token: Option<String>,
     },
+
+    /// Lanes pre-match readiness tally. Sent to BOTH players from each side's
+    /// perspective whenever a `PrepReady` arrives — so each client sees its
+    /// own `you_ready` and the opponent's `opp_ready` directly, no slot math.
+    /// Broadcast once after `LanesMatchFound` (with both false) so the UI can
+    /// render the 0/2 counter immediately.
+    PrepReadyState { you_ready: bool, opp_ready: bool },
+
+    /// Lanes pre-match: both sides confirmed, the coin has been flipped, the
+    /// arena now belongs to `winner`. Each client animates locally with this
+    /// authoritative result; the first `LanesRoundStart` arrives a few
+    /// seconds later so the verdict has time to land.
+    StartCoinFlip { winner: PlayerSlot },
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

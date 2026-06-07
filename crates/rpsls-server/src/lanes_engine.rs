@@ -7,6 +7,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use rand::Rng;
 use rpsls_core::constellation::{
     Battle, BattleConfig, BattleStatus, LanePlay, LaneResult, LaneWinner, RoundOutcome,
     WinCondition,
@@ -23,6 +24,20 @@ use crate::session::Session;
 /// to 13.5s on user feedback ("need more thinking room"). The countdown
 /// UI is unchanged — last 3s still trigger the urgency styling.
 const PICK_DEADLINE: Duration = Duration::from_millis(13_500);
+
+/// Hard cap on the pre-match prep window. If the other player never sends
+/// `Ready` within this budget we treat the silent side as having abandoned
+/// the match — cohesive with the post-match watchdog already in the client.
+/// 30s leaves enough slack for a phone to wake up + the WebView to mount
+/// (a 5–10s reconnect happens often on flaky cellular) without making the
+/// patient player stare at a frozen "0/2" forever.
+const PREP_DEADLINE: Duration = Duration::from_secs(30);
+
+/// How long the server waits between broadcasting `StartCoinFlip` and the
+/// first `LanesRoundStart`. Has to cover the client coin animation
+/// (`FLIP_DURATION_MS = 1600`) + the verdict reveal + a beat of breathing
+/// room. 4s feels right — anything shorter clips the "Terrain de X" line.
+const COIN_REVEAL_PAUSE: Duration = Duration::from_millis(4000);
 
 /// Commands sent to a running lanes match.
 #[derive(Debug)]
@@ -41,6 +56,28 @@ pub enum LanesCommand {
         slot: PlayerSlot,
         accept: bool,
     },
+    /// Pre-match coin-flip confirmation from one side. The match doesn't
+    /// start until BOTH slots have sent this.
+    Ready {
+        slot: PlayerSlot,
+    },
+}
+
+/// How the pre-match prep phase ended. Drives whether we enter the round
+/// loop or short-circuit straight to a forfeit broadcast.
+enum PrepOutcome {
+    /// Both sides confirmed — coin landed on `coin_winner`. The result is for
+    /// the client UI (whose arena dresses the board); gameplay is identical
+    /// either way, so the engine just discards it after broadcasting.
+    /// `coin_winner` is kept on the variant to make the broadcast payload
+    /// obvious at the call site even though no downstream code reads it.
+    #[allow(dead_code)]
+    Ready { coin_winner: PlayerSlot },
+    /// One side explicitly left during prep.
+    Leave { quitter: PlayerSlot },
+    /// Prep budget expired. `silent` is the slot that never confirmed; `None`
+    /// when NEITHER side confirmed (mutual timeout — no winner, no LP).
+    Timeout { silent: Option<PlayerSlot> },
 }
 
 /// How a round resolution ended at the collection layer.
@@ -113,6 +150,60 @@ async fn run_lanes_match(
 
         let mut round_no = 0u32;
         let mut forfeited = false;
+
+        // ── Pre-match: double "Ready" + server-side coin flip ──────────────
+        // The coin's `winner` slot only matters to the client (it dresses the
+        // arena with the winner's theme + pad); the engine doesn't read it.
+        let prep_failed = match prep_phase(&a, &b, &mut rx).await {
+            PrepOutcome::Ready { coin_winner: _ } => false,
+            PrepOutcome::Leave { quitter } => {
+                let other = session_for(other_slot(quitter), &a, &b);
+                other.send(ServerMessage::OpponentLeft);
+                let (round_wins_a, round_wins_b) = match quitter {
+                    PlayerSlot::A => (0u8, win_to),
+                    PlayerSlot::B => (win_to, 0u8),
+                };
+                broadcast_lanes_end(
+                    &a,
+                    &b,
+                    Some(other_slot(quitter)),
+                    round_wins_a,
+                    round_wins_b,
+                    true,
+                );
+                forfeited = true;
+                true
+            }
+            PrepOutcome::Timeout { silent: Some(slot) } => {
+                let other = session_for(other_slot(slot), &a, &b);
+                other.send(ServerMessage::OpponentLeft);
+                let (round_wins_a, round_wins_b) = match slot {
+                    PlayerSlot::A => (0u8, win_to),
+                    PlayerSlot::B => (win_to, 0u8),
+                };
+                broadcast_lanes_end(
+                    &a,
+                    &b,
+                    Some(other_slot(slot)),
+                    round_wins_a,
+                    round_wins_b,
+                    true,
+                );
+                forfeited = true;
+                true
+            }
+            PrepOutcome::Timeout { silent: None } => {
+                // Neither side ever pressed Ready — no winner, no LP, both
+                // get a clean forfeit notice and the task exits.
+                broadcast_lanes_end(&a, &b, None, 0, 0, true);
+                forfeited = true;
+                true
+            }
+        };
+
+        if prep_failed {
+            break;
+        }
 
         loop {
             if battle.status() != BattleStatus::InProgress {
@@ -283,7 +374,7 @@ async fn lanes_rematch_window(
                     }
                     return LanesRematch::Done;
                 }
-                LanesCommand::Play { .. } => {}
+                LanesCommand::Play { .. } | LanesCommand::Ready { .. } => {}
             },
         }
     }
@@ -293,6 +384,118 @@ fn session_for<'s>(slot: PlayerSlot, a: &'s Arc<Session>, b: &'s Arc<Session>) -
     match slot {
         PlayerSlot::A => a,
         PlayerSlot::B => b,
+    }
+}
+
+/// Pre-match double-confirm + server-authoritative coin flip.
+///
+/// Sends an initial `PrepReadyState { false, false }` to both sides so the
+/// 0/2 counter renders immediately, then waits up to `PREP_DEADLINE` for
+/// each side to send `Ready`. Every readiness update is broadcast
+/// per-perspective. As soon as BOTH have confirmed, the server rolls a coin
+/// (uniform random) and broadcasts `StartCoinFlip` with the winner, then
+/// pauses `COIN_REVEAL_PAUSE` so each client can animate locally before the
+/// first `LanesRoundStart` lands.
+///
+/// During prep, `Play`/`RequestRematch`/`RespondRematch` are silently
+/// ignored — clients have no UI to send them here, but a stray message from
+/// a desynced peer shouldn't crash the match.
+async fn prep_phase(
+    a: &Arc<Session>,
+    b: &Arc<Session>,
+    rx: &mut mpsc::UnboundedReceiver<LanesCommand>,
+) -> PrepOutcome {
+    let mut ready_a = false;
+    let mut ready_b = false;
+
+    // 0/2 baseline so the client UI doesn't render "—/2" while waiting for
+    // the first server message.
+    broadcast_ready_state(a, b, ready_a, ready_b);
+
+    let deadline = tokio::time::Instant::now() + PREP_DEADLINE;
+
+    loop {
+        let now = tokio::time::Instant::now();
+        if now >= deadline {
+            return PrepOutcome::Timeout {
+                silent: silent_slot(ready_a, ready_b),
+            };
+        }
+        let remaining = deadline - now;
+
+        match timeout(remaining, rx.recv()).await {
+            Err(_) => {
+                return PrepOutcome::Timeout {
+                    silent: silent_slot(ready_a, ready_b),
+                };
+            }
+            Ok(None) => {
+                // Channel closed — both sides went away. Treat as a leave by
+                // whichever side hadn't confirmed (defaults to A).
+                let quitter = silent_slot(ready_a, ready_b).unwrap_or(PlayerSlot::A);
+                return PrepOutcome::Leave { quitter };
+            }
+            Ok(Some(cmd)) => match cmd {
+                LanesCommand::Ready { slot } => {
+                    match slot {
+                        PlayerSlot::A => ready_a = true,
+                        PlayerSlot::B => ready_b = true,
+                    }
+                    broadcast_ready_state(a, b, ready_a, ready_b);
+
+                    if ready_a && ready_b {
+                        // Server-authoritative coin flip — uniform random.
+                        let coin_winner = if rand::thread_rng().gen_bool(0.5) {
+                            PlayerSlot::A
+                        } else {
+                            PlayerSlot::B
+                        };
+                        let msg = ServerMessage::StartCoinFlip {
+                            winner: coin_winner,
+                        };
+                        a.send(msg.clone());
+                        b.send(msg);
+                        // Hold the round loop just long enough for the client
+                        // animation + verdict reveal to read clearly.
+                        tokio::time::sleep(COIN_REVEAL_PAUSE).await;
+                        return PrepOutcome::Ready { coin_winner };
+                    }
+                }
+                LanesCommand::Leave { slot } => {
+                    return PrepOutcome::Leave { quitter: slot };
+                }
+                // Ignore everything else mid-prep.
+                LanesCommand::Play { .. }
+                | LanesCommand::RequestRematch { .. }
+                | LanesCommand::RespondRematch { .. } => {}
+            },
+        }
+    }
+}
+
+fn broadcast_ready_state(a: &Arc<Session>, b: &Arc<Session>, ready_a: bool, ready_b: bool) {
+    // Per-perspective: each client sees its OWN slot under `you_ready` so the
+    // UI math stays simple ("show 0/1/2 based on (you, opp)").
+    a.send(ServerMessage::PrepReadyState {
+        you_ready: ready_a,
+        opp_ready: ready_b,
+    });
+    b.send(ServerMessage::PrepReadyState {
+        you_ready: ready_b,
+        opp_ready: ready_a,
+    });
+}
+
+/// Map a (ready_a, ready_b) pair to the slot that hasn't confirmed yet.
+/// Returns `None` only when NEITHER side has confirmed — both timed out, so
+/// there's no asymmetric loser to penalize.
+fn silent_slot(ready_a: bool, ready_b: bool) -> Option<PlayerSlot> {
+    match (ready_a, ready_b) {
+        (false, true) => Some(PlayerSlot::A),
+        (true, false) => Some(PlayerSlot::B),
+        (false, false) => None,
+        // (true, true) is the success path, never observed here.
+        (true, true) => None,
     }
 }
 
@@ -340,7 +543,11 @@ async fn collect_lanes_round(
                     return (a_plays, b_plays, RoundEnd::Leave(slot));
                 }
                 // The rematch handshake only matters after a match — ignore mid-round.
-                LanesCommand::RequestRematch { .. } | LanesCommand::RespondRematch { .. } => {}
+                // `Ready` belongs to the prep phase only; a late one is a
+                // desynced client and gets dropped silently.
+                LanesCommand::RequestRematch { .. }
+                | LanesCommand::RespondRematch { .. }
+                | LanesCommand::Ready { .. } => {}
             },
         }
     }
