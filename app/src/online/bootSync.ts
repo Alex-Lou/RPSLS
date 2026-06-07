@@ -60,10 +60,48 @@ function runBootSyncImmediate(player: { id: string; nickname: string; claimToken
   };
 
   ws.onmessage = (ev) => {
-    let msg: { type: string; state?: PlayerProgress; claim_token?: string };
+    let msg: { type: string; state?: PlayerProgress; claim_token?: string; code?: string; message?: string };
     try {
       msg = JSON.parse(ev.data as string);
     } catch {
+      return;
+    }
+
+    // ── Reinstall recovery path ──
+    // Server rejects with "claim token mismatch" when the player_id exists
+    // server-side but our local claim_token is empty / wrong. This is the
+    // exact signature of a reinstall that wiped localStorage (WebView storage
+    // does NOT survive `adb install` without -r, nor a real user uninstall).
+    // The player's data is on the server but inaccessible without the token.
+    // Rather than leave the player stuck forever on a half-broken account,
+    // we treat the rejection as a "fresh start" signal: regenerate player.id
+    // locally so the next boot sync creates a clean record + fresh claim
+    // token. The local progression (currencies, cards, owned premiums)
+    // accumulated since the wipe is preserved and gets pushed to the new
+    // server record. NB: this loses access to pre-wipe server data, but
+    // that data was already unreachable; the alternative is "no sync at all
+    // until user uninstalls again". A future fix is to persist player.id +
+    // claimToken via a Tauri filesystem plugin so they survive WebView wipes.
+    if (msg.type === "error" && msg.code === "auth_failed" &&
+        (msg.message || "").includes("claim token") &&
+        !(player.claimToken || "").length) {
+      const newId = crypto.randomUUID();
+      // eslint-disable-next-line no-console
+      console.warn("[bootSync] claim-mismatch on empty local token — regenerating player.id (reinstall recovery).", { oldId: player.id, newId });
+      const store = useStore.getState();
+      store.applyServerSync({ id: newId, claimToken: undefined });
+      // Re-send hello with the fresh id so the server creates a clean record.
+      try {
+        ws.send(JSON.stringify({
+          type: "hello",
+          nickname: player.nickname || "Anonymous",
+          player_id: newId,
+          claim_token: "",
+        }));
+        // Update the bound `player` closure too so a subsequent message uses
+        // the new id when it tries to push.
+        (player as { id: string }).id = newId;
+      } catch { /* */ }
       return;
     }
 
