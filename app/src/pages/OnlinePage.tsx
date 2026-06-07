@@ -659,6 +659,14 @@ export function OnlinePage() {
           });
           return cur;
         });
+        // If the match died DURING prep (both prep timeouts + the mid-prep
+        // Leave path on the server send LanesMatchEnd straight from
+        // prep_phase), we're still in lanes_prep — slide into lanes_match
+        // so LanesMatchView can render the end screen instead of the
+        // player getting frozen on the "Confirmez tous les deux…" hint.
+        if (phaseRef.current === "lanes_prep") {
+          setPhase("lanes_match");
+        }
         pushPlayerState(clientRef.current);
         break;
       }
