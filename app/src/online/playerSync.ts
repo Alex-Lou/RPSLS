@@ -32,6 +32,7 @@ export function buildProgressFromPlayer(player: Player): PlayerProgress {
     cardMastery: player.cardMastery ?? {},
     codexClaimed: player.codexClaimed ?? [],
     rankedDeck: player.rankedDeck ?? [],
+    ownedPremiumSets: player.ownedPremiumSets ?? [],
     seasonNumber: player.season?.number ?? 1,
     seasonStartedAt: player.season?.startedAt ?? Date.now(),
     winStreak: player.winStreak ?? 0,
@@ -113,6 +114,16 @@ export function mergeServerState(
     patch.rankedDeck = server.rankedDeck;
   }
 
+  // Owned premium sets — UNION (paid content only ever grows; never lost on a
+  // reinstall or a device with a stale copy). Same durability model as cards.
+  const localSets = new Set(local.ownedPremiumSets ?? []);
+  const serverSets = server.ownedPremiumSets ?? [];
+  let setsChanged = false;
+  for (const s of serverSets) {
+    if (!localSets.has(s)) { localSets.add(s); setsChanged = true; }
+  }
+  if (setsChanged) patch.ownedPremiumSets = Array.from(localSets);
+
   // Season — take higher number
   const localSeason = local.season ?? { number: 1, startedAt: Date.now() };
   if (server.seasonNumber > localSeason.number) {
@@ -124,13 +135,21 @@ export function mergeServerState(
     patch.winStreak = server.winStreak;
   }
 
-  // Cosmetics — last-write-wins by updatedAt (NOT max/union; a preference has
-  // no "higher" value). Adopt the server's chosen look only when its sync is
-  // newer than anything we've synced locally — this restores the look after a
-  // reinstall or from another device, without clobbering a fresh local change.
-  // Each id is validated against the known registry so junk from a tampered
-  // save is ignored (and applyTheme can't crash on an unknown id).
-  if ((server.updatedAt ?? 0) > (local.syncedAt ?? 0)) {
+  // Cosmetics — the LOCAL choice is the stable source of truth on every boot.
+  // The server copy is a BACKUP that only seeds a fresh/wiped install — it must
+  // NEVER override a look the player already has locally, otherwise the theme
+  // visibly flickers at launch (local hydrate → server overwrite a few seconds
+  // later when bootSync lands). Previously this adopted the server look whenever
+  // server.updatedAt > local.syncedAt, which fired on essentially every boot.
+  //
+  // Rule: adopt the server look ONLY when the local profile is "vierge" — i.e.
+  // the player has no explicit background chosen (default / unset). That's the
+  // reinstall-recovery case. Once a background is chosen locally, the entire
+  // local look wins and is pushed up; the player keeps that choice every launch
+  // until THEY change it. (Avatar/nickname follow the same vierge gate.)
+  const localHasChosen =
+    !!local.backgroundId && local.backgroundId !== "default";
+  if (!localHasChosen && (server.updatedAt ?? 0) > 0) {
     if (server.themeId && server.themeId in THEMES) patch.themeId = server.themeId as ThemeId;
     if (server.backgroundId && server.backgroundId in BACKGROUNDS_BY_ID) patch.backgroundId = server.backgroundId as BackgroundId;
     if (server.padId && server.padId in PAD_META) patch.padId = server.padId as PadId;

@@ -44,6 +44,10 @@ pub struct PlayerProgress {
     pub codex_claimed: Vec<u32>,
     #[serde(default)]
     pub ranked_deck: Vec<String>,
+    /// Premium cosmetic sets the player has purchased. Synced (union) so a
+    /// reinstall never loses paid sets — same durability guarantee as cards.
+    #[serde(default)]
+    pub owned_premium_sets: Vec<String>,
     #[serde(default)]
     pub season_number: u32,
     #[serde(default)]
@@ -109,6 +113,7 @@ impl PlayerProgress {
 
         cap_vec(&mut self.card_collection, 64, 64);
         cap_vec(&mut self.ranked_deck, 16, 64);
+        cap_vec(&mut self.owned_premium_sets, 32, 32);
         self.codex_claimed.truncate(32);
         if self.card_mastery.len() > 64 {
             let keep: std::collections::HashSet<String> =

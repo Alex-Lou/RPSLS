@@ -45,6 +45,8 @@ export interface PlayerProgress {
   cardMastery: Record<string, number>;
   codexClaimed: number[];
   rankedDeck: string[];
+  /** Purchased premium sets — synced (union) so paid sets survive a reinstall. */
+  ownedPremiumSets?: string[];
   seasonNumber: number;
   seasonStartedAt: number;
   winStreak: number;
