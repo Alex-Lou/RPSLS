@@ -232,14 +232,22 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
       // longer has to discover a hidden scroll to find it).
       className="flex flex-col flex-1 min-h-0 py-2 px-2 max-w-lg mx-auto w-full"
     >
-      {/* Header — title + close, plus the read-only wallet so the player
-          always knows what they have without leaving the editor. */}
-      <div className="shrink-0 flex items-center justify-between gap-3 pb-3">
-        <h1 className="text-xl font-extrabold text-themed">Mon Deck</h1>
-        <div className="flex items-center gap-2">
-          <CurrencyBadges inert />
-          <button onClick={onClose} className="text-ink-muted hover:text-white text-xl px-2">✕</button>
+      {/* Header — two rows so the title doesn't get squeezed between a
+          full-width currency strip and the close button (which used to wrap
+          "Mon Deck" onto two lines on narrow phones). Row 1: title + close
+          target. Row 2: the read-only currency strip, full width. */}
+      <div className="shrink-0 flex flex-col gap-2 pb-3">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-xl font-extrabold text-themed tracking-tight truncate">
+            Mon Deck
+          </h1>
+          <button
+            onClick={onClose}
+            aria-label="Fermer"
+            className="shrink-0 w-9 h-9 -mr-1 rounded-full text-ink-muted hover:text-white hover:bg-hairline text-xl leading-none flex items-center justify-center transition"
+          >✕</button>
         </div>
+        <CurrencyBadges inert />
       </div>
 
       {/* Scroll region — only this middle band scrolls. */}
