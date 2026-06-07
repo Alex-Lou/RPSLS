@@ -7,12 +7,12 @@
  * collection. Locked cards stay greyed with a hint.
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
-import { ALL_CARD_IDS, CARDS, RARITY_COLOR } from "./cards";
+import { ALL_CARD_IDS, CARDS, isPassiveCard, RARITY_COLOR, RARITY_ORDER } from "./cards";
 import { CardImage } from "./CardImage";
-import type { CardId } from "./rankedTypes";
+import type { CardId, CardRarity } from "./rankedTypes";
 import { useT } from "../i18n";
 import { useNoMenuFx } from "../fx/menuFx";
 import { CurrencyBadges } from "./CurrencyBadges";
@@ -21,6 +21,30 @@ import { hapticTap } from "../haptic";
 const MAIN_SLOTS = 3;
 const RESERVE_SLOTS = 3;
 const TOTAL = MAIN_SLOTS + RESERVE_SLOTS;
+
+/** Compact French labels per rarity for the filter tabs. */
+const RARITY_FR: Record<CardRarity, string> = {
+  common: "Communes",
+  rare: "Rares",
+  epic: "Épiques",
+  legendary: "Légendaires",
+};
+
+/** Dot color per rarity — used in tab pills and section dividers. */
+const RARITY_DOT: Record<CardRarity, string> = {
+  common: "bg-zinc-400",
+  rare: "bg-blue-400",
+  epic: "bg-violet-400",
+  legendary: "bg-amber-400",
+};
+
+/** Tab pill ring color when ACTIVE (mirrors RARITY_DOT). */
+const RARITY_RING: Record<CardRarity, string> = {
+  common: "ring-zinc-400/60 bg-zinc-400/15 text-zinc-100",
+  rare: "ring-blue-400/60 bg-blue-400/15 text-blue-100",
+  epic: "ring-violet-400/60 bg-violet-400/15 text-violet-100",
+  legendary: "ring-amber-400/60 bg-amber-400/15 text-amber-100",
+};
 
 /** Cards unlocked by default (commons + first rares). Others need achievements. */
 const STARTER_CARDS: CardId[] = ["aegis", "precision", "anchor", "second-wind", "surge", "augur"];
@@ -84,6 +108,18 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
   });
   const [selected, setSelected] = useState<CardId | null>(null);
   const [collectionOpen, setCollectionOpen] = useState(true);
+  /* ──────────── Collection filters ────────────
+   * rarityFilter: which rarity tab is active ("all" or one of the 4 rarities).
+   * ownedOnly:    when true, hide locked cards (default: show all so the
+   *               player sees what's available to chase).
+   * inDeckOnly:   when true, show only cards currently equipped.
+   * passiveOnly:  when true, show only passive cards (deck-building helper).
+   * searchQuery:  free-text contains match on card name (lowercase). */
+  const [rarityFilter, setRarityFilter] = useState<CardRarity | "all">("all");
+  const [ownedOnly, setOwnedOnly] = useState(false);
+  const [inDeckOnly, setInDeckOnly] = useState(false);
+  const [passiveOnly, setPassiveOnly] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const mainSlots = deck.slice(0, MAIN_SLOTS) as (CardId | null)[];
   const reserveSlots = deck.slice(MAIN_SLOTS, TOTAL) as (CardId | null)[];
@@ -119,6 +155,72 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
   const usedInDeck = new Set(deck.filter(Boolean));
 
   const ownedCount = ALL_CARD_IDS.filter((id) => collection.includes(id)).length;
+
+  /** Count owned cards per rarity — shown in the rarity tab pills so the
+   *  player knows at a glance "how much of each tier I've collected". */
+  const ownedByRarity = useMemo(() => {
+    const counts: Record<CardRarity, { owned: number; total: number }> = {
+      common: { owned: 0, total: 0 },
+      rare: { owned: 0, total: 0 },
+      epic: { owned: 0, total: 0 },
+      legendary: { owned: 0, total: 0 },
+    };
+    for (const id of ALL_CARD_IDS) {
+      const r = CARDS[id].rarity;
+      counts[r].total += 1;
+      if (collection.includes(id)) counts[r].owned += 1;
+    }
+    return counts;
+  }, [collection]);
+
+  /** Filtered + grouped collection. Grouping is by mana cost within the
+   *  active rarity filter — gives the player a natural curve view inside
+   *  each tab without forcing them to scan a flat 46-card grid. */
+  const groupedByMana = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const filtered = ALL_CARD_IDS.filter((id) => {
+      const card = CARDS[id];
+      if (rarityFilter !== "all" && card.rarity !== rarityFilter) return false;
+      if (ownedOnly && !collection.includes(id)) return false;
+      if (inDeckOnly && !usedInDeck.has(id)) return false;
+      if (passiveOnly && !isPassiveCard(id)) return false;
+      if (q) {
+        const name = t(card.nameKey).toLowerCase();
+        if (!name.includes(q) && !id.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+    // Group by mana cost (1/2/3/4) so the player sees their curve.
+    const groups: Record<number, CardId[]> = {};
+    for (const id of filtered) {
+      const cost = CARDS[id].cost;
+      (groups[cost] ??= []).push(id);
+    }
+    // Within each cost bucket: rarity asc, then alphabetical name — the
+    // resulting order matches how a deck-builder mentally scans cards.
+    for (const cost of Object.keys(groups)) {
+      groups[+cost].sort((a, b) => {
+        const ra = RARITY_ORDER.indexOf(CARDS[a].rarity);
+        const rb = RARITY_ORDER.indexOf(CARDS[b].rarity);
+        if (ra !== rb) return ra - rb;
+        return t(CARDS[a].nameKey).localeCompare(t(CARDS[b].nameKey));
+      });
+    }
+    return [1, 2, 3, 4]
+      .filter((c) => groups[c]?.length)
+      .map((c) => ({ cost: c, ids: groups[c] }));
+  }, [rarityFilter, ownedOnly, inDeckOnly, passiveOnly, searchQuery, collection, usedInDeck, t]);
+
+  const totalShown = groupedByMana.reduce((sum, g) => sum + g.ids.length, 0);
+  const anyFilterActive = rarityFilter !== "all" || ownedOnly || inDeckOnly || passiveOnly || searchQuery.length > 0;
+
+  function clearAllFilters() {
+    setRarityFilter("all");
+    setOwnedOnly(false);
+    setInDeckOnly(false);
+    setPassiveOnly(false);
+    setSearchQuery("");
+  }
 
   return (
     <motion.div
@@ -168,13 +270,15 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        {/* Collection — collapsible. Tap the header to fold/unfold; the count
-            badge + chevron make the affordance obvious, and folding it shrinks
-            a long card list so the deck slots stay the focus. */}
-        <div>
+        {/* Collection — collapsible header + sticky filter bar + curve-grouped
+            cards grid. Designed to scale past 46 cards without becoming a wall
+            of icons: a rarity tab + an owned/in-deck/passive toggle + a search
+            input cut the visible set down to 6–12 cards, and a mana-cost
+            divider inside each tab gives the player a deck-builder's curve view. */}
+        <div className="flex flex-col gap-2">
           <button
             onClick={() => { hapticTap(); setCollectionOpen((o) => !o); }}
-            className="w-full flex items-center justify-between gap-2 mb-2 group"
+            className="w-full flex items-center justify-between gap-2 group"
           >
             <span className="flex items-center gap-2">
               <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-ink-muted">
@@ -183,66 +287,132 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
               <span className="text-[9px] font-black tabular-nums px-1.5 py-0.5 rounded-full bg-hairline text-ink-muted">
                 {ownedCount}/{ALL_CARD_IDS.length}
               </span>
+              {/* Soft progress bar — at-a-glance "how complete is my collection". */}
+              <span className="hidden sm:inline-flex h-1.5 w-20 rounded-full bg-hairline overflow-hidden">
+                <span
+                  className="h-full bg-themed transition-all duration-500"
+                  style={{ width: `${Math.round((ownedCount / ALL_CARD_IDS.length) * 100)}%` }}
+                />
+              </span>
             </span>
             <span className={"text-ink-faint text-xs transition-transform duration-200 " + (collectionOpen ? "rotate-180" : "")}>▾</span>
           </button>
+
           <AnimatePresence initial={false}>
             {collectionOpen && (
               <motion.div
-                key="collection-grid"
+                key="collection-body"
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: "auto", opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
                 transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                 className="overflow-hidden"
               >
-                <div className="grid grid-cols-4 gap-2 pt-0.5">
-                  {ALL_CARD_IDS.map((id) => {
-                    const card = CARDS[id];
-                    const unlocked = collection.includes(id);
-                    const inDeck = usedInDeck.has(id);
-                    const isSelected = selected === id;
-                    return (
-                      <motion.button
-                        key={id}
-                        onClick={() => handleCardTap(id)}
-                        whileTap={unlocked ? { scale: 0.92 } : undefined}
-                        className={
-                          "relative rounded-xl overflow-hidden aspect-[3/4] flex flex-col items-center justify-center transition " +
-                          (isSelected
-                            ? "ring-2 ring-white shadow-lg shadow-white/30 scale-105"
-                            : inDeck
-                            ? "ring-2 ring-emerald-400/50 opacity-60"
-                            : unlocked
-                            ? "ring-1 ring-white/20"
-                            : "ring-1 ring-white/5 grayscale opacity-30")
-                        }
+                <div className="flex flex-col gap-2 pt-1">
+                  {/* Search box — compact, with a clear (✕) when active. */}
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint text-xs pointer-events-none">🔍</span>
+                    <input
+                      type="text"
+                      inputMode="search"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Rechercher une carte…"
+                      className="w-full pl-8 pr-8 py-1.5 text-xs rounded-lg bg-surface-raised border border-hairline focus:border-white/40 focus:outline-none text-white placeholder:text-ink-faint transition"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery("")}
+                        aria-label="Effacer la recherche"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-hairline text-ink-muted hover:text-white text-[10px] flex items-center justify-center"
+                      >✕</button>
+                    )}
+                  </div>
+
+                  {/* Rarity tabs — horizontal pills with owned/total per rarity. */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 no-scrollbar">
+                    <RarityTab
+                      active={rarityFilter === "all"}
+                      onClick={() => { hapticTap(); setRarityFilter("all"); }}
+                      label="Toutes"
+                      count={`${ownedCount}/${ALL_CARD_IDS.length}`}
+                      dotClass="bg-white/70"
+                    />
+                    {RARITY_ORDER.map((r) => (
+                      <RarityTab
+                        key={r}
+                        active={rarityFilter === r}
+                        onClick={() => { hapticTap(); setRarityFilter(r); }}
+                        label={RARITY_FR[r]}
+                        count={`${ownedByRarity[r].owned}/${ownedByRarity[r].total}`}
+                        dotClass={RARITY_DOT[r]}
+                        activeRingClass={RARITY_RING[r]}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Filter chips — multi-select toggles. Reset button appears
+                      only when at least one filter is active so the bar stays
+                      clean in the default state. */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <FilterChip
+                      active={ownedOnly}
+                      onClick={() => { hapticTap(); setOwnedOnly((v) => !v); }}
+                      icon="📥"
+                      label="Possédées"
+                    />
+                    <FilterChip
+                      active={inDeckOnly}
+                      onClick={() => { hapticTap(); setInDeckOnly((v) => !v); }}
+                      icon="✓"
+                      label="Dans mon deck"
+                    />
+                    <FilterChip
+                      active={passiveOnly}
+                      onClick={() => { hapticTap(); setPassiveOnly((v) => !v); }}
+                      icon="∞"
+                      label="Passives"
+                    />
+                    {anyFilterActive && (
+                      <button
+                        onClick={() => { hapticTap(); clearAllFilters(); }}
+                        className="ml-auto text-[10px] uppercase tracking-wider text-ink-muted hover:text-white px-2 py-1 transition"
                       >
-                        <CardImage id={id} glyphSize="text-xl" />
-                        <div className="relative z-10 flex flex-col items-center gap-0.5 p-1">
-                          <span className="text-xl">{card.glyph}</span>
-                          <span className="text-[7px] font-bold uppercase text-white/90 text-center leading-tight">
-                            {t(card.nameKey)}
-                          </span>
-                          <span className={"text-[7px] font-bold " + RARITY_COLOR[card.rarity]}>
-                            {card.cost}m · {card.rarity}
-                          </span>
-                        </div>
-                        {!unlocked && (
-                          <div className="absolute inset-0 bg-black/70 flex items-center justify-center p-1 z-20">
-                            <span className="text-[8px] text-ink-muted text-center leading-tight">
-                              🔒 {UNLOCK_HINTS[id] ?? "Bientôt"}
-                            </span>
-                          </div>
-                        )}
-                        {inDeck && !isSelected && (
-                          <div className="absolute top-0.5 right-0.5 w-3 h-3 rounded-full bg-emerald-400 flex items-center justify-center z-20">
-                            <span className="text-[7px] text-zinc-900 font-black">✓</span>
-                          </div>
-                        )}
-                      </motion.button>
-                    );
-                  })}
+                        Réinitialiser
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Grouped grid — one section per mana cost present in the
+                      filtered set. AnimatePresence on the wrapper smooths the
+                      tab/filter switch without re-mounting each card. */}
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={`${rarityFilter}-${ownedOnly}-${inDeckOnly}-${passiveOnly}-${searchQuery}`}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: 0.18 }}
+                      className="flex flex-col gap-3 pt-1"
+                    >
+                      {totalShown === 0 ? (
+                        <EmptyState onReset={clearAllFilters} hasFilters={anyFilterActive} />
+                      ) : (
+                        groupedByMana.map(({ cost, ids }) => (
+                          <ManaGroup
+                            key={`cost-${cost}`}
+                            cost={cost}
+                            ids={ids}
+                            collection={collection}
+                            usedInDeck={usedInDeck}
+                            selected={selected}
+                            onCardTap={handleCardTap}
+                            t={t}
+                          />
+                        ))
+                      )}
+                    </motion.div>
+                  </AnimatePresence>
                 </div>
               </motion.div>
             )}
@@ -300,5 +470,204 @@ function DeckSlot({
         <div className="text-[7px] font-bold uppercase text-center text-white/90">{t(card.nameKey)}</div>
       </div>
     </button>
+  );
+}
+
+/* ────────────── Collection helpers ────────────── */
+
+/** Rarity tab pill — when active, gets a tinted ring + bg in the rarity color;
+ *  when inactive, a quiet hairline outline. The count "owned/total" is the
+ *  primary scannable info, the rarity dot the secondary one. */
+function RarityTab({
+  active, onClick, label, count, dotClass, activeRingClass,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  count: string;
+  dotClass: string;
+  /** Optional tinted look when active — defaults to a neutral white ring
+   *  (used by the "Toutes" tab which has no rarity color of its own). */
+  activeRingClass?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={
+        "shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider transition " +
+        (active
+          ? (activeRingClass ?? "bg-white/15 ring-white/40 text-white") + " ring-1"
+          : "bg-hairline/40 ring-1 ring-hairline text-ink-muted hover:text-white")
+      }
+    >
+      <span className={"w-1.5 h-1.5 rounded-full " + dotClass} aria-hidden />
+      <span>{label}</span>
+      <span className="text-[9px] font-black tabular-nums opacity-70">{count}</span>
+    </button>
+  );
+}
+
+/** Multi-select toggle chip — owned-only, in-deck-only, passives-only. */
+function FilterChip({
+  active, onClick, icon, label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: string;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={
+        "inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition " +
+        (active
+          ? "bg-emerald-400/20 ring-1 ring-emerald-400/50 text-emerald-100"
+          : "bg-hairline/40 ring-1 ring-hairline text-ink-muted hover:text-white")
+      }
+    >
+      <span aria-hidden>{icon}</span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
+/** Section divider + grid for one mana-cost bucket. Header shows the mana
+ *  cost as visual pips so the player reads the curve graphically, not as text. */
+function ManaGroup({
+  cost, ids, collection, usedInDeck, selected, onCardTap, t,
+}: {
+  cost: number;
+  ids: CardId[];
+  // String[] not CardId[] — the store persists cardCollection as plain
+  // strings; we don't re-validate here since ALL_CARD_IDS bounds `ids`.
+  collection: string[];
+  usedInDeck: Set<string | CardId | null>;
+  selected: CardId | null;
+  onCardTap: (id: CardId) => void;
+  t: (key: string) => string;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2 px-0.5">
+        <div className="flex items-center gap-0.5">
+          {Array.from({ length: cost }, (_, i) => (
+            <span key={i} className="w-1.5 h-1.5 rounded-full bg-sky-300 shadow-[0_0_4px_rgba(125,211,252,0.7)]" />
+          ))}
+        </div>
+        <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-ink-muted">
+          {cost} mana
+        </span>
+        <span className="text-[9px] font-black tabular-nums text-ink-faint">
+          ({ids.length})
+        </span>
+        <div className="flex-1 h-px bg-hairline ml-1" />
+      </div>
+      <div className="grid grid-cols-4 gap-2">
+        {ids.map((id, i) => (
+          <CardCell
+            key={id}
+            id={id}
+            index={i}
+            unlocked={collection.includes(id)}
+            inDeck={usedInDeck.has(id)}
+            isSelected={selected === id}
+            onClick={() => onCardTap(id)}
+            t={t}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Single card cell — the entire visual was extracted from the old inline
+ *  rendering so the new layout reuses it inside each mana group AND so a
+ *  per-cell staggered fade animation is possible (index-based delay). */
+function CardCell({
+  id, index, unlocked, inDeck, isSelected, onClick, t,
+}: {
+  id: CardId;
+  index: number;
+  unlocked: boolean;
+  inDeck: boolean;
+  isSelected: boolean;
+  onClick: () => void;
+  t: (key: string) => string;
+}) {
+  const card = CARDS[id];
+  return (
+    <motion.button
+      onClick={onClick}
+      whileTap={unlocked ? { scale: 0.92 } : undefined}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      // Tight stagger (16ms × index) — visible but never feels slow.
+      transition={{ delay: Math.min(index * 0.016, 0.24), duration: 0.18 }}
+      className={
+        "relative rounded-xl overflow-hidden aspect-[3/4] flex flex-col items-center justify-center transition " +
+        (isSelected
+          ? "ring-2 ring-white shadow-lg shadow-white/30 scale-105"
+          : inDeck
+          ? "ring-2 ring-emerald-400/50 opacity-70"
+          : unlocked
+          ? "ring-1 ring-white/20"
+          : "ring-1 ring-white/5 grayscale opacity-30")
+      }
+    >
+      <CardImage id={id} glyphSize="text-xl" />
+      {/* Mana cost pip — top-left corner, always visible (helps with curve scanning). */}
+      <div className="absolute top-0.5 left-0.5 z-10 inline-flex items-center justify-center gap-0.5 px-1 py-0.5 rounded-full bg-black/65 backdrop-blur-sm">
+        {Array.from({ length: card.cost }, (_, k) => (
+          <span key={k} className="w-1 h-1 rounded-full bg-sky-300" />
+        ))}
+      </div>
+      {/* Rarity micro-dot — top-right so it doesn't fight the mana pips. */}
+      <div
+        className={"absolute top-1 right-1 z-10 w-1.5 h-1.5 rounded-full " + RARITY_DOT[card.rarity]}
+        aria-hidden
+      />
+      <div className="relative z-10 flex flex-col items-center gap-0.5 p-1 mt-auto">
+        <span className="text-lg">{card.glyph}</span>
+        <span className="text-[7px] font-bold uppercase text-white/90 text-center leading-tight">
+          {t(card.nameKey)}
+        </span>
+        <span className={"text-[7px] font-bold " + RARITY_COLOR[card.rarity]}>
+          {isPassiveCard(id) ? "passive" : card.rarity}
+        </span>
+      </div>
+      {!unlocked && (
+        <div className="absolute inset-0 bg-black/70 flex items-center justify-center p-1 z-20">
+          <span className="text-[8px] text-ink-muted text-center leading-tight">
+            🔒 {UNLOCK_HINTS[id] ?? "Bientôt"}
+          </span>
+        </div>
+      )}
+      {inDeck && !isSelected && (
+        <div className="absolute top-0.5 right-3 z-20 w-3 h-3 rounded-full bg-emerald-400 flex items-center justify-center">
+          <span className="text-[7px] text-zinc-900 font-black">✓</span>
+        </div>
+      )}
+    </motion.button>
+  );
+}
+
+/** Shown when filters reduce the collection to zero matches. */
+function EmptyState({ onReset, hasFilters }: { onReset: () => void; hasFilters: boolean }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 py-8 px-4 text-center">
+      <div className="text-3xl opacity-40">📭</div>
+      <div className="text-xs text-ink-muted">
+        Aucune carte ne correspond aux filtres.
+      </div>
+      {hasFilters && (
+        <button
+          onClick={onReset}
+          className="mt-1 text-[10px] uppercase tracking-wider text-themed font-bold hover:underline"
+        >
+          Réinitialiser les filtres
+        </button>
+      )}
+    </div>
   );
 }
