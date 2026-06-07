@@ -26,6 +26,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 
 interface Crystal {
@@ -249,7 +250,7 @@ function QuartzInteractiveLayerInner({
     };
   }, [mode, onDown, onMove, onUp]);
 
-  return (
+  const content = (
     <div
       ref={layerRef}
       // Active mode: capture pointer events on the layer itself.
@@ -258,7 +259,13 @@ function QuartzInteractiveLayerInner({
       onPointerUp={mode === "active" ? onUp : undefined}
       onPointerCancel={mode === "active" ? onUp : undefined}
       onPointerLeave={mode === "active" ? onUp : undefined}
-      className="absolute inset-0"
+      // PASSIVE: fixed full-screen at z-[60] (ABOVE the opaque menu cards,
+      // BELOW modals at z-[120]) so the crystals/bubbles are VISIBLE in-game
+      // — previously the layer rendered at z-0 behind the menu, so the touch
+      // FX existed but were hidden. pointer-events stay none so taps reach
+      // the UI; the window-level listeners (effect above) drive the FX.
+      // ACTIVE: absolute fill inside the peek wrapper, capturing events.
+      className={mode === "passive" ? "fixed inset-0 z-[60]" : "absolute inset-0"}
       style={{
         pointerEvents: mode === "active" ? "auto" : "none",
         touchAction: "none",
@@ -272,6 +279,9 @@ function QuartzInteractiveLayerInner({
       </AnimatePresence>
     </div>
   );
+  // Passive layer portals to <body> so its z-[60] isn't trapped in the
+  // backdrop's z-0 stacking context (where it'd stay behind the menu).
+  return mode === "passive" ? createPortal(content, document.body) : content;
 }
 
 /** Small drifting bubble — gold rim, hollow centre, drifts up + fades. */

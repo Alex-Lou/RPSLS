@@ -16,8 +16,6 @@ import { TabPicker } from "../ui/TabPicker";
 import { PremiumPurchaseModal, type PremiumSet } from "../ui/PremiumPurchaseModal";
 import { PremiumBadge } from "../ui/PremiumBadge";
 import { OwnedBadgeLongPress } from "../ui/OwnedBadgeLongPress";
-import { QuartzBackdrop } from "../backdrops/QuartzBackdrop";
-import { ThemedBackdrop } from "../backdrops/ThemedBackdrop";
 import { useT } from "../i18n";
 import { hapticTap, hapticMatchStart } from "../haptic";
 import { useBackdropPeek } from "../backdrops/previewScene";
@@ -1082,58 +1080,127 @@ export function ProfilePage() {
       )}
       <PremiumPurchaseModal
         set={premiumModalSetId ? PREMIUM_SETS[premiumModalSetId] ?? null : null}
-        onClose={() => setPremiumModalSetId(null)}
+        onClose={() => {
+          // If the set was just purchased, the peek (still open behind the
+          // modal) should drop its "premium pending" mode so its button bar
+          // flips from Acheter → Choisir ce thème. The bg+pad+theme are
+          // already applied (we applied them on the preview tap), so the
+          // player keeps the look they just bought.
+          // NB: read ownership from the LIVE store, not the render closure —
+          // the modal's setTimeout(onClose, 2200) captured a stale onClose
+          // from before the purchase, so `player` here would not yet include
+          // the new set. useStore.getState() is always current.
+          const justBoughtId = premiumModalSetId;
+          setPremiumModalSetId(null);
+          const liveOwned = useStore.getState().player.ownedPremiumSets ?? [];
+          if (justBoughtId && liveOwned.includes(justBoughtId)) {
+            setPeekPremiumPending(null);
+            previousLookRef.current = null; // committed — don't revert on close
+          }
+        }}
       />
     </motion.div>
   );
 }
 
-/** Premium catalogue — single source of truth for the boutique. Each entry's
- *  preview is a real component (not a static image) so the player sees the
- *  scene live before paying. Add a new set: drop an entry here + register the
- *  background id with `premiumSetId: "<id>"` in themes.ts. */
+/** Accent palette + emblem for the lightweight purchase-modal preview tile.
+ *  Mirrors each set's `accent` in themes.ts. Kept local so the preview never
+ *  pulls in a live backdrop. */
+const PREVIEW_ACCENTS: Record<string, { from: string; to: string; bg: string; emoji: string }> = {
+  eclipse:    { from: "#d4a745", to: "#8b7fcf", bg: "#06050e", emoji: "🌑" },
+  phantom:    { from: "#5a7a9a", to: "#8a9bb5", bg: "#0c0e14", emoji: "👻" },
+  emberforge: { from: "#ff6a14", to: "#ff9426", bg: "#0a0503", emoji: "🔥" },
+  tempus:     { from: "#b8956a", to: "#d4a76a", bg: "#0a0703", emoji: "⏳" },
+  storm:      { from: "#4af0ff", to: "#a078ff", bg: "#060a16", emoji: "⚡" },
+  quartz:     { from: "#c8aef0", to: "#f6a5b8", bg: "#1a142a", emoji: "💠" },
+};
+
+/** PremiumPreviewTile — lightweight, ZERO-WebGL preview for the purchase
+ *  modal. Two earlier attempts mounted a live <ThemedBackdrop> here, which
+ *  spawned a SECOND WebGL context (the first being the full-screen peek the
+ *  modal opens over) and crashed mobile GPUs. The player already sees the
+ *  real animated backdrop full-screen in the peek; this tile just needs to
+ *  evoke the set with its accent gradient + emblem. Pure CSS / motion. */
+function PremiumPreviewTile({ setId }: { setId: string }) {
+  const a = PREVIEW_ACCENTS[setId] ?? PREVIEW_ACCENTS.eclipse;
+  return (
+    <div className="absolute inset-0 overflow-hidden" style={{ background: a.bg }}>
+      <motion.div
+        className="absolute inset-0"
+        style={{
+          background:
+            `radial-gradient(120% 90% at 18% 12%, ${a.from}cc, transparent 55%),` +
+            `radial-gradient(120% 90% at 86% 92%, ${a.to}aa, transparent 55%)`,
+        }}
+        animate={{ opacity: [0.72, 1, 0.72], scale: [1, 1.06, 1] }}
+        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+      />
+      {/* Diagonal shimmer sweep — sells "premium sheen". */}
+      <motion.div
+        className="absolute inset-y-0 w-1/3"
+        style={{ background: `linear-gradient(105deg, transparent, ${a.from}40, transparent)` }}
+        animate={{ x: ["-160%", "360%"] }}
+        transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut", repeatDelay: 1.0 }}
+      />
+      {/* Watermark emblem. */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-7xl opacity-25 select-none"
+              style={{ filter: `drop-shadow(0 0 26px ${a.from})` }}>
+          {a.emoji}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** Premium catalogue — single source of truth for the boutique. Preview is a
+ *  lightweight CSS tile (NOT a live backdrop — see PremiumPreviewTile). The
+ *  full animated scene is shown in the full-screen peek the player reaches
+ *  before this modal. Add a new set: drop an entry here + register the
+ *  background id with `premiumSetId: "<id>"` in themes.ts + an accent in
+ *  PREVIEW_ACCENTS above. */
 const PREMIUM_SETS: Record<string, PremiumSet> = {
   quartz: {
     id: "quartz",
     name: "Quartz",
     tagline: "Éclats cristallins prismatiques, un monde glaciaire et doux.",
     cost: 800,
-    previewArt: <QuartzBackdrop />,
+    previewArt: <PremiumPreviewTile setId="quartz" />,
   },
   eclipse: {
     id: "eclipse",
     name: "Eclipse",
     tagline: "Couronne solaire, anneau de diamant, vide onyx percé d'or.",
     cost: 800,
-    previewArt: <ThemedBackdrop scene="eclipse" />,
+    previewArt: <PremiumPreviewTile setId="eclipse" />,
   },
   phantom: {
     id: "phantom",
     name: "Phantom Realm",
     tagline: "Brume spectrale, larmes fantômes, volutes argentées.",
     cost: 800,
-    previewArt: <ThemedBackdrop scene="phantom" />,
+    previewArt: <PremiumPreviewTile setId="phantom" />,
   },
   emberforge: {
     id: "emberforge",
     name: "Ember Forge",
     tagline: "Forge naine, rivières de braise, cuivre martelé incandescent.",
     cost: 800,
-    previewArt: <ThemedBackdrop scene="emberforge" />,
+    previewArt: <PremiumPreviewTile setId="emberforge" />,
   },
   tempus: {
     id: "tempus",
     name: "Tempus Aeternum",
     tagline: "Sables du temps, engrenages antiques, sablier sépia éternel.",
     cost: 800,
-    previewArt: <ThemedBackdrop scene="tempus" />,
+    previewArt: <PremiumPreviewTile setId="tempus" />,
   },
   storm: {
     id: "storm",
     name: "Tempest Fury",
     tagline: "Foudre déchirante, rideaux de pluie, nuages d'orage grondants.",
     cost: 800,
-    previewArt: <ThemedBackdrop scene="storm" />,
+    previewArt: <PremiumPreviewTile setId="storm" />,
   },
 };
 

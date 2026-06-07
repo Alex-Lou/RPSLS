@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
 import { PremiumBadge } from "./PremiumBadge";
@@ -53,15 +54,25 @@ export function PremiumPurchaseModal({
    *   The closing handoff back to onClose is the parent's responsibility. */
   const [phase, setPhase] = useState<"idle" | "celebrating">("idle");
 
+  // Reset to idle ONLY when a different set opens. This effect must NOT
+  // depend on `onClose` — the parent passes a fresh inline onClose on every
+  // render, and the purchase itself triggers a parent re-render (store
+  // update). If onClose were a dep, that re-render would re-run this effect
+  // and slam phase back to "idle" the instant the celebration started —
+  // which is exactly why the unlock animation was invisible. `set` is a
+  // stable module-const reference per id, so this fires only on a real open.
+  useEffect(() => {
+    if (set) setPhase("idle");
+  }, [set]);
+
+  // Esc-to-close, idle phase only. Separate effect so its onClose dependency
+  // can't reset the celebration phase.
   useEffect(() => {
     if (!set) return;
-    setPhase("idle"); // reset whenever a fresh set opens
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && phase === "idle") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // phase intentionally outside deps — we don't want closing-during-celebrate.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [set, onClose]);
+  }, [set, onClose, phase]);
 
   if (!set) return null;
   const affordable = stars >= set.cost;
@@ -78,7 +89,11 @@ export function PremiumPurchaseModal({
     window.setTimeout(() => onClose(), 2200);
   };
 
-  return (
+  // Portal to <body> so the modal escapes any stacking context created by
+  // the profile page / the full-screen peek it opens over. WITHOUT this, the
+  // peek (portaled to body at z-[9999]) sits ON TOP of the modal and its
+  // celebration — the player saw nothing on purchase. z-[10000] clears it.
+  return createPortal(
     <motion.div
       role="dialog"
       aria-modal
@@ -86,8 +101,16 @@ export function PremiumPurchaseModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       onClick={onClose}
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
     >
+      {/* Full-screen celebration — rendered as a SIBLING of the card (not
+          inside it) so the burst fills the whole screen instead of being
+          clipped to the small card. z above the card. */}
+      <AnimatePresence>
+        {phase === "celebrating" && (
+          <CelebrationOverlay label={t("premium.unlocked")} setId={set.id} />
+        )}
+      </AnimatePresence>
       <motion.div
         onClick={(e) => e.stopPropagation()}
         initial={{ scale: 0.92, y: 16, opacity: 0 }}
@@ -99,11 +122,6 @@ export function PremiumPurchaseModal({
         <div className="absolute top-3 right-3 z-10">
           <PremiumBadge variant="pill" label={t("premium.label")} />
         </div>
-        <AnimatePresence>
-          {phase === "celebrating" && (
-            <CelebrationOverlay label={t("premium.unlocked")} setId={set.id} />
-          )}
-        </AnimatePresence>
         <div className="aspect-[4/3] w-full bg-gradient-to-br from-zinc-900 via-zinc-800 to-black relative overflow-hidden">
           {set.previewArt}
         </div>
@@ -162,7 +180,8 @@ export function PremiumPurchaseModal({
           </div>
         </div>
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body,
   );
 }
 
