@@ -79,13 +79,19 @@ export function PremiumPurchaseModal({
 
   const handleBuy = () => {
     if (owned || phase !== "idle") return;
-    const ok = buy(set.id, set.cost);
-    if (!ok) { hapticTap(); return; }
-    // Tap-confirm haptic NOW, success haptic at the burst peak (~280ms later)
-    // so the player feels two distinct beats: "tap accepted" → "REWARD".
+    // Affordability pre-check so we can start the animation BEFORE the heavy
+    // store mutation. The buy() call below triggers Zustand persist, which
+    // serialises the whole player state to localStorage synchronously — if
+    // that runs on the same tick as setPhase, it janks the celebration's
+    // first frame (the freeze Alex saw). We start the burst first, then defer
+    // buy() by two animation frames so the opening frames render smoothly.
+    if (stars < set.cost) { hapticTap(); return; }
     hapticMatchStart();
     setPhase("celebrating");
-    window.setTimeout(() => hapticMatchWin(), 280);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      buy(set.id, set.cost);
+      window.setTimeout(() => hapticMatchWin(), 60);
+    }));
     window.setTimeout(() => onClose(), 2200);
   };
 
@@ -282,7 +288,11 @@ const DEFAULT_FLAVOR: CelebrationFlavor = {
   shapes: "dots",
 };
 function CelebrationOverlay({ label, setId }: { label: string; setId?: string }) {
-  const PARTICLES = 28;
+  // 18 (was 28): on mid-range phones, 28 simultaneously-animated compositor
+  // layers ON TOP of the still-running WebGL backdrop dropped frames. 18 reads
+  // just as full but stays at 60fps. Each particle carries willChange:transform
+  // so the compositor promotes it once up-front instead of mid-animation.
+  const PARTICLES = 18;
   const f = (setId && FLAVORS[setId]) || DEFAULT_FLAVOR;
   return (
     <motion.div
@@ -361,6 +371,7 @@ function CelebrationOverlay({ label, setId }: { label: string; setId?: string })
               borderRadius,
               background: i % 2 === 0 ? f.particleA : f.particleB,
               boxShadow: f.particleShadow,
+              willChange: "transform, opacity",
             }}
             initial={{ x: 0, y: 0, opacity: 0, scale: 0.4, rotate }}
             animate={{

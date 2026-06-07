@@ -997,14 +997,15 @@ export function ProfilePage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
-              className="fixed inset-0 z-[9999] flex flex-col items-center justify-end pb-10"
-              onClick={() => {
-                // Ignore the opening tap's trailing click (mobile ghost-click).
-                if (performance.now() - peekOpenedAt.current < 400) return;
-                closePeek();
-              }}
+              // pointer-events-none on the container so taps on the backdrop
+              // PASS THROUGH to the touch layers (WebGL window-listeners /
+              // Quartz active layer) — the player can play with the scene to
+              // test the touch FX. Tapping NO LONGER closes/confirms the peek
+              // (that was the bug). Only the button column (pointer-events-auto
+              // below) commits or closes.
+              className="fixed inset-0 z-[9999] flex flex-col items-center justify-end pb-10 pointer-events-none"
             >
-              <div className="flex flex-col items-center gap-3 max-w-md w-full px-6" onClick={(e) => e.stopPropagation()}>
+              <div className="flex flex-col items-center gap-3 max-w-md w-full px-6 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                 {/* Header pill: name + appliqué/aperçu state. */}
                 <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/55 backdrop-blur-md border border-white/15">
                   {peekPremiumPending ? (
@@ -1071,7 +1072,7 @@ export function ProfilePage() {
                     </motion.button>
                   </div>
                 )}
-                <span className="text-white/55 text-[11px]">Touche pour revenir · Glisse pour interagir</span>
+                <span className="text-white/55 text-[11px]">Touche / glisse le fond pour jouer · les boutons valident</span>
               </div>
             </motion.div>
           )}
