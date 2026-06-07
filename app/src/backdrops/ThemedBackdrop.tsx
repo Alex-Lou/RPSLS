@@ -401,7 +401,34 @@ vec3 eclipse(vec2 uv, float aspect){
     }
   }
 
-  // ── SUBTLE STARS ──
+  // ── CONTINUOUS CORONA TURBULENCE ──
+  // Visible flame-like fluctuations rolling along the ring at every frame.
+  // Implementation: sample FBM along the angular axis WARPED by time, then
+  // band-limit to a narrow ring around the corona. Reads as plasma boiling.
+  float boilNoise = fbm(vec2(ang*3.5 + t*1.4, r*5.0 - t*0.8));
+  float boilBand = exp(-pow((r - ringR - 0.020)*22.0, 2.0));
+  col += vec3(1.0, 0.78, 0.30) * boilBand * boilNoise * 0.55;
+
+  // ── ORBITING CORONA EMBERS ──
+  // 8 small bright sparks revolve around the ring at varied speeds, each
+  // twinkling — visible motion at every moment, no waiting for events.
+  for(int i=0;i<8;i++){
+    float fi = float(i);
+    float emAng = u_time*(0.18 + fi*0.024) + fi*0.785;
+    vec2 emPos = vec2(cos(emAng), sin(emAng)) * (ringR + 0.012);
+    float emD = length(q - emPos);
+    float emTw = 0.55 + 0.45*sin(u_time*2.2 + fi*5.1);
+    col += vec3(1.0, 0.88, 0.55) * exp(-emD*emD*620.0) * emTw * 0.55;
+  }
+
+  // ── RADIAL HEAT SHIMMER (always-on outward streaks) ──
+  // Subtle radial sin wave makes the void around the ring shimmer
+  // continuously — never a dead frame.
+  float shimmer = 0.5 + 0.5*sin(ang*10.0 + r*22.0 - u_time*1.3);
+  col += vec3(0.85, 0.65, 0.30) * shimmer * smoothstep(0.20, 0.45, r) *
+         smoothstep(0.75, 0.40, r) * 0.06;
+
+  // ── DUST/STARS ──
   col += softStars(uv, aspect, 0.997, vec3(0.65, 0.75, 0.95))
        * smoothstep(ringR + 0.14, ringR + 0.55, r);
 
@@ -489,6 +516,54 @@ vec3 phantom(vec2 uv, float aspect){
   float mote = exp(-pow(length(fract(mp)-0.5),2.0)*32.0) * step(0.97, moteSeed);
   float moteTw = 0.5 + 0.5*sin(u_time*2.5 + moteSeed*30.0);
   col += vec3(0.70,0.84,0.94) * mote * moteTw * 0.18;
+
+  // ── DRIFTING FACE SILHOUETTES (ghost apparitions) ──
+  // 3 large soft "head" shapes drift very slowly across the canvas at
+  // different y positions. Pale teal hint behind the mist — the realm
+  // shows faces only fleetingly, fading in and out.
+  for(int i=0;i<3;i++){
+    float fi=float(i);
+    float fx = fract(0.10 + fi*0.32 + t*0.18);
+    vec2 fp = uv - vec2(fx, 0.30 + 0.18*sin(t*0.5+fi*1.8));
+    fp.x *= aspect;
+    fp.y *= 1.4;
+    float fd = length(fp);
+    float face = exp(-fd*fd*40.0);
+    float fade = 0.5 + 0.5*sin(t*0.42 + fi*2.3);
+    col += vec3(0.42,0.62,0.78) * face * fade * 0.22;
+    // Eyes within each face — two small voids.
+    float lx = fp.x + 0.025;
+    float rx = fp.x - 0.025;
+    float ey = fp.y + 0.005;
+    float eyeL = exp(-(lx*lx + ey*ey)*900.0);
+    float eyeR = exp(-(rx*rx + ey*ey)*900.0);
+    col -= vec3(0.10,0.14,0.18) * (eyeL+eyeR) * fade * 0.7;
+  }
+
+  // ── ORBITAL SOUL ORBS ──
+  // 6 small bright orbs slowly orbit a central focal point — pure
+  // continuous motion that lives at every frame.
+  for(int i=0;i<6;i++){
+    float fi=float(i);
+    float orbAng = u_time*(0.10 + fi*0.025) + fi*1.047;
+    float orbR = 0.18 + fi*0.025;
+    vec2 orbPos = vec2(0.5, 0.55) + vec2(cos(orbAng)*orbR/aspect, sin(orbAng)*orbR);
+    float od = distance(uv, orbPos);
+    float oTw = 0.5 + 0.5*sin(u_time*2.0 + fi*3.7);
+    col += vec3(0.70,0.85,1.0) * exp(-od*od*1400.0) * oTw * 0.45;
+  }
+
+  // ── CONTINUOUS HORIZONTAL MIST CURTAINS ──
+  // 3 long misty horizontal bands floating across at different rates,
+  // shimmering. Gives every frame a flowing texture.
+  for(int i=0;i<3;i++){
+    float fi=float(i);
+    float my = 0.18 + fi*0.27;
+    float mFlow = uv.x*4.0 + t*(0.7 + fi*0.18);
+    float mistShim = fbm(vec2(mFlow, my*4.0)) * 0.5 + 0.5;
+    float mistBand = exp(-pow((uv.y - my)*9.0, 2.0));
+    col += vec3(0.32,0.42,0.55) * mistBand * mistShim * 0.18;
+  }
 
   // Cold lavender vignette at edges (binds the realm).
   float r = length((uv - 0.5) * vec2(aspect, 1.0));
@@ -605,108 +680,233 @@ vec3 emberforge(vec2 uv, float aspect){
   return col;
 }
 
-// ── 12 TEMPUS — sands of time, ancient gears, sepia hourglass dunes ──
+// ── 12 TEMPUS — chronomancer's hall: domain-warped sand FBM (continuous
+//    swirl), 4 rotating bronze gears (counter-rotating, real teeth),
+//    central hourglass glow with cyclic sand build-up + drain, falling
+//    grains, zodiac star ring slowly turning, time-fracture chronoshock
+//    rings every ~9s, golden particles streaming through the centre. ──
 vec3 tempus(vec2 uv, float aspect){
-  vec2 p = uv*vec2(aspect,1.0)*3.0;
-  float t = u_time*0.06;
-  // Warm sepia sand void.
-  vec3 col = mix(vec3(0.10,0.06,0.03), vec3(0.04,0.03,0.01), length(uv-0.5)*1.2);
-  // Sand grain texture — high-frequency FBM in warm tones.
-  float sand = fbm(p*2.5 + vec2(t*0.3, t*0.2));
-  col += vec3(0.30,0.18,0.08) * sand * 0.25;
-  // Rotating gear shadow — circular FBM arcs.
-  float ang = atan((uv.y-0.5)*aspect, uv.x-0.5);
-  float gearR = length((uv-0.5)*vec2(aspect,1.0));
-  float teeth = abs(sin(ang*12.0 + t*0.4))*0.5+0.5;
-  float gear = smoothstep(0.22, 0.20, gearR) * smoothstep(0.32, 0.30, gearR) * teeth;
-  col += vec3(0.45,0.28,0.12) * gear * 0.16;
-  // Second gear counter-rotating.
-  float teeth2 = abs(sin(ang*8.0 - t*0.28))*0.5+0.5;
-  float gear2 = smoothstep(0.42, 0.40, gearR) * smoothstep(0.52, 0.50, gearR) * teeth2;
-  col += vec3(0.35,0.20,0.08) * gear2 * 0.10;
-  // Hourglass glow at the centre — warm golden bloom breathing.
-  col += vec3(0.55,0.35,0.12) * exp(-gearR*gearR*18.0) * (0.4+0.2*sin(t*0.9));
-  // Falling sand grains — sparse dots dropping down.
-  vec2 sp = uv*vec2(aspect,1.0)*vec2(50.0,35.0); sp.y -= t*1.8;
-  float grain = exp(-pow(length(fract(sp)-0.5),2.0)*40.0) * step(0.988, hash(floor(sp)));
-  col += vec3(0.60,0.38,0.18) * grain * 0.28;
-  // Faint bronze vignette.
-  col += vec3(0.15,0.08,0.03) * (1.0 - smoothstep(0.3,1.0, gearR)) * 0.2;
+  vec2 q = (uv - 0.5) * vec2(aspect, 1.0);
+  float r = length(q);
+  float ang = atan(q.y, q.x);
+  float t = u_time * 0.09;
+  float tFast = u_time * 0.32;
+
+  // ── DOMAIN-WARPED SAND BACKGROUND (continuous swirl, NEVER static) ──
+  // Sand "winds" sweep across — two FBM passes, each warped by the other
+  // so the dunes curl rather than slide. Same trick that gives nebula its
+  // liquid feel.
+  vec2 p = uv * vec2(aspect, 1.0) * 2.4;
+  vec2 q1 = vec2(fbm(p + vec2(t*0.6, 0.0)), fbm(p + vec2(5.2, 1.3) - vec2(0.0, t*0.6)));
+  vec2 q2 = vec2(fbm(p + 3.0*q1 + vec2(1.7, 9.2) + t*0.4),
+                 fbm(p + 3.0*q1 + vec2(8.3, 2.8) - t*0.4));
+  float duneF = fbm(p + 3.5*q2);
+  vec3 col = mix(vec3(0.04, 0.025, 0.010), vec3(0.18, 0.10, 0.04),
+                 smoothstep(0.20, 0.85, duneF));
+  // Bronze undertone where the FBM peaks read warmest.
+  col = mix(col, vec3(0.32, 0.18, 0.06), smoothstep(0.55, 0.95, q2.x) * 0.55);
+  col = mix(col, vec3(0.45, 0.28, 0.08), smoothstep(0.65, 1.0, q1.y) * 0.30);
+
+  // ── 4 CONCENTRIC GEARS — counter-rotating, real-feeling teeth ──
+  // Each gear is a thin annulus modulated by a high-frequency sin wave on
+  // the angle (the teeth). Rotation speeds differ + counter-direction so
+  // they read as a clockwork system meshed together.
+  float gear1 = smoothstep(0.020, 0.0, abs(r - 0.16))
+              * (0.55 + 0.45 * abs(sin(ang*16.0 + t*1.0)));
+  float gear2 = smoothstep(0.018, 0.0, abs(r - 0.26))
+              * (0.55 + 0.45 * abs(sin(ang*22.0 - t*0.7)));
+  float gear3 = smoothstep(0.016, 0.0, abs(r - 0.38))
+              * (0.50 + 0.50 * abs(sin(ang*28.0 + t*0.5)));
+  float gear4 = smoothstep(0.012, 0.0, abs(r - 0.52))
+              * (0.50 + 0.50 * abs(sin(ang*36.0 - t*0.35)));
+  col += vec3(0.85, 0.55, 0.20) * gear1 * 0.45;
+  col += vec3(0.75, 0.48, 0.16) * gear2 * 0.38;
+  col += vec3(0.65, 0.40, 0.12) * gear3 * 0.30;
+  col += vec3(0.55, 0.32, 0.10) * gear4 * 0.22;
+
+  // ── ZODIAC STAR RING ──
+  // 12 bright "constellation marker" sparks evenly placed on the outer
+  // ring, slowly rotating, twinkling independently. Reads as a celestial
+  // dial in motion.
+  float zodiacR = 0.62;
+  float zodiacAng = mod(ang - t*0.35, 6.28318);
+  float seg = floor(zodiacAng * 12.0 / 6.28318);
+  float segCentre = (seg + 0.5) * 6.28318 / 12.0;
+  float angDist = abs(zodiacAng - segCentre);
+  float zodiacDist = sqrt((r - zodiacR)*(r - zodiacR) + (angDist*zodiacR)*(angDist*zodiacR));
+  float zodiacTw = 0.45 + 0.55 * sin(u_time*1.8 + seg*7.3);
+  col += vec3(1.0, 0.85, 0.40) * exp(-zodiacDist*zodiacDist*1200.0) * zodiacTw * 0.85;
+
+  // ── CENTRAL HOURGLASS GLOW ──
+  // The visual focal point: a warm golden bloom that pulses with the
+  // hourglass cycle. Outer halo + inner core, both breathing on offset
+  // periods so the centre never sits flat.
+  float coreP = 0.65 + 0.35 * sin(u_time*0.70);
+  float bloomP = 0.55 + 0.45 * sin(u_time*0.45 + 1.2);
+  col += vec3(0.95, 0.65, 0.22) * exp(-r*r*18.0) * coreP * 0.60;
+  col += vec3(0.65, 0.40, 0.14) * exp(-r*r*5.0)  * bloomP * 0.30;
+  // Inner hot core (white-gold).
+  col += vec3(1.0, 0.92, 0.55) * exp(-r*r*120.0) * coreP * 0.55;
+
+  // ── CHRONO-SHOCK RING (periodic event) ──
+  // Every ~9s the central hourglass "fractures time" and a bright golden
+  // ring rapidly expands outward + dissipates. Big wow moment.
+  float chronoCycle = mod(u_time, 9.0);
+  float chronoR = chronoCycle * 0.13;
+  float chronoRing = exp(-pow((r - chronoR)*22.0, 2.0)) * exp(-chronoCycle*0.55);
+  col += vec3(1.0, 0.92, 0.55) * chronoRing * 0.90;
+  // Twin slower ghost ring trailing behind.
+  float chronoR2 = chronoCycle * 0.085;
+  float chronoRing2 = exp(-pow((r - chronoR2)*28.0, 2.0)) * exp(-chronoCycle*0.40);
+  col += vec3(0.95, 0.65, 0.22) * chronoRing2 * 0.55;
+
+  // ── FALLING SAND GRAINS ──
+  // High-density rapid-fall stream of golden grains. The shower runs
+  // top-to-bottom across the whole canvas at varied speeds — this is what
+  // sells continuous motion at every pixel.
+  vec2 sp = uv*vec2(aspect,1.0)*vec2(55.0, 38.0); sp.y -= tFast;
+  float grain = exp(-pow(length(fract(sp)-0.5), 2.0)*55.0)
+              * step(0.984, hash(floor(sp)));
+  float grainTw = 0.55 + 0.45*sin(u_time*4.0 + hash(floor(sp))*30.0);
+  col += vec3(1.0, 0.72, 0.28) * grain * grainTw * 0.85;
+
+  // ── GOLD SAND STREAM AT CENTRE ──
+  // A vertical river of bright grains pouring down through the centre
+  // (the hourglass neck flow). Always running, brighter than the wide
+  // grain shower, ties the eye to the focal point.
+  float centreStream = exp(-pow((uv.x - 0.5)*aspect*22.0, 2.0));
+  vec2 csp = vec2(uv.x*aspect*8.0, uv.y*32.0 - tFast*1.4);
+  float csGrain = exp(-pow(length(fract(csp)-0.5), 2.0)*35.0) *
+                  step(0.93, hash(floor(csp)));
+  col += vec3(1.0, 0.82, 0.40) * centreStream * csGrain * 1.1;
+  // Soft halo around the stream so the eye reads volume, not a line.
+  col += vec3(0.85, 0.55, 0.18) * centreStream * 0.18 * coreP;
+
+  // ── BRONZE VIGNETTE that breathes with the centre ──
+  col += vec3(0.18, 0.10, 0.04) * (1.0 - smoothstep(0.35, 1.05, r)) * 0.22;
+  col -= vec3(0.04, 0.025, 0.012) * smoothstep(0.65, 1.05, r);
+
   return col;
 }
 
-// ── 13 STORM — tempest fury, lightning, rain curtains, rolling clouds ──
+// ── 13 STORM — tempest fury: VORTEX storm cell, 4 simultaneous fork bolts,
+//    ground reflection glow, sheet-rain wind sweep, thunder shake, rolling
+//    domain-warped thunderheads, multiple flash beats per cycle. Continuous
+//    motion at every pixel + a strike feels SEISMIC. ──
 vec3 storm(vec2 uv, float aspect){
-  float t = u_time*0.07;
-  // Deep thunderhead sky — darkest at bottom, lighter toward top. Adds a
-  // slow horizontal sway so the entire sky pulses with wind tension.
-  float skySway = 0.92 + 0.08*sin(u_time*0.3);
-  vec3 col = mix(vec3(0.03,0.04,0.10), vec3(0.06,0.08,0.16),
+  float t = u_time*0.085;
+  float wind = sin(u_time*0.35);
+  // Deep thunderhead sky — slow vertical sway tinted by wind direction.
+  float skySway = 0.90 + 0.10*sin(u_time*0.3);
+  vec3 col = mix(vec3(0.025,0.035,0.10), vec3(0.05,0.07,0.18),
                  smoothstep(0.0,1.0,uv.y)) * skySway;
 
-  // ROLLING THUNDERHEADS — two FBM cloud layers at different scales and
-  // drift directions for parallax depth.
-  float cloudA = fbm(vec2(uv.x*5.0 + t*0.5, uv.y*4.0));
-  float cloudB = fbm(vec2(uv.x*9.0 - t*0.8, uv.y*3.0 + 0.7));
-  col += vec3(0.07,0.09,0.16) * cloudA * smoothstep(0.0,0.7,uv.y) * 0.4;
-  col += vec3(0.04,0.06,0.12) * cloudB * smoothstep(0.0,0.5,uv.y) * 0.25;
+  // ── VORTEX STORM CELL — rotating clouds at the centre ──
+  // A rotation field offsets the cloud sampling positions so the
+  // thunderheads SWIRL around the centre instead of just sliding. This is
+  // the single most "weather is alive" change.
+  vec2 c = uv - vec2(0.5, 0.55);
+  c.x *= aspect;
+  float r = length(c);
+  float swirl = atan(c.y, c.x) + (0.35 / max(r, 0.12)) * sin(u_time*0.18);
+  vec2 swirlUV = vec2(0.5 + cos(swirl)*r/aspect, 0.55 + sin(swirl)*r);
+  // Two FBM cloud layers WARPED by the swirl — heavy continuous churn.
+  float cloudA = fbm(vec2(swirlUV.x*5.5 + t*0.6, swirlUV.y*4.0 + t*0.3));
+  float cloudB = fbm(vec2(uv.x*9.0 - t*0.85 + wind*0.4, uv.y*3.2 + 0.7));
+  col += vec3(0.08,0.10,0.18) * cloudA * smoothstep(0.0,0.85,uv.y) * 0.55;
+  col += vec3(0.04,0.06,0.13) * cloudB * smoothstep(0.0,0.55,uv.y) * 0.30;
+  // Bright dramatic cloud peaks where the FBM stacks — readable storm
+  // tops glowing from internal lightning.
+  float peaks = smoothstep(0.65, 0.95, cloudA);
+  col += vec3(0.18,0.22,0.36) * peaks * smoothstep(0.0,0.85,uv.y) * 0.50;
 
-  // DISTANT HORIZON LIGHTNING — soft amber-violet glow pulsing at the
-  // bottom (you "see" lightning beyond the horizon you can't reach).
-  float horizon = smoothstep(0.3, 0.0, uv.y);
-  float horizonPulse = smoothstep(0.95, 1.0, sin(u_time*0.42));
-  col += vec3(0.45,0.30,0.65) * horizon * horizonPulse * 0.35;
+  // ── DISTANT HORIZON SHEET LIGHTNING ──
+  float horizon = smoothstep(0.30, 0.0, uv.y);
+  float horizonPulse = smoothstep(0.92, 1.0, sin(u_time*0.42));
+  col += vec3(0.50,0.32,0.70) * horizon * horizonPulse * 0.45;
+  // CONTINUOUS soft horizon shimmer (wind on the horizon) — never sits flat.
+  col += vec3(0.20,0.18,0.35) * horizon * (0.55 + 0.45*sin(u_time*0.9 + uv.x*8.0)) * 0.12;
 
-  // PRIMARY LIGHTNING FLASH — full screen white-purple burst, ~every 6s.
-  float flashCycle = fract(t*0.15);
-  float flash = smoothstep(0.92,0.96, flashCycle) * smoothstep(1.0,0.96, flashCycle);
-  flash += smoothstep(0.48,0.50, flashCycle) * smoothstep(0.52,0.48, flashCycle) * 0.5;
-  col += vec3(0.6,0.7,1.0) * flash * exp(-length(uv-0.5)*0.5) * 0.35;
+  // ── PRIMARY + SECONDARY FLASH ──
+  // Faster cycle (every ~4.5s) + each cycle gives THREE beats: lead flash,
+  // mid afterglow, late strobe — sells "active storm" not a clock.
+  float flashCycle = fract(t*0.22);
+  float flash = smoothstep(0.86, 0.91, flashCycle) * smoothstep(0.99, 0.92, flashCycle);
+  float aftFlash = smoothstep(0.55, 0.58, flashCycle) * smoothstep(0.66, 0.59, flashCycle);
+  float strobe = smoothstep(0.30, 0.32, flashCycle) * smoothstep(0.36, 0.32, flashCycle) * 0.6;
+  col += vec3(0.65,0.75,1.0) * flash * exp(-length(uv-0.5)*0.5) * 0.45;
+  col += vec3(0.40,0.55,0.85) * aftFlash * 0.30;
+  col += vec3(0.55,0.65,0.95) * strobe * 0.22;
 
-  // SECONDARY DELAYED FLASH — thunder afterglow, 40% intensity, slight delay.
-  float aftFlash = smoothstep(0.61, 0.63, flashCycle) * smoothstep(0.66, 0.63, flashCycle);
-  col += vec3(0.40,0.55,0.85) * aftFlash * 0.25;
+  // ── 4 BOLTS firing simultaneously on flash ──
+  // Each bolt is a jagged near-vertical filament (sin offsets give the
+  // crooked zigzag). Different X locations, different jitter frequencies
+  // — feels like the whole front sheet is sparking at once.
+  float bolt1x = 0.18 + 0.04*sin(u_time*0.4);
+  float bolt2x = 0.42 + 0.06*cos(u_time*0.35 + 1.7);
+  float bolt3x = 0.66 + 0.05*sin(u_time*0.30 + 3.1);
+  float bolt4x = 0.82 + 0.03*cos(u_time*0.55 + 0.6);
+  float bolt1 = smoothstep(0.012,0.0, abs(uv.x - bolt1x - 0.030*sin(uv.y*15.0)));
+  float bolt2 = smoothstep(0.011,0.0, abs(uv.x - bolt2x - 0.025*sin(uv.y*19.0 + 1.5)));
+  float bolt3 = smoothstep(0.010,0.0, abs(uv.x - bolt3x - 0.022*sin(uv.y*23.0 + 0.8)));
+  float bolt4 = smoothstep(0.009,0.0, abs(uv.x - bolt4x - 0.028*sin(uv.y*17.0 + 2.4)));
+  // Bolt 1 + 3 have fork branches.
+  float fork1 = smoothstep(0.008,0.0, abs(uv.x - bolt1x - 0.10 - 0.02*sin(uv.y*22.0)))
+              * smoothstep(0.55, 0.30, uv.y);
+  float fork3 = smoothstep(0.008,0.0, abs(uv.x - bolt3x + 0.09 + 0.018*sin(uv.y*20.0)))
+              * smoothstep(0.50, 0.28, uv.y);
+  // Bolt brightness: primary glow + bluish core.
+  col += vec3(0.60,0.85,1.0) * bolt1 * flash * smoothstep(0.0,0.90,uv.y) * 1.05;
+  col += vec3(0.65,0.80,1.0) * bolt2 * flash * smoothstep(0.0,0.85,uv.y) * 0.90;
+  col += vec3(0.70,0.85,1.0) * bolt3 * aftFlash * smoothstep(0.0,0.85,uv.y) * 1.05;
+  col += vec3(0.55,0.75,0.95) * bolt4 * strobe * smoothstep(0.0,0.80,uv.y) * 0.85;
+  col += vec3(0.55,0.80,1.0) * fork1 * flash * 0.65;
+  col += vec3(0.65,0.80,1.0) * fork3 * aftFlash * 0.65;
+  // Bolt OUTER GLOW — purple halo so bolts feel volumetric, not pencils.
+  col += vec3(0.50,0.30,0.85) * (bolt1+bolt2)*flash*0.30;
+  col += vec3(0.55,0.35,0.90) * bolt3*aftFlash*0.35;
+  // Strike point bursts at the BASE of bolt 1 + 3 (where they "hit").
+  float hit1 = exp(-pow((uv.x-bolt1x)*aspect*9.0,2.0) - pow((uv.y-0.05)*8.0,2.0));
+  float hit3 = exp(-pow((uv.x-bolt3x)*aspect*9.0,2.0) - pow((uv.y-0.05)*8.0,2.0));
+  col += vec3(1.0,0.95,0.85) * hit1 * flash * 1.4;
+  col += vec3(1.0,0.95,0.85) * hit3 * aftFlash * 1.4;
 
-  // BOLTS — 3 lightning bolts now, each at a TIME-VARYING x position so they
-  // don't always strike in the same place. Each has its own duty cycle.
-  // Bolt #1 — main bolt, follows flashCycle.
-  float bolt1x = 0.30 + 0.06*sin(u_time*0.4);
-  float bolt1 = smoothstep(0.014,0.0, abs(uv.x - bolt1x - 0.025*sin(uv.y*14.0)));
-  // Branch fork — a smaller offshoot mid-way.
-  float bolt1Fork = smoothstep(0.010,0.0, abs(uv.x - bolt1x - 0.12 - 0.02*sin(uv.y*22.0)))
-                  * smoothstep(0.55, 0.30, uv.y);
-  col += vec3(0.55,0.80,1.0) * bolt1 * flash * smoothstep(0.0,0.85,uv.y) * 0.85;
-  col += vec3(0.55,0.80,1.0) * bolt1Fork * flash * smoothstep(0.0,0.55,uv.y) * 0.55;
+  // ── CLOUD ILLUMINATION ──
+  col += vec3(0.30,0.45,0.80) * cloudA * flash * smoothstep(0.0,0.65,uv.y) * 0.45;
+  col += vec3(0.25,0.35,0.65) * cloudA * aftFlash * smoothstep(0.0,0.65,uv.y) * 0.25;
 
-  // Bolt #2 — secondary, different x, different cycle.
-  float bolt2x = 0.62 + 0.08*cos(u_time*0.35 + 1.7);
-  float bolt2 = smoothstep(0.012,0.0, abs(uv.x - bolt2x - 0.03*sin(uv.y*11.0 + 1.5)));
-  col += vec3(0.65,0.75,1.0) * bolt2 * flash * smoothstep(0.0,0.80,uv.y) * 0.75;
+  // ── GROUND REFLECTION ──
+  // The bottom 12% lights up cyan when a bolt fires (the ground catching
+  // the flash). Cheap fake but reads HARD as wet pavement.
+  float ground = smoothstep(0.12, 0.0, uv.y);
+  col += vec3(0.30,0.45,0.85) * ground * flash * 1.0;
+  col += vec3(0.25,0.35,0.70) * ground * aftFlash * 0.6;
 
-  // Bolt #3 — appears only on the AFTERGLOW flash (the answering strike).
-  float bolt3x = 0.45 + 0.10*sin(u_time*0.25 + 3.1);
-  float bolt3 = smoothstep(0.011,0.0, abs(uv.x - bolt3x - 0.024*sin(uv.y*16.0 + 0.8)));
-  col += vec3(0.70,0.85,1.0) * bolt3 * aftFlash * smoothstep(0.0,0.85,uv.y) * 0.80;
+  // ── RAIN — 3 layers parallax + wind shear ──
+  vec2 rp = uv*vec2(aspect,1.0)*vec2(40.0,75.0); rp.x -= t*3.4 + wind*0.3;
+  float rain = smoothstep(0.93,0.96, fract(rp.x + rp.y*0.32 + wind*0.5))
+             * step(0.965, hash(floor(rp)));
+  col += vec3(0.30,0.45,0.65) * rain * 0.18;
+  col += vec3(0.55,0.70,0.95) * rain * flash * 0.50;
+  vec2 rp2 = uv*vec2(aspect,1.0)*vec2(60.0,50.0); rp2.x -= t*1.7;
+  float rain2 = smoothstep(0.92,0.95, fract(rp2.x + rp2.y*0.22 + wind*0.3))
+              * step(0.96, hash(floor(rp2)));
+  col += vec3(0.35,0.50,0.70) * rain2 * 0.12;
+  vec2 rp3 = uv*vec2(aspect,1.0)*vec2(28.0,90.0); rp3.x -= t*4.5;
+  float rain3 = smoothstep(0.94,0.97, fract(rp3.x + rp3.y*0.40))
+              * step(0.97, hash(floor(rp3)));
+  col += vec3(0.45,0.60,0.85) * rain3 * 0.10;
 
-  // CLOUD ILLUMINATION — when a bolt strikes, the clouds near it light up
-  // cyan from within. Adds the volumetric "lightning revealing the storm".
-  col += vec3(0.30,0.45,0.75) * cloudA * flash * smoothstep(0.0,0.6,uv.y) * 0.30;
+  // ── SHEET-RAIN WIND SWEEP — slow translucent vertical band crossing ──
+  // Reads as a heavy curtain of rain advancing across the foreground.
+  float sweepX = fract(u_time*0.06 + wind*0.05);
+  float sweep = exp(-pow((uv.x - sweepX)*aspect*2.8, 2.0))
+              * smoothstep(0.0, 0.5, uv.y) * smoothstep(0.9, 0.3, uv.y);
+  col += vec3(0.20,0.28,0.42) * sweep * 0.22;
 
-  // RAIN LAYER 1 — fast diagonal streaks.
-  vec2 rp = uv*vec2(aspect,1.0)*vec2(45.0,80.0); rp.x -= t*3.0;
-  float rain = smoothstep(0.94,0.96, fract(rp.x + rp.y*0.3)) * step(0.97, hash(floor(rp)));
-  col += vec3(0.25,0.40,0.60) * rain * 0.14;
-  // Rain is BRIGHTER during flash (illuminated drops).
-  col += vec3(0.45,0.65,0.85) * rain * flash * 0.30;
-
-  // RAIN LAYER 2 — slower, denser, more sparse highlights.
-  vec2 rp2 = uv*vec2(aspect,1.0)*vec2(60.0,50.0); rp2.x -= t*1.5;
-  float rain2 = smoothstep(0.92,0.95, fract(rp2.x + rp2.y*0.2)) * step(0.96, hash(floor(rp2)));
-  col += vec3(0.30,0.45,0.65) * rain2 * 0.10;
-
-  // RAIN MIST — heavy curtain at the bottom for atmospheric depth.
+  // ── RAIN MIST CURTAIN at top of view ──
   float mistBand = fbm(uv*vec2(aspect,1.0)*vec2(8.0,3.0) + vec2(t*1.5,0.0));
-  col += vec3(0.12,0.18,0.28) * mistBand * smoothstep(0.8, 1.0, uv.y) * 0.45;
+  col += vec3(0.13,0.18,0.30) * mistBand * smoothstep(0.85, 1.0, uv.y) * 0.45;
 
   return col;
 }
@@ -802,10 +1002,51 @@ void main(){
       col += vec3(0.0,0.9,0.8) * sin(td*35.0 - age*6.0) * exp(-td*4.0) * exp(-age*2.8) * 0.5;
       col += vec3(1.0,0.3,0.65) * exp(-td*td*60.0) * exp(-age*1.8) * 0.6;
     } else if (u_scene == 9) {
-      // Eclipse → a golden flare burst at the touch point, like a second
-      // diamond ring flaring on contact.
-      col += vec3(1.0,0.88,0.55) * sin(td*32.0 - age*6.0) * exp(-td*4.2) * exp(-age*2.0) * 0.55;
-      col += vec3(1.0,0.95,0.75) * exp(-td*td*55.0) * exp(-age*1.6) * 0.7;
+      // Eclipse → SOLAR FLARE on contact: golden corona radiating + bright
+      // diamond bead + 8 radial flare rays bursting outward.
+      float ang9 = atan(uv.y - tuv.y, (uv.x - tuv.x) * aspect);
+      float rays9 = abs(sin(ang9 * 4.0)) * 0.5 + 0.5;
+      col += vec3(1.0,0.88,0.55) * sin(td*32.0 - age*6.0) * exp(-td*4.2) * exp(-age*2.0) * 0.65;
+      col += vec3(1.0,0.95,0.75) * exp(-td*td*55.0) * exp(-age*1.6) * 0.95;
+      col += vec3(1.0,0.78,0.30) * rays9 * exp(-td*3.8) * exp(-age*2.6) * 0.40;
+    } else if (u_scene == 10) {
+      // Phantom → a SOUL FLARE emerges at the tap point: ghost-pale glow,
+      // wisp tendril rising upward, soft cyan-lavender halo. Distinct ethereal
+      // signature, NOT a ripple.
+      float wispY = max(0.0, tuv.y - uv.y);          // only above the touch
+      float wispCol = exp(-wispY * 4.5) * exp(-pow((uv.x - tuv.x) * aspect * 18.0, 2.0));
+      col += vec3(0.78,0.85,1.0) * wispCol * exp(-age*1.8) * 0.85;
+      col += vec3(0.92,0.96,1.0) * exp(-td*td*48.0) * exp(-age*1.4) * 0.95;
+      col += vec3(0.55,0.70,0.95) * sin(td*18.0 - age*4.0) * exp(-td*4.2) * exp(-age*2.4) * 0.30;
+    } else if (u_scene == 11) {
+      // Emberforge → HAMMER STRIKE at the tap point: blinding white-gold spark
+      // + expanding shockring + 12 radial spark trails (industrial, premium).
+      col += vec3(1.0,0.95,0.65) * exp(-td*td*120.0) * exp(-age*2.2) * 1.6;
+      col += vec3(1.0,0.55,0.10) * smoothstep(0.03,0.0, abs(td - age*0.40)) *
+             exp(-age*2.0) * 1.1;
+      float ang11 = atan(uv.y - tuv.y, (uv.x - tuv.x) * aspect);
+      float sparks = exp(-pow(sin(ang11*6.0)*4.0, 2.0));
+      col += vec3(1.0,0.70,0.15) * sparks * exp(-td*3.0) * exp(-age*3.0) * 0.7;
+    } else if (u_scene == 12) {
+      // Tempus → TIME RIPPLE: sepia sand explosion outward from the touch,
+      // followed by a slower golden bronze wave. Reads as "time bending".
+      col += vec3(0.85,0.55,0.20) * sin(td*24.0 - age*5.0) * exp(-td*4.0) * exp(-age*2.2) * 0.55;
+      col += vec3(0.95,0.78,0.32) * exp(-td*td*40.0) * exp(-age*1.4) * 0.85;
+      // Slow halo expansion — outermost ring.
+      col += vec3(0.65,0.42,0.18) * smoothstep(0.025,0.0, abs(td - age*0.35)) *
+             exp(-age*1.5) * 0.55;
+    } else if (u_scene == 13) {
+      // Storm → LIGHTNING TO TOUCH: vertical bolt strikes from the top down
+      // to the tap point + thunder-flash brightening + bright dot at impact.
+      float boltDist = abs((uv.x - tuv.x) * aspect);
+      float boltCol = exp(-boltDist * 70.0) *
+                      smoothstep(1.0, tuv.y, uv.y);
+      col += vec3(0.55,0.85,1.0) * boltCol * smoothstep(0.0,0.05,age) * exp(-age*4.5) * 1.7;
+      col += vec3(0.80,0.55,1.0) * boltCol * exp(-age*3.5) * 0.8;
+      // Flash brightens whole frame for ~0.1s.
+      col += vec3(0.40,0.55,0.85) * exp(-age*16.0) * 0.55;
+      // Bright pop at impact.
+      col += vec3(1.0,0.92,0.78) * exp(-td*td*110.0) * exp(-age*4.0) * 1.4;
     } else {
       // Galaxy / Nebula / Aurora / Casino → a soft universal ripple.
       col += vec3(0.80,0.85,1.0) * sin(td*26.0 - age*7.0) * exp(-td*4.8) * exp(-age*2.6) * 0.35;

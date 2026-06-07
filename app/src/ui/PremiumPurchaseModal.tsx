@@ -100,7 +100,9 @@ export function PremiumPurchaseModal({
           <PremiumBadge variant="pill" label={t("premium.label")} />
         </div>
         <AnimatePresence>
-          {phase === "celebrating" && <CelebrationOverlay label={t("premium.unlocked")} />}
+          {phase === "celebrating" && (
+            <CelebrationOverlay label={t("premium.unlocked")} setId={set.id} />
+          )}
         </AnimatePresence>
         <div className="aspect-[4/3] w-full bg-gradient-to-br from-zinc-900 via-zinc-800 to-black relative overflow-hidden">
           {set.previewArt}
@@ -146,9 +148,9 @@ export function PremiumPurchaseModal({
             {__DEV_PREMIUM__ && !owned && (
               <button
                 onClick={() => { hapticTap(); grant(1000); }}
-                className="text-[10px] uppercase tracking-wider text-ink-muted py-1 rounded hover:text-amber-300 transition"
+                className="text-[11px] uppercase tracking-wider font-bold text-amber-300 py-2 rounded-lg border border-amber-300/40 bg-amber-300/5 hover:bg-amber-300/15 transition"
               >
-                {t("premium.devGrant")}
+                ✦ +1000 TEST (dev)
               </button>
             )}
             <button
@@ -164,16 +166,105 @@ export function PremiumPurchaseModal({
   );
 }
 
-/* ───── Celebration overlay — gold burst + shockwave + "✦ DÉBLOQUÉ !" ─────
+/* ───── Themed celebration overlay ─────
  *
- * Pure CSS / motion. Sits on top of the modal card (absolute inset-0, z-[5])
- * so it covers the preview + content without breaking the rounded outline.
- * Twenty-four particles burst from the centre, a ring shockwave expands, and
- * the unlock label scales in with a slight rubber-band overshoot. Auto-fades
- * out after 2 s so the parent's setTimeout-onClose lands on a clean exit.
- */
-function CelebrationOverlay({ label }: { label: string }) {
-  const PARTICLES = 24;
+ * Burst, rings, label — every parameter switches per set so each purchase
+ * feels like a different ritual:
+ *   eclipse    → corona gold + 8 radial spokes + amber wash
+ *   phantom    → spectral teal wisps rising + ghost flash
+ *   tempus     → bronze sand grains pouring in a cyclone
+ *   storm      → cyan-purple lightning forks + screen flash
+ *   emberforge → orange-gold ember burst + shock ring (kept "powerful" per
+ *                user's love for this theme)
+ *   quartz     → prismatic dichroic shards radiating + spectral sweep
+ *   default    → original gold burst (legacy fallback)
+ *
+ * Mounts above modal card (z-[5]), pointer-events-none, ~2s self-fade. */
+type CelebrationFlavor = {
+  wash: string;                        // big radial flash background
+  ringColor: string;                   // expanding shockwave ring border
+  particleA: string;
+  particleB: string;
+  particleShadow: string;
+  labelGradient: string;               // CSS linear-gradient for the unlock label
+  labelGlow: string;                   // text-shadow colour
+  shapes: "dots" | "shards" | "wisps" | "grains" | "forks" | "sparks";
+};
+const FLAVORS: Record<string, CelebrationFlavor> = {
+  eclipse: {
+    wash: "radial-gradient(circle at 50% 45%, rgba(255,206,120,0.78), rgba(212,167,69,0.32) 32%, rgba(40,28,18,0) 70%)",
+    ringColor: "#f6cf80",
+    particleA: "#fde9bf",
+    particleB: "#d4a745",
+    particleShadow: "0 0 14px rgba(246,207,128,0.95)",
+    labelGradient: "linear-gradient(90deg, #fde9bf, #d4a745, #fde9bf)",
+    labelGlow: "rgba(212,167,69,0.85)",
+    shapes: "sparks",
+  },
+  phantom: {
+    wash: "radial-gradient(circle at 50% 45%, rgba(160,200,235,0.75), rgba(106,138,170,0.28) 35%, rgba(20,28,42,0) 70%)",
+    ringColor: "#cfe3f4",
+    particleA: "#e0eef9",
+    particleB: "#8ba6c2",
+    particleShadow: "0 0 16px rgba(207,227,244,0.80)",
+    labelGradient: "linear-gradient(90deg, #ffffff, #b8d0e6, #ffffff)",
+    labelGlow: "rgba(180,210,235,0.80)",
+    shapes: "wisps",
+  },
+  tempus: {
+    wash: "radial-gradient(circle at 50% 50%, rgba(214,167,106,0.72), rgba(139,105,20,0.30) 35%, rgba(26,18,8,0) 70%)",
+    ringColor: "#d4a76a",
+    particleA: "#f0d4a0",
+    particleB: "#b8956a",
+    particleShadow: "0 0 12px rgba(212,167,106,0.90)",
+    labelGradient: "linear-gradient(90deg, #f0d4a0, #b8956a, #f0d4a0)",
+    labelGlow: "rgba(180,140,80,0.85)",
+    shapes: "grains",
+  },
+  storm: {
+    wash: "radial-gradient(circle at 50% 45%, rgba(120,220,255,0.78), rgba(160,120,255,0.32) 35%, rgba(8,12,24,0) 70%)",
+    ringColor: "#7adcff",
+    particleA: "#a8f0ff",
+    particleB: "#a078ff",
+    particleShadow: "0 0 18px rgba(122,220,255,0.95)",
+    labelGradient: "linear-gradient(90deg, #b0f0ff, #a078ff, #b0f0ff)",
+    labelGlow: "rgba(120,220,255,0.90)",
+    shapes: "forks",
+  },
+  emberforge: {
+    wash: "radial-gradient(circle at 50% 45%, rgba(255,148,38,0.82), rgba(255,106,20,0.35) 35%, rgba(26,8,4,0) 70%)",
+    ringColor: "#ff9426",
+    particleA: "#ffd9a3",
+    particleB: "#ff6a14",
+    particleShadow: "0 0 16px rgba(255,148,38,0.95)",
+    labelGradient: "linear-gradient(90deg, #ffd9a3, #ff9426, #ffd9a3)",
+    labelGlow: "rgba(255,106,20,0.95)",
+    shapes: "sparks",
+  },
+  quartz: {
+    wash: "radial-gradient(circle at 50% 45%, rgba(232,210,250,0.72), rgba(200,174,240,0.30) 35%, rgba(30,20,50,0) 70%)",
+    ringColor: "#dabffa",
+    particleA: "#f6a5b8",
+    particleB: "#c8aef0",
+    particleShadow: "0 0 16px rgba(218,191,250,0.90)",
+    labelGradient: "linear-gradient(90deg, #ffe2f7, #c8aef0, #ffe2f7)",
+    labelGlow: "rgba(200,174,240,0.85)",
+    shapes: "shards",
+  },
+};
+const DEFAULT_FLAVOR: CelebrationFlavor = {
+  wash: "radial-gradient(circle at 50% 45%, rgba(251,191,36,0.55), rgba(251,191,36,0.18) 35%, transparent 70%)",
+  ringColor: "#fcd34d",
+  particleA: "#fde68a",
+  particleB: "#fbbf24",
+  particleShadow: "0 0 10px rgba(251,191,36,0.85)",
+  labelGradient: "linear-gradient(90deg, #fde68a, #fbbf24, #fde68a)",
+  labelGlow: "rgba(251,191,36,0.65)",
+  shapes: "dots",
+};
+function CelebrationOverlay({ label, setId }: { label: string; setId?: string }) {
+  const PARTICLES = 28;
+  const f = (setId && FLAVORS[setId]) || DEFAULT_FLAVOR;
   return (
     <motion.div
       className="absolute inset-0 z-[5] flex items-center justify-center pointer-events-none overflow-hidden"
@@ -182,71 +273,103 @@ function CelebrationOverlay({ label }: { label: string }) {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.25 }}
     >
-      {/* Gold wash that floods the card on entry. */}
+      {/* Themed wash flood. */}
       <motion.span
         className="absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(circle at 50% 45%, rgba(251,191,36,0.55), rgba(251,191,36,0.18) 35%, transparent 70%)",
-        }}
-        animate={{ opacity: [0, 0.95, 0.6, 0] }}
-        transition={{ duration: 1.9, times: [0, 0.18, 0.5, 1], ease: "easeOut" }}
+        style={{ background: f.wash }}
+        animate={{ opacity: [0, 0.98, 0.6, 0] }}
+        transition={{ duration: 2.0, times: [0, 0.18, 0.5, 1], ease: "easeOut" }}
       />
-      {/* Two expanding shockwave rings — staggered. */}
-      {[0, 0.18].map((delay, i) => (
+      {/* Three expanding shockwave rings — staggered, themed border colour. */}
+      {[0, 0.16, 0.32].map((delay, i) => (
         <motion.span
           key={i}
-          className="absolute rounded-full border-2 border-amber-300"
-          style={{ width: 12, height: 12 }}
-          initial={{ scale: 0, opacity: 0.9 }}
-          animate={{ scale: [0, 14], opacity: [0.95, 0] }}
-          transition={{ duration: 1.1, delay, ease: "easeOut" }}
+          className="absolute rounded-full"
+          style={{ width: 12, height: 12, border: `2px solid ${f.ringColor}` }}
+          initial={{ scale: 0, opacity: 0.92 }}
+          animate={{ scale: [0, 16], opacity: [0.95, 0] }}
+          transition={{ duration: 1.3, delay, ease: "easeOut" }}
         />
       ))}
-      {/* Burst particles. Angle + distance chosen per index — deterministic,
-          no Math.random so motion doesn't desync between StrictMode mounts. */}
+      {/* Themed particle burst. Each FLAVOR.shapes value renders a slightly
+          different particle aesthetic without doubling the codepath: a single
+          motion.span with width/height/border-radius/rotate that varies. */}
       {Array.from({ length: PARTICLES }).map((_, i) => {
         const angle = (i / PARTICLES) * Math.PI * 2;
-        const dist = 110 + (i % 3) * 24;
-        const dx = Math.cos(angle) * dist;
-        const dy = Math.sin(angle) * dist;
-        const size = 5 + (i % 4);
+        // Forks shoot straight down (lightning), wisps drift upward only.
+        const dist = 110 + (i % 4) * 28;
+        let dx = Math.cos(angle) * dist;
+        let dy = Math.sin(angle) * dist;
+        if (f.shapes === "wisps") {
+          dx = Math.cos(angle) * 60;
+          dy = -Math.abs(Math.sin(angle)) * 140 - 30;
+        } else if (f.shapes === "forks") {
+          dx = (((i % 5) - 2) / 2) * 90 + Math.cos(angle) * 18;
+          dy = 60 + (i % 4) * 30;
+        } else if (f.shapes === "grains") {
+          dx = Math.cos(angle * 1.6) * (60 + (i % 4) * 12);
+          dy = 30 + (i % 7) * 20;
+        }
+        let width = 5 + (i % 4);
+        let height = width;
+        let borderRadius = "9999px";
+        let rotate = 0;
+        if (f.shapes === "shards") {
+          width = 3 + (i % 3);
+          height = 14 + (i % 5) * 3;
+          borderRadius = "2px";
+          rotate = (angle * 180) / Math.PI + 90;
+        } else if (f.shapes === "wisps") {
+          width = 4 + (i % 3);
+          height = 22 + (i % 6) * 2;
+          borderRadius = "9999px";
+        } else if (f.shapes === "forks") {
+          width = 2;
+          height = 36 + (i % 4) * 8;
+          borderRadius = "1px";
+        } else if (f.shapes === "grains") {
+          width = 3 + (i % 3);
+          height = 3 + (i % 3);
+          borderRadius = "9999px";
+        }
         return (
           <motion.span
             key={i}
-            className="absolute rounded-full"
+            className="absolute"
             style={{
-              width: size,
-              height: size,
-              background: i % 2 === 0 ? "#fde68a" : "#fbbf24",
-              boxShadow: "0 0 10px rgba(251,191,36,0.85)",
+              width,
+              height,
+              borderRadius,
+              background: i % 2 === 0 ? f.particleA : f.particleB,
+              boxShadow: f.particleShadow,
             }}
-            initial={{ x: 0, y: 0, opacity: 0, scale: 0.4 }}
+            initial={{ x: 0, y: 0, opacity: 0, scale: 0.4, rotate }}
             animate={{
               x: dx,
               y: dy,
               opacity: [0, 1, 1, 0],
-              scale: [0.4, 1.2, 1, 0.6],
+              scale: [0.4, 1.2, 1, 0.5],
+              rotate: rotate + (f.shapes === "shards" ? 60 : 0),
             }}
-            transition={{ duration: 1.4, delay: i * 0.008, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 1.6, delay: i * 0.008, ease: [0.22, 1, 0.36, 1] }}
           />
         );
       })}
-      {/* Unlock label — big, with a rubber-band scale-in + sustained shimmer. */}
+      {/* Unlock label — themed gradient + glow. */}
       <motion.div
         className="relative text-center"
         initial={{ scale: 0.4, opacity: 0, y: 12 }}
-        animate={{ scale: [0.4, 1.18, 1], opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, times: [0, 0.55, 1], ease: [0.22, 1, 0.36, 1] }}
+        animate={{ scale: [0.4, 1.22, 1], opacity: 1, y: 0 }}
+        transition={{ duration: 0.75, times: [0, 0.55, 1], ease: [0.22, 1, 0.36, 1] }}
       >
         <div
           className="text-2xl sm:text-3xl font-black uppercase tracking-[0.18em]"
           style={{
-            background: "linear-gradient(90deg, #fde68a, #fbbf24, #fde68a)",
+            background: f.labelGradient,
             backgroundClip: "text",
             WebkitBackgroundClip: "text",
             color: "transparent",
-            textShadow: "0 0 24px rgba(251,191,36,0.65)",
+            textShadow: `0 0 28px ${f.labelGlow}`,
           }}
         >
           ✦ {label}
