@@ -182,6 +182,7 @@ export function RankedPickPhase({
           oppCard={null}
           mode="picking"
           oppHandSize={oppHandSize}
+          compassPeek={compassRevealed}
           onLaneClick={handleMyLaneTap}
           onOppLaneClick={handleOppLaneTap}
           augurTargeting={isAugurTargeting || isOracleTargeting}

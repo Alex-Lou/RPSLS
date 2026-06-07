@@ -36,6 +36,12 @@ export interface LanesBoardProps {
   laneResults?: LaneResult[];
   /** Visible opponent hand count (face-down minicards above the opp row). */
   oppHandSize?: number;
+  /** Boussole peek: which lane the opponent's card targets this round, or
+   *  null if the opponent's card has no lane target (or no card played).
+   *  When present, the targeted opp lane gets a cyan ghost-card badge so the
+   *  player SEES where the incoming card will land and can react (anchor,
+   *  aegis, crepuscule, etc.). Picking phase only — reveal already shows it. */
+  compassPeek?: { lane: LaneTarget | null } | null;
   onLaneClick?: (lane: LaneTarget) => void;
   onOppLaneClick?: (lane: LaneTarget) => void;
   augurTargeting?: boolean;
@@ -44,7 +50,7 @@ export interface LanesBoardProps {
 export function LanesBoard({
   youName, opponentName,
   picks, oppPicks, augurRevealed,
-  myCard, oppCard, mode, laneResults, oppHandSize,
+  myCard, oppCard, mode, laneResults, oppHandSize, compassPeek,
   onLaneClick, onOppLaneClick, augurTargeting = false,
 }: LanesBoardProps) {
   // The pad is the player's own — unless a coin-flipped arena overrides it
@@ -100,6 +106,7 @@ export function LanesBoard({
         augurRevealed={augurRevealed}
         mode={mode}
         laneResults={laneResults}
+        compassPeek={compassPeek}
         onOppLaneClick={onOppLaneClick}
         augurTargeting={augurTargeting}
       />
@@ -122,7 +129,7 @@ export function LanesBoard({
 }
 
 function OpponentRow({
-  oppPicks, oppCard, augurRevealed, mode, laneResults,
+  oppPicks, oppCard, augurRevealed, mode, laneResults, compassPeek,
   onOppLaneClick, augurTargeting,
 }: {
   oppPicks: [Move, Move, Move] | null;
@@ -130,6 +137,7 @@ function OpponentRow({
   augurRevealed: { lane: LaneTarget; move: Move } | null;
   mode: "picking" | "locked" | "reveal";
   laneResults?: LaneResult[];
+  compassPeek?: { lane: LaneTarget | null } | null;
   onOppLaneClick?: (lane: LaneTarget) => void;
   augurTargeting: boolean;
 }) {
@@ -158,6 +166,13 @@ function OpponentRow({
         const revealed = mode !== "reveal" || i < revealedLanes;
         const showCard = mode === "reveal" && oppCard && "lane" in oppCard && oppCard.lane === lane;
 
+        // Boussole ghost-card peek: only during pick/locked (the reveal phase
+        // already shows the real card via showCard below), and only on the
+        // exact lane the opponent's card targets.
+        const showCompassPeek =
+          mode !== "reveal" &&
+          compassPeek?.lane !== null &&
+          compassPeek?.lane === lane;
         return (
           <div key={i} className="relative">
             {oppMove ? (
@@ -168,9 +183,11 @@ function OpponentRow({
                 pulsing={!augurTargeting}
                 clickable={augurTargeting}
                 onClick={() => onOppLaneClick?.(lane)}
+                compassMarked={showCompassPeek}
               />
             )}
             {showCard && oppCard && <CardSlot id={oppCard.id} position="tr" flipReveal />}
+            {showCompassPeek && <CompassGhostCard />}
           </div>
         );
       })}
@@ -213,25 +230,61 @@ function PlayerRow({
   );
 }
 
-function FaceDownCard({ index: _index, pulsing: _pulsing, clickable = false, onClick }: {
+function FaceDownCard({ index: _index, pulsing: _pulsing, clickable = false, onClick, compassMarked = false }: {
   index: number; pulsing: boolean; clickable?: boolean; onClick?: () => void;
+  /** Boussole peek: opponent's card targets THIS lane → tint the placeholder
+   *  cyan so the player's eye lands here before reading the ghost-card badge. */
+  compassMarked?: boolean;
 }) {
   // Static, solid card — no opacity pulse (that read as "unstable/random").
   // A clickable Augur target keeps a steady highlight instead of flickering.
+  // Compass-marked lane gets a cyan tint that reads as "incoming danger".
   const cls =
-    "aspect-[5/4] w-full rounded-xl border-2 flex items-center justify-center " +
+    "aspect-[5/4] w-full rounded-xl border-2 flex items-center justify-center transition " +
     (clickable
       ? "border-violet-400/60 bg-violet-500/25 cursor-pointer hover:bg-violet-500/35 ring-2 ring-violet-400/40"
+      : compassMarked
+      ? "border-cyan-400/70 bg-cyan-500/20 ring-2 ring-cyan-300/50"
       : "border-dashed border-hairline bg-surface-2");
   const inner = (
     <div className={cls}>
-      <span className={"text-3xl sm:text-4xl font-black " + (clickable ? "text-violet-300" : "text-zinc-600")}>
+      <span className={
+        "text-3xl sm:text-4xl font-black " +
+        (clickable ? "text-violet-300" : compassMarked ? "text-cyan-200/80" : "text-zinc-600")
+      }>
         {clickable ? "👁️" : "?"}
       </span>
     </div>
   );
   if (clickable) return <button onClick={onClick} className="w-full">{inner}</button>;
   return inner;
+}
+
+/** Boussole ghost card — a small cyan card silhouette in the top-right corner
+ *  of the targeted opp lane. The compass icon + pulsing ring tell the player
+ *  "an unknown card will hit THIS lane — react now (anchor/aegis/twilight)". */
+function CompassGhostCard() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8, scale: 0.7 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: "spring", stiffness: 300, damping: 22 }}
+      className="absolute -top-1 -right-1 z-20 pointer-events-none"
+      aria-hidden
+    >
+      {/* Pulsing aura behind the ghost card so it reads as "live, incoming". */}
+      <motion.div
+        initial={{ opacity: 0.3, scale: 0.9 }}
+        animate={{ opacity: [0.3, 0.7, 0.3], scale: [0.9, 1.25, 0.9] }}
+        transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute inset-0 rounded-md bg-cyan-400/45 blur-md"
+      />
+      <div className="relative w-7 h-9 sm:w-8 sm:h-10 rounded-md bg-gradient-to-br from-cyan-500/80 to-sky-700/80 border border-cyan-300/70 shadow-lg shadow-cyan-900/50 flex flex-col items-center justify-center gap-0.5">
+        <span className="text-sm leading-none">🧭</span>
+        <span className="text-[8px] sm:text-[9px] font-black leading-none text-white/95">?</span>
+      </div>
+    </motion.div>
+  );
 }
 
 function FaceUpOppCard({ move, verdict, revealed, preReveal }: {
