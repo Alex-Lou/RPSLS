@@ -132,23 +132,48 @@ function runBootSyncImmediate(player: { id: string; nickname: string; claimToken
     if (msg.type === "error" && msg.code === "auth_failed" &&
         (msg.message || "").includes("claim token") &&
         !(player.claimToken || "").length) {
-      const newId = crypto.randomUUID();
-      // eslint-disable-next-line no-console
-      console.warn("[bootSync] claim-mismatch on empty local token — regenerating player.id (reinstall recovery).", { oldId: player.id, newId });
-      const store = useStore.getState();
-      store.applyServerSync({ id: newId, claimToken: undefined });
-      // Re-send hello with the fresh id so the server creates a clean record.
-      try {
-        ws.send(JSON.stringify({
-          type: "hello",
-          nickname: player.nickname || "Anonymous",
-          player_id: newId,
-          claim_token: "",
-        }));
-        // Update the bound `player` closure too so a subsequent message uses
-        // the new id when it tries to push.
-        (player as { id: string }).id = newId;
-      } catch { /* */ }
+      // ANTI-DUPLICATE: minting a fresh player.id here orphans the old server
+      // record and creates a SECOND account for the same person — the exact
+      // "doublons" we must never produce. So before regenerating, make a LAST
+      // attempt to recover the durable anchor (Tauri store): localStorage may
+      // have been wiped while the OS-managed anchor still holds our real
+      // id + claim token. If so, RE-ASSERT that identity instead of creating a
+      // new one. Only when there is genuinely no recoverable identity (true
+      // first run after a total wipe with no anchor) do we regenerate.
+      void loadAnchor().then((anchor) => {
+        const store = useStore.getState();
+        if (anchor.id && anchor.claimToken) {
+          // eslint-disable-next-line no-console
+          console.warn("[bootSync] claim-mismatch but anchor recovered — re-asserting durable identity (no new account).", { id: anchor.id.slice(0, 8) + "…" });
+          store.applyServerSync({ id: anchor.id, claimToken: anchor.claimToken });
+          (player as { id: string; claimToken?: string }).id = anchor.id;
+          (player as { id: string; claimToken?: string }).claimToken = anchor.claimToken;
+          try {
+            ws.send(JSON.stringify({
+              type: "hello",
+              nickname: player.nickname || "Anonymous",
+              player_id: anchor.id,
+              claim_token: anchor.claimToken,
+            }));
+          } catch { /* */ }
+          return;
+        }
+        // No durable identity anywhere → a genuine fresh start is the only
+        // option (the old record is permanently unreachable without its token).
+        const newId = crypto.randomUUID();
+        // eslint-disable-next-line no-console
+        console.warn("[bootSync] claim-mismatch + no anchor — regenerating player.id (true fresh start).", { oldId: player.id, newId });
+        store.applyServerSync({ id: newId, claimToken: undefined });
+        try {
+          ws.send(JSON.stringify({
+            type: "hello",
+            nickname: player.nickname || "Anonymous",
+            player_id: newId,
+            claim_token: "",
+          }));
+          (player as { id: string }).id = newId;
+        } catch { /* */ }
+      });
       return;
     }
 

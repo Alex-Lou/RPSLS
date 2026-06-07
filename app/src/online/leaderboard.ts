@@ -45,9 +45,21 @@ export interface LeaderboardEntry {
   lp: number;
 }
 
-/** Top-N players, highest LP first. */
+/** Top-N players, highest LP first.
+ *
+ *  De-duplicated by nickname: the same physical player can hold more than one
+ *  `player.id` (e.g. an old id orphaned by a reinstall that predates the
+ *  durable anchor). Without collapsing, that person shows up several times on
+ *  the ladder with the same name — exactly the "doublons" we never want. We
+ *  keep the HIGHEST-LP entry per nickname and re-rank. (Two genuinely distinct
+ *  players sharing a nickname is possible but rare at this game's scale; the
+ *  higher score wins the row — an acceptable trade for a clean board.)
+ *
+ *  We over-fetch (3×) so that after collapsing duplicates we still surface
+ *  ~limit distinct players. */
 export async function fetchTop(limit = 100): Promise<LeaderboardEntry[]> {
-  const flat = await cmd<string[]>(["ZREVRANGE", KEY, "0", String(limit - 1), "WITHSCORES"]);
+  const fetchN = Math.min(limit * 3, 500);
+  const flat = await cmd<string[]>(["ZREVRANGE", KEY, "0", String(fetchN - 1), "WITHSCORES"]);
   if (!flat || flat.length === 0) return [];
   const ids: string[] = [];
   const lps: number[] = [];
@@ -61,12 +73,18 @@ export async function fetchTop(limit = 100): Promise<LeaderboardEntry[]> {
   } catch {
     /* names hash missing → fall back to "Anonyme" */
   }
-  return ids.map((id, i) => ({
-    rank: i + 1,
-    id,
-    nickname: (names[i] && names[i]!.trim()) || "Anonyme",
-    lp: lps[i],
-  }));
+  // Collapse same-nickname duplicates, keeping the highest-LP id. ZREVRANGE is
+  // already LP-desc, so the FIRST time we see a nickname is its best entry.
+  const byNick = new Map<string, { id: string; nickname: string; lp: number }>();
+  for (let i = 0; i < ids.length; i++) {
+    const nickname = (names[i] && names[i]!.trim()) || "Anonyme";
+    const key = nickname.toLowerCase();
+    if (!byNick.has(key)) byNick.set(key, { id: ids[i], nickname, lp: lps[i] });
+  }
+  return [...byNick.values()]
+    .sort((a, b) => b.lp - a.lp)
+    .slice(0, limit)
+    .map((e, i) => ({ rank: i + 1, id: e.id, nickname: e.nickname, lp: e.lp }));
 }
 
 /** The caller's own rank + LP, or null if they're not on the board yet. */
