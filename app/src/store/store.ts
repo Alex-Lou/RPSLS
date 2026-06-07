@@ -560,9 +560,84 @@ export const useStore = create<AppState>()(
         // app at render OR open a self-XSS via avatar URL.
         return sanitisePersisted(state) as AppState;
       },
+      // Exclude `history` from the auto-persist payload. Zustand re-serialises
+      // the WHOLE persisted shape on every set() call — at peak gameplay
+      // (recordMatch + reward + streak in the same beat) that was rewriting
+      // ~15-50 KB of JSON to localStorage on every action. Pulling history
+      // out cuts the persisted blob to ~5 KB and the I/O drops ~80 %. The
+      // history then rides a debounced side-channel writer (below) so it
+      // still survives a reinstall, just no longer hot-path.
+      partialize: (state) => ({
+        player: state.player,
+        onboarded: state.onboarded,
+        locale: state.locale,
+        serverConfig: state.serverConfig,
+        // history intentionally omitted — see `historySidePersist` below.
+      }) as unknown as AppState,
+      // Hydrate history from its side channel on boot, since partialize
+      // hides it from Zustand's own persist round-trip.
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        try {
+          const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
+          if (raw) state.history = JSON.parse(raw) as MatchRecord[];
+        } catch {
+          // Bad JSON or storage exception → start with an empty history.
+          // The mainline state stays valid; we just lose past matches.
+        }
+      },
     }
   )
 );
+
+/** localStorage key for the history side-channel (kept out of the main
+ *  rpsls-app-state blob — see partialize above). */
+const HISTORY_STORAGE_KEY = "rpsls-history";
+/** Maximum delay between a recordMatch and the corresponding history flush.
+ *  2 s is short enough that an app kill never loses more than the last
+ *  match, long enough that a 5-burst (match end → reward → streak →
+ *  mastery → quest claim) collapses into a single write. */
+const HISTORY_FLUSH_DELAY_MS = 2_000;
+
+let _historyFlushTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleHistoryFlush() {
+  if (_historyFlushTimer) return;
+  _historyFlushTimer = setTimeout(() => {
+    _historyFlushTimer = null;
+    try {
+      const h = useStore.getState().history;
+      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(h));
+    } catch {
+      // Quota exceeded or storage disabled — silently drop. The in-memory
+      // history is still correct for the live session.
+    }
+  }, HISTORY_FLUSH_DELAY_MS);
+}
+
+// Subscribe once at module load: every change to history schedules a
+// debounced flush. Same-tick bursts collapse into one write.
+{
+  let lastRef: MatchRecord[] | null = null;
+  useStore.subscribe((s) => {
+    if (s.history !== lastRef) {
+      lastRef = s.history;
+      scheduleHistoryFlush();
+    }
+  });
+}
+
+// Best-effort final flush on pagehide — covers the "user kills the app
+// during the 2 s debounce window" case without blocking the close path.
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", () => {
+    if (!_historyFlushTimer) return;
+    clearTimeout(_historyFlushTimer);
+    _historyFlushTimer = null;
+    try {
+      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(useStore.getState().history));
+    } catch { /* ignore */ }
+  });
+}
 
 /* ───────── Helpers ───────── */
 
