@@ -28,7 +28,18 @@ Le système de cosmétiques premium (5 sets : **Eclipse, Phantom, Emberforge, Te
 
 ---
 
-## 2. 🔴 BUGS BLOQUANTS — diagnostiqués, à corriger en premier
+## 2. ✅ BUGS BLOQUANTS — TOUS CORRIGÉS & vérifiés device (commit `3ae9312`)
+
+> Les 3 bugs ci-dessous **sont résolus et vérifiés sur device réel** (via WebView DevTools / CDP). Section conservée pour la trace technique. **Tu peux passer directement au §5 (style).**
+
+- **Bug 1 (crash achat)** → `previewArt` n'est plus un `ThemedBackdrop` live : remplacé par `PremiumPreviewTile` (gradient CSS/motion, zéro WebGL). Vérifié : contexte WebGL reste à **1** quand la modale s'ouvre sur un fond premium (était 2 → crash).
+- **Bug 2 (célébration invisible)** → (a) modale portalisée sur `body` à `z-[10000]` (au-dessus du peek z-9999) + célébration plein écran sortie de la carte ; (b) **vraie cause** : le `useEffect` de reset de `phase` dépendait de `onClose` (recréé à chaque render parent → l'achat re-render → reset `phase` à idle instantanément). Scindé pour ne dépendre que de `set`. Vérifié : **28 particules** rendues à l'achat.
+- **Bug 3 (Quartz pas tactile)** → couche passive portalisée sur `body` à `z-[60]` (au-dessus du menu, pointer-events-none, listeners window). Vérifié : un tap spawne un cristal visible par-dessus le menu, les boutons restent cliquables.
+- **Secondaire (peek post-achat)** → le `setTimeout(onClose,2200)` capturait un `onClose` périmé ; lecture de l'ownership via `useStore.getState()`. Vérifié : le peek bascule en « ✓ Choisir ce thème » après achat.
+
+---
+
+## 2bis. 🔴 (archive) Diagnostic original des bugs
 
 ### BUG 1 — Crash + restart à l'achat d'un premium
 
@@ -251,11 +262,12 @@ $appPid = (& $adb shell pidof com.alex.rpsls).Trim()
 
 ## 9. Première action recommandée pour le prochain agent
 
-1. Lire ce fichier en entier. ✅
-2. **Corriger bug 1** (previewArt → aperçu non-WebGL) — débloque l'achat.
-3. **Corriger bug 2** (célébration plein écran hors modale) — rend l'achat gratifiant.
-4. **Corriger bug 3** (couche Quartz en portal z-60 pointer-events-none) — Quartz tactile enfin visible.
-5. Builder + installer + **vérifier l'achat de bout en bout** sur device (DevTools : déclencher l'achat, confirmer pas de crash + célébration visible).
-6. Attaquer le **système de cadres par thème** (§5, P1) — le plus gros levier de « vrai travail de style ».
+Les 3 bugs bloquants (§2) sont **déjà corrigés et vérifiés device**. Donc :
 
-Bon courage. L'infra est solide ; il reste à lui donner une âme. 🎨
+1. Lire ce fichier en entier. ✅
+2. Attaquer le **système de cadres/ornements par thème** (§5, checklist P1) — le plus gros levier de « vrai travail de style » qu'Alex réclame. Aujourd'hui tous les cadres sont `rounded-2xl border-hairline` identiques ; chaque thème mérite sa bordure (arcs dorés Eclipse, rouages Tempus, angles électriques Storm, brume Phantom, rivets Emberforge).
+3. Vérifier sur device la **lisibilité menu sur fonds flashy** (la capture d'Alex montrait Tempus limite) — ajuster `.theme-flashy` dans `App.css` si besoin.
+4. Exploiter vraiment la **typo signature** par thème (§5, P2).
+5. Builder + installer + vérifier sur device après chaque lot (cf. §6).
+
+Bon courage. L'infra est solide, les bugs sont morts ; il reste à lui donner une âme. 🎨
