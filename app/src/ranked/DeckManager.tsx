@@ -329,8 +329,10 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
                     )}
                   </div>
 
-                  {/* Rarity tabs — horizontal pills with owned/total per rarity. */}
-                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 no-scrollbar">
+                  {/* Rarity tabs — horizontal pills with owned/total per rarity.
+                      Vertical padding (py-1.5) prevents the active pill's ring
+                      from clipping against the overflow container's edges. */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto py-1.5 -mx-1 px-1 no-scrollbar">
                     <RarityTab
                       active={rarityFilter === "all"}
                       onClick={() => { hapticTap(); setRarityFilter("all"); }}
@@ -353,8 +355,9 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
 
                   {/* Filter chips — multi-select toggles. Reset button appears
                       only when at least one filter is active so the bar stays
-                      clean in the default state. */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
+                      clean in the default state. py-0.5 keeps the active ring
+                      from clipping at the top edge. */}
+                  <div className="flex items-center gap-1.5 flex-wrap py-0.5">
                     <FilterChip
                       active={ownedOnly}
                       onClick={() => { hapticTap(); setOwnedOnly((v) => !v); }}
