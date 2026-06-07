@@ -20,7 +20,7 @@ import { useT } from "./i18n";
 import { setHapticSettings } from "./haptic";
 import { initSentry, shutdownSentry } from "./monitoring/sentry";
 import { startSyncSubscriber } from "./online/playerSync";
-import { runBootSync } from "./online/bootSync";
+import { runBootSync, restoreAnchorIntoStore } from "./online/bootSync";
 
 // Code-split heavy pages — each becomes its own JS chunk that Vite ships
 // on demand the first time the user navigates there. Cuts the initial
@@ -104,7 +104,14 @@ export default function App() {
     const r = rolloverSeasonIfDue();
     if (r) setSeasonRollover(r);
     startSyncSubscriber();
-    runBootSync();
+    // Restore the durable anchor FIRST (Tauri plugin-store JSON), THEN
+    // start the boot sync — so a freshly wiped localStorage (post-reinstall)
+    // gets seeded with the previous player.id + claimToken before any
+    // server handshake runs. Without this, the bootSync would Hello with a
+    // freshly-generated UUID and lose the account.
+    void restoreAnchorIntoStore().finally(() => {
+      runBootSync();
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -8,6 +8,14 @@
     "opener:default",
     "haptics:default",
     "haptics:allow-vibrate",
-    "haptics:allow-impact-feedback"
+    "haptics:allow-impact-feedback",
+    "store:default",
+    "store:allow-get",
+    "store:allow-set",
+    "store:allow-save",
+    "store:allow-load",
+    "store:allow-delete",
+    "store:allow-keys",
+    "store:allow-entries"
   ]
 }

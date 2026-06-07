@@ -10,6 +10,53 @@
 import { useStore, DEFAULT_CLOUD_URL } from "../store/store";
 import { normalizeServerUrl, type PlayerProgress } from "./online";
 import { buildProgressFromPlayer, mergeServerState } from "./playerSync";
+import { loadAnchor, saveAnchor } from "./playerAnchor";
+
+/** Restore player.id + claimToken from the durable Tauri anchor file into
+ *  the Zustand store. This MUST run before the first bootSync handshake —
+ *  otherwise a freshly-wiped localStorage (post-reinstall) hands the server
+ *  a brand-new UUID and orphans every diamond, star, dust, card, owned set,
+ *  cosmetic preference the player has earned.
+ *
+ *  Behaviour:
+ *   - If the anchor file is missing (true first launch), no-op.
+ *   - If the local store ALREADY has a non-null claimToken, no-op (the local
+ *     store is the source of truth — the anchor is just a backup against
+ *     wipes).
+ *   - If the local store is missing the claimToken but the anchor has one,
+ *     restore BOTH id and claimToken so the next Hello presents the right
+ *     pair and the server recognises us.
+ *
+ *  Tauri-only — on browser preview the loader silently returns nulls and we
+ *  no-op. */
+export async function restoreAnchorIntoStore(): Promise<void> {
+  try {
+    const anchor = await loadAnchor();
+    if (!anchor.id || !anchor.claimToken) return;
+    const store = useStore.getState();
+    const local = store.player;
+    // If local already has a matching pair, nothing to do. If local has a
+    // DIFFERENT (older or wiped) id but the anchor has a real claim token,
+    // the anchor wins — that's the whole point of the backup.
+    if (local.claimToken && local.claimToken === anchor.claimToken &&
+        local.id === anchor.id) {
+      return;
+    }
+    // Restore the anchored identity so the next Hello uses it.
+    store.applyServerSync({
+      id: anchor.id,
+      claimToken: anchor.claimToken,
+    });
+    // eslint-disable-next-line no-console
+    console.warn("[bootSync] restored anchor identity from durable store", {
+      id: anchor.id.slice(0, 8) + "...",
+      hadLocalToken: !!local.claimToken,
+    });
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn("[bootSync] anchor restore failed", e);
+  }
+}
 
 const BOOT_SYNC_TIMEOUT = 8_000;
 
@@ -117,6 +164,15 @@ function runBootSyncImmediate(player: { id: string; nickname: string; claimToken
 
       if (Object.keys(patch).length > 0) {
         store.applyServerSync(patch);
+      }
+
+      // Persist (id, claimToken) to the DURABLE Tauri anchor so a future
+      // localStorage wipe (reinstall, OS cleanup) doesn't orphan the account.
+      // Fire-and-forget — never blocks the bootSync.
+      const finalId = patch.id ?? currentPlayer.id;
+      const finalToken = patch.claimToken ?? currentPlayer.claimToken;
+      if (finalId && finalToken) {
+        void saveAnchor(finalId, finalToken);
       }
 
       // Push merged state back

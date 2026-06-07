@@ -18,6 +18,13 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_haptics::init())
+        // tauri-plugin-store persists JSON files in the OS's data dir
+        // (Android: /data/data/<pkg>/files/). The "player_anchor.json" key
+        // survives the localStorage wipe that happens on uninstall in
+        // Tauri Android. This is the durable home for player.id +
+        // claimToken so the account isn't lost when the WebView storage
+        // is purged.
+        .plugin(tauri_plugin_store::Builder::default().build())
         .invoke_handler(tauri::generate_handler![resolve_round, random_move])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
