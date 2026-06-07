@@ -192,6 +192,10 @@ const fr: Record<string, string> = {
   "premium.devGrant": "+1000 ✦ (test uniquement)",
   "premium.close": "Fermer",
   "premium.unlocked": "Débloqué !",
+  "crash.title": "Une erreur est survenue",
+  "crash.body": "L'app a rencontré une erreur inattendue. Ta progression est sauve — seul l'écran a planté. Touche ci-dessous pour réessayer, ou rouvre l'app si ça persiste.",
+  "crash.details": "Détails",
+  "crash.retry": "Réessayer",
   "premium.quartz.name": "Quartz",
   "premium.quartz.tagline": "Éclats cristallins prismatiques, un monde glaciaire et doux.",
   "ranked.bonus.combo": "Combo",
@@ -624,6 +628,11 @@ const fr: Record<string, string> = {
   "theme.pastel": "Pastel",
   "theme.sunset": "Crépuscule",
   "theme.forest": "Forêt",
+  "theme.eclipse": "Éclipse",
+  "theme.phantom": "Spectre",
+  "theme.emberforge": "Forge Braise",
+  "theme.tempus": "Tempus",
+  "theme.storm": "Tempête",
 
   // ── Pads ──
   "pad.chalkboard": "Tableau noir",

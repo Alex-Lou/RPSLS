@@ -1,4 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { useStore } from "../store/store";
+import { tFor } from "../i18n";
 
 /**
  * AppErrorBoundary — last-resort React error trap.
@@ -40,6 +42,11 @@ export class AppErrorBoundary extends Component<{ children: ReactNode }, State> 
 }
 
 function CrashScreen({ error, onReset }: { error: Error; onReset: () => void }) {
+  // Pull the locale via getState (not useStore) so this works inside a
+  // class-error-boundary subtree where hooks would crash on render. The
+  // crash screen is the LAST place where we want a re-mount loop.
+  const locale = useStore.getState().locale;
+  const T = (key: string) => tFor(locale, key);
   return (
     <div
       role="alert"
@@ -47,15 +54,13 @@ function CrashScreen({ error, onReset }: { error: Error; onReset: () => void }) 
     >
       <div className="text-5xl" aria-hidden>💥</div>
       <h1 className="text-2xl font-black tracking-tight bg-gradient-to-br from-amber-300 via-fuchsia-300 to-cyan-300 bg-clip-text text-transparent">
-        Something broke
+        {T("crash.title")}
       </h1>
       <p className="text-sm text-ink-muted max-w-sm leading-relaxed">
-        The app hit an unexpected error. Your progress is safe — it's only
-        the screen that crashed. Tap below to try again, or reopen the app
-        if it still misbehaves.
+        {T("crash.body")}
       </p>
       <details className="text-[11px] text-ink-faint max-w-sm">
-        <summary className="cursor-pointer mb-1">Details</summary>
+        <summary className="cursor-pointer mb-1">{T("crash.details")}</summary>
         <pre className="whitespace-pre-wrap text-left bg-hairline p-2 rounded-md font-mono">
           {error.message}
         </pre>
@@ -64,7 +69,7 @@ function CrashScreen({ error, onReset }: { error: Error; onReset: () => void }) 
         onClick={onReset}
         className="mt-2 px-6 py-2.5 rounded-xl font-bold text-white bg-themed shadow-lg shadow-violet-500/30 hover:scale-[1.02] transition"
       >
-        Try again
+        {T("crash.retry")}
       </button>
     </div>
   );

@@ -192,6 +192,10 @@ const en: Record<string, string> = {
   "premium.devGrant": "+1000 ✦ (test only)",
   "premium.close": "Close",
   "premium.unlocked": "Unlocked!",
+  "crash.title": "Something broke",
+  "crash.body": "The app hit an unexpected error. Your progress is safe — only the screen crashed. Tap below to try again, or reopen the app if it still misbehaves.",
+  "crash.details": "Details",
+  "crash.retry": "Try again",
   "premium.quartz.name": "Quartz",
   "premium.quartz.tagline": "Crystalline shards refracting prismatic light — a soft, glacial world.",
   "ranked.bonus.combo": "Combo",
@@ -633,6 +637,11 @@ const en: Record<string, string> = {
   "theme.pastel": "Pastel",
   "theme.sunset": "Sunset",
   "theme.forest": "Forest",
+  "theme.eclipse": "Eclipse",
+  "theme.phantom": "Phantom",
+  "theme.emberforge": "Ember Forge",
+  "theme.tempus": "Tempus",
+  "theme.storm": "Tempest",
 
   // ── Pads ──
   "pad.chalkboard": "Blackboard",
