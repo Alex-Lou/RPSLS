@@ -13,6 +13,14 @@ import { buildProgressFromPlayer, mergeServerState } from "./playerSync";
 
 const BOOT_SYNC_TIMEOUT = 8_000;
 
+/** Cold-start jitter window. When N players open the app within the same
+ *  short window (e.g. after a push notification), their bootSync would all
+ *  hit the dormant Render instance at the same instant — the first few get
+ *  a 429 from the governor, the rest pile on top. A random 0-8 s delay turns
+ *  that synchronised spike into a smooth ramp. The sync is silent + fully
+ *  background so the delay has zero user-facing cost. */
+const BOOT_SYNC_JITTER_MAX_MS = 8_000;
+
 export function runBootSync() {
   const state = useStore.getState();
   const player = state.player;
@@ -23,7 +31,14 @@ export function runBootSync() {
   if (!normalized) return;
 
   const wsUrl = normalized.replace(/\/+$/, "") + "/ws";
+  const jitterMs = Math.floor(Math.random() * BOOT_SYNC_JITTER_MAX_MS);
+  // Bail the whole thing into a microtask after the jitter so the WebSocket
+  // is only constructed AFTER the random wait — otherwise we'd build the
+  // connection at app boot and just delay the message, which still herds.
+  setTimeout(() => runBootSyncImmediate(player, wsUrl), jitterMs);
+}
 
+function runBootSyncImmediate(player: { id: string; nickname: string; claimToken?: string }, wsUrl: string) {
   let ws: WebSocket;
   try {
     ws = new WebSocket(wsUrl);
