@@ -1,6 +1,6 @@
 /**
- * 26 cards — 4 rarities (15 base + 11 bonus). Deck of 8, hand of 3.
- * Passive cards (kind: "passive") are equipped but never drawn.
+ * 46 cards — 4 rarities (15 base + 11 bonus Lot 1 + 20 bonus V3).
+ * Deck of 8, hand of 3. Passive cards (kind: "passive") are equipped but never drawn.
  */
 
 import type { CardId, CardRarity, RankedCard } from "./rankedTypes";
@@ -194,6 +194,158 @@ export const CARDS: Record<CardId, RankedCard> = {
     nameKey: "ranked.cards.trinite.name", descKey: "ranked.cards.trinite.desc",
     targetHintKey: "ranked.cards.trinite.targetHint",
     art: "/Cards Bonus/trinite.png",
+  },
+
+  /* ───────────────────────────────────────────────────────────────────────
+   * BONUS V3 — 20 new mechanics cards (see docs/CARTES_BONUS_V3.md)
+   * ─────────────────────────────────────────────────────────────────────── */
+
+  /* ⚪ V3 COMMONS — 1 mana */
+  sablier: {
+    id: "sablier", cost: 1, rarity: "common",
+    target: "none", palette: "amber", glyph: "⏱️",
+    nameKey: "ranked.cards.sablier.name", descKey: "ranked.cards.sablier.desc",
+    targetHintKey: "ranked.cards.sablier.targetHint",
+    art: "/Cards Bonus/sablier.png",
+  },
+  remanence: {
+    id: "remanence", cost: 1, rarity: "common",
+    target: "lane", palette: "fuchsia", glyph: "👻",
+    nameKey: "ranked.cards.remanence.name", descKey: "ranked.cards.remanence.desc",
+    targetHintKey: "ranked.cards.remanence.targetHint",
+    art: "/Cards Bonus/remanence.png",
+  },
+  offre: {
+    id: "offre", cost: 1, rarity: "common",
+    target: "none", palette: "emerald", glyph: "🤝",
+    nameKey: "ranked.cards.offre.name", descKey: "ranked.cards.offre.desc",
+    targetHintKey: "ranked.cards.offre.targetHint",
+    art: "/Cards Bonus/offre.png",
+  },
+  braise: {
+    id: "braise", cost: 1, rarity: "common",
+    target: "none", palette: "orange", glyph: "🔥",
+    nameKey: "ranked.cards.braise.name", descKey: "ranked.cards.braise.desc",
+    targetHintKey: "ranked.cards.braise.targetHint",
+    art: "/Cards Bonus/braise.png",
+  },
+  echappee: {
+    id: "echappee", cost: 1, rarity: "common",
+    target: "lane", palette: "sky", glyph: "🏃",
+    nameKey: "ranked.cards.echappee.name", descKey: "ranked.cards.echappee.desc",
+    targetHintKey: "ranked.cards.echappee.targetHint",
+    art: "/Cards Bonus/echappee.png",
+  },
+
+  /* 🔵 V3 RARES — 2 mana */
+  "oracle-inverse": {
+    id: "oracle-inverse", cost: 2, rarity: "rare",
+    target: "none", palette: "fuchsia", glyph: "🔮",
+    nameKey: "ranked.cards.oracle-inverse.name", descKey: "ranked.cards.oracle-inverse.desc",
+    targetHintKey: "ranked.cards.oracle-inverse.targetHint",
+    art: "/Cards Bonus/oracle-inverse.png",
+  },
+  fardeau: {
+    id: "fardeau", cost: 2, rarity: "rare",
+    target: "none", palette: "zinc", glyph: "🪨",
+    nameKey: "ranked.cards.fardeau.name", descKey: "ranked.cards.fardeau.desc",
+    targetHintKey: "ranked.cards.fardeau.targetHint",
+    art: "/Cards Bonus/fardeau.png",
+  },
+  crepuscule: {
+    id: "crepuscule", cost: 2, rarity: "rare",
+    target: "lane", palette: "amber", glyph: "🌅",
+    nameKey: "ranked.cards.crepuscule.name", descKey: "ranked.cards.crepuscule.desc",
+    targetHintKey: "ranked.cards.crepuscule.targetHint",
+    art: "/Cards Bonus/crepuscule.png",
+  },
+  cascade: {
+    id: "cascade", cost: 2, rarity: "rare",
+    target: "none", palette: "sky", glyph: "💧",
+    nameKey: "ranked.cards.cascade.name", descKey: "ranked.cards.cascade.desc",
+    targetHintKey: "ranked.cards.cascade.targetHint",
+    art: "/Cards Bonus/cascade.png",
+  },
+  "echo-temporel": {
+    id: "echo-temporel", cost: 2, rarity: "rare",
+    target: "none", palette: "violet", glyph: "🕐",
+    nameKey: "ranked.cards.echo-temporel.name", descKey: "ranked.cards.echo-temporel.desc",
+    targetHintKey: "ranked.cards.echo-temporel.targetHint",
+    art: "/Cards Bonus/echo-temporel.png",
+  },
+  "ancre-temporelle": {
+    id: "ancre-temporelle", cost: 2, rarity: "rare",
+    target: "none", palette: "cyan", glyph: "⚓",
+    nameKey: "ranked.cards.ancre-temporelle.name", descKey: "ranked.cards.ancre-temporelle.desc",
+    targetHintKey: "ranked.cards.ancre-temporelle.targetHint",
+    art: "/Cards Bonus/ancre-temporelle.png",
+  },
+
+  /* 🟣 V3 EPICS — 3 mana */
+  metamorphose: {
+    id: "metamorphose", cost: 3, rarity: "epic",
+    target: "none", palette: "emerald", glyph: "🦋",
+    nameKey: "ranked.cards.metamorphose.name", descKey: "ranked.cards.metamorphose.desc",
+    targetHintKey: "ranked.cards.metamorphose.targetHint",
+    art: "/Cards Bonus/metamorphose.png",
+  },
+  gaia: {
+    id: "gaia", cost: 3, rarity: "epic", kind: "passive",
+    target: "none", palette: "emerald", glyph: "🛡️",
+    nameKey: "ranked.cards.gaia.name", descKey: "ranked.cards.gaia.desc",
+    targetHintKey: "ranked.cards.gaia.targetHint",
+    art: "/Cards Bonus/gaia.png",
+  },
+  "marchand-ames": {
+    id: "marchand-ames", cost: 3, rarity: "epic",
+    target: "none", palette: "rose", glyph: "💀",
+    nameKey: "ranked.cards.marchand-ames.name", descKey: "ranked.cards.marchand-ames.desc",
+    targetHintKey: "ranked.cards.marchand-ames.targetHint",
+    art: "/Cards Bonus/marchand-ames.png",
+  },
+  telepathie: {
+    id: "telepathie", cost: 3, rarity: "epic",
+    target: "none", palette: "violet", glyph: "🧠",
+    nameKey: "ranked.cards.telepathie.name", descKey: "ranked.cards.telepathie.desc",
+    targetHintKey: "ranked.cards.telepathie.targetHint",
+    art: "/Cards Bonus/telepathie.png",
+  },
+  paradoxe: {
+    id: "paradoxe", cost: 3, rarity: "epic",
+    target: "none", palette: "cyan", glyph: "⏳",
+    nameKey: "ranked.cards.paradoxe.name", descKey: "ranked.cards.paradoxe.desc",
+    targetHintKey: "ranked.cards.paradoxe.targetHint",
+    art: "/Cards Bonus/paradoxe.png",
+  },
+  benediction: {
+    id: "benediction", cost: 3, rarity: "epic",
+    target: "none", palette: "yellow", glyph: "✨",
+    nameKey: "ranked.cards.benediction.name", descKey: "ranked.cards.benediction.desc",
+    targetHintKey: "ranked.cards.benediction.targetHint",
+    art: "/Cards Bonus/benediction.png",
+  },
+
+  /* 🟡 V3 LEGENDARIES — 4 mana */
+  schrodinger: {
+    id: "schrodinger", cost: 4, rarity: "legendary",
+    target: "none", palette: "fuchsia", glyph: "📦",
+    nameKey: "ranked.cards.schrodinger.name", descKey: "ranked.cards.schrodinger.desc",
+    targetHintKey: "ranked.cards.schrodinger.targetHint",
+    art: "/Cards Bonus/schrodinger.png",
+  },
+  juge: {
+    id: "juge", cost: 4, rarity: "legendary",
+    target: "none", palette: "yellow", glyph: "⚖️",
+    nameKey: "ranked.cards.juge.name", descKey: "ranked.cards.juge.desc",
+    targetHintKey: "ranked.cards.juge.targetHint",
+    art: "/Cards Bonus/juge.png",
+  },
+  genese: {
+    id: "genese", cost: 4, rarity: "legendary",
+    target: "none", palette: "yellow", glyph: "🌟",
+    nameKey: "ranked.cards.genese.name", descKey: "ranked.cards.genese.desc",
+    targetHintKey: "ranked.cards.genese.targetHint",
+    art: "/Cards Bonus/genese.png",
   },
 };
 

@@ -47,6 +47,27 @@ const UNLOCK_HINTS: Partial<Record<CardId, string>> = {
   prophetie: "Ouvre des packs ou forge-la",
   conduit: "Ouvre des packs ou forge-la",
   trinite: "Pack rare ou forge légendaire",
+  // V3 bonus cards — same pack/forge economy as Lot 1.
+  sablier: "Ouvre des packs à la boutique",
+  remanence: "Ouvre des packs à la boutique",
+  offre: "Ouvre des packs à la boutique",
+  braise: "Ouvre des packs à la boutique",
+  echappee: "Ouvre des packs à la boutique",
+  "oracle-inverse": "Ouvre des packs ou forge-la",
+  fardeau: "Ouvre des packs ou forge-la",
+  crepuscule: "Ouvre des packs ou forge-la",
+  cascade: "Ouvre des packs ou forge-la",
+  "echo-temporel": "Ouvre des packs ou forge-la",
+  "ancre-temporelle": "Ouvre des packs ou forge-la",
+  metamorphose: "Ouvre des packs ou forge-la",
+  gaia: "Ouvre des packs ou forge-la",
+  "marchand-ames": "Ouvre des packs ou forge-la",
+  telepathie: "Ouvre des packs ou forge-la",
+  paradoxe: "Ouvre des packs ou forge-la",
+  benediction: "Ouvre des packs ou forge-la",
+  schrodinger: "Pack rare ou forge légendaire",
+  juge: "Pack rare ou forge légendaire",
+  genese: "Pack rare ou forge légendaire",
 };
 
 export function DeckManager({ onClose }: { onClose: () => void }) {

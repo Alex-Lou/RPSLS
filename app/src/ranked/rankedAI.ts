@@ -51,18 +51,25 @@ function chooseCpuCard(ctx: RankedCpuContext, picks: LanePlay[]): PlayedCard | n
   if (has("supernova")) return { id: "supernova" };
   if (has("trou-noir")) return { id: "trou-noir" };
   if (has("surge"))     return { id: "surge", lane: favLane };
+  if (has("benediction")) return { id: "benediction" };
   if (has("tide"))      return { id: "tide", lane: 0 as LaneTarget };
   if (has("heist"))     return { id: "heist", lane: favLane };
   if (has("sangsue"))   return { id: "sangsue", lane: favLane };
+  if (has("fardeau"))   return { id: "fardeau" };
   if (has("curse"))     return { id: "curse", lane: randLane() };
   if (has("vortex"))    return { id: "vortex" };
   if (has("gambit"))    return { id: "gambit" };
   if (has("precision")) return { id: "precision", lane: favLane };
   if (has("rempart"))   return { id: "rempart" };
+  if (has("cascade"))   return { id: "cascade" };
+  if (has("crepuscule")) return { id: "crepuscule", lane: randLane() };
   if (has("aegis"))     return { id: "aegis", lane: randLane() };
   if (has("anchor"))    return { id: "anchor", lane: randLane() };
   if (has("riposte"))   return { id: "riposte", lane: randLane() };
+  if (has("remanence")) return { id: "remanence", lane: randLane() };
   if (has("mirror"))    return { id: "mirror", lane: randLane() };
+  if (has("braise"))    return { id: "braise" };
+  if (has("sablier"))   return { id: "sablier" };
   if (has("second-wind")) return { id: "second-wind" };
 
   return null;

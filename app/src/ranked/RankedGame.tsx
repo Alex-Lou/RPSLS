@@ -48,6 +48,16 @@ import type {
 
 const LANE_COUNT = 3;
 const PICK_DEADLINE_MS = 20_000;
+
+/** Canonical RPSLS counters — used by Le Choix de Schrödinger to compute
+ *  the "superposed" second move for each lane. */
+const COUNTER_MOVE: Record<Move, Move> = {
+  rock: "paper",
+  paper: "scissors",
+  scissors: "rock",
+  lizard: "rock",
+  spock: "lizard",
+};
 const ROUND_PAUSE_MS = 7_500;
 const REVEAL_SUSPENSE_MS = 1_400;
 const MATCH_FOUND_SPLASH_MS = 2_500;
@@ -66,8 +76,12 @@ const SUDDEN_DEATH_DUEL_TIE_MS = 1_700;
 const BASE_CPU_HAND_POOL: CardId[] = [
   "aegis", "surge", "augur", "curse", "precision", "riposte",
   "heist", "tide", "vortex",
-  // Bonus actives the CPU can throw (passives are player-only).
+  // Bonus Lot 1 actives the CPU can throw (passives are player-only).
   "sangsue", "rempart", "trou-noir",
+  // V3 actives the CPU can also play (simpler effects only — anything
+  // requiring a player-side modal stays off the CPU's menu).
+  "sablier", "remanence", "braise", "crepuscule", "cascade",
+  "fardeau", "benediction",
 ];
 
 /** Pool the player draws from when a successful Heist nets them a card. Heist
@@ -98,6 +112,25 @@ function makeBattle(savedDeck?: string[]): RankedBattleState {
     roundsPlayed: 0,
     bonusHistory: [],
   };
+}
+
+/** Pick the lowest-rarity (then random) sacrificial card in a hand, excluding
+ *  the card being played itself. Used by Métamorphose. */
+function pickSacrifice(hand: CardId[], exclude: CardId): CardId | null {
+  const pool = hand.filter((c) => c !== exclude);
+  if (pool.length === 0) return null;
+  const order: CardId[] = pool.slice().sort((a, b) => {
+    const ra = ["common", "rare", "epic", "legendary"].indexOf(CARDS[a].rarity);
+    const rb = ["common", "rare", "epic", "legendary"].indexOf(CARDS[b].rarity);
+    return ra - rb;
+  });
+  return order[0];
+}
+
+/** Rarity ladder: returns the rarity one tier above (legendary loops to itself
+ *  per the design — sacrificing a legendary draws TWO of the same tier). */
+function nextRarityUp(r: "common" | "rare" | "epic" | "legendary"): "common" | "rare" | "epic" | "legendary" {
+  return r === "common" ? "rare" : r === "rare" ? "epic" : "legendary";
 }
 
 function removeFirst<T>(arr: T[], v: T): T[] {
@@ -196,9 +229,61 @@ export function RankedGame({
    *  the player's disinformation lands one round later (consumed at draw). */
   const mascaradePoisonRef = useRef(false);
 
+  /* ──────────── V3 bonus-card state ──────────── */
+  /** Braise (Ember): once played, each subsequent ROUND LOST shaves 1 mana off
+   *  the cost of your next card (cumulative, min cost = 1). The discount is
+   *  reset to 0 every time a card is actually played. */
+  const braiseActiveRef = useRef(false);
+  const braiseStacksRef = useRef(0);
+  /** Extra mana granted at the start of the NEXT round only — fed by Offre
+   *  (+2), Sablier (+1). Consumed in startNextRound. */
+  const bonusManaNextRoundRef = useRef(0);
+  /** Permanent mana-cap boost from Marchand d'Âmes (+3, repeatable). */
+  const manaMaxBoostRef = useRef(0);
+  /** Cascade armed this round: after resolve, fill hand to 3 on win / dump
+   *  hand on loss. */
+  const cascadeArmedRef = useRef(false);
+  /** Cascade just paid off: next round's draws are free (mana-discounted).
+   *  Implemented by clearing the cost of the first card played next round. */
+  const cascadeFreeNextRoundRef = useRef(false);
+  /** Écho temporel: if armed and the round ends in YOUR loss, the result is
+   *  rewritten as a draw — your card is refunded, no discard penalty. The
+   *  CPU isn't actually rewound (their cards are kept) — it's a "stop-loss". */
+  const echoActiveRef = useRef(false);
+  /** Ancre temporelle snapshot: state to restore if you lose the next 2 rounds.
+   *  Cleared if you win any of them. */
+  const anchorSnapshotRef = useRef<{
+    winsA: number; winsB: number;
+    hand: CardId[]; deck: CardId[]; discard: CardId[]; usedOneShotCards: CardId[];
+  } | null>(null);
+  /** Rounds left on the anchor watch (2 → 1 → 0). */
+  const anchorRoundsLeftRef = useRef(0);
+  /** Anchor loss-streak counter — increments per loss while watching, restores at 2. */
+  const anchorLossStreakRef = useRef(0);
+  /** Gaïa (Bouclier de Gaïa): passive, charged at match start if equipped.
+   *  Consumed once per match the first time the round would be a loss. */
+  const gaiaChargedRef = useRef(false);
+  /** Once-per-match limiter for Paradoxe Temporel. */
+  const paradoxeUsedRef = useRef(false);
+  /** Once-per-match limiter for Genèse. */
+  const genesisUsedRef = useRef(false);
+  /** Fardeau (Burden): force the CPU to play this card NEXT round (consumed). */
+  const fardeauNextCpuRef = useRef<CardId | null>(null);
+  /** Previous round's CPU picks — used by Rémanence to summon the ghost of the
+   *  opponent's last move on a chosen lane. */
+  const prevOppPicksRef = useRef<Move[] | null>(null);
+  /** Oracle Inverse (Mind Reader): the 3 random CPU-hand cards revealed this
+   *  round. Shown as a soft chip strip during pick phase. Cleared at next round. */
+  const [oppHandRevealed, setOppHandRevealed] = useState<CardId[] | null>(null);
+  /** Genèse pending reset — applied at the start of next round. */
+  const genesisPendingRef = useRef(false);
+
   /* ──────────── Lifecycle ──────────── */
   useEffect(() => {
     hapticMatchStart();
+    // Seed Bouclier de Gaïa charge if the passive is equipped — consumed once
+    // per match on the first round you'd lose.
+    gaiaChargedRef.current = battle.passives.includes("gaia");
     const id = window.setTimeout(() => startNextRound(), MATCH_FOUND_SPLASH_MS);
     return () => window.clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -216,12 +301,55 @@ export function RankedGame({
     const nextNo = roundNoRef.current + 1;
     roundNoRef.current = nextNo;
 
+    // Genèse reset (4-mana legendary): wipe round wins, reshuffle full deck,
+    // empty hand/discard. Mana, mana-boost, charges all reset too. The card
+    // itself is already burned (it's a legendary one-shot).
+    if (genesisPendingRef.current) {
+      genesisPendingRef.current = false;
+      braiseActiveRef.current = false;
+      braiseStacksRef.current = 0;
+      bonusManaNextRoundRef.current = 0;
+      manaMaxBoostRef.current = 0;
+      cascadeArmedRef.current = false;
+      cascadeFreeNextRoundRef.current = false;
+      echoActiveRef.current = false;
+      anchorSnapshotRef.current = null;
+      anchorRoundsLeftRef.current = 0;
+      anchorLossStreakRef.current = 0;
+      // Re-seed gaia if equipped (it gets a fresh charge after Genèse — feels
+      // right since the match is "starting over").
+      gaiaChargedRef.current = battle.passives.includes("gaia");
+      setBattle((b) => {
+        const fullSource = [...b.deck, ...b.hand, ...b.discard, ...b.usedOneShotCards];
+        return {
+          ...b,
+          deck: shuffle(fullSource),
+          hand: [],
+          discard: [],
+          usedOneShotCards: [],
+          oppHandSize: STARTING_HAND,
+          roundWinsA: 0,
+          roundWinsB: 0,
+          bonusHistory: [],
+        };
+      });
+      // Schedule the actual round start AFTER the state batch settles —
+      // re-enter startNextRound on the fresh state.
+      window.setTimeout(() => startNextRound(), 50);
+      // Roll back the round number we just bumped — the rerun will bump it.
+      roundNoRef.current = nextNo - 1;
+      return;
+    }
+
     // +1 base mana so the curve is round1:2 → round3:4. The old `nextNo`
     // curve locked the 4-cost Supernova until round 4, by which point most
     // Bo3 matches are already over — it was effectively a dead card.
     // Cadence (passive) lifts the cap from 4 to 5 so 4-cost cards arc earlier.
-    const manaCap = battle.passives.includes("cadence") ? 5 : MAX_MANA;
-    const newMana = Math.min(manaCap, nextNo + 1);
+    // Marchand d'Âmes adds a permanent +3 ceiling on top.
+    const manaCap = (battle.passives.includes("cadence") ? 5 : MAX_MANA) + manaMaxBoostRef.current;
+    const bonusMana = bonusManaNextRoundRef.current;
+    bonusManaNextRoundRef.current = 0;
+    const newMana = Math.min(manaCap, nextNo + 1 + bonusMana);
     setAugurCooldown((c) => Math.max(0, c - 1));
 
     const shouldDraw = nextNo === 1 || wonLastRoundRef.current;
@@ -229,8 +357,12 @@ export function RankedGame({
     compensationDrawNextRef.current = false;
     // Pillage (passive): each round you WON, draw 1 extra card next round.
     const pillageDraw = wonLastRoundRef.current && battle.passives.includes("pillage") ? 1 : 0;
+    // Cascade payoff: refill to full hand (3) at the start of next round.
+    const cascadeRefill = cascadeFreeNextRoundRef.current;
+    cascadeFreeNextRoundRef.current = false;
     const baseDrawCount = nextNo === 1 ? STARTING_HAND : shouldDraw ? 1 : 0;
-    const drawCount = baseDrawCount + (compensationDraw ? 1 : 0) + pillageDraw;
+    const cascadeExtra = cascadeRefill ? Math.max(0, HAND_CAP - battle.hand.length - baseDrawCount) : 0;
+    const drawCount = baseDrawCount + (compensationDraw ? 1 : 0) + pillageDraw + cascadeExtra;
     // Bump the cap for this draw cycle so the compensation / Pillage cards are
     // honored even if the player also hit the normal cap this round.
     const drawCap = HAND_CAP + (compensationDraw ? 1 : 0) + pillageDraw;
@@ -242,7 +374,12 @@ export function RankedGame({
     const mascaradePoison = mascaradePoisonRef.current;
     mascaradePoisonRef.current = false;
     const usedOneShots = new Set(cpuOneShotsRef.current);
-    const cpuHand = BASE_CPU_HAND_POOL.filter((id) => !usedOneShots.has(id));
+    let cpuHand = BASE_CPU_HAND_POOL.filter((id) => !usedOneShots.has(id));
+    // Fardeau (Burden): the burdened card is FORCED into the CPU's hand and
+    // they MUST play it this round (the AI's natural choice is bypassed).
+    const forcedFardeau = fardeauNextCpuRef.current;
+    fardeauNextCpuRef.current = null;
+    if (forcedFardeau) cpuHand = [forcedFardeau];
     const cpuDecision = cpuRankedDecision(
       {
         mood: moodRef.current,
@@ -254,6 +391,8 @@ export function RankedGame({
       LANE_COUNT,
     );
     cpuDecisionRef.current = cpuDecision;
+    // Clear last round's Oracle Inverse reveal — fresh round, no peek yet.
+    setOppHandRevealed(null);
 
     // Reset round-time state.
     setPicks([null, null, null]);
@@ -310,6 +449,14 @@ export function RankedGame({
       setAugurRevealed(null); // Clear single augur, we use oracle state
       setOracleRevealed(r);
       setAugurCooldown(3);
+    } else if (card.id === "telepathie") {
+      // Télépathie — same reveal as Oracle but flavored "secret": no extra
+      // UI hint, just the 3 picks revealed silently in oracle slots.
+      const cpu = cpuDecisionRef.current;
+      if (cpu) {
+        const r: [Move, Move, Move] = [cpu.plays[0].mv, cpu.plays[1].mv, cpu.plays[2].mv];
+        setOracleRevealed(r);
+      }
     } else if (card.id === "mascarade") {
       // Bluff: poison the NEXT round's CPU read (disinformation lands later).
       mascaradePoisonRef.current = true;
@@ -319,15 +466,170 @@ export function RankedGame({
       const lane = oc && "lane" in oc ? (oc.lane as LaneTarget) : null;
       setCompassRevealed({ lane });
     }
+    /* ─────────── V3 instant effects ─────────── */
+    else if (card.id === "sablier") {
+      // Sand-bender. Vs CPU the deadline is moot, so the card grants tempo:
+      // +1 card NOW + +1 mana NEXT round — keeps the time-manipulation
+      // theme by trading "saved seconds" for resource velocity.
+      bonusManaNextRoundRef.current += 1;
+      setBattle((b) => {
+        const dr = drawN(b.deck, b.hand, b.discard, 1, b.hand.length + 1);
+        return { ...b, deck: dr.deck, hand: dr.hand, discard: dr.discard };
+      });
+    }
+    else if (card.id === "offre") {
+      // Pure mana-bank — +2 next round in exchange for telegraphing your move
+      // (the CPU doesn't use that info, so vs CPU the offer is generous).
+      bonusManaNextRoundRef.current += 2;
+    }
+    else if (card.id === "braise") {
+      // Comeback charge: from now on, each round you LOSE shaves 1 mana off
+      // your next card's cost (cumulative; min cost 1, reset when a card lands).
+      braiseActiveRef.current = true;
+      braiseStacksRef.current = 0;
+    }
+    else if (card.id === "oracle-inverse") {
+      // Reveal 3 random cards from the CPU's notional hand — shown as a chip
+      // strip in the pick phase so the player can plan around them.
+      const usedOneShots = new Set(cpuOneShotsRef.current);
+      const pool = BASE_CPU_HAND_POOL.filter((id) => !usedOneShots.has(id));
+      const picked: CardId[] = [];
+      const work = pool.slice();
+      for (let i = 0; i < 3 && work.length > 0; i++) {
+        const idx = Math.floor(Math.random() * work.length);
+        picked.push(work[idx]);
+        work.splice(idx, 1);
+      }
+      setOppHandRevealed(picked);
+    }
+    else if (card.id === "fardeau") {
+      // Stuff a weak card into the CPU's NEXT hand and force them to play it.
+      // "second-wind" is a no-target, low-impact common — perfect as a poison.
+      fardeauNextCpuRef.current = "second-wind";
+    }
+    else if (card.id === "cascade") {
+      // All-in: WIN this round → refill hand to full for next round. LOSE →
+      // empty hand. Decided at resolveAndAdvance — we just arm it here.
+      cascadeArmedRef.current = true;
+    }
+    else if (card.id === "ancre-temporelle") {
+      // Snapshot the battle state RIGHT NOW (pre-resolve). Restored after
+      // you lose 2 rounds in a row while the anchor watches; cleared if you
+      // win any of them.
+      anchorSnapshotRef.current = {
+        winsA: battle.roundWinsA,
+        winsB: battle.roundWinsB,
+        hand: battle.hand.slice(),
+        deck: battle.deck.slice(),
+        discard: battle.discard.slice(),
+        usedOneShotCards: battle.usedOneShotCards.slice(),
+      };
+      anchorRoundsLeftRef.current = 2;
+      anchorLossStreakRef.current = 0;
+    }
+    else if (card.id === "echo-temporel") {
+      // Stop-loss: if THIS round ends in your loss, it's rewritten as a draw
+      // and your card is refunded. The CPU's card still fires and burns.
+      echoActiveRef.current = true;
+    }
+    else if (card.id === "metamorphose") {
+      // Sacrifice one card (auto: lowest rarity in hand) → draw a card of
+      // one rarity higher. Legendary sacrifice draws TWO legendaries.
+      setBattle((b) => {
+        const sacrifice = pickSacrifice(b.hand, "metamorphose");
+        if (!sacrifice) return b;
+        const sacrificeRarity = CARDS[sacrifice].rarity;
+        const targetRarity = nextRarityUp(sacrificeRarity);
+        const drawCount = sacrificeRarity === "legendary" ? 2 : 1;
+        // Burn the sacrifice (epics/legendaries to usedOneShotCards, else discard).
+        let handAfter = removeFirst(b.hand, sacrifice);
+        let discardAfter = b.discard;
+        let usedAfter = b.usedOneShotCards;
+        if (sacrificeRarity === "epic" || sacrificeRarity === "legendary") {
+          usedAfter = [...usedAfter, sacrifice];
+        } else {
+          discardAfter = [...discardAfter, sacrifice];
+        }
+        // Pull from the deck — favor the target rarity, fall back to any card
+        // if none in deck. Implemented as a filtered pull from the shuffled deck.
+        let deckAfter = b.deck.slice();
+        const drawn: CardId[] = [];
+        for (let i = 0; i < drawCount; i++) {
+          let idx = deckAfter.findIndex((id) => CARDS[id].rarity === targetRarity);
+          if (idx === -1) idx = 0; // fallback to top of deck
+          if (deckAfter.length === 0) break;
+          drawn.push(deckAfter[idx]);
+          deckAfter.splice(idx, 1);
+        }
+        return {
+          ...b,
+          deck: deckAfter,
+          hand: [...handAfter, ...drawn],
+          discard: discardAfter,
+          usedOneShotCards: usedAfter,
+        };
+      });
+    }
+    else if (card.id === "marchand-ames") {
+      // Faustian trade — discard 1 random card from hand (HP proxy), gain a
+      // permanent +3 mana cap, and draw 3 cards.
+      manaMaxBoostRef.current += 3;
+      setBattle((b) => {
+        let handAfter = b.hand.slice();
+        let discardAfter = b.discard.slice();
+        let usedAfter = b.usedOneShotCards.slice();
+        if (handAfter.length > 0) {
+          const dr = discardRandom(handAfter, discardAfter, usedAfter);
+          handAfter = dr.hand;
+          discardAfter = dr.discard;
+          usedAfter = dr.usedOneShotCards;
+        }
+        const draw = drawN(b.deck, handAfter, discardAfter, 3, HAND_CAP + 3);
+        return {
+          ...b,
+          deck: draw.deck,
+          hand: draw.hand,
+          discard: draw.discard,
+          usedOneShotCards: usedAfter,
+        };
+      });
+    }
+    else if (card.id === "paradoxe") {
+      // Time-skip: this round is voided. We mark it so resolveAndAdvance
+      // refunds mana, returns the card to hand, and jumps to the next round.
+      // Limit 1/match — guarded at handleSelectCard via a stub flag below.
+      paradoxeUsedRef.current = true;
+    }
+    else if (card.id === "genese") {
+      // Match reset. Take effect at the START of the next round so the
+      // current round's resolution completes (the card still burns).
+      genesisUsedRef.current = true;
+      genesisPendingRef.current = true;
+    }
     // riposte, vortex, supernova, second-wind, tide, precision, anchor, curse,
-    // surge, aegis, heist, sangsue, rempart, trou-noir, trinite, prescience →
+    // surge, aegis, heist, sangsue, rempart, trou-noir, trinite, prescience,
+    // remanence (lane copy applied at resolve), echappee (lane wipe applied at
+    // resolve), crepuscule (lane immunity in fx), benediction (bonus in fx),
+    // schrodinger (best-of-two at resolve), juge (stat-based resolve) →
     // applied at resolve time, no immediate UI effect beyond the card badge.
   }
   function handleCancelCard() {
     if (cardPlayed?.id === "augur") setAugurRevealed(null);
     if (cardPlayed?.id === "oracle") setOracleRevealed(null);
+    if (cardPlayed?.id === "telepathie") setOracleRevealed(null);
     if (cardPlayed?.id === "mascarade") mascaradePoisonRef.current = false;
     if (cardPlayed?.id === "boussole") setCompassRevealed(null);
+    if (cardPlayed?.id === "oracle-inverse") setOppHandRevealed(null);
+    if (cardPlayed?.id === "sablier") bonusManaNextRoundRef.current = Math.max(0, bonusManaNextRoundRef.current - 1);
+    if (cardPlayed?.id === "offre") bonusManaNextRoundRef.current = Math.max(0, bonusManaNextRoundRef.current - 2);
+    if (cardPlayed?.id === "braise") { braiseActiveRef.current = false; braiseStacksRef.current = 0; }
+    if (cardPlayed?.id === "fardeau") fardeauNextCpuRef.current = null;
+    if (cardPlayed?.id === "cascade") cascadeArmedRef.current = false;
+    if (cardPlayed?.id === "ancre-temporelle") { anchorSnapshotRef.current = null; anchorRoundsLeftRef.current = 0; }
+    if (cardPlayed?.id === "echo-temporel") echoActiveRef.current = false;
+    if (cardPlayed?.id === "marchand-ames") manaMaxBoostRef.current = Math.max(0, manaMaxBoostRef.current - 3);
+    if (cardPlayed?.id === "paradoxe") paradoxeUsedRef.current = false;
+    if (cardPlayed?.id === "genese") { genesisUsedRef.current = false; genesisPendingRef.current = false; }
     setCardPlayed(null);
   }
   function revealAugurFor(lane: LaneTarget): Move {
@@ -351,6 +653,28 @@ export function RankedGame({
       cpu.plays[0].mv, cpu.plays[1].mv, cpu.plays[2].mv,
     ];
 
+    // Paradoxe Temporel: skip resolution entirely. Refund the played card
+    // and the mana spent on it — the round simply never happens.
+    if (!timedOut && cardPlayed?.id === "paradoxe") {
+      setCardPlayed(null);
+      setPicks([null, null, null]);
+      // Refund: leave hand untouched (the card was never removed yet) and
+      // skip mana spend. The card itself still BURNS because it's an epic
+      // one-shot (limit 1/match enforced by usedOneShotCards check below).
+      setBattle((b) => ({
+        ...b,
+        // Burn the paradoxe card as one-shot.
+        hand: removeFirst(b.hand, "paradoxe"),
+        usedOneShotCards: [...b.usedOneShotCards, "paradoxe"],
+      }));
+      setRound(null);
+      window.setTimeout(() => startNextRound(), 600);
+      return;
+    }
+
+    // Remember the round we're playing for Rémanence next time.
+    const prevOppPicksThisRound: Move[] = [...cpuPicks];
+
     if (!timedOut) {
       playerHistoryRef.current.push(...playerPicks);
     }
@@ -373,6 +697,45 @@ export function RankedGame({
       displayPlayerPicks[ml] = cpuPlays[ml].mv;
     }
 
+    // Rémanence: summon the GHOST of the opponent's last-round move on the
+    // chosen lane — your move there is replaced by that ghost. Falls back to
+    // the opp's CURRENT pick on that lane if there's no recorded history
+    // (round 1, etc.), which essentially mimics a Mirror.
+    if (!timedOut && cardPlayed?.id === "remanence") {
+      const ml = (cardPlayed as { lane: LaneTarget }).lane;
+      const ghost = prevOppPicksRef.current?.[ml] ?? cpuPlays[ml].mv;
+      playerPlays[ml] = { mv: ghost, mana: 0 };
+      displayPlayerPicks[ml] = ghost;
+    }
+
+    // Échappée: clear your move on the chosen lane (we use a synthetic "rock"
+    // for the engine call — applyCardEffects then wipes the lane to a draw).
+    // The visual reveal shows the empty slot via the lane outcome.
+    if (!timedOut && cardPlayed?.id === "echappee") {
+      // Engine still needs a valid Move to compare, but we'll erase the lane
+      // score in applyCardEffects. Display as the original pick so the player
+      // sees "their move ran away" rather than a fake substitution.
+      // (No mutation needed — the post-resolve wipe is enough.)
+    }
+
+    // Le Choix de Schrödinger: simulate a second move per lane (the move that
+    // would have beaten the opp's pick on that lane), pick whichever gives
+    // you the better outcome lane-by-lane. Falls back to your real pick if
+    // the simulated cover is the same.
+    if (!timedOut && cardPlayed?.id === "schrodinger") {
+      for (let i = 0; i < playerPlays.length; i++) {
+        const yourMv = playerPlays[i].mv;
+        const oppMv = cpuPlays[i].mv;
+        // Find a move that BEATS the opp's move (the second superposed move).
+        const cover = COUNTER_MOVE[oppMv];
+        if (cover !== yourMv && cover) {
+          // Take the cover — it's strictly better than a tie or loss.
+          playerPlays[i] = { mv: cover, mana: 0 };
+          displayPlayerPicks[i] = cover;
+        }
+      }
+    }
+
     let base: RoundOutcome;
     if (timedOut) {
       base = {
@@ -389,6 +752,30 @@ export function RankedGame({
       base = resolveLanesRound(playerPlays, cpuPlays);
     }
 
+    // Le Juge (The Judge): override the RPSLS-based resolution with
+    // stat-based judgement — lane 0 = round wins, lane 1 = cards in hand,
+    // lane 2 = remaining deck size. Moves are ignored; the judgement is
+    // alternative justice.
+    if (!timedOut && cardPlayed?.id === "juge") {
+      const yourStats = [battle.roundWinsA, battle.hand.length, battle.deck.length];
+      const oppStats = [battle.roundWinsB, battle.oppHandSize, BASE_CPU_HAND_POOL.length - cpuOneShotsRef.current.length];
+      const judgedLanes = base.lanes.map((lr, i) => {
+        if (yourStats[i] > oppStats[i]) return { ...lr, winner: "a" as const, points: 1 };
+        if (yourStats[i] < oppStats[i]) return { ...lr, winner: "b" as const, points: 1 };
+        return { ...lr, winner: "draw" as const, points: 0 };
+      });
+      const judgedAPoints = judgedLanes.filter((l) => l.winner === "a").length;
+      const judgedBPoints = judgedLanes.filter((l) => l.winner === "b").length;
+      base = {
+        lanes: judgedLanes,
+        aPoints: judgedAPoints,
+        bPoints: judgedBPoints,
+        roundWinner:
+          judgedAPoints > judgedBPoints ? "a" :
+          judgedBPoints > judgedAPoints ? "b" : "draw",
+      };
+    }
+
     const myCard = timedOut ? null : cardPlayed;
     // Trou noir (Singularity): annul the opponent's card entirely — none of its
     // effects fire this round. `cpu.card` is still used below for logging, the
@@ -401,7 +788,9 @@ export function RankedGame({
     if (myCard?.id) youCardsPlayedRef.current.push(myCard.id);
     if (cpu.card?.id) oppCardsPlayedRef.current.push(cpu.card.id);
 
-    const fx = applyCardEffects(base, myCard, oppCard);
+    const gaiaCharged = gaiaChargedRef.current;
+    const fx = applyCardEffects(base, myCard, oppCard, { gaiaChargedA: gaiaCharged });
+    if (fx.gaiaSavedA) gaiaChargedRef.current = false;
     // Conduit (passive): the player's combos pay +1 extra.
     const conduitActive = battle.passives.includes("conduit");
     // Combo detection uses post-Mirror picks so bonus history stays aligned
@@ -418,6 +807,17 @@ export function RankedGame({
       conduitActive, false,
     );
     let finalWinner = finalRoundWinner(fx.outcome, bonuses, myCard, oppCard);
+
+    // Écho temporel — stop-loss: if this would be your loss, rewrite as draw.
+    // The card itself is refunded to your hand (and to mana) on success.
+    let echoRefund = false;
+    if (!timedOut && echoActiveRef.current && finalWinner === "b") {
+      echoActiveRef.current = false;
+      finalWinner = "draw";
+      echoRefund = true;
+    } else if (!timedOut && echoActiveRef.current) {
+      echoActiveRef.current = false; // consume the watch even on win/draw
+    }
     // Trinité parfaite (Perfect Trinity): if your three picks are ALL different
     // (a true trinity), you win the round outright. Otherwise the card is wasted.
     const trinityActive = !timedOut && myCard?.id === "trinite";
@@ -442,6 +842,53 @@ export function RankedGame({
 
     wonLastRoundRef.current = finalWinner === "a";
 
+    // Bookkeeping for cross-round effects.
+    if (!timedOut) prevOppPicksRef.current = prevOppPicksThisRound;
+    // Braise: every loss past the played-card moment shaves 1 off the next
+    // card's cost (cap +stacks per round, never sub-1).
+    if (braiseActiveRef.current && finalWinner === "b") braiseStacksRef.current += 1;
+    if (myCard) braiseStacksRef.current = 0; // a played card consumes the discount
+    // Ancre temporelle watchdog.
+    if (anchorRoundsLeftRef.current > 0) {
+      anchorRoundsLeftRef.current -= 1;
+      if (finalWinner === "b") anchorLossStreakRef.current += 1;
+      else anchorLossStreakRef.current = 0;
+      if (anchorLossStreakRef.current >= 2 && anchorSnapshotRef.current) {
+        // Restore the snapshot — apply at the end of this resolve so the
+        // visible reveal still plays out before the rewind.
+        const snap = anchorSnapshotRef.current;
+        anchorSnapshotRef.current = null;
+        anchorRoundsLeftRef.current = 0;
+        anchorLossStreakRef.current = 0;
+        window.setTimeout(() => {
+          setBattle((b) => ({
+            ...b,
+            roundWinsA: snap.winsA,
+            roundWinsB: snap.winsB,
+            hand: snap.hand,
+            deck: snap.deck,
+            discard: snap.discard,
+            usedOneShotCards: snap.usedOneShotCards,
+          }));
+        }, ROUND_PAUSE_MS - 200);
+      }
+    }
+    // Cascade post-resolve: WIN refills hand for free next round, LOSS dumps it.
+    if (cascadeArmedRef.current) {
+      cascadeArmedRef.current = false;
+      if (finalWinner === "a") cascadeFreeNextRoundRef.current = true;
+      else if (finalWinner === "b") {
+        window.setTimeout(() => {
+          setBattle((b) => ({
+            ...b,
+            discard: [...b.discard, ...b.hand.filter((c) => CARDS[c].rarity !== "epic" && CARDS[c].rarity !== "legendary")],
+            usedOneShotCards: [...b.usedOneShotCards, ...b.hand.filter((c) => CARDS[c].rarity === "epic" || CARDS[c].rarity === "legendary")],
+            hand: [],
+          }));
+        }, ROUND_PAUSE_MS - 200);
+      }
+    }
+
     // Heist resolution — trigger only when the heister's targeted lane was
     // actually won by them.
     const myHeistLane = myCard?.id === "heist" ? (myCard as { lane: LaneTarget }).lane : null;
@@ -462,18 +909,32 @@ export function RankedGame({
     if (oppHeistSuccess) compensationDrawNextRef.current = true;
 
     // Battle state update: discard played card, spend mana, lose 1 card if loss.
-    const spentMana = myCard ? CARDS[myCard.id].cost : 0;
+    // Braise discount: the next card costs (cost - braiseStacks), min 1. The
+    // discount is applied here so the player only pays the reduced cost.
+    const playedCost = myCard ? Math.max(1, CARDS[myCard.id].cost - braiseStacksRef.current) : 0;
+    const spentMana = playedCost;
     setBattle((b) => {
-      let handAfter = myCard ? removeFirst(b.hand, myCard.id) : b.hand;
+      // Écho refund: if the stop-loss fired, the card is RETURNED to the
+      // player's hand and the mana spend is reversed (handled by setMana below).
+      const cardKeptInHand = echoRefund && myCard?.id === "echo-temporel";
+      let handAfter = myCard && !cardKeptInHand ? removeFirst(b.hand, myCard.id) : b.hand;
       let discardAfter = b.discard;
       let usedOneShotAfter = b.usedOneShotCards;
-      if (myCard) {
+      if (myCard && !cardKeptInHand) {
         const rarity = CARDS[myCard.id].rarity;
         if (rarity === "epic" || rarity === "legendary") {
           usedOneShotAfter = [...usedOneShotAfter, myCard.id];
         } else {
           discardAfter = [...discardAfter, myCard.id];
         }
+      }
+      // Échappée draws 1 card immediately (above the cap by 1 if necessary).
+      if (myCard?.id === "echappee") {
+        const dr = drawN(b.deck, handAfter, discardAfter, 1, handAfter.length + 1);
+        handAfter = dr.hand;
+        discardAfter = dr.discard;
+        // Reassign the deck reference for the rest of this update block.
+        b = { ...b, deck: dr.deck };
       }
       // Player Heist landed → steal a random card from the CPU's notional hand.
       if (myHeistSuccess) {
@@ -534,7 +995,8 @@ export function RankedGame({
         bonusHistory: [...b.bonusHistory, bonuses],
       };
     });
-    setMana((m) => Math.max(0, m - spentMana));
+    // Mana spend: skipped entirely if Écho refunded the card.
+    if (!echoRefund) setMana((m) => Math.max(0, m - spentMana));
 
     const nextRoundWinsA = battle.roundWinsA + (finalWinner === "a" ? 1 : 0) + gambitWinBonus;
     const nextRoundWinsB = battle.roundWinsB + (finalWinner === "b" ? 1 : 0);
@@ -631,11 +1093,14 @@ export function RankedGame({
     setAugurRevealed(null);
     setOracleRevealed(null);
     setCompassRevealed(null);
+    setOppHandRevealed(null);
     setRiposteData(null);
     setSuddenDeathData(null);
     setAugurCooldown(0);
     setMana(1);
-    setBattle(makeBattle(savedDeck));
+    const fresh = makeBattle(savedDeck);
+    setBattle(fresh);
+    gaiaChargedRef.current = fresh.passives.includes("gaia");
     cpuDecisionRef.current = null;
     mascaradePoisonRef.current = false;
     playerHistoryRef.current = [];
@@ -644,6 +1109,24 @@ export function RankedGame({
     wonLastRoundRef.current = false;
     compensationDrawNextRef.current = false;
     cpuOneShotsRef.current = [];
+    youCardsPlayedRef.current = [];
+    oppCardsPlayedRef.current = [];
+    // Reset all V3 cross-round state.
+    braiseActiveRef.current = false;
+    braiseStacksRef.current = 0;
+    bonusManaNextRoundRef.current = 0;
+    manaMaxBoostRef.current = 0;
+    cascadeArmedRef.current = false;
+    cascadeFreeNextRoundRef.current = false;
+    echoActiveRef.current = false;
+    anchorSnapshotRef.current = null;
+    anchorRoundsLeftRef.current = 0;
+    anchorLossStreakRef.current = 0;
+    paradoxeUsedRef.current = false;
+    genesisUsedRef.current = false;
+    genesisPendingRef.current = false;
+    fardeauNextCpuRef.current = null;
+    prevOppPicksRef.current = null;
     if (deadlineTimerRef.current) {
       window.clearTimeout(deadlineTimerRef.current);
       deadlineTimerRef.current = null;
@@ -881,9 +1364,10 @@ export function RankedGame({
         cardPlayed={cardPlayed}
         augurRevealed={augurRevealed}
         mana={mana}
-        manaMax={battle.passives.includes("cadence") ? 5 : MAX_MANA}
+        manaMax={(battle.passives.includes("cadence") ? 5 : MAX_MANA) + manaMaxBoostRef.current}
         passives={battle.passives}
         compassRevealed={compassRevealed}
+        oppHandRevealed={oppHandRevealed}
         hand={battle.hand}
         oppHandSize={battle.oppHandSize}
         roundWinsYou={battle.roundWinsA}

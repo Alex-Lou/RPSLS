@@ -118,6 +118,12 @@ export const CODEX_TIERS: CodexTier[] = [
   { threshold: 15, eclats: 300, dust: 80 },
   { threshold: 20, eclats: 450, dust: 120 },
   { threshold: 26, eclats: 700, dust: 200 },
+  // V3 expansion — collection grows from 26 to 46 cards. Tiers continue at
+  // roughly the same density (every 5–10 new cards) so the chase still has
+  // milestones, with the final all-46 reward being the biggest of the game.
+  { threshold: 32, eclats: 850, dust: 250 },
+  { threshold: 40, eclats: 1100, dust: 350 },
+  { threshold: 46, eclats: 1500, dust: 500 },
 ];
 
 /** Find the tier definition for a given threshold, or undefined if unknown. */

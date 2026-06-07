@@ -28,6 +28,9 @@ export interface RankedPickPhaseProps {
   manaMax?: number;
   passives?: CardId[];
   compassRevealed?: { lane: LaneTarget | null } | null;
+  /** Oracle Inverse reveal — 3 cards peeked from the opponent's notional hand,
+   *  shown as a soft chip strip beside the passives during the pick phase. */
+  oppHandRevealed?: CardId[] | null;
   hand: CardId[];
   oppHandSize: number;
   augurCooldown: number;
@@ -44,7 +47,7 @@ export interface RankedPickPhaseProps {
 
 export function RankedPickPhase({
   youName, opponentName,
-  picks, augurRevealed, cardPlayed, mana, manaMax = 4, passives = [], compassRevealed,
+  picks, augurRevealed, cardPlayed, mana, manaMax = 4, passives = [], compassRevealed, oppHandRevealed,
   hand, oppHandSize, augurCooldown,
   startedAt, deadlineMs, showTimer = true,
   onPickMove, onPlayCard, onCancelCard, onClearLane, onLock,
@@ -63,7 +66,13 @@ export function RankedPickPhase({
     if (selectedCard) {
       const card = CARDS[selectedCard];
       if (card.target === "lane") {
-        onPlayCard({ id: selectedCard as "aegis" | "surge" | "precision" | "anchor" | "curse" | "tide" | "riposte" | "mirror" | "sangsue", lane });
+        onPlayCard({
+          id: selectedCard as
+            | "aegis" | "surge" | "precision" | "anchor" | "curse" | "tide"
+            | "riposte" | "mirror" | "sangsue"
+            | "remanence" | "echappee" | "crepuscule",
+          lane,
+        });
         setSelectedCard(null);
       }
       return;
@@ -99,9 +108,19 @@ export function RankedPickPhase({
       } else if (id === "gambit") {
         onPlayCard({ id: "gambit" });
       } else if (id) {
-        // Bonus "none"-target actives — immediate, no lane tap:
+        // Bonus "none"-target actives — immediate, no lane tap. Lot 1:
         // prescience, mascarade, boussole, rempart, trou-noir, trinite.
-        onPlayCard({ id: id as "prescience" | "mascarade" | "boussole" | "rempart" | "trou-noir" | "trinite" });
+        // V3: sablier, offre, braise, cascade, echo-temporel, ancre-temporelle,
+        // metamorphose, marchand-ames, paradoxe, benediction, schrodinger,
+        // juge, genese, fardeau, oracle-inverse, telepathie.
+        onPlayCard({
+          id: id as
+            | "prescience" | "mascarade" | "boussole" | "rempart" | "trou-noir" | "trinite"
+            | "sablier" | "offre" | "braise" | "cascade" | "echo-temporel"
+            | "ancre-temporelle" | "metamorphose" | "marchand-ames"
+            | "paradoxe" | "benediction" | "schrodinger" | "juge" | "genese"
+            | "fardeau" | "oracle-inverse" | "telepathie",
+        });
       }
       return;
     }
@@ -169,9 +188,9 @@ export function RankedPickPhase({
         />
       </div>
 
-      {/* Boussole (Surveyor) reveal + always-on passives strip. Both are
-          compact so the ScaleToFit wrapper keeps the Lock button on-screen. */}
-      {(compassRevealed || passives.length > 0) && (
+      {/* Boussole reveal + always-on passives + Oracle Inverse peek strip.
+          All compact so the ScaleToFit wrapper keeps the Lock button on-screen. */}
+      {(compassRevealed || passives.length > 0 || (oppHandRevealed && oppHandRevealed.length > 0)) && (
         <div className="w-full max-w-md flex flex-wrap items-center justify-center gap-1.5 px-1">
           {compassRevealed && (
             <span className="text-[11px] font-bold rounded-full px-2 py-0.5 bg-sky-500/20 border border-sky-400/40 text-sky-200">
@@ -187,6 +206,16 @@ export function RankedPickPhase({
               title={t(CARDS[id].descKey)}
             >
               <span aria-hidden>{CARDS[id].glyph}</span>
+              {t(CARDS[id].nameKey)}
+            </span>
+          ))}
+          {oppHandRevealed && oppHandRevealed.map((id, i) => (
+            <span
+              key={`peek-${id}-${i}`}
+              className="text-[11px] font-bold rounded-full px-2 py-0.5 bg-fuchsia-500/15 border border-fuchsia-400/40 text-fuchsia-200 inline-flex items-center gap-1"
+              title={t(CARDS[id].descKey)}
+            >
+              <span aria-hidden>🔮 {CARDS[id].glyph}</span>
               {t(CARDS[id].nameKey)}
             </span>
           ))}

@@ -42,11 +42,17 @@ export function applyEcho(
 
 /**
  * Apply all post-resolve card effects.
+ *
+ * Extra context lets bonus mechanics reach in without bloating the PlayedCard
+ * shape: `gaiaChargedA/B` = a Bouclier de Gaïa passive is still loaded for
+ * that side and may consume itself this round; the result `gaiaSavedA/B`
+ * flags tell the caller to spend the charge.
  */
 export function applyCardEffects(
   base: RoundOutcome,
   myCard: PlayedCard | null,
   oppCard: PlayedCard | null,
+  ctx?: { gaiaChargedA?: boolean; gaiaChargedB?: boolean },
 ): {
   outcome: RoundOutcome;
   surgeBonusA: number;
@@ -61,6 +67,11 @@ export function applyCardEffects(
   cursePenaltyB: number;
   leechPenaltyA: number;
   leechPenaltyB: number;
+  gaiaSavedA: boolean;
+  gaiaSavedB: boolean;
+  /** Crépuscule (Twilight): lane index that was set "card-immune" this round,
+   *  or null. Both sides' lane-targeted cards are skipped on it. */
+  twilightLane: LaneTarget | null;
 } {
   const lanes = base.lanes.map(cloneLane);
   let aPoints = base.aPoints;
@@ -71,15 +82,42 @@ export function applyCardEffects(
   let tideBonusA = 0, tideBonusB = 0;
   let cursePenaltyA = 0, cursePenaltyB = 0;
   let leechPenaltyA = 0, leechPenaltyB = 0;
+  let gaiaSavedA = false, gaiaSavedB = false;
+
+  // Crépuscule (Twilight): one lane goes card-immune for the whole round.
+  // The card that SET twilight still counts as a non-lane card (it has its
+  // own immune lane) — every OTHER lane-targeted card on that lane is no-op.
+  const twilightLaneA = myCard?.id === "crepuscule" ? (myCard as { lane: LaneTarget }).lane : null;
+  const twilightLaneB = oppCard?.id === "crepuscule" ? (oppCard as { lane: LaneTarget }).lane : null;
+  const twilightLane = twilightLaneA ?? twilightLaneB;
+
+  // Échappée (Escape): your move on this lane is gone — the lane is empty for
+  // you. Wipe the points the engine awarded so the lane is a 0-0 no-score.
+  // Card cancels nothing else; if both sides played Échappée on the same lane
+  // it's still a no-score for both.
+  const escapeLaneA = myCard?.id === "echappee" ? (myCard as { lane: LaneTarget }).lane : null;
+  const escapeLaneB = oppCard?.id === "echappee" ? (oppCard as { lane: LaneTarget }).lane : null;
+  if (escapeLaneA !== null && lanes[escapeLaneA]) {
+    if (lanes[escapeLaneA].winner === "a") aPoints -= 1;
+    if (lanes[escapeLaneA].winner === "b") bPoints -= 1;
+    lanes[escapeLaneA] = { ...lanes[escapeLaneA], winner: "draw", points: 0 };
+  }
+  if (escapeLaneB !== null && lanes[escapeLaneB]) {
+    if (lanes[escapeLaneB].winner === "a") aPoints -= 1;
+    if (lanes[escapeLaneB].winner === "b") bPoints -= 1;
+    lanes[escapeLaneB] = { ...lanes[escapeLaneB], winner: "draw", points: 0 };
+  }
 
   // Check if lanes are anchored (immune to opponent card effects)
   const aAnchorLane = myCard?.id === "anchor" ? (myCard as { lane: LaneTarget }).lane : null;
   const bAnchorLane = oppCard?.id === "anchor" ? (oppCard as { lane: LaneTarget }).lane : null;
+  const isImmuneA = (i: number) => aAnchorLane === i || twilightLane === i;
+  const isImmuneB = (i: number) => bAnchorLane === i || twilightLane === i;
 
-  // 1. Aegis: loss → draw
+  // 1. Aegis: loss → draw (skipped on twilight lane)
   if (myCard?.id === "aegis") {
     const i = (myCard as { lane: LaneTarget }).lane;
-    if (lanes[i]?.winner === "b") {
+    if (lanes[i]?.winner === "b" && twilightLane !== i) {
       lanes[i] = { ...lanes[i], winner: "draw", points: 0 };
       bPoints -= 1;
       aegisSavedA = true;
@@ -87,7 +125,7 @@ export function applyCardEffects(
   }
   if (oppCard?.id === "aegis") {
     const i = (oppCard as { lane: LaneTarget }).lane;
-    if (lanes[i]?.winner === "a") {
+    if (lanes[i]?.winner === "a" && twilightLane !== i) {
       lanes[i] = { ...lanes[i], winner: "draw", points: 0 };
       aPoints -= 1;
       aegisSavedB = true;
@@ -113,10 +151,10 @@ export function applyCardEffects(
 
   // 1c. Rempart (global aegis): EVERY lane you lose this round becomes a draw —
   //     a panic button against a big opposing hand. No points gained, just the
-  //     bleeding stopped. An anchored lane (opp Anchor) is left untouched.
+  //     bleeding stopped. An anchored or twilight lane is left untouched.
   if (myCard?.id === "rempart") {
     for (let i = 0; i < lanes.length; i++) {
-      if (lanes[i]?.winner === "b" && bAnchorLane !== i) {
+      if (lanes[i]?.winner === "b" && !isImmuneB(i)) {
         lanes[i] = { ...lanes[i], winner: "draw", points: 0 };
         bPoints -= 1;
       }
@@ -124,7 +162,7 @@ export function applyCardEffects(
   }
   if (oppCard?.id === "rempart") {
     for (let i = 0; i < lanes.length; i++) {
-      if (lanes[i]?.winner === "a" && aAnchorLane !== i) {
+      if (lanes[i]?.winner === "a" && !isImmuneA(i)) {
         lanes[i] = { ...lanes[i], winner: "draw", points: 0 };
         aPoints -= 1;
       }
@@ -133,11 +171,11 @@ export function applyCardEffects(
 
   // 2. Precision: lane treated as favoured → handled in computeRoundBonuses
 
-  // 3. Surge: win = +1, lose = opponent +1. Blocked by opponent Aegis.
+  // 3. Surge: win = +1, lose = opponent +1. Blocked by opponent Aegis or twilight.
   if (myCard?.id === "surge") {
     const i = (myCard as { lane: LaneTarget }).lane;
     const blockedByOppAegis = oppCard?.id === "aegis" && (oppCard as { lane: LaneTarget }).lane === i;
-    if (!blockedByOppAegis && bAnchorLane !== i) {
+    if (!blockedByOppAegis && !isImmuneB(i)) {
       if (lanes[i]?.winner === "a") surgeBonusA += 1;
       else if (lanes[i]?.winner === "b") surgePenaltyA += 1;
     }
@@ -145,7 +183,7 @@ export function applyCardEffects(
   if (oppCard?.id === "surge") {
     const i = (oppCard as { lane: LaneTarget }).lane;
     const blockedByMyAegis = myCard?.id === "aegis" && (myCard as { lane: LaneTarget }).lane === i;
-    if (!blockedByMyAegis && aAnchorLane !== i) {
+    if (!blockedByMyAegis && !isImmuneA(i)) {
       if (lanes[i]?.winner === "b") surgeBonusB += 1;
       else if (lanes[i]?.winner === "a") surgePenaltyB += 1;
     }
@@ -154,23 +192,50 @@ export function applyCardEffects(
   // 4. Curse: if opponent wins the cursed lane, they lose 1pt from total
   if (myCard?.id === "curse") {
     const i = (myCard as { lane: LaneTarget }).lane;
-    if (lanes[i]?.winner === "b" && bAnchorLane !== i) cursePenaltyB += 1;
+    if (lanes[i]?.winner === "b" && !isImmuneB(i)) cursePenaltyB += 1;
   }
   if (oppCard?.id === "curse") {
     const i = (oppCard as { lane: LaneTarget }).lane;
-    if (lanes[i]?.winner === "a" && aAnchorLane !== i) cursePenaltyA += 1;
+    if (lanes[i]?.winner === "a" && !isImmuneA(i)) cursePenaltyA += 1;
   }
 
   // 4b. Sangsue (Leech): if YOU win the targeted lane, the opponent loses 1pt
   //     from their total (offensive mirror of Curse). Blocked if that lane is
-  //     anchored by the opponent.
+  //     anchored or in twilight.
   if (myCard?.id === "sangsue") {
     const i = (myCard as { lane: LaneTarget }).lane;
-    if (lanes[i]?.winner === "a" && bAnchorLane !== i) leechPenaltyB += 1;
+    if (lanes[i]?.winner === "a" && !isImmuneB(i)) leechPenaltyB += 1;
   }
   if (oppCard?.id === "sangsue") {
     const i = (oppCard as { lane: LaneTarget }).lane;
-    if (lanes[i]?.winner === "b" && aAnchorLane !== i) leechPenaltyA += 1;
+    if (lanes[i]?.winner === "b" && !isImmuneA(i)) leechPenaltyA += 1;
+  }
+
+  // 5b. Bouclier de Gaïa (Gaia Shield) — PASSIVE: once-per-match auto-save.
+  //     If after all preceding fx you'd still lose the round on lane count,
+  //     EVERY lane you lose becomes a draw and the shield consumes itself.
+  //     The caller decides whether to spend the charge based on gaiaSavedA/B.
+  const aLanesLost = lanes.filter((l) => l.winner === "b").length;
+  const bLanesLost = lanes.filter((l) => l.winner === "a").length;
+  const aWillLose = aLanesLost > lanes.filter((l) => l.winner === "a").length;
+  const bWillLose = bLanesLost > lanes.filter((l) => l.winner === "b").length;
+  if (ctx?.gaiaChargedA && aWillLose) {
+    for (let i = 0; i < lanes.length; i++) {
+      if (lanes[i]?.winner === "b") {
+        lanes[i] = { ...lanes[i], winner: "draw", points: 0 };
+        bPoints -= 1;
+      }
+    }
+    gaiaSavedA = true;
+  }
+  if (ctx?.gaiaChargedB && bWillLose) {
+    for (let i = 0; i < lanes.length; i++) {
+      if (lanes[i]?.winner === "a") {
+        lanes[i] = { ...lanes[i], winner: "draw", points: 0 };
+        aPoints -= 1;
+      }
+    }
+    gaiaSavedB = true;
   }
 
   // 5. Tide: if you win 2+ lanes, ALL your wins give +1
@@ -196,6 +261,8 @@ export function applyCardEffects(
     tideBonusA, tideBonusB,
     cursePenaltyA, cursePenaltyB,
     leechPenaltyA, leechPenaltyB,
+    gaiaSavedA, gaiaSavedB,
+    twilightLane,
   };
 }
 
@@ -229,6 +296,18 @@ export function computeRoundBonuses(
   const comboBonusA = aComboBase > 0 ? aComboBase + (aConduit ? 1 : 0) : 0;
   const comboBonusB = bComboBase > 0 ? bComboBase + (bConduit ? 1 : 0) : 0;
 
+  // Bénédiction (Blessing): a SHARED bonus — when either side plays it, every
+  // lane won by EITHER side scores +1 extra. Mutual buff; you pick the round
+  // where you think you'll out-win, otherwise you're handing the opponent points.
+  const benedictionActive = myCard?.id === "benediction" || oppCard?.id === "benediction";
+  let benedictionBonusA = 0, benedictionBonusB = 0;
+  if (benedictionActive) {
+    for (const lr of outcome.lanes) {
+      if (lr.winner === "a") benedictionBonusA += 1;
+      else if (lr.winner === "b") benedictionBonusB += 1;
+    }
+  }
+
   return {
     comboBonusA, comboBonusB,
     favouredBonusA, favouredBonusB,
@@ -238,6 +317,8 @@ export function computeRoundBonuses(
     tideBonusA: fx.tideBonusA, tideBonusB: fx.tideBonusB,
     cursePenaltyA: fx.cursePenaltyA, cursePenaltyB: fx.cursePenaltyB,
     leechPenaltyA: fx.leechPenaltyA, leechPenaltyB: fx.leechPenaltyB,
+    benedictionBonusA, benedictionBonusB,
+    gaiaSavedA: fx.gaiaSavedA, gaiaSavedB: fx.gaiaSavedB,
   };
 }
 
@@ -263,11 +344,13 @@ export function finalRoundWinner(
 
   let aTotal =
     outcome.aPoints + bonuses.comboBonusA + bonuses.favouredBonusA +
-    bonuses.surgeBonusA + bonuses.surgePenaltyB + bonuses.tideBonusA -
+    bonuses.surgeBonusA + bonuses.surgePenaltyB + bonuses.tideBonusA +
+    bonuses.benedictionBonusA -
     bonuses.cursePenaltyA - bonuses.leechPenaltyA;
   let bTotal =
     outcome.bPoints + bonuses.comboBonusB + bonuses.favouredBonusB +
-    bonuses.surgeBonusB + bonuses.surgePenaltyA + bonuses.tideBonusB -
+    bonuses.surgeBonusB + bonuses.surgePenaltyA + bonuses.tideBonusB +
+    bonuses.benedictionBonusB -
     bonuses.cursePenaltyB - bonuses.leechPenaltyB;
 
   aTotal = applySupernovaToTotal(aTotal, aLanesWon, myCard?.id === "supernova");
@@ -286,6 +369,6 @@ export function totalBonusForSide(
   bonuses: RoundBonusBreakdown,
 ): number {
   if (side === "a")
-    return bonuses.comboBonusA + bonuses.favouredBonusA + bonuses.surgeBonusA + bonuses.tideBonusA;
-  return bonuses.comboBonusB + bonuses.favouredBonusB + bonuses.surgeBonusB + bonuses.tideBonusB;
+    return bonuses.comboBonusA + bonuses.favouredBonusA + bonuses.surgeBonusA + bonuses.tideBonusA + bonuses.benedictionBonusA;
+  return bonuses.comboBonusB + bonuses.favouredBonusB + bonuses.surgeBonusB + bonuses.tideBonusB + bonuses.benedictionBonusB;
 }

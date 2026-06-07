@@ -97,6 +97,8 @@ export interface RankedMatchViewProps {
   passives?: CardId[];
   /** Boussole reveal: which lane the opponent's card targets (null = none). */
   compassRevealed?: { lane: LaneTarget | null } | null;
+  /** Oracle Inverse reveal: 3 cards peeked from the opponent's notional hand. */
+  oppHandRevealed?: CardId[] | null;
   hand: CardId[];
   oppHandSize: number;
   // Actions
@@ -125,7 +127,7 @@ type Phase = "matched" | "picking" | "reveal-intro" | "reveal" | "match-end";
 export function RankedMatchView({
   nickname, match,
   round, lastResult, end,
-  picks, cardPlayed, augurRevealed, mana, manaMax, passives, compassRevealed, hand, oppHandSize,
+  picks, cardPlayed, augurRevealed, mana, manaMax, passives, compassRevealed, oppHandRevealed, hand, oppHandSize,
   roundWinsYou, roundWinsOpp, augurCooldown,
   onPickMove, onClearLane, onPlayCard, onCancelCard, onLock,
   revealAugurFor, onLeave, onRematch, onNext, showTimer = true,
@@ -242,6 +244,7 @@ export function RankedMatchView({
             manaMax={manaMax}
             passives={passives}
             compassRevealed={compassRevealed}
+            oppHandRevealed={oppHandRevealed}
             hand={hand}
             oppHandSize={oppHandSize}
             augurCooldown={augurCooldown}

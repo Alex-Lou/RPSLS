@@ -78,31 +78,31 @@ A playing card showing two hands meeting in a handshake at the center, but one h
 
 ---
 
-**Carte #4 — BRAISE** => valide mais besoin de clarté dans les eplications au joueur
+**Carte #4 — BRAISE** (clarifiée)
 
 - **Coût:** 1 mana
 - **Cible:** self
 - **Type:** active
 - **Glyphe:** 🔥
-- **Palette:** orange
-- **Effet:** Jusqu'à la fin du match, quand vous PERDEZ un round, votre prochaine carte coûte 1 mana de moins (minimum 1). L'effet se cumule : 2 pertes d'affilée = -2 mana sur la prochaine carte.
-- **Impact:** Récompense la résilience. Plus vous êtes en difficulté, plus vos cartes deviennent accessibles. Idéal en mode "comeback".
+- **Palette:** `#f97316` (orange feu vif)
+- **Effet:** JOUEZ cette carte (elle ne fait rien immédiatement). ENSUITE, jusqu'à la fin du match, chaque round que vous PERDEZ réduit de 1 le coût de votre PROCHAINE carte (cumulable : 2 défaites d'affilée = -2 mana). Le coût ne peut pas descendre en dessous de 1. L'effet se déclenche APRÈS la première défaite suivant la pose de Braise — pas avant.
+- **Impact:** Plus vous êtes en difficulté, plus vos cartes deviennent accessibles. Idéal en mode comeback — vous perdez des rounds mais gagnez en puissance de carte.
 - **Unlock:** Gagner un match après avoir été mené 0-2.
-- **Description i18n:** "Chaque défaite alimente votre prochaine carte. Coût réduit de 1 par round perdu."
+- **Description i18n:** "Posez Braise. Ensuite, chaque défaite réduit le coût de votre prochaine carte de 1 (min 1). Cumulable."
 
 ---
 
-**Carte #5 — ÉCHAPPÉE** => Valide mais pas en abuser cargrave comme consequence si abus.
+**Carte #5 — ÉCHAPPÉE** (clarifiée — usage unique par round)
 
 - **Coût:** 1 mana
 - **Cible:** lane
 - **Type:** active
 - **Glyphe:** 🏃
-- **Palette:** sky
-- **Effet:** RETIREZ votre move de la lane choisie. La lane devient VIDE pour vous ce round (pas de points possibles sur cette lane), mais vous piochez 1 carte immédiatement. L'adversaire, lui, a joué sur cette lane — son move est gaspillé (il ne gagne pas de point).
-- **Impact:** Sacrifiez une lane pour forcer un "miss" chez l'adversaire ET piocher. Utile quand vous savez que vous allez perdre la lane de toute façon.
+- **Palette:** `#38bdf8` (bleu ciel vif)
+- **Effet:** RETIREZ votre move de la lane choisie. La lane devient VIDE pour vous ce round (0 point possible). En contrepartie, piochez 1 carte immédiatement. L'adversaire a déjà placé son move sur cette lane → il ne marque pas de point. **Limite : 1 utilisation par round.** Jouer Échappée consomme votre action de carte pour ce round — vous ne pouvez pas l'enchaîner avec d'autres cartes.
+- **Impact:** Sacrifiez une lane que vous alliez perdre de toute façon pour gagner un avantage de pioche et forcer un miss adverse. Usage défensif ou tactique, jamais abusif car limité à 1/round.
 - **Unlock:** Gagner un round où vous avez perdu 2 lanes sur 3.
-- **Description i18n:** "Abandonnez une lane. L'adversaire tape dans le vide. Piochez 1 carte."
+- **Description i18n:** "Abandonnez une lane. L'adversaire tape dans le vide. Piochez 1 carte. Limité à 1/round."
 
 ---
 
@@ -219,17 +219,19 @@ A playing card featuring a massive anchor made of glowing energy chains, plunged
 
 ---
 
-**Carte #13 — BOUCLIER DE GAÏA** => OK mais faut penser a des points de pv dans certains types de match/affrontements
+**Carte #13 — BOUCLIER DE GAÏA** (clarifiée — fonctionnement cross-mode)
+
+> **Note sur les PV :** Dans les modes SANS système de PV explicite (Constellation classique, Casual), le bouclier absorbe TOUS les points perdus sur un round (1 round entier = annulé, score inchangé). Dans les modes AVEC PV (La Spirale, certains modes futurs), le bouclier absorbe tous les dégâts HP reçus ce round — le joueur ne perd aucun PV. Le bouclier ne se déclenche PAS sur un draw.
 
 - **Coût:** 3 mana
 - **Cible:** self
 - **Type:** passive
 - **Glyphe:** 🛡️
-- **Palette:** emerald
-- **Effet:** PASSIF. Une fois par match, quand vous devriez PERDRE un round (subir des dégâts), ces dégâts sont ANNULÉS. Le bouclier se consume après une utilisation. Ne se déclenche pas sur un draw.
-- **Impact:** Immunité unique. Vous pouvez jouer agressivement pendant un round, sachant que vous ne pouvez PAS perdre de PV.
+- **Palette:** `#34d399` (vert jade protecteur)
+- **Effet:** PASSIF. Une fois par match, quand vous devriez PERDRE un round, les dégâts sont ANNULÉS. Le bouclier se consume après une utilisation. Ne se déclenche pas sur un draw. En modes avec PV, absorbe tous les HP du round. En modes sans PV, le round perdu devient un draw forcé (0 point pour l'adversaire).
+- **Impact:** Immunité unique pour 1 round. Jouez agressivement sans crainte — ce round, rien ne peut vous atteindre.
 - **Unlock:** Survivre à un round où l'adversaire a infligé 3+ dégâts (sur plusieurs lanes).
-- **Description i18n:** "Une fois par match, absorbez tous les dégâts d'un round."
+- **Description i18n:** "Une fois par match, absorbez tous les dégâts d'un round. Le round perdu devient un draw forcé."
 
 ---
 
@@ -247,31 +249,33 @@ A playing card featuring a massive anchor made of glowing energy chains, plunged
 
 ---
 
-**Carte #15 — TÉLÉPATHIE**=> OK mais il doit pas voir que je vois chez lui , bizare mais je me comprends, il faut laisser une tension a l'autre sachant qu'il sait que je regarde ce qu'il joue
+**Carte #15 — TÉLÉPATHIE** (clarifiée — lecture silencieuse, l'adversaire ignore tout)
+
+> **Principe de tension :** L'adversaire ne SAIT PAS que vous lisez dans son esprit. Il ne reçoit AUCUNE notification, aucun effet visuel, aucun indice. De son point de vue, le round se déroule normalement. La tension est ENTIÈREMENT dans votre camp — c'est VOUS qui détenez l'information secrète, et c'est VOUS qui devez l'exploiter sans éveiller les soupçons. Le coût de 3 mana est justifié par cette discrétion absolue (Oracle, qui coûte 3 mana aussi, ANNONCE visuellement sa lecture à l'adversaire).
 
 - **Coût:** 3 mana
 - **Cible:** none
 - **Type:** active
 - **Glyphe:** 🧠
-- **Palette:** violet
-- **Effet:** PÉNÉTREZ l'esprit de l'adversaire. Voyez le MOVE qu'il va jouer CE round sur CHAQUE lane (comme Oracle, mais pour le round en cours uniquement). De plus, vous pouvez CHANGER un de vos propres moves APRÈS avoir vu les siens (un seul, sur une lane de votre choix).
-- **Impact:** Oracle + flexibilité. L'adversaire ne peut rien cacher, et vous pouvez vous adapter en temps réel.
+- **Palette:** `#8b5cf6` (violet psychique)
+- **Effet:** PÉNÉTREZ silencieusement l'esprit de l'adversaire. Voyez le MOVE qu'il va jouer CE round sur CHAQUE lane, SANS qu'il le sache (aucune notification, aucun indicateur visuel côté adverse). De plus, vous pouvez CHANGER un de vos propres moves APRÈS avoir vu les siens (un seul, sur une lane de votre choix). L'adversaire ne voit pas que vous avez changé.
+- **Impact:** Oracle DISCRET + flexibilité. L'adversaire joue normalement, ignorant que vous anticipez chacun de ses gestes. La pression mentale est 100% dans votre tête — et c'est ça qui rend la carte jubilatoire.
 - **Unlock:** Utiliser Augur 5 fois dans des matchs différents (déblocage progressif).
-- **Description i18n:** "Lisez les 3 moves adverses. Changez UN de vos moves après."
+- **Description i18n:** "Lisez les 3 moves adverses en secret. Changez UN de vos moves après."
 
 ---
 
-**Carte #16 — PARADOXE TEMPOREL**=> PAS MAL VALIDE SOUS CONDITIONS
+**Carte #16 — PARADOXE TEMPOREL** (clarifiée — usage limité à 1/match)
 
 - **Coût:** 3 mana
 - **Cible:** none
 - **Type:** active
 - **Glyphe:** ⏳
-- **Palette:** cyan
-- **Effet:** SAUTEZ le round en cours. Il n'y a PAS de résolution. Pas de gagnant, pas de perdant, pas de points. On passe DIRECTEMENT au round suivant. Les cartes jouées ce round retournent dans les mains. Le mana dépensé est remboursé.
-- **Impact:** "Skip turn". Utile quand le round s'annonce désastreux. Vous perdez une opportunité de marquer, mais l'adversaire aussi.
+- **Palette:** `#06b6d4` (cyan vif)
+- **Effet:** SAUTEZ le round en cours. Il n'y a PAS de résolution. Pas de gagnant, pas de perdant, pas de points. On passe DIRECTEMENT au round suivant. Les cartes jouées ce round retournent dans les mains. Le mana dépensé (y compris les 3 de Paradoxe Temporel) est remboursé. **Limite : 1 utilisation par match.** La carte est défaussée après usage (comme toutes les Épiques/Légendaires).
+- **Impact:** "Skip turn". Utile quand le round s'annonce désastreux — vous annulez un round que vous alliez perdre. L'adversaire perd aussi son opportunité de marquer. Le remboursement de mana rend la carte neutre en ressources (coût net = 0, juste la carte consommée).
 - **Unlock:** Gagner un match après qu'un round ait été un draw.
-- **Description i18n:** "Sautez ce round. Pas de résolution. On passe au suivant."
+- **Description i18n:** "Sautez ce round. Pas de résolution. Mana remboursé. 1/match."
 
 ---
 
@@ -293,45 +297,58 @@ A playing card featuring a massive anchor made of glowing energy chains, plunged
 
 ---
 
-**Carte #18 — LE CHOIX DE SCHRÖDINGER** => j adore
+**Carte #18 — LE CHOIX DE SCHRÖDINGER**
 
 - **Coût:** 4 mana
 - **Cible:** none
 - **Type:** active
 - **Glyphe:** 📦
-- **Palette:** fuchsia
-- **Effet:** SÉLECTIONNEZ 2 moves différents. Vous les placez TOUS LES DEUX sur CHAQUE lane (superposition quantique). À la révélation, pour CHAQUE lane, le move qui GAGNE contre l'adversaire est celui qui compte. Si les deux gagnent → +3 pts bonus. Si les deux perdent → -2 pts de pénalité. Si un gagne et l'autre perd → le gagnant compte normalement. L'adversaire joue normalement (1 move par lane).
-- **Impact:** Vous couvrez 2 options sur 5 par lane. La probabilité de gagner chaque lane est considérablement augmentée, mais le risque de double perte existe. C'est le "chat de Schrödinger" appliqué au RPSLS.
-- **Unlock:** Gagner un match où chaque round a eu un résultat différent (win, loss, draw dans le même match).
+- **Palette:** `#c084fc` (fuchsia quantique)
+- **Effet:** SÉLECTIONNEZ 2 moves différents. Vous les placez TOUS LES DEUX sur CHAQUE lane (superposition quantique). Le move gagnant compte. Double win = +3 bonus, double loss = -2 pénalité.
+- **Impact:** Couverture de 2 options/5 par lane. Le "chat de Schrödinger" appliqué au RPSLS.
+- **Unlock:** Gagner un match où chaque round a eu un résultat différent.
 - **Description i18n:** "Superposez 2 moves par lane. Le meilleur compte."
+
+**🎨 PROMPT ILLUSTRATION:**
+```
+A playing card showing a mysterious sealed box at its center — Schrödinger's box — with quantum wave-particles (⇿) oscillating around it. The box is slightly open, revealing TWO ghostly hands emerging simultaneously, each forming a different RPSLS gesture (one Rock, one Paper). The hands are translucent, overlapping, existing in superposition. Above the box, a cat silhouette fades in and out of visibility — both alive and not. The background is a deep quantum purple (#0d001a) with probability wave interference patterns (rippling concentric circles in #c084fc at 20% opacity). The card border is fuchsia (#c084fc) with alternating solid/dashed lines representing wave-particle duality. Glyph "📦" embossed in white-gold at top-right. 1024×1024 PNG with transparency on the outer card edges. Style: quantum physics, mysterious, elegant, mobile-game card art.
+```
 
 ---
 
-**Carte #19 — LE JUGE** => Je ne comprends pas trop mais j'aime bien
+**Carte #19 — LE JUGE**
 
 - **Coût:** 4 mana
 - **Cible:** none
 - **Type:** active
 - **Glyphe:** ⚖️
-- **Palette:** yellow
-- **Effet:** CHAQUE lane est jugée SÉPARÉMENT ce round — pas de RPSLS. Sur la lane 1 : le joueur qui a le plus de PV gagne. Sur la lane 2 : le joueur qui a le plus de cartes en main gagne. Sur la lane 3 : le joueur qui a gagné le plus de rounds dans le match gagne. En cas d'égalité sur une lane, c'est un draw. Les moves joués sont ignorés — seuls les critères comptent.
-- **Impact:** Change complètement les règles pour un round. Les moves deviennent inutiles — ce sont vos STATS qui parlent. Activez quand vous dominez dans les catégories.
-- **Unlock:** Gagner un match où vous avez mené dans les PV, les cartes en main, ET les rounds gagnés simultanément.
+- **Palette:** `#eab308` (or solaire de justice)
+- **Effet:** CHAQUE lane est jugée sur des CRITÈRES, pas le RPSLS. Lane 1 = PV, lane 2 = Cartes en main, lane 3 = Rounds gagnés. Les moves sont IGNORÉS.
+- **Impact:** Les règles normales sont suspendues. Ce sont vos STATS qui comptent.
+- **Unlock:** Gagner un match en dominant PV, cartes ET rounds simultanément.
 - **Description i18n:** "Ce round, ignorez les moves. Jugez sur PV, cartes en main, et historique."
 
+**🎨 PROMPT ILLUSTRATION:**
+```
+A playing card dominated by a massive golden (#eab308) balance scale in the center. Each of the three scale pans holds a different symbol: the left pan holds a glowing red heart (HP), the center pan holds three miniature cards (hand size), and the right pan holds a trophy icon (rounds won). The scale is tilted — one pan heavier than the others. Below the scale, three lane markers are shown but their RPSLS symbols are CROSSED OUT with golden X marks. A judge's gavel hovers above, about to strike. The background is a solemn courtroom grey-black (#0d0d0d) with faint law-text columns in gold. The card border is gold with balance-scale corner motifs. Glyph "⚖️" embossed in brilliant gold at top-right. 1024×1024 PNG with transparency on the outer card edges. Style: judicial, authoritative, dramatic, mobile-game card art.
 ---
 
-**Carte #20 — GENÈSE**=> OK SOUS CERTAINES CONDITIONS
+**Carte #20 — GENÈSE**
 
 - **Coût:** 4 mana
 - **Cible:** none
 - **Type:** active (usage unique — retirée du jeu après utilisation)
 - **Glyphe:** 🌟
-- **Palette:** yellow
-- **Effet:** RÉINITIALISEZ le match. Le score revient à 0-0. Tous les PV sont restaurés au maximum. Toutes les cartes dans les défausses et les mains sont mélangées dans les pioches. Chaque joueur pioche 3 nouvelles cartes. Le mana est réinitialisé. Tout modificateur permanent est effacé. Le match continue comme s'il venait de commencer... mais les cartes jouées avant Genèse ne reviennent PAS dans les pioches (elles sont "hors du temps"). Une seule Genèse par match.
-- **Impact:** "Nouvelle partie". Efface toutes les erreurs et tous les avantages. Parfait quand vous êtes mené 0-2 et que vous voulez repartir à zéro. L'adversaire perd tout son avantage accumulé.
-- **Unlock:** Accomplir TOUTES les quêtes du jeu (12 quêtes de base). C'est la carte ultime, réservée aux joueurs qui ont tout accompli.
+- **Palette:** `#fef08a` (jaune stellaire brillant)
+- **Effet:** RÉINITIALISEZ le match. Score 0-0, PV max, cartes remélangées, mana reset. Le match recommence.
+- **Impact:** "Nouvelle partie". Efface tout — erreurs et avantages. Une seule utilisation par match.
+- **Unlock:** Accomplir TOUTES les quêtes du jeu (12 quêtes de base). Carte ultime.
 - **Description i18n:** "Réinitialisez le score. Le match recommence. Une seule fois."
+
+**🎨 PROMPT ILLUSTRATION:**
+```
+A playing card showing a cosmic rebirth — a brilliant starburst of pure white-gold (#fef08a) light exploding from the center, pushing away darkness in all directions. The light forms the shape of a phoenix with wings of stellar dust, rising from what was. Below the starburst, the remnants of the old match — broken score markers, shattered card fragments, extinguished mana crystals — are swept toward the card's edges, dissolving into nothing. The background transitions from deep void-black (#000000) at the edges to brilliant golden-white (#fef08a) at the center. The card border is white-gold with radiant halo effects. Glyph "🌟" embossed in blinding white at top-right. This should be the most brilliant, hopeful, "new beginning" card in the entire game. 1024×1024 PNG with transparency on the outer card edges. Style: cosmic rebirth, divine light, ultimate hope, mobile-game card art.
+```
 
 ---
 

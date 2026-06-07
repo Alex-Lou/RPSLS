@@ -1,6 +1,7 @@
 /**
  * Constellation Ranked — pure types.
- * 26 cards across 4 rarities (15 base + 11 bonus). Deck of 8, hand of 3.
+ * 46 cards across 4 rarities (15 base + 11 bonus Lot 1 + 20 bonus V3).
+ * Deck of 8, hand of 3.
  */
 
 import type { Move } from "../engine/game";
@@ -17,7 +18,14 @@ export type CardId =
   | "prescience" | "cadence" | "mascarade" | "boussole" // commons (1 mana)
   | "sangsue" | "rempart" | "pillage"                   // rares (2 mana)
   | "trou-noir" | "prophetie" | "conduit"               // epics (3 mana)
-  | "trinite";                                          // legendary (4 mana)
+  | "trinite"                                           // legendary (4 mana)
+  // ── Bonus cards (V3 — 20 new mechanics) ──
+  | "sablier" | "remanence" | "offre" | "braise" | "echappee"             // commons (1 mana)
+  | "oracle-inverse" | "fardeau" | "crepuscule" | "cascade"               // rares (2 mana)
+  | "echo-temporel" | "ancre-temporelle"                                  //   ↑
+  | "metamorphose" | "gaia" | "marchand-ames" | "telepathie"              // epics (3 mana)
+  | "paradoxe" | "benediction"                                            //   ↑
+  | "schrodinger" | "juge" | "genese";                                    // legendary (4 mana)
 
 export type CardRarity = "common" | "rare" | "epic" | "legendary";
 
@@ -53,8 +61,17 @@ export type PlayedCard =
   | { id: "supernova" }
   | { id: "gambit" }
   | { id: "second-wind" }
-  // Bonus actives with no target — immediate, board-wide or self effects.
-  | { id: "prescience" | "mascarade" | "boussole" | "rempart" | "trou-noir" | "trinite" };
+  // Bonus Lot 1 actives with no target — immediate, board-wide or self effects.
+  | { id: "prescience" | "mascarade" | "boussole" | "rempart" | "trou-noir" | "trinite" }
+  // ── V3: lane-targeted ──
+  | { id: "remanence" | "echappee" | "crepuscule"; lane: LaneTarget }
+  // ── V3: no-target / self / instant ──
+  | { id: "sablier" | "offre" | "braise" | "cascade" | "echo-temporel"
+        | "ancre-temporelle" | "metamorphose" | "marchand-ames"
+        | "paradoxe" | "benediction" | "schrodinger" | "juge" | "genese"
+        | "fardeau" | "oracle-inverse" | "telepathie" }
+  // ── V3: telepathie reveals all 3 like oracle ──
+  ;
 
 /* ──────────── Round / battle state ──────────── */
 
@@ -109,6 +126,13 @@ export interface RoundBonusBreakdown {
    *  lane. leechPenaltyA = points A loses to B's leech, and vice-versa. */
   leechPenaltyA: number;
   leechPenaltyB: number;
+  /** Bénédiction (Blessing): +1 per lane won by either side, applied to both
+   *  sides when EITHER plays the card. */
+  benedictionBonusA: number;
+  benedictionBonusB: number;
+  /** Bouclier de Gaïa: cosmetic flag — set when the passive triggered this round. */
+  gaiaSavedA: boolean;
+  gaiaSavedB: boolean;
 }
 
 export interface CpuRoundDecision {
