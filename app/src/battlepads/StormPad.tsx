@@ -42,42 +42,80 @@ export function StormPad({ compact = false, ...props }: React.SVGProps<SVGSVGEle
         ))}
       </g>
 
-      {/* Lightning flash glow — brief bright burst, every 12 s. Compressed
-          from a 20-keyframe values list to a 4-step keyTimes-precise spike
-          (0 → 0.7 → 0 inside 4 % of the cycle), same visual, ~5× less SMIL
-          parsing work at mount. */}
+      {/* Lightning flash glow — primary bright burst + delayed thunder
+          afterglow that decays slower. Same 12s cycle as the bolts. */}
       <rect width={W} height={H} fill="url(#st-flash)" filter="url(#st-blur8)">
         <animate attributeName="opacity"
           values="0;0;0.7;0;0"
           keyTimes="0;0.46;0.48;0.52;1"
           dur="12s" repeatCount="indefinite" />
       </rect>
+      {/* Secondary delayed flash — thunder afterglow, longer decay, dimmer. */}
+      <rect width={W} height={H} fill="url(#st-flash)" filter="url(#st-blur8)" opacity="0">
+        <animate attributeName="opacity"
+          values="0;0;0.32;0.18;0"
+          keyTimes="0;0.50;0.52;0.58;0.68"
+          dur="12s" repeatCount="indefinite" />
+      </rect>
+      {/* Distant horizon flash — amber-violet pulse at bottom edge. */}
+      <rect x="0" y={H - 200} width={W} height="200" fill={PURPLE} fillOpacity="0" filter="url(#st-blur8)">
+        <animate attributeName="fill-opacity"
+          values="0;0;0.20;0.06;0"
+          keyTimes="0;0.78;0.80;0.84;0.92"
+          dur="12s" repeatCount="indefinite" />
+      </rect>
 
-      {/* Jagged lightning bolts — same compression. Each bolt fires once per
-          cycle; cycle length staggered per bolt so they never co-fire. The
-          previous 30-keyframe `values` strings parsed for nothing. */}
+      {/* Jagged lightning bolts with FORK BRANCHES — three primary bolts at
+          staggered times, each with a side branch that fires the same
+          micro-window. Inner cyan + outer purple halo for dichroic snap. */}
       <g stroke={BOLT} strokeOpacity="0.55" fill="none" strokeWidth="2" filter="url(#st-blur4)">
         {[
-          { x: 380, pts: "M 380 60 L 350 140 L 370 160 L 330 260 L 360 290 L 310 400" },
-          { x: 950, pts: "M 950 40 L 920 120 L 945 135 L 900 230 L 930 260 L 880 370 L 910 390" },
-          { x: 680, pts: "M 680 70 L 660 150 L 685 170 L 640 280 L 670 310 L 630 420" },
+          {
+            pts:  "M 380 60 L 350 140 L 370 160 L 330 260 L 360 290 L 310 400",
+            fork: "M 370 160 L 410 200 L 388 235 L 425 290",
+          },
+          {
+            pts:  "M 950 40 L 920 120 L 945 135 L 900 230 L 930 260 L 880 370 L 910 390",
+            fork: "M 945 135 L 985 175 L 962 210 L 998 260",
+          },
+          {
+            pts:  "M 680 70 L 660 150 L 685 170 L 640 280 L 670 310 L 630 420",
+            fork: "M 660 150 L 620 195 L 638 230 L 600 280",
+          },
         ].map((b, i) => {
           const dur = 10 + i * 3;
           const begin = `${i * 2}s`;
           return (
             <g key={i}>
+              {/* Main bolt. */}
               <path d={b.pts}>
                 <animate attributeName="stroke-opacity"
-                  values="0;0;0.65;0.1;0"
+                  values="0;0;0.85;0.1;0"
                   keyTimes="0;0.36;0.38;0.40;1"
                   dur={`${dur}s`} begin={begin} repeatCount="indefinite" />
               </path>
-              <path d={b.pts} stroke={PURPLE} strokeOpacity="0.3" strokeWidth="3">
+              {/* Outer purple halo of main bolt. */}
+              <path d={b.pts} stroke={PURPLE} strokeOpacity="0.3" strokeWidth="5">
                 <animate attributeName="stroke-opacity"
-                  values="0;0;0.4;0.06;0"
+                  values="0;0;0.55;0.08;0"
                   keyTimes="0;0.36;0.38;0.40;1"
                   dur={`${dur}s`} begin={begin} repeatCount="indefinite" />
               </path>
+              {/* Fork branch — thinner, same timing. */}
+              <path d={b.fork} strokeWidth="1.3">
+                <animate attributeName="stroke-opacity"
+                  values="0;0;0.65;0.08;0"
+                  keyTimes="0;0.36;0.385;0.40;1"
+                  dur={`${dur}s`} begin={begin} repeatCount="indefinite" />
+              </path>
+              {/* Strike-point flare on the upper origin of the main bolt. */}
+              <circle cx={parseInt(b.pts.split(" ")[1])} cy={parseInt(b.pts.split(" ")[2])}
+                r="20" fill={BOLT} fillOpacity="0" filter="url(#st-blur4)">
+                <animate attributeName="fill-opacity"
+                  values="0;0;0.6;0;0"
+                  keyTimes="0;0.36;0.39;0.42;1"
+                  dur={`${dur}s`} begin={begin} repeatCount="indefinite" />
+              </circle>
             </g>
           );
         })}

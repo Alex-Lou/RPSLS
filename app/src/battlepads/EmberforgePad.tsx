@@ -68,6 +68,48 @@ export function EmberforgePad({ compact = false, ...props }: React.SVGProps<SVGS
         </circle>
       </g>
 
+      {/* ANVIL SILHOUETTE — dark T-shaped block centre, lit by forge from above. */}
+      <g transform={`translate(${W/2} ${H/2 + 40})`}>
+        {/* Anvil body — vertical post. */}
+        <rect x="-60" y="-50" width="120" height="100" rx="6" fill="#040201" stroke={COPPER} strokeOpacity="0.20" strokeWidth="1.5" />
+        {/* Anvil top — wider slab. */}
+        <rect x="-100" y="-80" width="200" height="34" rx="6" fill="#080302" stroke={COPPER} strokeOpacity="0.25" strokeWidth="1.5" />
+        {/* Heat glow on the anvil's struck top edge. */}
+        <rect x="-95" y="-84" width="190" height="3" fill={AMBER} fillOpacity="0.35" filter="url(#ef-blur3)">
+          <animate attributeName="fill-opacity" values="0.25;0.65;0.25" dur="3.2s" repeatCount="indefinite" />
+        </rect>
+        {/* Periodic HAMMER STRIKE flash — bright pulse + shock ring + radial sparks. */}
+        <g>
+          {/* Ground-zero flash dot. */}
+          <circle cx="0" cy="-82" r="14" fill="#ffeacc" fillOpacity="0" filter="url(#ef-blur3)">
+            <animate attributeName="fill-opacity"
+              values="0;0;0.95;0.3;0;0"
+              keyTimes="0;0.46;0.50;0.55;0.62;1"
+              dur="5.5s" repeatCount="indefinite" />
+          </circle>
+          {/* Expanding shock ring. */}
+          <circle cx="0" cy="-82" r="10" fill="none" stroke={AMBER} strokeWidth="2" strokeOpacity="0">
+            <animate attributeName="r" values="6;6;120" keyTimes="0;0.48;0.85" dur="5.5s" repeatCount="indefinite" />
+            <animate attributeName="stroke-opacity" values="0;0;0.85;0" keyTimes="0;0.48;0.52;0.85" dur="5.5s" repeatCount="indefinite" />
+          </circle>
+          {/* 8 outward sparks. */}
+          {Array.from({ length: 8 }).map((_, i) => {
+            const ang = (i / 8) * Math.PI * 2 - Math.PI / 2;
+            const x2 = Math.cos(ang) * 130;
+            const y2 = -82 + Math.sin(ang) * 130;
+            return (
+              <line key={i} x1="0" y1="-82" x2={x2} y2={y2}
+                stroke={AMBER} strokeOpacity="0" strokeWidth="1.4" strokeLinecap="round">
+                <animate attributeName="stroke-opacity"
+                  values="0;0;0.85;0"
+                  keyTimes="0;0.48;0.55;0.78"
+                  dur="5.5s" repeatCount="indefinite" />
+              </line>
+            );
+          })}
+        </g>
+      </g>
+
       {/* Rising ember motes */}
       {!compact && Array.from({ length: 16 }).map((_, i) => {
         const x = 120 + (i * 93) % 1300;
