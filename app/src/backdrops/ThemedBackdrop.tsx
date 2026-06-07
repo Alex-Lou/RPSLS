@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { menuFxSuppressed } from "../fx/menuFx";
 
 /**
  * ThemedBackdrop — live, hand-coded animated backgrounds on a full-screen
@@ -1265,6 +1266,10 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
       touchY = canvas.height - e.clientY * dpr;
     };
     const onTDown = (e: PointerEvent) => {
+      // NEVER react to touch during a match (classic / ranked / constellation /
+      // training). Match surfaces call useNoMenuFx() → menuFxSuppressed() is
+      // true; the playmat is for playing, not for painting backdrop ripples.
+      if (menuFxSuppressed()) return;
       setTouch(e);
       touchDownAt = performance.now();
       pressing = true;
@@ -1274,6 +1279,7 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
       startLoop();
     };
     const onTMove = (e: PointerEvent) => {
+      if (menuFxSuppressed()) { pressing = false; return; }
       if (pressing) {
         setTouch(e);
         const dx = e.clientX - downX;

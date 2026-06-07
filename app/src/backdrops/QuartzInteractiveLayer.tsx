@@ -28,6 +28,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
+import { menuFxSuppressed } from "../fx/menuFx";
 
 interface Crystal {
   id: number;
@@ -129,6 +130,8 @@ function QuartzInteractiveLayerInner({
 
   const onDown = useCallback((e: React.PointerEvent) => {
     if (!enabled) return;
+    // NEVER spawn crystals during a match — match surfaces suppress menu FX.
+    if (menuFxSuppressed()) return;
     const p = pctFromEvent(e);
     downAt.current = p;
     // Was this tap inside an existing crystal? If so, shatter it instead of
@@ -172,6 +175,7 @@ function QuartzInteractiveLayerInner({
 
   const onMove = useCallback((e: React.PointerEvent) => {
     if (!enabled || downAt.current === null) return;
+    if (menuFxSuppressed()) return;
     const p = pctFromEvent(e);
     const dx = p.x - downAt.current.x;
     const dy = p.y - downAt.current.y;
