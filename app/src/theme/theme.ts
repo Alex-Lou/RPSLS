@@ -50,7 +50,7 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
   void:   { id: "void",   label: "Void",   emoji: "◼️", primary: "#ffffff", secondary: "#666666", bg: "#000000", fontHeadline: "jetbrains",    fontBody: "jetbrains",  fontMono: "jetbrains" },
   prism:  { id: "prism",  label: "Prism",  emoji: "💎", primary: "#ffffff", secondary: "#8b5cf6", bg: "#050510", fontHeadline: "spaceGrotesk", fontBody: "inter",      fontMono: "jetbrains" },
   ink:    { id: "ink",    label: "Ink",    emoji: "🖋️", primary: "#1a1a1a", secondary: "#8c8c8c", bg: "#f5f0e8", fontHeadline: "ebGaramond",   fontBody: "cormorant",  fontMono: "jetbrains" },
-  bloom:  { id: "bloom",  label: "Bloom",  emoji: "🌸", primary: "#ff7eb3", secondary: "#81c784", bg: "#f0f4f0", fontHeadline: "playfair",     fontBody: "inter",      fontMono: "jetbrains" },
+  bloom:  { id: "bloom",  label: "Bloom",  emoji: "🌸", primary: "#c45a86", secondary: "#5f9367", bg: "#1c2218", fontHeadline: "playfair",     fontBody: "inter",      fontMono: "jetbrains" },
 };
 
 export function applyTheme(themeId: ThemeId) {

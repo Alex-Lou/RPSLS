@@ -294,10 +294,14 @@ export const BACKGROUNDS: BackgroundDef[] = [
     id: "bloom",     label: "Bloom",          emoji: "🌸",
     src: null, scene: "bloom",                defaultPadId: "bloom",
     premiumSetId: "bloom",
-    light: true,
+    // 2026-06-07 — bloom backdrop was darkened to a dusky meadow, so the
+    // light-scaffolding (white-mixed panels + dark ink) no longer fits;
+    // it painted near-white modals over the dark meadow = HUD aveuglant.
+    // Switching to the default dark-glass surfaces + light ink: panels
+    // read as tinted dark sheets against the meadow, text stays bright.
     skin: { fontHeadline: "playfair",     fontBody: "inter",        fontMono: "jetbrains" },
     miniature: null,
-    accent: { from: "#ff7eb3", to: "#81c784" },
+    accent: { from: "#c45a86", to: "#5f9367" },
   },
 
   // Player's OWN image — uploaded in Profile, stored as a data URL. The
