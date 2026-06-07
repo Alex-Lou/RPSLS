@@ -30,6 +30,10 @@ pub struct PlayerProgress {
     pub eclats: u64,
     #[serde(default)]
     pub dust: u64,
+    /// Premium currency (✦). Synced so unspent stars survive a reinstall — same
+    /// durability guarantee as eclats/dust.
+    #[serde(default)]
+    pub stars: u64,
     #[serde(default)]
     pub wins: u64,
     #[serde(default)]
@@ -42,6 +46,10 @@ pub struct PlayerProgress {
     pub card_mastery: HashMap<String, u64>,
     #[serde(default)]
     pub codex_claimed: Vec<u32>,
+    /// One-time quest claim ids — union-merged on the client so rewards can't
+    /// be re-claimed after a reinstall.
+    #[serde(default)]
+    pub claimed_quests: Vec<String>,
     #[serde(default)]
     pub ranked_deck: Vec<String>,
     /// Premium cosmetic sets the player has purchased. Synced (union) so a
@@ -54,6 +62,17 @@ pub struct PlayerProgress {
     pub season_started_at: u64,
     #[serde(default)]
     pub win_streak: u32,
+    /// Classé (classic 1v1) own ladder + record — cloud-saved like the rest of
+    /// the progression so it survives reinstall and follows the player across
+    /// devices.
+    #[serde(default)]
+    pub classe_lp: u64,
+    #[serde(default)]
+    pub classe_wins: u64,
+    #[serde(default)]
+    pub classe_losses: u64,
+    #[serde(default)]
+    pub classe_draws: u64,
     /// Epoch millis of last sync — used for last-write-wins on cosmetics.
     #[serde(default)]
     pub updated_at: u64,
@@ -69,6 +88,18 @@ pub struct PlayerProgress {
     pub avatar: String,
     #[serde(default)]
     pub nickname: String,
+
+    // ── Gameplay / accessibility prefs (0 / empty / false = "unset") ──
+    #[serde(default)]
+    pub difficulty: String,
+    /// UI font scale multiplier (1.0 = default). 0.0 means "never set on this
+    /// device" — the client only ADOPTS values >= 1.
+    #[serde(default)]
+    pub font_scale: f32,
+    /// True once the player has explicitly picked a pad — gates the first-run
+    /// chooser from popping back on a re-install.
+    #[serde(default)]
+    pub pad_chosen: bool,
 }
 
 /// Hard ceiling for any single numeric progression field — well above any
@@ -105,15 +136,24 @@ impl PlayerProgress {
         self.rank_lp = self.rank_lp.min(5_000);
         self.eclats = self.eclats.min(MAX_NUM);
         self.dust = self.dust.min(MAX_NUM);
+        self.stars = self.stars.min(MAX_NUM);
         self.wins = self.wins.min(MAX_NUM);
         self.losses = self.losses.min(MAX_NUM);
         self.draws = self.draws.min(MAX_NUM);
+        // Classé runs its own ladder on the same 5000 ceiling as ranked.
+        self.classe_lp = self.classe_lp.min(5_000);
+        self.classe_wins = self.classe_wins.min(MAX_NUM);
+        self.classe_losses = self.classe_losses.min(MAX_NUM);
+        self.classe_draws = self.classe_draws.min(MAX_NUM);
         self.season_number = self.season_number.min(100_000);
         self.win_streak = self.win_streak.min(100_000);
 
         cap_vec(&mut self.card_collection, 64, 64);
         cap_vec(&mut self.ranked_deck, 16, 64);
         cap_vec(&mut self.owned_premium_sets, 32, 32);
+        // Quests accumulate over seasons of play — 128 ids is plenty without
+        // letting a tampered client blow up Redis storage.
+        cap_vec(&mut self.claimed_quests, 128, 64);
         self.codex_claimed.truncate(32);
         if self.card_mastery.len() > 64 {
             let keep: std::collections::HashSet<String> =
@@ -129,6 +169,14 @@ impl PlayerProgress {
         clamp_str(&mut self.pad_id, 32);
         clamp_str(&mut self.avatar, 300);
         clamp_str(&mut self.nickname, 24);
+        clamp_str(&mut self.difficulty, 16);
+        // font_scale: NaN/Inf/negative → "unset" (0). Cap legit values at 2x
+        // so a tampered client can't ship 1e30 and break the UI on adopt.
+        if !self.font_scale.is_finite() || self.font_scale < 0.0 {
+            self.font_scale = 0.0;
+        } else if self.font_scale > 2.0 {
+            self.font_scale = 2.0;
+        }
     }
 }
 
