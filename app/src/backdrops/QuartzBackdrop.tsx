@@ -1,19 +1,7 @@
-/**
- * QuartzBackdrop — premium animated background, SVG/SMIL only.
- *
- * Distinct from every other backdrop in the app (no nebula, no neon grid, no
- * lava). The aesthetic is **mineral**: prismatic shards that grow + slowly
- * rotate, faint refraction streaks washing across, a soft pearlescent base.
- * Cool pastels (lavender + blush + ice) — meant to read as glacial luxury.
- *
- * SVG/SMIL chosen over WebGL deliberately:
- *   1. The app already runs ONE WebGL context (SplashShader) — adding another
- *      would crash mid-range GPUs.
- *   2. SMIL pauses cleanly when the tab is hidden + when paired with the
- *      offscreen-pause hook, costing zero battery off-view.
- *   3. The pad set (also Quartz) uses the same primitives, so the pieces
- *      feel of-a-piece.
- */
+/** QuartzBackdrop — premium SVG/SMIL "mineral" backdrop. Prismatic shards,
+ *  procedural hex lattice, spectral rainbow sweep, periodic crystal growth
+ *  events. Single WebGL context is reserved for the splash; SMIL pauses
+ *  cleanly when hidden. */
 
 import { useEffect, useRef } from "react";
 import { QuartzInteractiveLayer } from "./QuartzInteractiveLayer";
@@ -33,16 +21,55 @@ const STOPS = {
   softGold: "#ffeed1",   // gold whisper for fracture interiors
 } as const;
 
-/** Six crystal shards at fixed positions — count picked so the canvas stays
- *  composed (not a noise field). Positions hand-tuned, not random. */
+/** Twelve crystal shards at fixed positions, three size-tiers (foreground,
+ *  mid, background) so the canvas reads as a layered crystal CLUSTER instead
+ *  of six floating decals. Positions hand-tuned, not random — each shard sits
+ *  in a deliberate composition triangle that doesn't crowd the HUD. */
 const SHARDS: Array<{ cx: number; cy: number; size: number; rot: number; delay: number }> = [
-  { cx: 18, cy: 22, size: 26, rot: -14, delay: 0 },
-  { cx: 78, cy: 16, size: 22, rot: 22,  delay: 1.4 },
-  { cx: 88, cy: 72, size: 30, rot: -38, delay: 2.6 },
-  { cx: 12, cy: 78, size: 24, rot: 18,  delay: 3.4 },
+  // Foreground hero shards — large, focal.
   { cx: 50, cy: 50, size: 38, rot: 8,   delay: 0.8 },
+  { cx: 88, cy: 72, size: 30, rot: -38, delay: 2.6 },
+  { cx: 18, cy: 22, size: 26, rot: -14, delay: 0 },
+  // Mid layer — supporting crystals.
+  { cx: 78, cy: 16, size: 22, rot: 22,  delay: 1.4 },
+  { cx: 12, cy: 78, size: 24, rot: 18,  delay: 3.4 },
   { cx: 64, cy: 38, size: 18, rot: -22, delay: 4.0 },
+  // Background bed — small crystals, far-field, denser refraction.
+  { cx: 32, cy: 12, size: 14, rot: 11,  delay: 2.0 },
+  { cx: 92, cy: 30, size: 12, rot: -8,  delay: 5.1 },
+  { cx: 4,  cy: 50, size: 13, rot: 36,  delay: 6.0 },
+  { cx: 40, cy: 88, size: 14, rot: -28, delay: 4.4 },
+  { cx: 70, cy: 92, size: 12, rot: 17,  delay: 5.5 },
+  { cx: 26, cy: 60, size: 11, rot: -45, delay: 3.0 },
 ];
+
+/** Four "growth seed" positions where a crystal periodically GROWS from a
+ *  spark of light. Staggered so the canvas always has one forming. */
+const SEEDS: Array<{ cx: number; cy: number; rot: number; begin: number }> = [
+  { cx: 35, cy: 40, rot: 18,  begin: 0 },
+  { cx: 60, cy: 70, rot: -22, begin: 8 },
+  { cx: 80, cy: 50, rot: 35,  begin: 16 },
+  { cx: 22, cy: 88, rot: -10, begin: 24 },
+];
+
+/** Bokeh blobs (8) and lattice trace lines (5) — extracted as consts so the
+ *  JSX stays compact and the layout intent is readable. */
+const BOKEH = [
+  [15, 30, 28, 6, 32], [70, 22, 22, -4, 38], [88, 60, 26, 5, 30], [32, 78, 30, -6, 36],
+  [56, 44, 18, 7, 28], [22, 55, 16, -5, 42], [78, 84, 20, 4, 34], [6, 8, 14, 3, 40],
+] as const;
+const FRACTURES = [
+  [0, 40, 100, 0.4, -8,  9,  0],
+  [0, 64, 100, 0.5, 14,  12, 1.6],
+  [0, 28, 100, 0.3, -22, 11, 3.2],
+] as const;
+const LATTICE = [
+  [0, 14, 100, 22, 13, 0],
+  [100, 36, 0, 48, 16, 2.4],
+  [0, 58, 100, 66, 14, 4.8],
+  [100, 78, 0, 86, 17, 7.0],
+  [20, 0, 28, 100, 19, 1.6],
+] as const;
 
 export function QuartzBackdrop() {
   const ref = useRef<SVGSVGElement | null>(null);
@@ -126,29 +153,64 @@ export function QuartzBackdrop() {
           <stop offset="50%"  stopColor={STOPS.softGold} stopOpacity="0.9" />
           <stop offset="100%" stopColor={STOPS.softGold} stopOpacity="0" />
         </linearGradient>
+
+        {/* Spectral rainbow band — full prism dispersion across a swept arc.
+            Used for a slow refraction rainbow that paints across the canvas
+            when light passes through the central crystal cluster. */}
+        <linearGradient id="qz-spectrum" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%"  stopColor="#ff5577" stopOpacity="0" />
+          <stop offset="15%" stopColor="#ff8a55" stopOpacity="0.35" />
+          <stop offset="30%" stopColor="#ffd96a" stopOpacity="0.45" />
+          <stop offset="45%" stopColor="#9fea8b" stopOpacity="0.45" />
+          <stop offset="60%" stopColor="#7fcfff" stopOpacity="0.40" />
+          <stop offset="75%" stopColor="#b487f0" stopOpacity="0.40" />
+          <stop offset="90%" stopColor="#e0a8ff" stopOpacity="0.20" />
+          <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+        </linearGradient>
+
+        {/* Caustic ring — bright ring of refracted light, used as halo
+            around a growing crystal "birth" event. */}
+        <radialGradient id="qz-caustic" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"  stopColor={STOPS.glow} stopOpacity="0" />
+          <stop offset="48%" stopColor={STOPS.glow} stopOpacity="0.0" />
+          <stop offset="55%" stopColor="#ffffff" stopOpacity="0.85" />
+          <stop offset="65%" stopColor={STOPS.warmRose} stopOpacity="0.35" />
+          <stop offset="100%" stopColor={STOPS.warmRose} stopOpacity="0" />
+        </radialGradient>
+
+        {/* Mineral vein — interior crystalline lattice traces. */}
+        <linearGradient id="qz-lattice" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%"   stopColor={STOPS.glow} stopOpacity="0.4" />
+          <stop offset="50%"  stopColor="#ffffff" stopOpacity="0.7" />
+          <stop offset="100%" stopColor={STOPS.lavender} stopOpacity="0.4" />
+        </linearGradient>
+
+        {/* Twin-color facet — pink/blue dichroism for premium "spectrolite" feel. */}
+        <linearGradient id="qz-dichroic" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%"  stopColor="#a0d4ff" stopOpacity="0.55" />
+          <stop offset="50%" stopColor={STOPS.glow} stopOpacity="0.9" />
+          <stop offset="100%" stopColor={STOPS.warmRose} stopOpacity="0.55" />
+        </linearGradient>
+
+        {/* Hex lattice prism — used as overlay weave to add procedural
+            crystalline grain across the entire canvas. */}
+        <pattern id="qz-hex" x="0" y="0" width="14" height="12" patternUnits="userSpaceOnUse">
+          <path d="M 7 0 L 14 4 L 14 12 L 7 16 L 0 12 L 0 4 Z"
+                fill="none" stroke={STOPS.glow} strokeOpacity="0.06" strokeWidth="0.15" />
+        </pattern>
       </defs>
 
       {/* Base wash. */}
       <rect width="100" height="100" fill="url(#qz-base)" />
 
-      {/* Layer A — depth bokeh. Eight large soft blobs drift slowly in opposing
-          directions to create parallax behind the shards. */}
+      {/* Layer A — depth bokeh: 8 soft blobs parallax behind shards. */}
       <g opacity="0.7">
-        {[
-          { cx: 15, cy: 30, r: 28, dx: 6,  dur: 32 },
-          { cx: 70, cy: 22, r: 22, dx: -4, dur: 38 },
-          { cx: 88, cy: 60, r: 26, dx: 5,  dur: 30 },
-          { cx: 32, cy: 78, r: 30, dx: -6, dur: 36 },
-          { cx: 56, cy: 44, r: 18, dx: 7,  dur: 28 },
-          { cx: 22, cy: 55, r: 16, dx: -5, dur: 42 },
-          { cx: 78, cy: 84, r: 20, dx: 4,  dur: 34 },
-          { cx: 6,  cy: 8,  r: 14, dx: 3,  dur: 40 },
-        ].map((b, i) => (
-          <circle key={i} cx={b.cx} cy={b.cy} r={b.r} fill="url(#qz-bokeh)">
-            <animate attributeName="cx" values={`${b.cx};${b.cx + b.dx};${b.cx}`}
-              dur={`${b.dur}s`} repeatCount="indefinite" />
-            <animate attributeName="r" values={`${b.r};${b.r * 1.15};${b.r}`}
-              dur={`${b.dur * 0.8}s`} repeatCount="indefinite" />
+        {BOKEH.map(([cx, cy, r, dx, dur], i) => (
+          <circle key={i} cx={cx} cy={cy} r={r} fill="url(#qz-bokeh)">
+            <animate attributeName="cx" values={`${cx};${cx + dx};${cx}`}
+              dur={`${dur}s`} repeatCount="indefinite" />
+            <animate attributeName="r" values={`${r};${r * 1.15};${r}`}
+              dur={`${dur * 0.8}s`} repeatCount="indefinite" />
           </circle>
         ))}
       </g>
@@ -164,18 +226,12 @@ export function QuartzBackdrop() {
         </ellipse>
       </g>
 
-      {/* Layer C — three hairline fractures crossing the canvas. Each is a
-          slim band with a gold inner trace that pulses, like a vein of fire
-          inside ice. */}
-      {[
-        { x: 0, y: 40, w: 100, h: 0.4, rot: -8,  dur: 9,  delay: 0 },
-        { x: 0, y: 64, w: 100, h: 0.5, rot: 14,  dur: 12, delay: 1.6 },
-        { x: 0, y: 28, w: 100, h: 0.3, rot: -22, dur: 11, delay: 3.2 },
-      ].map((f, i) => (
-        <g key={i} transform={`rotate(${f.rot} 50 50)`}>
-          <rect x={f.x} y={f.y} width={f.w} height={f.h} fill="url(#qz-fracture)">
+      {/* Layer C — 3 hairline fractures pulse like veins of fire inside ice. */}
+      {FRACTURES.map(([x, y, w, h, rot, dur, delay], i) => (
+        <g key={i} transform={`rotate(${rot} 50 50)`}>
+          <rect x={x} y={y} width={w} height={h} fill="url(#qz-fracture)">
             <animate attributeName="opacity" values="0.0;0.85;0.0"
-              dur={`${f.dur}s`} begin={`${f.delay}s`} repeatCount="indefinite" />
+              dur={`${dur}s`} begin={`${delay}s`} repeatCount="indefinite" />
           </rect>
         </g>
       ))}
@@ -190,6 +246,48 @@ export function QuartzBackdrop() {
           <animateTransform attributeName="transform" type="translate"
             values="30 0; -30 0; 30 0" dur="28s" repeatCount="indefinite" />
         </rect>
+      </g>
+
+      {/* Slow SPECTRAL RAINBOW SWEEP — full prism band passes across the canvas
+          every 18s, rotating slightly each pass. The single most "luxury"
+          read of the scene. */}
+      <g opacity="0.55">
+        <rect x="-60" y="44" width="220" height="4" fill="url(#qz-spectrum)"
+              transform="rotate(-18 50 50)">
+          <animateTransform attributeName="transform" type="translate"
+            values="-40 0; 40 0; -40 0" dur="18s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="0; 0.7; 0.7; 0"
+            keyTimes="0; 0.25; 0.75; 1" dur="18s" repeatCount="indefinite" />
+        </rect>
+        <rect x="-60" y="52" width="220" height="3" fill="url(#qz-spectrum)"
+              transform="rotate(-18 50 50)" opacity="0.55">
+          <animateTransform attributeName="transform" type="translate"
+            values="-44 0; 44 0; -44 0" dur="18s" begin="0.4s" repeatCount="indefinite" />
+        </rect>
+      </g>
+
+      {/* PROCEDURAL HEX LATTICE OVERLAY — full-canvas pattern wash. The pattern
+          itself is static, but a slow translate + opacity breath sells matter
+          on a finer scale than shards alone could. */}
+      <g opacity="0.6">
+        <rect x="-10" y="-10" width="120" height="120" fill="url(#qz-hex)">
+          <animateTransform attributeName="transform" type="translate"
+            values="0 0; 7 -5; 0 0" dur="44s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="0.45; 0.7; 0.45"
+            dur="14s" repeatCount="indefinite" />
+        </rect>
+      </g>
+
+      {/* INNER LATTICE TRACES — 5 diagonal pulse lines sell "matter glowing
+          from within" without filters. */}
+      <g opacity="0.65">
+        {LATTICE.map(([x1, y1, x2, y2, dur, delay], i) => (
+          <line key={i} x1={x1} y1={y1} x2={x2} y2={y2}
+                stroke="url(#qz-lattice)" strokeWidth="0.25" strokeOpacity="0">
+            <animate attributeName="stroke-opacity" values="0; 0.6; 0"
+              dur={`${dur}s`} begin={`${delay}s`} repeatCount="indefinite" />
+          </line>
+        ))}
       </g>
 
       {/* The six crystal shards. Each grows from a seed (scale 0 → 1), then
@@ -217,6 +315,42 @@ export function QuartzBackdrop() {
               <animate attributeName="opacity" values="0;0.8;0" dur={`${8 + i}s`} begin={`${s.delay}s`} repeatCount="indefinite" />
             </line>
           </g>
+        </g>
+      ))}
+
+      {/* GROWING CRYSTAL SEEDS — every ~32s a new crystal grows from a seed
+          point with a caustic flash, 4 seeds staggered 8s. */}
+      {SEEDS.map((s, i) => (
+        <g key={`seed-${i}`} transform={`translate(${s.cx} ${s.cy})`}>
+          <circle r="3" fill="url(#qz-caustic)" opacity="0">
+            <animate attributeName="r" values="2; 22; 30" keyTimes="0; 0.4; 1"
+              dur="6s" begin={`${s.begin}s; 32s; 64s; 96s`} repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0; 0.95; 0" keyTimes="0; 0.3; 1"
+              dur="6s" begin={`${s.begin}s; 32s; 64s; 96s`} repeatCount="indefinite" />
+          </circle>
+          <g transform={`rotate(${s.rot})`} opacity="0">
+            <use href="#qz-shape" width="16" height="26" x="-8" y="-13" />
+            <animateTransform attributeName="transform" type="scale"
+              values="0; 0.15; 1.05; 1; 1; 0" keyTimes="0; 0.15; 0.32; 0.5; 0.9; 1"
+              dur="32s" begin={`${s.begin}s`} repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0; 1; 1; 1; 0"
+              keyTimes="0; 0.15; 0.5; 0.9; 1" dur="32s"
+              begin={`${s.begin}s`} repeatCount="indefinite" />
+          </g>
+          {/* 12 radial dichroic prism sparks at peak growth. */}
+          {Array.from({ length: 12 }).map((_, j) => {
+            const ang = (j / 12) * Math.PI * 2;
+            return (
+              <line key={j} x1="0" y1="0"
+                x2={Math.cos(ang) * 8} y2={Math.sin(ang) * 8}
+                stroke="url(#qz-dichroic)" strokeWidth="0.4"
+                strokeOpacity="0" strokeLinecap="round">
+                <animate attributeName="stroke-opacity" values="0; 0.9; 0"
+                  keyTimes="0; 0.05; 0.18" dur="32s"
+                  begin={`${s.begin + 1.6}s`} repeatCount="indefinite" />
+              </line>
+            );
+          })}
         </g>
       ))}
 
