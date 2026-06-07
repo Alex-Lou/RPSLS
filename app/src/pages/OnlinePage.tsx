@@ -1292,11 +1292,18 @@ export function OnlinePage() {
                 youReady: prepReadyState.you,
                 oppReady: prepReadyState.opp,
                 coinWinner: prepCoinWinner,
+                // `connDropped` flips true on "reconnecting" and false on
+                // "open" — mirrors the underlying OnlineClient status, so
+                // the prep button reflects the actual wire state.
+                connectionAlive: !connDropped,
                 onReady: () => {
-                  if (prepReadyState.you) return;
+                  if (prepReadyState.you || connDropped) return;
                   // Optimistic local flip — server will echo back the same
                   // `prep_ready_state` shortly, but the button feels
-                  // unresponsive otherwise on a 100ms RTT.
+                  // unresponsive otherwise on a 100ms RTT. OnlineClient now
+                  // queues the send if the socket happens to be mid-flap,
+                  // so the message replays on reconnect (TTL guards against
+                  // landing in a dead match).
                   setPrepReadyState((s) => ({ ...s, you: true }));
                   clientRef.current?.send({ type: "prep_ready" });
                 },

@@ -61,7 +61,18 @@ export interface OnlinePrep {
    *  button; idempotent on the server side, so the screen doesn't enforce
    *  one-shot behaviour. */
   onReady: () => void;
+  /** False when the underlying WebSocket is reconnecting / dropped. Gates
+   *  the ready button so the user sees the connection state instead of a
+   *  silent queue into OnlineClient's offline buffer. */
+  connectionAlive: boolean;
 }
+
+/** Wall-clock budget the SERVER gives both players to confirm — must stay in
+ *  sync with `PREP_DEADLINE` in `crates/rpsls-server/src/lanes_engine.rs`. The
+ *  countdown is purely informational (server is authoritative on timeout); a
+ *  visible ticker prevents the player from sitting on the screen wondering
+ *  if anything is happening. */
+const PREP_BUDGET_MS = 30_000;
 
 export function MatchPrepScreen({
   youName, youAvatar, youThemeId, youBackgroundId,
@@ -98,6 +109,29 @@ export function MatchPrepScreen({
 
   const isOnline = !!online;
   const readyCount = isOnline ? (online!.youReady ? 1 : 0) + (online!.oppReady ? 1 : 0) : 0;
+
+  // Visible 30s prep countdown — wakes the player up before the server
+  // timeout kicks in. Starts at component mount (= when lanes_match_found
+  // landed) and stops once the coin is flipping/landed (timeout no longer
+  // applicable). Server timestamp would be more accurate, but adding it
+  // to the wire just to drive a UI ticker is overkill — a tiny start-time
+  // skew is invisible at 1-second resolution.
+  const prepStartRef = useRef<number>(0);
+  if (prepStartRef.current === 0) prepStartRef.current = Date.now();
+  const [prepRemainingMs, setPrepRemainingMs] = useState<number>(PREP_BUDGET_MS);
+  useEffect(() => {
+    if (!isOnline) return;
+    if (phase !== "idle") return;
+    const tick = () => {
+      const elapsed = Date.now() - prepStartRef.current;
+      setPrepRemainingMs(Math.max(0, PREP_BUDGET_MS - elapsed));
+    };
+    tick();
+    const id = window.setInterval(tick, 250);
+    return () => window.clearInterval(id);
+  }, [isOnline, phase]);
+  const prepSecondsLeft = Math.ceil(prepRemainingMs / 1000);
+  const prepUrgent = prepSecondsLeft <= 10;
 
   // Track the in-flight timers so they get cancelled on unmount and on a
   // fresh flip(). The previous version returned a cleanup function from
@@ -220,11 +254,13 @@ export function MatchPrepScreen({
               <p className="text-[11px] text-ink-faint max-w-xs">
                 {phase === "flipping"
                   ? "La pièce tourne…"
-                  : online!.youReady && !online!.oppReady
-                    ? `En attente de ${oppName}…`
-                    : online!.oppReady && !online!.youReady
-                      ? `${oppName} est prêt — confirme pour lancer la pièce.`
-                      : "Confirmez tous les deux pour lancer la pièce du terrain."}
+                  : !online!.connectionAlive
+                    ? "Connexion perdue — reprise en cours…"
+                    : online!.youReady && !online!.oppReady
+                      ? `En attente de ${oppName}…`
+                      : online!.oppReady && !online!.youReady
+                        ? `${oppName} est prêt — confirme pour lancer la pièce.`
+                        : "Confirmez tous les deux pour lancer la pièce du terrain."}
               </p>
               {/* 0/2 → 1/2 → 2/2 — the actual "double confirm" UI. */}
               <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/30 border border-white/10">
@@ -240,6 +276,20 @@ export function MatchPrepScreen({
                   <ReadyDot on={online!.oppReady} label={oppName} />
                 </span>
               </div>
+              {/* 30s budget ticker — purely informational; the server is
+                  authoritative on the actual timeout. Becomes urgent (rose)
+                  in the last 10s so the player can react before forfeit. */}
+              {phase === "idle" && (
+                <div
+                  className={
+                    "mt-1.5 inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.2em] font-bold tabular-nums " +
+                    (prepUrgent ? "text-rose-300" : "text-ink-faint")
+                  }
+                >
+                  <span>⏱</span>
+                  <span>{prepSecondsLeft}s</span>
+                </div>
+              )}
             </div>
           ) : (
             <p key="hint" className="text-[11px] text-ink-faint text-center max-w-xs">
@@ -252,24 +302,28 @@ export function MatchPrepScreen({
           isOnline ? (
             // Online mode: one button only — "Je suis prêt". The coin is
             // server-driven, so no local trigger. Tap is idempotent on the
-            // server; we disable the button locally for UX clarity.
+            // server; we disable the button locally for UX clarity AND when
+            // the WebSocket is reconnecting, so the user sees the connection
+            // state instead of a silent enqueue into the offline buffer.
             <div className="flex flex-col items-center gap-2 w-full">
               <motion.button
-                whileTap={{ scale: online!.youReady ? 1 : 0.96 }}
+                whileTap={{ scale: online!.youReady || !online!.connectionAlive ? 1 : 0.96 }}
                 onClick={() => {
-                  if (online!.youReady || phase === "flipping") return;
+                  if (online!.youReady || phase === "flipping" || !online!.connectionAlive) return;
                   hapticTap();
                   online!.onReady();
                 }}
-                disabled={online!.youReady || phase === "flipping"}
+                disabled={online!.youReady || phase === "flipping" || !online!.connectionAlive}
                 className="w-full max-w-xs py-3 rounded-2xl font-bold text-white bg-themed shadow-lg disabled:opacity-60"
                 style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
               >
                 {phase === "flipping"
                   ? "La pièce tourne…"
-                  : online!.youReady
-                    ? "✓ Prêt — en attente de l'adversaire"
-                    : "Je suis prêt"}
+                  : !online!.connectionAlive
+                    ? "⏳ Reconnexion…"
+                    : online!.youReady
+                      ? "✓ Prêt — en attente de l'adversaire"
+                      : "Je suis prêt"}
               </motion.button>
             </div>
           ) : (
