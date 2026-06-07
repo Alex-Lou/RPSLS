@@ -243,7 +243,12 @@ export default function App() {
           mid-transition. */}
       <AnimatePresence mode="wait">
         {stage === "splash" && (
-          <Splash key="splash" onDone={afterSplash} scene={activeScene ?? null} />
+          <Splash
+            key="splash"
+            onDone={afterSplash}
+            scene={activeScene ?? null}
+            premiumScene={premiumScene ?? null}
+          />
         )}
         {stage === "welcome" && (
           <Suspense key="welcome" fallback={<RouteFallback />}>
@@ -388,7 +393,11 @@ function PageWrap({ children }: { children: React.ReactNode }) {
  * (no codec, no asset), the dark gradient backdrop still shows and the
  * logo/title sequence still fires — graceful degradation.
  */
-function Splash({ onDone, scene }: { onDone: () => void; scene: import("./backdrops/ThemedBackdrop").BackdropScene | null }) {
+function Splash({ onDone, scene, premiumScene }: {
+  onDone: () => void;
+  scene: import("./backdrops/ThemedBackdrop").BackdropScene | null;
+  premiumScene?: string | null;
+}) {
   const t = useT();
   const [phase, setPhase] = useState<"intro" | "logo" | "title" | "hint">("intro");
 
@@ -421,13 +430,16 @@ function Splash({ onDone, scene }: { onDone: () => void; scene: import("./backdr
       exit={{ opacity: 0 }}
       transition={{ duration: 0.5, ease: [0.4, 0.0, 0.2, 1] }}
     >
-      {/* Procedural WebGL fluid backdrop — replaces the previous <video>
-          tag. No native media controls flashing on Android WebView, no
-          codec compatibility issues, no asset to ship. Paints frame 1
-          instantly and loops forever. When the player has picked a coded
+      {/* Procedural WebGL fluid backdrop. When the player has picked a coded
           scene, the splash uses THAT scene instead so the opening matches
-          the chosen ambience (galaxy → galaxy splash, neon grid → grid…). */}
-      <SplashShader scene={scene} />
+          the chosen ambience. When the player owns the Quartz premium set
+          (a SVG/SMIL scene, not a fragment shader branch), the splash uses
+          the live QuartzBackdrop instead of the shader fallback. */}
+      {premiumScene === "quartz" ? (
+        <QuartzBackdropWithLayer />
+      ) : (
+        <SplashShader scene={scene} />
+      )}
 
       {/* Soft dark gradient overlay for legibility of the logo/title on top. */}
       <div

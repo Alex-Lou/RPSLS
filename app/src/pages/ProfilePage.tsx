@@ -17,6 +17,7 @@ import { PremiumPurchaseModal, type PremiumSet } from "../ui/PremiumPurchaseModa
 import { PremiumBadge } from "../ui/PremiumBadge";
 import { OwnedBadgeLongPress } from "../ui/OwnedBadgeLongPress";
 import { QuartzBackdrop } from "../backdrops/QuartzBackdrop";
+import { ThemedBackdrop } from "../backdrops/ThemedBackdrop";
 import { useT } from "../i18n";
 import { hapticTap, hapticMatchStart } from "../haptic";
 import { useBackdropPeek } from "../backdrops/previewScene";
@@ -969,6 +970,41 @@ const PREMIUM_SETS: Record<string, PremiumSet> = {
     tagline: "Éclats cristallins prismatiques, un monde glaciaire et doux.",
     cost: 800,
     previewArt: <QuartzBackdrop />,
+  },
+  eclipse: {
+    id: "eclipse",
+    name: "Eclipse",
+    tagline: "Couronne solaire, anneau de diamant, vide onyx percé d'or.",
+    cost: 800,
+    previewArt: <ThemedBackdrop scene="eclipse" />,
+  },
+  phantom: {
+    id: "phantom",
+    name: "Phantom Realm",
+    tagline: "Brume spectrale, larmes fantômes, volutes argentées.",
+    cost: 800,
+    previewArt: <ThemedBackdrop scene="phantom" />,
+  },
+  emberforge: {
+    id: "emberforge",
+    name: "Ember Forge",
+    tagline: "Forge naine, rivières de braise, cuivre martelé incandescent.",
+    cost: 800,
+    previewArt: <ThemedBackdrop scene="emberforge" />,
+  },
+  tempus: {
+    id: "tempus",
+    name: "Tempus Aeternum",
+    tagline: "Sables du temps, engrenages antiques, sablier sépia éternel.",
+    cost: 800,
+    previewArt: <ThemedBackdrop scene="tempus" />,
+  },
+  storm: {
+    id: "storm",
+    name: "Tempest Fury",
+    tagline: "Foudre déchirante, rideaux de pluie, nuages d'orage grondants.",
+    cost: 800,
+    previewArt: <ThemedBackdrop scene="storm" />,
   },
 };
 

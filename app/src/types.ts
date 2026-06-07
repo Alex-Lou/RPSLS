@@ -5,7 +5,11 @@ export type ThemeId =
   | "violet" | "neon" | "pastel" | "sunset" | "forest"
   | "ocean" | "ember" | "aurora" | "gold" | "cyber" | "rose" | "mono"
   // ── Premium palettes ──
-  | "quartz";
+  | "quartz"
+  // ── Eclipse set ──
+  | "eclipse"
+  // ── Phantom + Emberforge + Tempus + Storm ──
+  | "phantom" | "emberforge" | "tempus" | "storm";
 
 export type PadId =
   // Fully coded, animated playmats (SVG/SMIL — no PNGs anymore).
@@ -19,6 +23,8 @@ export type PadId =
   | "aura"
   // Elemental pads matching coded backgrounds.
   | "volcanic" | "abyss"
+  // ── Eclipse/Phantom/Emberforge/Tempus/Storm sets ──
+  | "eclipse" | "phantom" | "emberforge" | "tempus" | "storm"
   // ── Premium pads ──
   | "quartz"
   // Player's own uploaded mat (data URL on the player).
@@ -28,7 +34,7 @@ export type BackgroundId =
   | "default"
   // Coded / animated WebGL backdrops (no PNG — fully procedural).
   | "nebula" | "galaxy" | "aurora" | "holy" | "quantum" | "grid" | "casino"
-  | "volcanic" | "abyss"
+  | "volcanic" | "abyss" | "eclipse" | "phantom" | "emberforge" | "tempus" | "storm"
   // ── Premium backgrounds ──
   | "quartz"
   // Player's own uploaded image.
@@ -180,6 +186,11 @@ export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: st
   aura:       { label: "Aura",           emoji: "🎨", tagline: "S'accorde à ton thème : couleurs et lueurs vivantes.", category: "styled" },
   volcanic:   { label: "Volcanic",      emoji: "🌋", tagline: "Obsidienne craquelée, veines de lave, braises montantes.", category: "styled" },
   abyss:      { label: "Abyss",         emoji: "🐙", tagline: "Abysses océaniques, méduses bioluminescentes, profondeurs.", category: "styled" },
+  eclipse:    { label: "Eclipse",       emoji: "🌑", tagline: "Couronne solaire, anneau de diamant, vide onyx percé d'or.",     category: "styled", premiumSetId: "eclipse" },
+  phantom:    { label: "Phantom Realm", emoji: "👻", tagline: "Brume spectrale, larmes fantômes, volutes argentées flottantes.", category: "styled", premiumSetId: "phantom" },
+  emberforge: { label: "Ember Forge",   emoji: "🔥", tagline: "Forge naine, rivières de braise, cuivre martelé incandescent.",  category: "styled", premiumSetId: "emberforge" },
+  tempus:     { label: "Tempus Aeternum", emoji: "⏳", tagline: "Sables du temps, engrenages antiques, sablier sépia éternel.", category: "styled", premiumSetId: "tempus" },
+  storm:      { label: "Tempest Fury",  emoji: "⚡", tagline: "Foudre déchirante, rideaux de pluie, nuages d'orage grondants.",  category: "styled", premiumSetId: "storm" },
   quartz:     { label: "Quartz",        emoji: "💠", tagline: "Cristaux prismatiques, refractions glaciales, lumière douce.",     category: "styled", premiumSetId: "quartz" },
   custom:     { label: "Mon image",      emoji: "🖼️", tagline: "Ton propre tapis (paysage 3:2, ex. 1500×1000).",     category: "img" },
 };

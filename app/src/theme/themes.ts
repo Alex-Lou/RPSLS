@@ -153,6 +153,66 @@ export const BACKGROUNDS: BackgroundDef[] = [
     accent: { from: "#00e5c8", to: "#6040c0" },
   },
 
+  // ── Eclipse set ──
+  // Total solar eclipse: onyx void, golden corona ring, orbiting diamond-ring
+  // flare, wispy radial streamers. Dark centre keeps menu cards fully legible.
+  {
+    id: "eclipse",   label: "Eclipse",        emoji: "🌑",
+    src: null, scene: "eclipse",              defaultPadId: "eclipse",
+    premiumSetId: "eclipse",
+    skin: { fontHeadline: "cinzel",       fontBody: "cormorant",    fontMono: "jetbrains" },
+    miniature: null,
+    accent: { from: "#d4a745", to: "#8b7fcf" },
+  },
+
+  // ── Phantom set ──
+  // Haunted mist realm: pale lavender-grey void, wandering spectral wisps,
+  // teardrop silhouettes with drip lines, faint floating motes.
+  {
+    id: "phantom",   label: "Phantom Realm",   emoji: "👻",
+    src: null, scene: "phantom",              defaultPadId: "phantom",
+    premiumSetId: "phantom",
+    skin: { fontHeadline: "cinzel",       fontBody: "cormorant",    fontMono: "jetbrains" },
+    miniature: null,
+    accent: { from: "#5a7a9a", to: "#8a9bb5" },
+  },
+
+  // ── Emberforge set ──
+  // Dwarven smithy: deep forge coal, molten ember rivers, pulsing orange
+  // veins, hammered copper texture, rising fire motes.
+  {
+    id: "emberforge", label: "Ember Forge",     emoji: "🔥",
+    src: null, scene: "emberforge",            defaultPadId: "emberforge",
+    premiumSetId: "emberforge",
+    skin: { fontHeadline: "bebas",        fontBody: "rajdhani",     fontMono: "jetbrains" },
+    miniature: null,
+    accent: { from: "#ff6a14", to: "#ff9426" },
+  },
+
+  // ── Tempus set ──
+  // Sands of time: warm sepia dunes, rotating ancient gears, falling sand
+  // grains, hourglass glow, bronze vignette.
+  {
+    id: "tempus",    label: "Tempus Aeternum",  emoji: "⏳",
+    src: null, scene: "tempus",                defaultPadId: "tempus",
+    premiumSetId: "tempus",
+    skin: { fontHeadline: "cinzel",       fontBody: "cormorant",    fontMono: "jetbrains" },
+    miniature: null,
+    accent: { from: "#b8956a", to: "#d4a76a" },
+  },
+
+  // ── Storm set ──
+  // Tempest fury: deep thunderhead sky, rolling clouds, jagged lightning
+  // bolts, electric cyan+purple flash, falling rain curtains.
+  {
+    id: "storm",     label: "Tempest Fury",     emoji: "⚡",
+    src: null, scene: "storm",                 defaultPadId: "storm",
+    premiumSetId: "storm",
+    skin: { fontHeadline: "orbitron",     fontBody: "rajdhani",     fontMono: "jetbrains" },
+    miniature: null,
+    accent: { from: "#4af0ff", to: "#a078ff" },
+  },
+
   // ── Premium sets ──
   // Quartz: crystalline shards refracting prismatic light. SVG/SMIL only —
   // no WebGL context (the splash already owns it). Behaviour-gated: appears
@@ -209,5 +269,10 @@ export const BG_DEFAULT_THEME: Partial<Record<BackgroundId, ThemeId>> = {
   casino:   "forest",
   volcanic: "sunset",
   abyss:    "ocean",
-  quartz:   "quartz",
+  eclipse:    "eclipse",
+  phantom:    "phantom",
+  emberforge: "emberforge",
+  tempus:     "tempus",
+  storm:      "storm",
+  quartz:     "quartz",
 };
