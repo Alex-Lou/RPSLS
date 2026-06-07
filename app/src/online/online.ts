@@ -94,7 +94,10 @@ export type ClientMessage =
   | { type: "ping" }
   | { type: "request_rematch" }
   | { type: "respond_rematch"; accept: boolean }
-  | { type: "sync_state"; state: PlayerProgress };
+  | { type: "sync_state"; state: PlayerProgress }
+  // Lanes pre-match: this client confirms it's ready for the coin flip.
+  // The server only triggers the flip once BOTH sides have sent this.
+  | { type: "prep_ready" };
 
 /* Server → Client */
 export type ServerMessage =
@@ -159,7 +162,15 @@ export type ServerMessage =
       round_wins_a: number;
       round_wins_b: number;
       forfeit: boolean;
-    };
+    }
+  // Lanes pre-match: server's per-perspective readiness tally. `you_ready`
+  // is THIS client's slot; `opp_ready` is the other slot. Sent at prep entry
+  // (both false) and on every `prep_ready` arrival.
+  | { type: "prep_ready_state"; you_ready: boolean; opp_ready: boolean }
+  // Lanes pre-match: both sides confirmed, server has rolled the coin —
+  // `winner` is the slot whose arena dresses the duel. Client uses it to
+  // play the coin animation locally with the authoritative result.
+  | { type: "start_coin_flip"; winner: PlayerSlot };
 
 /* ──────────── URL helpers ──────────── */
 

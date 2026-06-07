@@ -692,6 +692,15 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
             }
         }
 
+        ClientMessage::PrepReady => {
+            // Only meaningful during a lanes match's prep phase; the engine
+            // ignores stray Ready commands once the round loop has started.
+            if let Some(entry) = state.in_lanes.get(&session.id) {
+                let (tx, slot) = entry.value().clone();
+                let _ = tx.send(LanesCommand::Ready { slot });
+            }
+        }
+
         ClientMessage::SyncState { state: progress } => {
             let pid = session.player_id();
             if !pid.is_empty() {
