@@ -88,10 +88,45 @@
   --ink-faint:  color-mix(in oklab, #b6b1c8 70%, var(--theme-primary) 30%);
 }
 
-/* Bloom and Ink are LIGHT scenes whose backgrounds are PALE (sky / paper):
-   the default theme-light ink colours (whiteish) become invisible against
-   them. Override with a dark ink stack + bumped surface opacity so cards
-   read like printed paper instead of ghost text. */
+/* Bloom (2026-06-07) — dropped `light: true` because the backdrop got
+   darkened to a dusky meadow. Now it rides the default dark-glass path,
+   but the default 72% theme-bg surface still lets the meadow bleed through
+   enough to grey out body copy. This override thickens the surfaces (88-
+   95% opaque) AND brightens the ink stack so every text tier stays AA-
+   readable on top of the panel. Fixes Alex's "encore trop illisible". */
+:root[data-premium="bloom"]:not(.theme-light) {
+  --surface:        color-mix(in oklab, var(--theme-bg) 92%, transparent);
+  --surface-2:      color-mix(in oklab, color-mix(in oklab, var(--theme-bg) 92%, var(--theme-primary) 8%) 95%, transparent);
+  --surface-raised: color-mix(in oklab, color-mix(in oklab, var(--theme-bg) 90%, var(--theme-primary) 10%) 97%, transparent);
+  --hairline:        color-mix(in oklab, white 18%, transparent);
+  --hairline-strong: color-mix(in oklab, var(--theme-primary) 55%, transparent);
+  --ink:        #f4f4f7;
+  --ink-muted:  #c8c8d0;
+  --ink-faint:  color-mix(in oklab, #a0a0a8 70%, var(--theme-primary) 30%);
+}
+
+/* Any zinc-* / slate-* / neutral-* / gray-* / stone-* medium-grey text
+   hardcoded by components turns mushy against the mossy bloom panel —
+   bump them all to the brighter ink-muted so labels in cards stay legible
+   (PlayMenu cards, picker cards, leaderboard rows…). */
+:root[data-premium="bloom"]:not(.theme-light) [class*="text-zinc-3"],
+:root[data-premium="bloom"]:not(.theme-light) [class*="text-zinc-4"],
+:root[data-premium="bloom"]:not(.theme-light) [class*="text-zinc-5"],
+:root[data-premium="bloom"]:not(.theme-light) [class*="text-slate-3"],
+:root[data-premium="bloom"]:not(.theme-light) [class*="text-slate-4"],
+:root[data-premium="bloom"]:not(.theme-light) [class*="text-slate-5"],
+:root[data-premium="bloom"]:not(.theme-light) [class*="text-neutral-3"],
+:root[data-premium="bloom"]:not(.theme-light) [class*="text-neutral-4"],
+:root[data-premium="bloom"]:not(.theme-light) [class*="text-gray-3"],
+:root[data-premium="bloom"]:not(.theme-light) [class*="text-gray-4"],
+:root[data-premium="bloom"]:not(.theme-light) [class*="text-stone-3"],
+:root[data-premium="bloom"]:not(.theme-light) [class*="text-stone-4"] {
+  color: #d8d8de !important;
+}
+
+/* Legacy LIGHT-scene overrides for Bloom + Ink (kept for Ink which is
+   still light: true; the bloom selectors below are dead since theme-light
+   no longer applies to bloom but they cost nothing). */
 :root.theme-light[data-premium="bloom"],
 :root.theme-light[data-premium="ink"] {
   --ink:        #1a1a1a;

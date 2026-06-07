@@ -26,27 +26,22 @@
 
 ### P0 — Demandees par Alex, en attente
 
-1. **Bloom shader — 90% fini, reste la generation procedurale des fleurs**
-   - 2026-06-07 device-validated: piques bouts de petales corriges (ellipse SDF
-     `nx² + ny² < 1`, rx ≈ 0.34 × pLen, BloomPad-style), touch FX bloom refait
-     (burst de N petales drift + flux continu pollen/petales sur slide, density
-     scale avec slider intensity). Alex valide ("franchement j'admire").
-   - **RESTE A FAIRE (10%)** : generation/disparition procedurale des fleurs.
-     Aujourd'hui les 5 vines portent toujours la meme fleur a la meme position
-     avec la meme couleur. Alex veut :
-       - cycle de vie (grow → bloom → fade) avec re-spawn a une nouvelle position
-       - variation continue : nb de petales (5/6/7/8), couleur (palette elargie),
-         taille
-       - "d'autres plantes" : ajouter une couche de petites fleurs sauvages au
-         sol, marguerites, tulipes — pas uniquement les 5 vines existantes
-   - Fichier : `app/src/backdrops/shaders/scenes/bloom.glsl.ts` (fonction `bloom`)
-   - Approche shader : seed = hash(vec2(fi, floor(u_time/lifespan + offset)))
-     change de valeur a chaque renouvellement de cycle → tous les params (x, hue,
-     petal count, size) derivent de seed. `phase = fract(...)` puis
-     `grow = smoothstep(0,0.15,phase)` et `fade = smoothstep(0.85,1.0,phase)` →
-     alpha = grow * (1 - fade).
+1. **Bloom shader — DONE (2026-06-07, mergee sur develop)**
+   - SDF ellipse petals (no spikes), touch FX refait (burst N petales + flux
+     continu pollen, density scale slider).
+   - Procedural lifecycle implementé : 5 vines + 10 wildflowers, chacun avec
+     son propre cycle (22-30s vines, 12-16s wildflowers). Hash-seeded
+     re-roll a chaque cycle : position, couleur (6 stops vines + 5 especes
+     sauvages), nb petales 5/6/7/8, taille, rotation. grow→bloom→fade.
+   - Backdrop assombri (sky+meadow dusk), palette HUD bloom mutee
+     (`#c45a86`/`#5f9367`), `light: true` retire de bloom → switch sur
+     dark-glass HUD via `:root[data-premium="bloom"]:not(.theme-light)` :
+     surfaces 92-97% opaques, ink #f4f4f7, ink-muted #c8c8d0, sweep CSS
+     `text-zinc/slate/neutral/gray/stone-3..5` → `#d8d8de !important`.
+   - Fichiers : `app/src/backdrops/shaders/scenes/bloom.glsl.ts`,
+     `app/src/theme/{theme,themes}.ts`, `app/src/App.css`.
 
-2. **Double confirmation online (0/2 → 1/2 → 2/2)**
+2. **Double confirmation online (0/2 → 1/2 → 2/2)** ← **NEXT**
    - Au pile-ou-face en ligne, les 2 joueurs doivent confirmer "pret" avant le lancer
    - Necessite: protocole WS serveur (Rust `crates/rpsls-server/src/main.rs`) + etat client
    - `MatchPrepScreen.tsx` doit afficher le compteur de joueurs prets
