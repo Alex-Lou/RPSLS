@@ -56,7 +56,43 @@ const HOLD_BLOOM_MS = 350;
 const BUBBLE_THROTTLE_MS = 70;
 const SHATTER_HIT_RADIUS_PCT = 6;
 
-export function QuartzInteractiveLayer({ enabled }: { enabled: boolean }) {
+/**
+ * Three operating modes:
+ *  - mode="off"     — layer is invisible-passthrough, no event listening.
+ *  - mode="passive" — layer listens at WINDOW level, NEVER intercepts clicks
+ *                     (pointerEvents stay 'none'). Crystals/bubbles render
+ *                     behind the UI so taps on buttons still register. Used
+ *                     during normal gameplay — the player can play with the
+ *                     backdrop without losing UI tappability.
+ *  - mode="active"  — layer captures pointer events on itself (pointerEvents:
+ *                     auto). Used during the full-screen peek so the
+ *                     interaction is the focus, no UI to compete for taps.
+ */
+export type QuartzLayerMode = "off" | "passive" | "active";
+
+export function QuartzInteractiveLayer({
+  enabled,
+  mode,
+}: {
+  enabled?: boolean;
+  mode?: QuartzLayerMode;
+}) {
+  // Backwards compat: callers passing `enabled` get the binary on/off behaviour;
+  // new callers can pass `mode` for tri-state control.
+  const resolvedMode: QuartzLayerMode = mode ?? (enabled ? "active" : "off");
+  const layerEnabled = resolvedMode !== "off";
+  return (
+    <QuartzInteractiveLayerInner enabled={layerEnabled} mode={resolvedMode} />
+  );
+}
+
+function QuartzInteractiveLayerInner({
+  enabled,
+  mode,
+}: {
+  enabled: boolean;
+  mode: QuartzLayerMode;
+}) {
   const [crystals, setCrystals] = useState<Crystal[]>([]);
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const layerRef = useRef<HTMLDivElement | null>(null);
@@ -188,16 +224,45 @@ export function QuartzInteractiveLayer({ enabled }: { enabled: boolean }) {
     if (holdTimer.current !== null) window.clearTimeout(holdTimer.current);
   }, []);
 
+  // In ACTIVE mode the layer itself receives pointer events (peek view).
+  // In PASSIVE mode we attach to WINDOW so UI elements still receive their
+  // own clicks — the backdrop simply ALSO listens, never intercepts.
+  useEffect(() => {
+    if (mode !== "passive") return;
+    const toEvt = (ev: PointerEvent) => ({
+      clientX: ev.clientX,
+      clientY: ev.clientY,
+    });
+    const handleDown = (e: PointerEvent) =>
+      onDown({ ...toEvt(e), nativeEvent: e } as unknown as React.PointerEvent);
+    const handleMove = (e: PointerEvent) =>
+      onMove({ ...toEvt(e), nativeEvent: e } as unknown as React.PointerEvent);
+    window.addEventListener("pointerdown", handleDown, { passive: true });
+    window.addEventListener("pointermove", handleMove, { passive: true });
+    window.addEventListener("pointerup", onUp, { passive: true });
+    window.addEventListener("pointercancel", onUp, { passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", handleDown);
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [mode, onDown, onMove, onUp]);
+
   return (
     <div
       ref={layerRef}
-      onPointerDown={onDown}
-      onPointerMove={onMove}
-      onPointerUp={onUp}
-      onPointerCancel={onUp}
-      onPointerLeave={onUp}
+      // Active mode: capture pointer events on the layer itself.
+      onPointerDown={mode === "active" ? onDown : undefined}
+      onPointerMove={mode === "active" ? onMove : undefined}
+      onPointerUp={mode === "active" ? onUp : undefined}
+      onPointerCancel={mode === "active" ? onUp : undefined}
+      onPointerLeave={mode === "active" ? onUp : undefined}
       className="absolute inset-0"
-      style={{ pointerEvents: enabled ? "auto" : "none", touchAction: "none" }}
+      style={{
+        pointerEvents: mode === "active" ? "auto" : "none",
+        touchAction: "none",
+      }}
     >
       <AnimatePresence>
         {bubbles.map((b) => <BubbleMark key={b.id} x={b.x} y={b.y} />)}

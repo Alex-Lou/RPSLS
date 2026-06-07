@@ -219,6 +219,72 @@ export function StormPad({ compact = false, ...props }: React.SVGProps<SVGSVGEle
         );
       })}
 
+      {/* ── TESLA COIL EMBLEM — pad signature distinct from the rain/clouds
+            of the backdrop. A central circular coil with an electric core,
+            radial arc discharges, and 6 voltage marks around the rim. ── */}
+      <g transform={`translate(${W/2} ${H/2})`}>
+        {/* Outer voltage ring with 12 marks. */}
+        {Array.from({ length: 12 }).map((_, i) => {
+          const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+          const r1 = 170;
+          const r2 = i % 2 === 0 ? 200 : 184;
+          return (
+            <line key={i}
+              x1={Math.cos(a) * r1} y1={Math.sin(a) * r1}
+              x2={Math.cos(a) * r2} y2={Math.sin(a) * r2}
+              stroke={BOLT} strokeOpacity="0.30" strokeWidth={i % 2 === 0 ? 2 : 1} />
+          );
+        })}
+        <circle r="170" fill="none" stroke={BOLT} strokeOpacity="0.18" strokeWidth="1" />
+        {/* 8 RADIAL ARC DISCHARGES — short zigzag lines radiating outward
+            with strobing opacity per group. */}
+        {[0,1,2,3,4,5,6,7].map((i) => {
+          const a = (i / 8) * Math.PI * 2;
+          const dur = 1.2 + (i % 3) * 0.3;
+          const begin = (i * 0.15).toFixed(2);
+          const x1 = Math.cos(a) * 60;
+          const y1 = Math.sin(a) * 60;
+          const xMid = Math.cos(a) * 90 + Math.sin(a) * 8;
+          const yMid = Math.sin(a) * 90 - Math.cos(a) * 8;
+          const x2 = Math.cos(a) * 130;
+          const y2 = Math.sin(a) * 130;
+          return (
+            <g key={i}>
+              <path d={`M ${x1} ${y1} L ${xMid} ${yMid} L ${x2} ${y2}`}
+                stroke={BOLT} strokeOpacity="0" strokeWidth="1.5" fill="none" strokeLinecap="round">
+                <animate attributeName="stroke-opacity" values="0;0.85;0;0"
+                  keyTimes="0;0.05;0.20;1" dur={`${dur}s`}
+                  begin={`${begin}s`} repeatCount="indefinite" />
+              </path>
+              <path d={`M ${x1} ${y1} L ${xMid} ${yMid} L ${x2} ${y2}`}
+                stroke={PURPLE} strokeOpacity="0" strokeWidth="3" fill="none" strokeLinecap="round">
+                <animate attributeName="stroke-opacity" values="0;0.4;0;0"
+                  keyTimes="0;0.05;0.20;1" dur={`${dur}s`}
+                  begin={`${begin}s`} repeatCount="indefinite" />
+              </path>
+            </g>
+          );
+        })}
+        {/* Inner glowing coil — dark core with pulsing electric ring. */}
+        <circle r="55" fill="#040810" />
+        <circle r="55" fill="none" stroke={BOLT} strokeOpacity="0.45" strokeWidth="1.5">
+          <animate attributeName="r" values="55;60;55" dur="1.4s" repeatCount="indefinite" />
+        </circle>
+        <circle r="42" fill="none" stroke={PURPLE} strokeOpacity="0.30" strokeWidth="1" strokeDasharray="3 4">
+          <animateTransform attributeName="transform" type="rotate"
+            from="0" to="360" dur="12s" repeatCount="indefinite" />
+        </circle>
+        <circle r="28" fill={BOLT} fillOpacity="0.20">
+          <animate attributeName="fill-opacity" values="0.20;0.55;0.20" dur="2.0s" repeatCount="indefinite" />
+        </circle>
+        {/* White-hot central bead with vertical lightning glyph. */}
+        <circle r="10" fill="#fff" fillOpacity="0.55">
+          <animate attributeName="fill-opacity" values="0.40;0.95;0.40" dur="1.0s" repeatCount="indefinite" />
+        </circle>
+        <path d="M -3 -8 L 1 -2 L -1 -1 L 3 7 L -1 1 L 1 0 L -3 -8 Z"
+          fill={BOLT} fillOpacity="0.85" />
+      </g>
+
       {/* Frame — electric cyan double border */}
       <rect x="42" y="42" width={W - 84} height={H - 84} rx="20"
             fill="none" stroke={FRAME} strokeOpacity="0.22" strokeWidth="1.8" />

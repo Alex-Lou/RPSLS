@@ -384,14 +384,18 @@ export function QuartzBackdrop() {
   );
 }
 
-/** Self-positioning wrapper: renders the SVG fill + the optional interactive
- *  layer in a relative container. Used by App.tsx to keep the layer pinned
- *  to the backdrop region (not the whole window). */
+/** Self-positioning wrapper: renders the SVG fill + the tri-state
+ *  interactive layer. `interactive=true` (during peek) hands ALL pointer
+ *  events to the layer — the player IS playing with the backdrop. Outside
+ *  peek the layer runs PASSIVELY: listens at window level so it can react to
+ *  every tap, drag, hold — but pointer-events stay 'none' so UI buttons
+ *  still receive their clicks. This lets curious fingers play with crystals
+ *  in-game WITHOUT killing the menu. */
 export function QuartzBackdropWithLayer({ interactive = false }: { interactive?: boolean }) {
   return (
     <div className="absolute inset-0">
       <QuartzBackdrop />
-      <QuartzInteractiveLayer enabled={interactive} />
+      <QuartzInteractiveLayer mode={interactive ? "active" : "passive"} />
     </div>
   );
 }

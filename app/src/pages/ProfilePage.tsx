@@ -916,41 +916,69 @@ export function ProfilePage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
-              className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black/95"
+              // Dimmed backdrop blur — NOT full-black takeover, the preview
+              // is a CARD popup, not a fullscreen swap. The user sees the
+              // pad at its actual game proportions in a contained frame.
+              className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black/75 backdrop-blur-md px-4"
               onClick={() => setPreviewPad(null)}
             >
-              <div className="w-full max-w-2xl aspect-[3/2] relative pointer-events-none" onClick={(e) => e.stopPropagation()}>
-                <BattlePad padId={previewPad} className="w-full h-full rounded-2xl overflow-hidden" />
-              </div>
-              <div className="flex items-center gap-2 mt-2 text-xs text-ink-faint">
-                <span className="font-bold text-white text-sm">{PAD_META[previewPad]?.label}</span>
-                <span>—</span>
-                <span>{PAD_META[previewPad]?.tagline}</span>
-              </div>
-              <div className="flex gap-3 mt-4 relative z-10" onClick={(e) => e.stopPropagation()}>
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    hapticMatchStart();
-                    updateProfile({ padId: previewPad, padChosen: true });
-                    setPreviewPad(null);
-                  }}
-                  className={
-                    "px-6 py-2.5 rounded-2xl font-bold text-sm shadow-lg transition " +
-                    (player.padId === previewPad
-                      ? "bg-emerald-500/80 text-white"
-                      : "bg-themed text-white")
-                  }
-                >
-                  {player.padId === previewPad ? "✓ Actif" : "Choisir ce tapis"}
-                </motion.button>
-                <button
-                  onClick={() => setPreviewPad(null)}
-                  className="px-5 py-2.5 rounded-2xl font-bold text-sm bg-white/10 text-ink hover:bg-white/15 transition"
-                >
-                  Fermer
-                </button>
-              </div>
+              <motion.div
+                initial={{ scale: 0.94, y: 12, opacity: 0 }}
+                animate={{ scale: 1, y: 0, opacity: 1 }}
+                exit={{ scale: 0.96, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 280, damping: 24 }}
+                onClick={(e) => e.stopPropagation()}
+                // Card with the pad rendered at REAL game proportions (3:2
+                // landscape) — bounded by max-w-md so it never explodes to
+                // fullscreen. The framed border + corner ticks signal "this
+                // is what your table will look like in a match".
+                className="w-full max-w-md rounded-3xl overflow-hidden border border-white/15 bg-zinc-950/85 shadow-2xl"
+              >
+                {/* The pad at its true 3:2 aspect ratio, framed. */}
+                <div className="relative w-full aspect-[3/2] bg-black overflow-hidden">
+                  <BattlePad padId={previewPad} className="absolute inset-0 w-full h-full" />
+                  {/* Subtle corner brackets to telegraph "game table". */}
+                  <div className="pointer-events-none absolute inset-3 border border-white/15 rounded-2xl" />
+                  <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/60 text-white/85 text-[10px] font-bold uppercase tracking-wider">
+                    Aperçu tapis
+                  </span>
+                </div>
+                {/* Label + tagline. */}
+                <div className="p-4 flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base font-black text-white">{PAD_META[previewPad]?.label}</span>
+                    {PAD_META[previewPad]?.premiumSetId && (
+                      <span className="text-[9px] uppercase tracking-wider font-black text-amber-300">✦ Premium</span>
+                    )}
+                  </div>
+                  <span className="text-xs text-ink-muted">{PAD_META[previewPad]?.tagline}</span>
+                </div>
+                {/* Action buttons. */}
+                <div className="px-4 pb-4 flex flex-col gap-2">
+                  <motion.button
+                    whileTap={{ scale: 0.96 }}
+                    onClick={() => {
+                      hapticMatchStart();
+                      updateProfile({ padId: previewPad, padChosen: true });
+                      setPreviewPad(null);
+                    }}
+                    className={
+                      "py-2.5 rounded-xl font-black text-sm uppercase tracking-wider shadow-lg transition " +
+                      (player.padId === previewPad
+                        ? "bg-emerald-500/85 text-white"
+                        : "bg-themed text-white")
+                    }
+                  >
+                    {player.padId === previewPad ? "✓ Tapis actif" : "Choisir ce tapis"}
+                  </motion.button>
+                  <button
+                    onClick={() => setPreviewPad(null)}
+                    className="py-2 rounded-xl font-bold text-xs uppercase tracking-wider bg-white/10 text-ink hover:bg-white/15 transition"
+                  >
+                    Fermer
+                  </button>
+                </div>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>,

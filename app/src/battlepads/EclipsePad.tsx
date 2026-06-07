@@ -197,6 +197,45 @@ export function EclipsePad({ compact = false, ...props }: React.SVGProps<SVGSVGE
         );
       })}
 
+      {/* ── CELESTIAL SEAL — 8-pointed star signature, distinct from the
+            corona ring of the matching backdrop. Reads as "this is the
+            Eclipse PAD" even without context: gold 8-point star + central
+            small diamond + outer dotted dial. ── */}
+      <g transform={`translate(${W/2} ${H/2})`}>
+        {/* Outer dial — 24 small dots around a 230-radius circle. */}
+        {Array.from({ length: 24 }).map((_, i) => {
+          const a = (i / 24) * Math.PI * 2 - Math.PI / 2;
+          return (
+            <circle key={i}
+              cx={Math.cos(a) * 230}
+              cy={Math.sin(a) * 230}
+              r={i % 6 === 0 ? 2.5 : 1.4}
+              fill={GOLD} fillOpacity={i % 6 === 0 ? 0.45 : 0.20} />
+          );
+        })}
+        {/* 8-pointed star — long alternating with short. */}
+        {[0,1,2,3,4,5,6,7].map((i) => {
+          const a = (i / 8) * Math.PI * 2 - Math.PI / 2;
+          const len = i % 2 === 0 ? 95 : 55;
+          const w = i % 2 === 0 ? 9 : 6;
+          const px = Math.cos(a) * len;
+          const py = Math.sin(a) * len;
+          const pxIn = Math.cos(a) * 12;
+          const pyIn = Math.sin(a) * 12;
+          // Perpendicular for the spear base.
+          const perpX = -Math.sin(a) * w;
+          const perpY = Math.cos(a) * w;
+          return (
+            <polygon key={i}
+              points={`${px},${py} ${pxIn+perpX},${pyIn+perpY} ${pxIn-perpX},${pyIn-perpY}`}
+              fill={GOLD} fillOpacity={i % 2 === 0 ? 0.30 : 0.18} />
+          );
+        })}
+        {/* Inner diamond bead. */}
+        <circle r="12" fill={PALE} fillOpacity="0.55" />
+        <circle r="6" fill="#fff" fillOpacity="0.85" />
+      </g>
+
       {/* ── Frame — double gold + silver geometric border ── */}
       <rect x="42" y="42" width={W - 84} height={H - 84} rx="22"
             fill="none" stroke={GOLD} strokeOpacity="0.18" strokeWidth="1.5" />

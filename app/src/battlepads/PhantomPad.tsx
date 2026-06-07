@@ -78,6 +78,47 @@ export function PhantomPad({ compact = false, ...props }: React.SVGProps<SVGSVGE
         );
       })}
 
+      {/* ── SPECTRAL EYE SEAL — pad signature distinct from the backdrop's
+            roaming faces. An ornate vesica piscis (almond) eye with iris,
+            pupil, and outer ectoplasm halo. Reads as "the realm watches" —
+            slow blink keyTimes give it presence. ── */}
+      <g transform={`translate(${W/2} ${H/2})`}>
+        {/* Outer ring of 12 ghost tear-shapes around the eye. */}
+        {Array.from({ length: 12 }).map((_, i) => {
+          const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+          const cx = Math.cos(a) * 180;
+          const cy = Math.sin(a) * 180;
+          return (
+            <g key={i} transform={`translate(${cx} ${cy}) rotate(${(a*180/Math.PI)+90})`}>
+              <ellipse cx="0" cy="0" rx="3" ry="8" fill={WISP} fillOpacity="0.30" />
+            </g>
+          );
+        })}
+        {/* Vesica piscis eye — two circle arcs intersecting. */}
+        <path d="M -110 0 Q 0 -55 110 0 Q 0 55 -110 0 Z"
+              fill="none" stroke={MOTE} strokeOpacity="0.35" strokeWidth="2" />
+        <path d="M -100 0 Q 0 -48 100 0 Q 0 48 -100 0 Z"
+              fill="#0f111a" fillOpacity="0.65" stroke={FRAME} strokeOpacity="0.18" strokeWidth="0.8" />
+        {/* Iris with radial striations. */}
+        <circle r="38" fill={WISP} fillOpacity="0.20" />
+        {[0,1,2,3,4,5,6,7,8,9,10,11].map((i) => {
+          const a = (i / 12) * Math.PI * 2;
+          return (
+            <line key={i}
+              x1={Math.cos(a) * 12} y1={Math.sin(a) * 12}
+              x2={Math.cos(a) * 36} y2={Math.sin(a) * 36}
+              stroke={TEAR} strokeOpacity="0.30" strokeWidth="0.6" />
+          );
+        })}
+        {/* Pupil — slow breath blink. */}
+        <circle r="14" fill="#0a0b12" fillOpacity="0.95" stroke={MOTE} strokeOpacity="0.3" strokeWidth="0.6">
+          <animate attributeName="ry" values="14;1.5;14" keyTimes="0;0.04;0.08"
+            dur="6s" repeatCount="indefinite" />
+        </circle>
+        {/* Tiny highlight bead. */}
+        <circle cx="-4" cy="-4" r="3" fill="#fff" fillOpacity="0.55" />
+      </g>
+
       {/* Frame — cold silver + ghost-white double border */}
       <rect x="44" y="44" width={W - 88} height={H - 88} rx="20"
             fill="none" stroke={FRAME} strokeOpacity="0.14" strokeWidth="1.5" />
