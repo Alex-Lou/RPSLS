@@ -84,7 +84,7 @@ const en: Record<string, string> = {
   "mode.casual": "Casual",
   "mode.casual.tag": "Vs CPU · earn XP",
   "mode.ranked": "Ranked",
-  "mode.ranked.tag": "Vs CPU · LP at stake",
+  "mode.ranked.tag": "Climb the ranks · LP & rewards",
   "mode.hotseat": "Hot-seat",
   "mode.hotseat.tag": "2 players, 1 device",
   "mode.online": "Online",
@@ -642,6 +642,12 @@ const en: Record<string, string> = {
   "theme.emberforge": "Ember Forge",
   "theme.tempus": "Tempus",
   "theme.storm": "Tempest",
+  "theme.coral": "Coral Reef",
+  "theme.rust": "Rust",
+  "theme.void": "Void",
+  "theme.prism": "Prism",
+  "theme.ink": "Ink Sumi-e",
+  "theme.bloom": "Bloom Garden",
 
   // ── Pads ──
   "pad.chalkboard": "Blackboard",

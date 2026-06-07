@@ -84,7 +84,7 @@ const fr: Record<string, string> = {
   "mode.casual": "Détendu",
   "mode.casual.tag": "Vs IA · gagne de l'XP",
   "mode.ranked": "Classé",
-  "mode.ranked.tag": "Vs IA · PR en jeu",
+  "mode.ranked.tag": "Grimpe au classement · PR & récompenses",
   "mode.hotseat": "Hot-seat",
   "mode.hotseat.tag": "2 joueurs, 1 appareil",
   "mode.online": "En ligne",
@@ -633,6 +633,12 @@ const fr: Record<string, string> = {
   "theme.emberforge": "Forge Braise",
   "theme.tempus": "Tempus",
   "theme.storm": "Tempête",
+  "theme.coral": "Récif Corallien",
+  "theme.rust": "Rouille",
+  "theme.void": "Vide",
+  "theme.prism": "Prisme",
+  "theme.ink": "Encre Sumi-e",
+  "theme.bloom": "Floraison",
 
   // ── Pads ──
   "pad.chalkboard": "Tableau noir",
