@@ -39,6 +39,19 @@ Le système de cosmétiques premium (5 sets : **Eclipse, Phantom, Emberforge, Te
 
 ---
 
+## 2ter. ✅ Vague 2 de corrections (post-test device) — toutes vérifiées
+
+Lot suivant, vérifié sur device via CDP. **Critères de vérif à reproduire si tu retouches ces zones :**
+
+- **Flicker de thème au démarrage** → CORRIGÉ. Cause : `mergeServerState` adoptait les cosmétiques serveur dès `server.updatedAt > local.syncedAt` (≈ chaque boot) → le thème changeait en cours de lancement. Fix : le choix LOCAL est la vérité ; le serveur n'est adopté que si le local est **vierge** (`backgroundId` absent / `"default"` = reinstall). **Vérif** : poser un `backgroundId` local, reload, attendre le bootSync → le bg local doit être **inchangé** (test device : `stable:true`).
+- **Peek : le tap confirmait au lieu de tester le tactile** → CORRIGÉ. Le conteneur du peek (`z-[9999]`) avait `onClick={closePeek}`. Fix : conteneur `pointer-events-none` (le tap **traverse** vers les couches tactiles : window-listeners WebGL / Quartz active layer), colonne de boutons `pointer-events-auto`. **Vérif** : ouvrir un peek, dispatch un tap au centre → le peek doit **rester ouvert** (`peekStillOpen:true`) ; seuls Choisir/Acheter/Fermer ferment.
+- **Célébration d'achat qui freeze/lag** → CORRIGÉ. Cause probable : `buy()` déclenche la sérialisation persist (localStorage) de tout le state **sur la même frame** que `setPhase("celebrating")` → jank de la 1ère frame. Fix : démarrer l'anim d'abord, **différer `buy()` de 2 `requestAnimationFrame`** ; particules 28 → **18** + `willChange:transform`. **Vérif** : à l'achat, `particlesWithWillChange===18`, 1 seul contexte WebGL, et le `buy` différé **crédite quand même** (set possédé après). Critère qualité Alex : **60 fps** ressenti pendant le burst.
+- **`ownedPremiumSets` n'était PAS synchronisé serveur** → CORRIGÉ. Les sets premium achetés étaient local-only → un reinstall les perdait (contraire à l'exigence « ne jamais perdre mes achats »). Fix : ajouté `owned_premium_sets` à `PlayerProgress` (serveur Rust + client), mergé en **union** comme les cartes. ⚠️ **Le serveur doit être redéployé (Render)** pour que la persistance prenne effet. **Vérif** : acheter un set, reinstall (ou wipe localStorage + restore anchor), le set doit revenir via le sync.
+
+> ⚠️ **Pièges de vérif récurrents** (apprentissages) : (1) le pilotage device se fait via **CDP / `Runtime.evaluate`** (le tap ADB est bloqué). (2) Mesurer une célébration de 2,2 s avec **deux** appels Node séparés rate la fenêtre (le 2e process démarre trop tard) → faire **un seul eval** `click + await + capture`. (3) `getContext('webgl')` sur un canvas déjà en 2D renvoie `null` → un `gl:false` ne veut pas dire « pas de WebGL ailleurs ». (4) Le merge cosmétique LWW peut **réécraser** un changement local fait via DevTools si tu ne bumpes pas le timestamp — passer par l'UI pour un vrai test.
+
+---
+
 ## 2bis. 🔴 (archive) Diagnostic original des bugs
 
 ### BUG 1 — Crash + restart à l'achat d'un premium
