@@ -39,6 +39,8 @@ uniform int   u_scene;
 uniform vec2  u_touch;     // last touch position, GL coords (y up), in px
 uniform float u_touchAge;  // seconds since the last tap → fades the ripple
 uniform float u_hold;      // eased press duration 0..~1.2 (0 = released)
+uniform float u_swipeMag;  // 0..1 normalised magnitude of last horizontal swipe
+uniform float u_swipeAge;  // seconds since the last horizontal swipe ended
 
 const float PI = 3.14159265;
 
@@ -1002,51 +1004,89 @@ void main(){
       col += vec3(0.0,0.9,0.8) * sin(td*35.0 - age*6.0) * exp(-td*4.0) * exp(-age*2.8) * 0.5;
       col += vec3(1.0,0.3,0.65) * exp(-td*td*60.0) * exp(-age*1.8) * 0.6;
     } else if (u_scene == 9) {
-      // Eclipse → SOLAR FLARE on contact: golden corona radiating + bright
-      // diamond bead + 8 radial flare rays bursting outward.
-      float ang9 = atan(uv.y - tuv.y, (uv.x - tuv.x) * aspect);
-      float rays9 = abs(sin(ang9 * 4.0)) * 0.5 + 0.5;
-      col += vec3(1.0,0.88,0.55) * sin(td*32.0 - age*6.0) * exp(-td*4.2) * exp(-age*2.0) * 0.65;
-      col += vec3(1.0,0.95,0.75) * exp(-td*td*55.0) * exp(-age*1.6) * 0.95;
-      col += vec3(1.0,0.78,0.30) * rays9 * exp(-td*3.8) * exp(-age*2.6) * 0.40;
+      // Eclipse → TAP: small diamond bead glint at touch (subtle, NEVER blinds).
+      //   LONG-PRESS: corona breathes around the touch point (the eclipse
+      //   "exhales" with the held finger).
+      //   SWIPE (u_swipeDx): drags a golden trail across the screen.
+      float h9 = clamp(u_hold, 0.0, 1.0);
+      // Tap: tight golden glint (subtle).
+      col += vec3(1.0,0.92,0.65) * exp(-td*td*90.0) * exp(-age*2.8) * 0.45;
+      // Hold: corona ring growth at touch, breathing.
+      float coronaH = smoothstep(0.012,0.0, abs(td - 0.04 - h9*0.10));
+      col += vec3(1.0,0.78,0.35) * coronaH * h9 * (0.65 + 0.35*sin(u_time*2.5)) * 0.50;
+      // Swipe: a horizontal trail of light across the canvas (dx-driven).
+      float trail9 = exp(-abs((uv.y - tuv.y))*aspect*9.0) * smoothstep(0.0,0.5,u_swipeMag);
+      col += vec3(1.0,0.80,0.35) * trail9 * exp(-u_swipeAge*1.5) * 0.30;
     } else if (u_scene == 10) {
-      // Phantom → a SOUL FLARE emerges at the tap point: ghost-pale glow,
-      // wisp tendril rising upward, soft cyan-lavender halo. Distinct ethereal
-      // signature, NOT a ripple.
-      float wispY = max(0.0, tuv.y - uv.y);          // only above the touch
-      float wispCol = exp(-wispY * 4.5) * exp(-pow((uv.x - tuv.x) * aspect * 18.0, 2.0));
-      col += vec3(0.78,0.85,1.0) * wispCol * exp(-age*1.8) * 0.85;
-      col += vec3(0.92,0.96,1.0) * exp(-td*td*48.0) * exp(-age*1.4) * 0.95;
-      col += vec3(0.55,0.70,0.95) * sin(td*18.0 - age*4.0) * exp(-td*4.2) * exp(-age*2.4) * 0.30;
+      // Phantom → TAP: subtle ghost glow (gentle).
+      //   LONG-PRESS: a soul orb MATERIALISES at the touch, growing with hold.
+      //   SWIPE: parts the mist sideways like curtains in a haunted hall.
+      float h10 = clamp(u_hold, 0.0, 1.0);
+      // Tap: gentle pale halo.
+      col += vec3(0.85,0.92,1.0) * exp(-td*td*60.0) * exp(-age*1.8) * 0.42;
+      // Hold: bright orb GROWS with hold + outer glow.
+      float orbR = 0.025 + h10*0.06;
+      float orb = exp(-pow((td - 0.0)*1.0, 2.0) / (orbR*orbR));
+      col += vec3(0.95,0.98,1.0) * orb * h10 * (0.65 + 0.20*sin(u_time*2.0)) * 0.45;
+      col += vec3(0.55,0.75,0.95) * exp(-td*td*20.0) * h10 * 0.20;
+      // Swipe: a parting curtain — soft horizontal band of bright pixels.
+      float partY = exp(-pow((uv.y - tuv.y)*aspect*4.5, 2.0));
+      col += vec3(0.70,0.85,1.0) * partY * smoothstep(0.0,0.6,u_swipeMag) *
+             exp(-u_swipeAge*1.3) * 0.25;
     } else if (u_scene == 11) {
-      // Emberforge → HAMMER STRIKE at the tap point: blinding white-gold spark
-      // + expanding shockring + 12 radial spark trails (industrial, premium).
-      col += vec3(1.0,0.95,0.65) * exp(-td*td*120.0) * exp(-age*2.2) * 1.6;
-      col += vec3(1.0,0.55,0.10) * smoothstep(0.03,0.0, abs(td - age*0.40)) *
-             exp(-age*2.0) * 1.1;
-      float ang11 = atan(uv.y - tuv.y, (uv.x - tuv.x) * aspect);
-      float sparks = exp(-pow(sin(ang11*6.0)*4.0, 2.0));
-      col += vec3(1.0,0.70,0.15) * sparks * exp(-td*3.0) * exp(-age*3.0) * 0.7;
+      // Emberforge → TAP: gentle ember pop (no blinding spark).
+      //   LONG-PRESS: forge mouth at the touch WIDENS + brightens (you fan
+      //   the coals with your finger). The longer you hold, the bigger the
+      //   blaze.
+      //   SWIPE: trail of sparks follows the finger horizontally.
+      float h11 = clamp(u_hold, 0.0, 1.0);
+      col += vec3(1.0,0.65,0.20) * exp(-td*td*80.0) * exp(-age*2.5) * 0.55;
+      // Hold: a bright forge mouth grows under the touch (warm radial).
+      float forgeR = 0.04 + h11*0.14;
+      float forge = exp(-td*td / (forgeR*forgeR));
+      col += vec3(1.0,0.55,0.10) * forge * h11 * (0.55 + 0.25*sin(u_time*4.0)) * 0.55;
+      col += vec3(1.0,0.85,0.45) * exp(-td*td*200.0) * h11 * 0.40;
+      // Swipe: spark trail (smaller bright dots floating along the swipe).
+      float trailE = exp(-abs(uv.y - tuv.y)*aspect*12.0);
+      col += vec3(1.0,0.70,0.15) * trailE * smoothstep(0.0,0.5,u_swipeMag) *
+             exp(-u_swipeAge*1.8) * 0.30;
     } else if (u_scene == 12) {
-      // Tempus → TIME RIPPLE: sepia sand explosion outward from the touch,
-      // followed by a slower golden bronze wave. Reads as "time bending".
-      col += vec3(0.85,0.55,0.20) * sin(td*24.0 - age*5.0) * exp(-td*4.0) * exp(-age*2.2) * 0.55;
-      col += vec3(0.95,0.78,0.32) * exp(-td*td*40.0) * exp(-age*1.4) * 0.85;
-      // Slow halo expansion — outermost ring.
-      col += vec3(0.65,0.42,0.18) * smoothstep(0.025,0.0, abs(td - age*0.35)) *
-             exp(-age*1.5) * 0.55;
+      // Tempus → TAP: small sepia ripple (calm).
+      //   LONG-PRESS: time SLOWS — bronze glow grows at touch, edges of the
+      //   canvas darken slightly (time fracture).
+      //   SWIPE: sand sweeps in the direction of the swipe (dust trail).
+      float h12 = clamp(u_hold, 0.0, 1.0);
+      col += vec3(0.85,0.55,0.20) * exp(-td*td*55.0) * exp(-age*2.0) * 0.42;
+      // Hold: bronze glow + dusk haze.
+      float fract12 = smoothstep(0.020,0.0, abs(td - h12*0.18));
+      col += vec3(0.85,0.55,0.20) * fract12 * h12 * 0.45;
+      col += vec3(0.95,0.78,0.32) * exp(-td*td*22.0) * h12 * 0.20;
+      // Slight darkening at edges when held (time fracture).
+      col -= vec3(0.04,0.025,0.012) * h12 * smoothstep(0.5, 1.05, length((uv-0.5)*vec2(aspect,1.0)));
+      // Swipe: horizontal dust band.
+      float sandTr = exp(-abs(uv.y - tuv.y)*aspect*7.0);
+      col += vec3(0.75,0.45,0.18) * sandTr * smoothstep(0.0,0.5,u_swipeMag) *
+             exp(-u_swipeAge*1.4) * 0.22;
     } else if (u_scene == 13) {
-      // Storm → LIGHTNING TO TOUCH: vertical bolt strikes from the top down
-      // to the tap point + thunder-flash brightening + bright dot at impact.
+      // Storm → TAP: gentle cloud illumination (no full lightning).
+      //   LONG-PRESS: a bolt CHARGES — bright spot at finger + intensifies →
+      //   when released (age starts climbing), the bolt STRIKES.
+      //   SWIPE: rain visibly DRIVEN in the swipe direction (wind).
+      float h13 = clamp(u_hold, 0.0, 1.0);
+      // Tap: soft cyan cloud illumination at touch.
+      col += vec3(0.30,0.55,0.85) * exp(-td*td*30.0) * exp(-age*2.5) * 0.50;
+      // Hold: charging glow at finger.
+      col += vec3(0.55,0.75,1.0) * exp(-td*td*180.0) * h13 * (0.55 + 0.25*sin(u_time*8.0)) * 0.55;
+      // Release strike: only fires when age is fresh AND came after a charge.
       float boltDist = abs((uv.x - tuv.x) * aspect);
-      float boltCol = exp(-boltDist * 70.0) *
-                      smoothstep(1.0, tuv.y, uv.y);
-      col += vec3(0.55,0.85,1.0) * boltCol * smoothstep(0.0,0.05,age) * exp(-age*4.5) * 1.7;
-      col += vec3(0.80,0.55,1.0) * boltCol * exp(-age*3.5) * 0.8;
-      // Flash brightens whole frame for ~0.1s.
-      col += vec3(0.40,0.55,0.85) * exp(-age*16.0) * 0.55;
-      // Bright pop at impact.
-      col += vec3(1.0,0.92,0.78) * exp(-td*td*110.0) * exp(-age*4.0) * 1.4;
+      float boltMask = exp(-boltDist * 60.0) * smoothstep(1.0, tuv.y, uv.y);
+      col += vec3(0.55,0.85,1.0) * boltMask * smoothstep(0.0,0.05,age) *
+             exp(-age*5.0) * 0.85;
+      col += vec3(0.95,0.95,0.85) * exp(-td*td*100.0) * exp(-age*5.0) * 0.65;
+      // Swipe: wind-driven rain band (visible bright band drifting with swipe).
+      float windBand = exp(-abs(uv.y - tuv.y)*aspect*5.0);
+      col += vec3(0.55,0.70,0.95) * windBand * smoothstep(0.0,0.4,u_swipeMag) *
+             exp(-u_swipeAge*1.3) * 0.22;
     } else {
       // Galaxy / Nebula / Aurora / Casino → a soft universal ripple.
       col += vec3(0.80,0.85,1.0) * sin(td*26.0 - age*7.0) * exp(-td*4.8) * exp(-age*2.6) * 0.35;
@@ -1093,12 +1133,20 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
     let uTouch: WebGLUniformLocation | null = null;
     let uTouchAge: WebGLUniformLocation | null = null;
     let uHold: WebGLUniformLocation | null = null;
+    let uSwipeMag: WebGLUniformLocation | null = null;
+    let uSwipeAge: WebGLUniformLocation | null = null;
     let running = false;
     let start = performance.now();
     let last = 0;
     // Touch state for the per-scene backdrop interaction.
     let touchX = -1e6, touchY = -1e6, touchDownAt = -1e6, hold = 0;
     let pressing = false;
+    // Swipe detection — horizontal-dominant move that DOESN'T conflict with
+    // vertical scroll. Recorded on pointer move; magnitude normalised to
+    // [0,1] over half a viewport width.
+    let downX = 0, downY = 0, swipeMag = 0, swipeEndedAt = -1e6;
+    const SWIPE_TRIGGER_PX = 36;  // dead-zone before counting as swipe
+    let swipeArmed = false;
 
     const resize = () => {
       if (!gl) return;
@@ -1150,6 +1198,8 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
       uTouch = gl.getUniformLocation(prog, "u_touch");
       uTouchAge = gl.getUniformLocation(prog, "u_touchAge");
       uHold = gl.getUniformLocation(prog, "u_hold");
+      uSwipeMag = gl.getUniformLocation(prog, "u_swipeMag");
+      uSwipeAge = gl.getUniformLocation(prog, "u_swipeAge");
       const uScene = gl.getUniformLocation(prog, "u_scene");
       uSceneRef.current = uScene;
       gl.uniform1i(uScene, SCENE_INDEX[sceneRef.current]);
@@ -1175,6 +1225,10 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
         gl.uniform2f(uTouch, touchX, touchY);
         gl.uniform1f(uTouchAge, (now - touchDownAt) / 1000);
         gl.uniform1f(uHold, hold);
+        gl.uniform1f(uSwipeMag, swipeMag);
+        gl.uniform1f(uSwipeAge, (now - swipeEndedAt) / 1000);
+        // Swipe magnitude fades to zero gradually so the trail tail dies out.
+        swipeMag = Math.max(0, swipeMag - dt * 1.2);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
       }
       rafRef.current = requestAnimationFrame(frame);
@@ -1201,15 +1255,46 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
     canvas.addEventListener("webglcontextrestored", onRestored as EventListener, false);
     window.addEventListener("resize", resize);
 
-    // Touch interaction → feed finger position (GL y-up) + press state to the
-    // shader. Listened on window since the canvas is pointer-events:none.
+    // Touch interaction → feed finger position (GL y-up) + press state + swipe
+    // magnitude to the shader. Listened on window since the canvas is
+    // pointer-events:none. Swipe detection: arms only when horizontal motion
+    // dominates vertical (|dx| > |dy|*1.2) AND exceeds a dead-zone. This way
+    // a vertical scroll on a menu list NEVER triggers a backdrop swipe.
     const setTouch = (e: PointerEvent) => {
       touchX = e.clientX * dpr;
       touchY = canvas.height - e.clientY * dpr;
     };
-    const onTDown = (e: PointerEvent) => { setTouch(e); touchDownAt = performance.now(); pressing = true; startLoop(); };
-    const onTMove = (e: PointerEvent) => { if (pressing) setTouch(e); };
-    const onTUp = () => { pressing = false; };
+    const onTDown = (e: PointerEvent) => {
+      setTouch(e);
+      touchDownAt = performance.now();
+      pressing = true;
+      downX = e.clientX;
+      downY = e.clientY;
+      swipeArmed = false;
+      startLoop();
+    };
+    const onTMove = (e: PointerEvent) => {
+      if (pressing) {
+        setTouch(e);
+        const dx = e.clientX - downX;
+        const dy = e.clientY - downY;
+        if (!swipeArmed && Math.abs(dx) > SWIPE_TRIGGER_PX &&
+            Math.abs(dx) > Math.abs(dy) * 1.2) {
+          swipeArmed = true;
+        }
+        if (swipeArmed) {
+          // Magnitude rises with absolute horizontal displacement, capped at
+          // half-viewport-width for a clean [0,1] range. Sign isn't tracked
+          // — the shader uses magnitude only (per-scene direction is implicit).
+          swipeMag = Math.min(1, Math.abs(dx) / (window.innerWidth * 0.5));
+        }
+      }
+    };
+    const onTUp = () => {
+      pressing = false;
+      if (swipeArmed) swipeEndedAt = performance.now();
+      swipeArmed = false;
+    };
     window.addEventListener("pointerdown", onTDown, { passive: true });
     window.addEventListener("pointermove", onTMove, { passive: true });
     window.addEventListener("pointerup", onTUp, { passive: true });

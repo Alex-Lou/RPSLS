@@ -90,8 +90,41 @@ export function ProfilePage() {
   // Guards the ghost-click: the same tap that opens the peek must not be the
   // one that dismisses it. We ignore dismiss taps for a short window.
   const peekOpenedAt = useRef(0);
-  const openPeek = () => { peekOpenedAt.current = performance.now(); setPeek(true); };
-  const closePeek = () => { setPeek(false); };
+  /** Backdrop state snapshot taken BEFORE entering peek. Used to revert when
+   *  the user closes the peek without confirming (e.g. tapped a non-premium
+   *  thumbnail to "try it on" then changed their mind). Premium-not-owned
+   *  peeks also rely on this — they preview the bg without committing it,
+   *  and the snapshot lets us roll back if the user doesn't buy. */
+  const previousLookRef = useRef<{
+    backgroundId?: BackgroundId;
+    padId?: PadId;
+    themeId?: ThemeId;
+  } | null>(null);
+  /** Set when the peek is showing a premium scene the player DOESN'T own.
+   *  In that mode the bottom-of-screen control bar swaps "Choisir" for
+   *  "Acheter" + a price tag, and closing the peek WITHOUT buying reverts
+   *  to the previous look. */
+  const [peekPremiumPending, setPeekPremiumPending] = useState<string | null>(null);
+  const openPeek = () => {
+    peekOpenedAt.current = performance.now();
+    setPeek(true);
+  };
+  /** Confirm + close: the bg has already been applied (or is the pre-peek
+   *  look if peekPremiumPending), nothing else to do. */
+  const confirmPeek = () => {
+    previousLookRef.current = null;
+    setPeekPremiumPending(null);
+    setPeek(false);
+  };
+  /** Cancel + close: revert to the previous look if we have a snapshot. */
+  const closePeek = () => {
+    if (previousLookRef.current) {
+      updateProfile(previousLookRef.current);
+      previousLookRef.current = null;
+    }
+    setPeekPremiumPending(null);
+    setPeek(false);
+  };
   // Never leave the shell hidden if the page unmounts while peeking.
   useEffect(() => () => setPeek(false), [setPeek]);
   const currentBg = BACKGROUNDS.find((b) => b.id === (player.backgroundId ?? "default"));
@@ -495,26 +528,40 @@ export function ProfilePage() {
                       bgFileRef.current?.click();
                       return;
                     }
+                    previousLookRef.current = {
+                      backgroundId: player.backgroundId,
+                      padId: player.padId,
+                      themeId: player.themeId,
+                    };
                     updateProfile({ backgroundId: "custom" });
                     openPeek();
                     return;
                   }
-                  // Premium gate: if the bg belongs to a premium set the player
-                  // doesn't yet own, open the purchase modal instead of applying.
-                  if (bg.premiumSetId && !(player.ownedPremiumSets ?? []).includes(bg.premiumSetId)) {
-                    setPremiumModalSetId(bg.premiumSetId);
-                    return;
-                  }
-                  // Apply instantly (selection can never fail), then open a
-                  // full-screen peek of the now-live animated backdrop. Picking
-                  // a background auto-applies its matched pad + HUD palette so
-                  // the whole look stays coherent (still overridable after).
+                  // Snapshot BEFORE applying so the peek can revert on cancel.
+                  previousLookRef.current = {
+                    backgroundId: player.backgroundId,
+                    padId: player.padId,
+                    themeId: player.themeId,
+                  };
+                  // Premium PREVIEW: when the player doesn't own this set yet,
+                  // we STILL apply the bg+pad+theme temporarily so the peek
+                  // shows the actual scene at full screen — but mark the peek
+                  // as "premium pending" so its button bar swaps "Choisir" for
+                  // "Acheter" + a price tag, and closing without buying reverts.
+                  const isPremiumLocked =
+                    !!bg.premiumSetId &&
+                    !(player.ownedPremiumSets ?? []).includes(bg.premiumSetId);
                   hapticMatchStart();
                   const patch: Partial<{ backgroundId: BackgroundId; padId: PadId; themeId: ThemeId }> = { backgroundId: bg.id };
                   if (bg.defaultPadId) patch.padId = bg.defaultPadId;
                   const matchedTheme = BG_DEFAULT_THEME[bg.id];
                   if (matchedTheme) patch.themeId = matchedTheme;
                   updateProfile(patch);
+                  if (isPremiumLocked) {
+                    setPeekPremiumPending(bg.premiumSetId!);
+                  } else {
+                    setPeekPremiumPending(null);
+                  }
                   openPeek();
                 }}
                 className={
@@ -931,20 +978,74 @@ export function ProfilePage() {
                 closePeek();
               }}
             >
-              <div className="flex flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
+              <div className="flex flex-col items-center gap-3 max-w-md w-full px-6" onClick={(e) => e.stopPropagation()}>
+                {/* Header pill: name + appliqué/aperçu state. */}
                 <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/55 backdrop-blur-md border border-white/15">
-                  <span className="text-emerald-400 text-sm font-black">✓</span>
-                  <span className="font-bold text-white text-sm drop-shadow">{currentBg?.label ?? "Fond"}</span>
-                  <span className="text-cyan-300 text-[11px] font-bold uppercase tracking-wide">appliqué</span>
+                  {peekPremiumPending ? (
+                    <>
+                      <span className="text-amber-300 text-sm font-black">✦</span>
+                      <span className="font-bold text-white text-sm drop-shadow">{currentBg?.label ?? "Fond"}</span>
+                      <span className="text-amber-300 text-[11px] font-bold uppercase tracking-wide">aperçu premium</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-emerald-400 text-sm font-black">✓</span>
+                      <span className="font-bold text-white text-sm drop-shadow">{currentBg?.label ?? "Fond"}</span>
+                      <span className="text-cyan-300 text-[11px] font-bold uppercase tracking-wide">appliqué</span>
+                    </>
+                  )}
                 </div>
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onClick={closePeek}
-                  className="px-8 py-3 rounded-2xl font-bold text-base shadow-xl bg-themed text-white"
-                >
-                  Fermer l'aperçu
-                </motion.button>
-                <span className="text-white/55 text-[11px]">Touche l'écran pour revenir</span>
+                {/* Button row — content depends on premium-locked vs applied. */}
+                {peekPremiumPending ? (
+                  <div className="flex flex-col gap-2 w-full">
+                    <motion.button
+                      whileTap={{ scale: 0.96 }}
+                      onClick={() => {
+                        // Open the purchase modal ON TOP of the peek. After purchase,
+                        // CelebrationOverlay fires inside the modal; on close we
+                        // confirmPeek() since the player now owns the set.
+                        if (peekPremiumPending) setPremiumModalSetId(peekPremiumPending);
+                      }}
+                      className="w-full py-3 rounded-2xl font-black text-base uppercase tracking-wider shadow-xl bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 text-zinc-900"
+                    >
+                      ✦ Acheter ce thème
+                    </motion.button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <motion.button
+                        whileTap={{ scale: 0.96 }}
+                        onClick={confirmPeek}
+                        className="py-2.5 rounded-xl font-bold text-sm bg-white/10 border border-white/20 text-white"
+                      >
+                        Garder l'aperçu
+                      </motion.button>
+                      <motion.button
+                        whileTap={{ scale: 0.96 }}
+                        onClick={closePeek}
+                        className="py-2.5 rounded-xl font-bold text-sm bg-white/5 border border-white/15 text-white/85"
+                      >
+                        Fermer
+                      </motion.button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2 w-full">
+                    <motion.button
+                      whileTap={{ scale: 0.96 }}
+                      onClick={confirmPeek}
+                      className="py-3 rounded-2xl font-black text-sm uppercase tracking-wider shadow-xl bg-themed text-white"
+                    >
+                      ✓ Choisir ce thème
+                    </motion.button>
+                    <motion.button
+                      whileTap={{ scale: 0.96 }}
+                      onClick={closePeek}
+                      className="py-3 rounded-2xl font-bold text-sm uppercase tracking-wider bg-white/10 border border-white/20 text-white"
+                    >
+                      Fermer
+                    </motion.button>
+                  </div>
+                )}
+                <span className="text-white/55 text-[11px]">Touche pour revenir · Glisse pour interagir</span>
               </div>
             </motion.div>
           )}

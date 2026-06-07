@@ -191,13 +191,17 @@ export default function App() {
   const activeScene = activeBg?.scene;
   const premiumScene = activeBg?.premiumScene;
   const isLightBg = activeBg?.light === true;
+  const isFlashyBg = activeBg?.flashy === true;
 
-  // Toggle the global `theme-light` class on <html> so App.css can darken
-  // text + thicken surfaces when a pastel backdrop (Quartz) is active.
-  // Pure CSS swap — no React re-render on every menu page.
+  // Toggle the global `theme-light` / `theme-flashy` classes on <html> so
+  // App.css can darken text + thicken surfaces when a pastel backdrop
+  // (Quartz) or a high-contrast flashy backdrop (Storm, Aurora, Galaxy,
+  // Holy, Casino, Neon Grid) is active. Pure CSS swap — no React re-render
+  // on every menu page.
   useEffect(() => {
     document.documentElement.classList.toggle("theme-light", isLightBg);
-  }, [isLightBg]);
+    document.documentElement.classList.toggle("theme-flashy", isFlashyBg);
+  }, [isLightBg, isFlashyBg]);
 
   return (
     <div className="h-full w-full select-none overflow-hidden">

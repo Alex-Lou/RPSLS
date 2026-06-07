@@ -55,6 +55,13 @@ export interface BackgroundDef {
    *  bump card opacity + text contrast — the default dark-glass surfaces
    *  blur out against Quartz-style pastels. */
   light?: boolean;
+  /** True when the scene has FREQUENT bright flashes, lots of motion, or
+   *  high-contrast highlights (Storm lightning, Galaxy stars, Holy beams,
+   *  Aurora curtains, Casino sparkles, Grid neon). App.tsx adds a
+   *  `theme-flashy` class so menu surfaces thicken up + ink darkens
+   *  slightly and headline weight bumps, keeping text legible against the
+   *  busier backdrop. */
+  flashy?: boolean;
   /** When true, this entry is the player's OWN uploaded image (stored as a
    *  data URL on the player). App.tsx paints player.customBgUrl. */
   custom?: boolean;
@@ -98,6 +105,7 @@ export const BACKGROUNDS: BackgroundDef[] = [
   {
     id: "galaxy",    label: "Galaxy",         emoji: "✨",
     src: null, scene: "galaxy",               defaultPadId: "galaxy",
+    flashy: true,
     skin: { fontHeadline: "audiowide",    fontBody: "exo2",         fontMono: "spaceMono"  },
     miniature: null,
     accent: { from: "#a855f7", to: "#22d3ee" },
@@ -105,6 +113,7 @@ export const BACKGROUNDS: BackgroundDef[] = [
   {
     id: "aurora",    label: "Aurora",         emoji: "🌠",
     src: null, scene: "aurora",               defaultPadId: "cosmos",
+    flashy: true,
     skin: { fontHeadline: "exo2",         fontBody: "rajdhani",     fontMono: "spaceMono"  },
     miniature: null,
     accent: { from: "#34d399", to: "#8b5cf6" },
@@ -112,6 +121,7 @@ export const BACKGROUNDS: BackgroundDef[] = [
   {
     id: "holy",      label: "Holy",           emoji: "✝️",
     src: null, scene: "holy",                 defaultPadId: "holy",
+    flashy: true,
     skin: { fontHeadline: "cinzel",       fontBody: "cormorant",    fontMono: "imFell"     },
     miniature: null,
     accent: { from: "#fbbf24", to: "#6366f1" },
@@ -126,6 +136,7 @@ export const BACKGROUNDS: BackgroundDef[] = [
   {
     id: "grid",      label: "Neon Grid",      emoji: "🌐",
     src: null, scene: "grid",                 defaultPadId: "neon",
+    flashy: true,
     skin: { fontHeadline: "orbitron",     fontBody: "rajdhani",     fontMono: "shareTech"  },
     miniature: null,
     accent: { from: "#06b6d4", to: "#f0abfc" },
@@ -133,6 +144,7 @@ export const BACKGROUNDS: BackgroundDef[] = [
   {
     id: "casino",    label: "Casino Royale",  emoji: "🎰",
     src: null, scene: "casino",               defaultPadId: "casino",
+    flashy: true,
     skin: { fontHeadline: "playfair",     fontBody: "cormorant",    fontMono: "bebas"      },
     miniature: null,
     accent: { from: "#10b981", to: "#f5c543" },
@@ -208,6 +220,7 @@ export const BACKGROUNDS: BackgroundDef[] = [
     id: "storm",     label: "Tempest Fury",     emoji: "⚡",
     src: null, scene: "storm",                 defaultPadId: "storm",
     premiumSetId: "storm",
+    flashy: true,
     skin: { fontHeadline: "orbitron",     fontBody: "rajdhani",     fontMono: "jetbrains" },
     miniature: null,
     accent: { from: "#4af0ff", to: "#a078ff" },
