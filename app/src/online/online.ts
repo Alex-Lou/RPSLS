@@ -219,6 +219,24 @@ function nextReconnectDelay(attempt: number): number {
   return jitter(Math.min(raw, BACKOFF_MAX_MS));
 }
 
+/** Send-queue cap. Past this, the OLDEST entry is dropped (sliding window),
+ *  so a long outage can't grow the queue unbounded. 32 is far above the
+ *  burst a normal user produces (a few moves per round). */
+const SEND_QUEUE_MAX = 32;
+/** Send-queue TTL. A queued message older than this is dropped on flush —
+ *  the server would have moved past it anyway (e.g. a `prep_ready` from a
+ *  match that already forfeited). 10s covers most reconnects without
+ *  letting stale moves leak into a new round. */
+const SEND_QUEUE_TTL_MS = 10_000;
+
+/** Wire-level message types that are SAFE to drop silently when the socket
+ *  is down — keep-alive / ephemeral telemetry. They'd land stale on flush
+ *  with no value, and queueing them would push real game messages out of
+ *  the FIFO window. */
+function isDroppableOffline(msg: ClientMessage): boolean {
+  return msg.type === "ping";
+}
+
 export class OnlineClient {
   private ws: WebSocket | null = null;
   private listeners = new Set<Listener>();
@@ -227,6 +245,10 @@ export class OnlineClient {
   private closedByUser = false;
   private lastUrl: string | null = null;
   private reconnectAttempt = 0;
+  /** FIFO buffer of messages enqueued while the socket was NOT open. Flushed
+   *  in order on the next `open` event (initial connect AND reconnect).
+   *  Each entry stamps an enqueue time so we can drop stale ones at flush. */
+  private sendQueue: Array<{ msg: ClientMessage; at: number }> = [];
   /** Last seen connection state. */
   status: "idle" | "connecting" | "open" | "reconnecting" | "closed" | "error" = "idle";
   onStatus?: (s: OnlineClient["status"]) => void;
@@ -273,6 +295,11 @@ export class OnlineClient {
           if (this.pingTimer) clearInterval(this.pingTimer);
           this.pingTimer = setInterval(() => this.send({ type: "ping" }), 25_000);
           if (wasReconnect) this.onReconnect?.();
+          // Flush AFTER onReconnect so the consumer (OnlinePage) re-issues
+          // `hello` first — the server expects identity to land before any
+          // gameplay messages. The flush is FIFO with a TTL drop so a long
+          // outage doesn't replay stale moves into a fresh state.
+          this.flushSendQueue();
           resolve();
         };
         ws.onerror = () => {
@@ -340,6 +367,38 @@ export class OnlineClient {
   send(msg: ClientMessage): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(msg));
+      return;
+    }
+    // Offline / mid-reconnect — drop telemetry, queue everything else FIFO
+    // with a sliding-window cap so a long outage stays bounded.
+    if (isDroppableOffline(msg)) return;
+    if (this.sendQueue.length >= SEND_QUEUE_MAX) {
+      this.sendQueue.shift();
+    }
+    this.sendQueue.push({ msg, at: Date.now() });
+  }
+
+  /** Replay the send queue in order. Called from `onopen` after a reconnect.
+   *  TTL-drop ensures stale messages from a long-dead match never poison the
+   *  reconnected session — the server's per-state guards would ignore them
+   *  anyway, but flushing them wastes bandwidth and could pin the
+   *  per-session rate limit. */
+  private flushSendQueue(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    if (this.sendQueue.length === 0) return;
+    const now = Date.now();
+    const pending = this.sendQueue;
+    this.sendQueue = [];
+    for (const { msg, at } of pending) {
+      if (now - at > SEND_QUEUE_TTL_MS) continue;
+      try {
+        this.ws.send(JSON.stringify(msg));
+      } catch {
+        // Re-enqueue at the head if the socket died mid-flush — next reconnect
+        // will retry. Capping the queue at MAX still applies.
+        this.sendQueue.unshift({ msg, at });
+        break;
+      }
     }
   }
 
@@ -361,6 +420,8 @@ export class OnlineClient {
       clearInterval(this.pingTimer);
       this.pingTimer = null;
     }
+    // User-initiated disconnect — anything still queued is now irrelevant.
+    this.sendQueue = [];
     this.setStatus("closed");
   }
 
