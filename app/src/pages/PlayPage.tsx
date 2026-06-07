@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
-import { GameMode, type BackgroundId, type PadId, type ThemeId } from "../types";
+import { GameMode } from "../types";
 import { type DailyChallenge } from "../engine/daily";
 import type { Page } from "../Sidebar";
 import { UserHeader } from "../UserHeader";
@@ -14,6 +14,7 @@ import { DeckManager } from "../ranked/DeckManager";
 import { MatchPrepScreen, type Arena } from "../ranked/MatchPrepScreen";
 import { ArenaPadProvider } from "../ranked/arena";
 import { useArenaOverride } from "../ranked/arenaOverride";
+import { oppPersona } from "../ranked/personaSeed";
 import { applyTheme } from "../theme/theme";
 import { levelFromXp } from "../engine/leveling";
 import { Game } from "./play/PlayGame";
@@ -35,24 +36,6 @@ type View =
   | { kind: "classe_lobby" }
   | { kind: "classe_bracket" }
   | { kind: "classe_match"; oppName: string; oppAvatar: string };
-
-/** Deterministic theme + pad + backdrop persona for a CPU opponent, seeded
- *  by name so the same opponent always shows the same arena (used by the
- *  coin-flip arena swap). Backdrops are picked from the FREE coded scenes
- *  so a "ceding the field" never depends on the opponent owning a premium
- *  set the player can't see. */
-const PERSONA_THEMES: ThemeId[] = ["violet", "neon", "sunset", "forest", "ocean", "ember", "aurora", "gold", "cyber", "rose"];
-const PERSONA_PADS: PadId[] = ["chalkboard", "vintage", "cosmos", "galaxy", "neon", "comics", "cyberpunk", "holy", "quantum", "casino"];
-const PERSONA_BGS: BackgroundId[] = ["nebula", "galaxy", "aurora", "holy", "quantum", "grid", "casino", "volcanic", "abyss"];
-function oppPersona(name: string): { themeId: ThemeId; padId: PadId; backgroundId: BackgroundId } {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  return {
-    themeId: PERSONA_THEMES[h % PERSONA_THEMES.length],
-    padId: PERSONA_PADS[(h >> 3) % PERSONA_PADS.length],
-    backgroundId: PERSONA_BGS[(h >> 7) % PERSONA_BGS.length],
-  };
-}
 
 export function PlayPage({
   onNavigate, homeNonce,

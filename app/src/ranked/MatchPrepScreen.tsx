@@ -10,6 +10,19 @@
  *
  * The winning side's `{ themeId, padId }` is handed back via `onReady` and
  * applied as a MATCH-SCOPED override (never persisted) by the caller.
+ *
+ * Two modes:
+ *  - LOCAL (default, no `online` prop): the user controls the coin entirely.
+ *    Tapping "Lancer la pièce" rolls a `Math.random()` and starts the flip
+ *    animation. Used in the local tournament against an AI persona.
+ *  - ONLINE (`online` prop set): both players must press "Je suis prêt"
+ *    first. The counter ticks 0/2 → 1/2 → 2/2 as the server broadcasts
+ *    `prep_ready_state`. When both are ready, the server rolls the coin
+ *    server-side and sends `start_coin_flip { winner }`; the parent then
+ *    sets `online.coinWinner`, which triggers the animation here with the
+ *    authoritative result (never `Math.random()` locally — would desync
+ *    the two clients). The parent navigates onward when `lanes_round_start`
+ *    arrives; this screen never calls `onReady` in online mode.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -32,10 +45,28 @@ export interface Arena {
   backgroundId: BackgroundId;
 }
 
+/** Wiring for online double-confirmation mode. When supplied, the screen
+ *  hides the local coin trigger and instead drives the flip from server
+ *  events. */
+export interface OnlinePrep {
+  /** True once THIS player has sent `prep_ready`. */
+  youReady: boolean;
+  /** True once the opponent has sent `prep_ready`. */
+  oppReady: boolean;
+  /** Side that won the coin (translated from the server's `start_coin_flip`
+   *  PlayerSlot into this client's perspective). `null` until the server
+   *  has sent it — animation stays idle. */
+  coinWinner: "you" | "opp" | null;
+  /** Send `prep_ready` to the server. Called when the user taps the ready
+   *  button; idempotent on the server side, so the screen doesn't enforce
+   *  one-shot behaviour. */
+  onReady: () => void;
+}
+
 export function MatchPrepScreen({
   youName, youAvatar, youThemeId, youBackgroundId,
   oppName, oppAvatar, oppThemeId, oppPadId, oppBackgroundId,
-  onReady, onBack,
+  onReady, onBack, online,
 }: {
   youName: string;
   youAvatar: string;
@@ -50,6 +81,9 @@ export function MatchPrepScreen({
   oppBackgroundId: BackgroundId;
   onReady: (arena: Arena) => void;
   onBack: () => void;
+  /** When supplied, switches the screen into double-confirm + server-driven
+   *  coin-flip mode. Omit for the local AI-tournament flow. */
+  online?: OnlinePrep;
 }) {
   // Deck is prepared earlier (in the ranked lobby), so this screen is just
   // the coin flip for the arena — no deck management here.
@@ -61,6 +95,9 @@ export function MatchPrepScreen({
 
   const youTheme = THEMES[youThemeId];
   const oppTheme = THEMES[oppThemeId];
+
+  const isOnline = !!online;
+  const readyCount = isOnline ? (online!.youReady ? 1 : 0) + (online!.oppReady ? 1 : 0) : 0;
 
   // Track the in-flight timers so they get cancelled on unmount and on a
   // fresh flip(). The previous version returned a cleanup function from
@@ -74,11 +111,11 @@ export function MatchPrepScreen({
   };
   useEffect(() => () => clearFlipTimers(), []);
 
-  function flip() {
-    if (phase === "flipping") return;
+  /** Shared animation driver. Local mode rolls the result; online mode is
+   *  handed an authoritative result from the server. */
+  function startFlip(result: "you" | "opp") {
     clearFlipTimers();
     hapticTick();
-    const result: "you" | "opp" = Math.random() < 0.5 ? "you" : "opp";
     setWinner(result);
     setPhase("flipping");
     // Snappier toss — 1.6s feels punchy without dragging. One mid-toss tick
@@ -91,11 +128,25 @@ export function MatchPrepScreen({
     flipTimersRef.current = [t1, t2];
   }
 
+  function flip() {
+    if (phase === "flipping") return;
+    startFlip(Math.random() < 0.5 ? "you" : "opp");
+  }
+
   function concede() {
     hapticTick();
     setWinner("opp");
     setPhase("landed");
   }
+
+  // Online mode: kick off the local animation when the server tells us who
+  // won. Guard on `phase === "idle"` so a late re-render with the same coin
+  // result doesn't restart the animation mid-flight.
+  useEffect(() => {
+    if (!isOnline) return;
+    const w = online!.coinWinner;
+    if (w && phase === "idle") startFlip(w);
+  }, [isOnline, online?.coinWinner, phase]);
 
   function start() {
     hapticTap();
@@ -157,8 +208,39 @@ export function MatchPrepScreen({
                   ? "Tes couleurs et ton pad habillent le duel."
                   : "Tu joues sur le terrain adverse — adapte-toi."}
               </div>
+              {/* Local mode: the "AI" is implicitly ready; online mode: we
+                  already know the opponent confirmed (otherwise the coin
+                  wouldn't have flipped). Either way, a discreet ✓ line. */}
               <div className="text-[10px] text-emerald-300 font-bold mt-1">✓ {oppName} est prêt</div>
             </motion.div>
+          ) : isOnline ? (
+            // Online prep idle/flipping hint: explain the gate to the user
+            // ("waiting on the other side") rather than the abstract coin.
+            <div key="online-hint" className="text-center">
+              <p className="text-[11px] text-ink-faint max-w-xs">
+                {phase === "flipping"
+                  ? "La pièce tourne…"
+                  : online!.youReady && !online!.oppReady
+                    ? `En attente de ${oppName}…`
+                    : online!.oppReady && !online!.youReady
+                      ? `${oppName} est prêt — confirme pour lancer la pièce.`
+                      : "Confirmez tous les deux pour lancer la pièce du terrain."}
+              </p>
+              {/* 0/2 → 1/2 → 2/2 — the actual "double confirm" UI. */}
+              <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/30 border border-white/10">
+                <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-ink-muted">Prêts</span>
+                <span
+                  className="text-[12px] font-black tabular-nums"
+                  style={{ color: readyCount === 2 ? "var(--theme-primary)" : undefined }}
+                >
+                  {readyCount}/2
+                </span>
+                <span className="flex items-center gap-1 ml-0.5">
+                  <ReadyDot on={online!.youReady} label="Toi" />
+                  <ReadyDot on={online!.oppReady} label={oppName} />
+                </span>
+              </div>
+            </div>
           ) : (
             <p key="hint" className="text-[11px] text-ink-faint text-center max-w-xs">
               La pièce décide quel thème + pad habille le plateau pendant le duel.
@@ -167,24 +249,60 @@ export function MatchPrepScreen({
         </AnimatePresence>
 
         {phase !== "landed" ? (
-          <div className="flex flex-col items-center gap-2 w-full">
-            <motion.button
-              whileTap={{ scale: 0.96 }}
-              onClick={flip}
-              disabled={phase === "flipping"}
-              className="w-full max-w-xs py-3 rounded-2xl font-bold text-white bg-themed shadow-lg disabled:opacity-60"
-              style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
-            >
-              {phase === "flipping" ? "La pièce tourne…" : "🪙 Lancer la pièce"}
-            </motion.button>
-            <button
-              onClick={concede}
-              disabled={phase === "flipping"}
-              className="text-[11px] font-bold text-ink-muted hover:text-white transition disabled:opacity-40"
-            >
-              Céder le terrain à l'adversaire
-            </button>
-          </div>
+          isOnline ? (
+            // Online mode: one button only — "Je suis prêt". The coin is
+            // server-driven, so no local trigger. Tap is idempotent on the
+            // server; we disable the button locally for UX clarity.
+            <div className="flex flex-col items-center gap-2 w-full">
+              <motion.button
+                whileTap={{ scale: online!.youReady ? 1 : 0.96 }}
+                onClick={() => {
+                  if (online!.youReady || phase === "flipping") return;
+                  hapticTap();
+                  online!.onReady();
+                }}
+                disabled={online!.youReady || phase === "flipping"}
+                className="w-full max-w-xs py-3 rounded-2xl font-bold text-white bg-themed shadow-lg disabled:opacity-60"
+                style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
+              >
+                {phase === "flipping"
+                  ? "La pièce tourne…"
+                  : online!.youReady
+                    ? "✓ Prêt — en attente de l'adversaire"
+                    : "Je suis prêt"}
+              </motion.button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-2 w-full">
+              <motion.button
+                whileTap={{ scale: 0.96 }}
+                onClick={flip}
+                disabled={phase === "flipping"}
+                className="w-full max-w-xs py-3 rounded-2xl font-bold text-white bg-themed shadow-lg disabled:opacity-60"
+                style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
+              >
+                {phase === "flipping" ? "La pièce tourne…" : "🪙 Lancer la pièce"}
+              </motion.button>
+              <button
+                onClick={concede}
+                disabled={phase === "flipping"}
+                className="text-[11px] font-bold text-ink-muted hover:text-white transition disabled:opacity-40"
+              >
+                Céder le terrain à l'adversaire
+              </button>
+            </div>
+          )
+        ) : isOnline ? (
+          // Online mode after the coin lands: parent navigates onward when
+          // `lanes_round_start` arrives. Show a holding hint so the user
+          // understands the wait is intentional (~3s, matches server pause).
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-[11px] font-bold text-ink-muted text-center"
+          >
+            Le duel commence…
+          </motion.div>
         ) : (
           <motion.button
             initial={{ opacity: 0, y: 8 }}
@@ -199,6 +317,19 @@ export function MatchPrepScreen({
         )}
       </div>
     </motion.div>
+  );
+}
+
+function ReadyDot({ on, label }: { on: boolean; label: string }) {
+  return (
+    <span
+      title={`${label}${on ? " — prêt" : " — en attente"}`}
+      className={
+        "w-2 h-2 rounded-full transition " +
+        (on ? "bg-emerald-400 shadow-[0_0_6px_#34d39988]" : "bg-white/20")
+      }
+      aria-label={`${label}${on ? " prêt" : " en attente"}`}
+    />
   );
 }
 

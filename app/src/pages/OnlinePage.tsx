@@ -20,6 +20,11 @@ import {
   type LanesRoundResultData,
   type LanesEndData,
 } from "../match/LanesMatchView";
+import { MatchPrepScreen } from "../ranked/MatchPrepScreen";
+import { oppPersona } from "../ranked/personaSeed";
+import { ArenaPadProvider } from "../ranked/arena";
+import { useArenaOverride } from "../ranked/arenaOverride";
+import { applyTheme } from "../theme/theme";
 import {
   hapticTap,
   hapticLock,
@@ -42,6 +47,7 @@ type Phase =
   | "round"
   | "reveal"
   | "match_end"
+  | "lanes_prep"   // Pre-match prep + coin flip with double "Je suis prêt"
   | "lanes_match"  // Constellation Lanes match in progress (LanesMatchView)
   | "lanes_bot"    // Local CPU fallback for Lanes (no opponent found / offline)
   | "error";
@@ -241,6 +247,15 @@ export function OnlinePage() {
   const [lanesEnd, setLanesEnd] = useState<LanesEndData | null>(null);
   const [lanesSubmitted, setLanesSubmitted] = useState(false);
 
+  // Pre-match prep — drives MatchPrepScreen in lanes_prep phase. `coinWinner`
+  // is the side (from THIS client's POV) the server flipped to; null until
+  // `start_coin_flip` arrives. The arena (theme + pad + backdrop) is derived
+  // on render from `coinWinner` + the opponent persona, no extra state needed.
+  // Reset every time a fresh `lanes_match_found` lands so a rematch starts
+  // clean.
+  const [prepReadyState, setPrepReadyState] = useState<{ you: boolean; opp: boolean }>({ you: false, opp: false });
+  const [prepCoinWinner, setPrepCoinWinner] = useState<"you" | "opp" | null>(null);
+
   // Rematch handshake (post-match): we asked / opponent asked / a brief toast.
   const [rematchPending, setRematchPending] = useState(false);
   const [rematchOffered, setRematchOffered] = useState(false);
@@ -295,6 +310,40 @@ export function OnlinePage() {
   const activeServerUrl = serverConfig.cloudUrl;
   const { status: connStatus, latencyMs, refresh: refreshStatus } =
     useServerStatus(activeServerUrl);
+
+  // Lanes arena override — when the coin gave the duel to the opponent's
+  // side, swap the player's WHOLE LOOK (backdrop scene + HUD theme + pad)
+  // for the duration of the prep + match. Mirrors PlayPage's local-tournament
+  // setup: backdrop via `arenaOverride.bg`, theme via CSS-var mutation +
+  // snapshot/restore on cleanup, pad via <ArenaPadProvider> down in the
+  // match view. Effect deps stay narrow on purpose: phase changes
+  // (lanes_prep → lanes_match) MUST NOT trigger a cleanup/re-apply (would
+  // snapshot the opp theme as the "original" and never restore the player's
+  // own). Cleanup runs when the override should END — either the coin
+  // resolves to "you", the match ends (lanesOppPersona → null), or the user
+  // leaves.
+  const setArenaBg = useArenaOverride((s) => s.setBg);
+  const lanesOppPersona = useMemo(
+    () => (lanesMatch ? oppPersona(lanesMatch.opponent || "Anonymous") : null),
+    [lanesMatch?.opponent],
+  );
+  useEffect(() => {
+    if (prepCoinWinner !== "opp" || !lanesOppPersona) return;
+    const root = document.documentElement;
+    const snap = {
+      p: root.style.getPropertyValue("--theme-primary"),
+      s: root.style.getPropertyValue("--theme-secondary"),
+      b: root.style.getPropertyValue("--theme-bg"),
+    };
+    applyTheme(lanesOppPersona.themeId);
+    setArenaBg(lanesOppPersona.backgroundId);
+    return () => {
+      if (snap.p) root.style.setProperty("--theme-primary", snap.p);
+      if (snap.s) root.style.setProperty("--theme-secondary", snap.s);
+      if (snap.b) root.style.setProperty("--theme-bg", snap.b);
+      setArenaBg(null);
+    };
+  }, [prepCoinWinner, lanesOppPersona, setArenaBg]);
 
   /* ── Lazy create client ── */
   function ensureClient(): Promise<OnlineClient> {
@@ -488,7 +537,8 @@ export function OnlinePage() {
         setPhase("error");
         break;
       case "lanes_match_found":
-        // Fresh match — wipe any stale state from a previous one.
+        // Fresh match — wipe any stale state from a previous one, including
+        // prep readiness + coin winner so a rematch starts clean.
         clearRematch();
         disarmBotFallback();
         setLanesMatch({
@@ -502,9 +552,26 @@ export function OnlinePage() {
         setLanesLastResult(null);
         setLanesEnd(null);
         setLanesSubmitted(false);
-        setPhase("lanes_match");
+        setPrepReadyState({ you: false, opp: false });
+        setPrepCoinWinner(null);
+        setPhase("lanes_prep");
         hapticMatchStart();
         break;
+
+      case "prep_ready_state":
+        // Server sent per-perspective tally — no slot math needed.
+        setPrepReadyState({ you: msg.you_ready, opp: msg.opp_ready });
+        break;
+
+      case "start_coin_flip": {
+        // Translate server slot to this client's POV. The actual coin
+        // animation runs inside MatchPrepScreen, driven by `prepCoinWinner`.
+        const lm = lanesMatchRef.current;
+        const side: "you" | "opp" =
+          lm && msg.winner === lm.youAre ? "you" : "opp";
+        setPrepCoinWinner(side);
+        break;
+      }
 
       case "lanes_round_start":
         setLanesRound({
@@ -515,6 +582,12 @@ export function OnlinePage() {
         // A new round wipes the just-seen reveal and the locked picks.
         setLanesLastResult(null);
         setLanesSubmitted(false);
+        // First round arriving from the server is the signal that prep is
+        // done — leave the prep screen for the real match view. Subsequent
+        // rounds (already in lanes_match) are no-ops on this branch.
+        if (phaseRef.current === "lanes_prep") {
+          setPhase("lanes_match");
+        }
         break;
 
       case "lanes_round_result": {
@@ -1174,6 +1247,56 @@ export function OnlinePage() {
           />
         )}
 
+        {phase === "lanes_prep" && lanesMatch && lanesOppPersona && (
+          <motion.div
+            key="lanes-prep"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.25 }}
+            className="flex-1 flex flex-col min-h-0"
+          >
+            <MatchPrepScreen
+              key={`lanes-prep-${lanesMatch.matchId}`}
+              youName={player.nickname || "Toi"}
+              youAvatar={player.avatar}
+              youThemeId={player.themeId}
+              youBackgroundId={player.backgroundId ?? "default"}
+              oppName={lanesMatch.opponent || "Adversaire"}
+              // No avatar exchange in the protocol yet — use a placeholder
+              // glyph; the persona theme + bg already gives a distinct look.
+              oppAvatar="🛡️"
+              oppThemeId={lanesOppPersona.themeId}
+              oppPadId={lanesOppPersona.padId}
+              oppBackgroundId={lanesOppPersona.backgroundId}
+              onBack={() => {
+                clientRef.current?.send({ type: "leave_match" });
+                setLanesMatch(null);
+                setPrepReadyState({ you: false, opp: false });
+                setPrepCoinWinner(null);
+                backToMenu();
+              }}
+              // `onReady` is never called in online mode (the transition out
+              // of the prep screen is driven by `lanes_round_start`), but
+              // the prop is required by the component.
+              onReady={() => {}}
+              online={{
+                youReady: prepReadyState.you,
+                oppReady: prepReadyState.opp,
+                coinWinner: prepCoinWinner,
+                onReady: () => {
+                  if (prepReadyState.you) return;
+                  // Optimistic local flip — server will echo back the same
+                  // `prep_ready_state` shortly, but the button feels
+                  // unresponsive otherwise on a 100ms RTT.
+                  setPrepReadyState((s) => ({ ...s, you: true }));
+                  clientRef.current?.send({ type: "prep_ready" });
+                },
+              }}
+            />
+          </motion.div>
+        )}
+
         {phase === "lanes_match" && lanesMatch && (
           <motion.div
             key="lanes"
@@ -1182,32 +1305,37 @@ export function OnlinePage() {
             exit={{ opacity: 0 }}
             className="flex-1 flex flex-col min-h-0"
           >
-            <LanesMatchView
-              nickname={player.nickname}
-              match={lanesMatch}
-              round={lanesRound}
-              lastResult={lanesLastResult}
-              end={lanesEnd}
-              submitted={lanesSubmitted}
-              onSubmitPicks={(picks) => {
-                hapticLock();
-                clientRef.current?.send({
-                  type: "play_lanes",
-                  plays: picks.map((mv) => ({ mv, mana: 0 })),
-                });
-                setLanesSubmitted(true);
-              }}
-              onLeave={() => {
-                clientRef.current?.send({ type: "leave_match" });
-                setLanesMatch(null);
-                setLanesRound(null);
-                setLanesLastResult(null);
-                setLanesEnd(null);
-                setLanesSubmitted(false);
-                backToMenu();
-              }}
-              onRematch={requestRematch}
-            />
+            {/* When the coin gave the duel to the opponent's pad, the arena
+                override pad replaces the player's own. null = no override. */}
+            <ArenaPadProvider value={prepCoinWinner === "opp" ? lanesOppPersona?.padId ?? null : null}>
+              <LanesMatchView
+                nickname={player.nickname}
+                match={lanesMatch}
+                round={lanesRound}
+                lastResult={lanesLastResult}
+                end={lanesEnd}
+                submitted={lanesSubmitted}
+                onSubmitPicks={(picks) => {
+                  hapticLock();
+                  clientRef.current?.send({
+                    type: "play_lanes",
+                    plays: picks.map((mv) => ({ mv, mana: 0 })),
+                  });
+                  setLanesSubmitted(true);
+                }}
+                onLeave={() => {
+                  clientRef.current?.send({ type: "leave_match" });
+                  setLanesMatch(null);
+                  setLanesRound(null);
+                  setLanesLastResult(null);
+                  setLanesEnd(null);
+                  setLanesSubmitted(false);
+                  setPrepCoinWinner(null);
+                  backToMenu();
+                }}
+                onRematch={requestRematch}
+              />
+            </ArenaPadProvider>
           </motion.div>
         )}
 
