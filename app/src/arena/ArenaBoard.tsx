@@ -12,7 +12,8 @@
  * the plan phase, which routes back to ArenaGame's handlers.
  */
 
-import { motion } from "motion/react";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "../icons";
 import { useStore } from "../store/store";
 import { BattlePad } from "../BattlePad";
@@ -32,10 +33,17 @@ export interface ArenaBoardProps {
    *  lock and resolver. Ghost previews on opp lanes + chip strip of their
    *  spells so the player SEES what's incoming before damage lands. */
   oppPreview?: TurnIntent | null;
+  /** Current step in the sequenced resolver — drives the phase banner so
+   *  the player always knows what's about to happen / just happened. */
+  resolveStep?: "reveal-opp" | "spells" | "summons" | "combat" | "settle" | null;
 }
 
-export function ArenaBoard({ board, playerSide, intent, oppPreview }: ArenaBoardProps) {
+export function ArenaBoard({ board, playerSide, intent, oppPreview, resolveStep }: ArenaBoardProps) {
   const padId = useArenaPad(useStore((s) => s.player.padId));
+  // Player identity for the hero portrait — pulls avatar + nickname from
+  // the store so the board reads as "alex vs CPU" instead of "Toi vs Adv".
+  const playerAvatar = useStore((s) => s.player.avatar);
+  const playerName = useStore((s) => s.player.nickname) || "Toi";
   const oppSide: Side = playerSide === "a" ? "b" : "a";
   const me = board[playerSide];
   const opp = board[oppSide];
@@ -56,8 +64,13 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview }: ArenaBoard
       />
 
       <div className="relative flex flex-col gap-2 p-2 sm:p-3 flex-1 min-h-0">
+        {/* Phase banner — at the top so the player always knows where
+         *  we are in the turn loop. Shows planning by default; switches
+         *  to the resolver step labels during the sequenced resolve. */}
+        <PhaseBanner step={resolveStep ?? null} turn={board.turn} />
+
         {/* Opponent strip */}
-        <HeroStrip hero={opp} side="opp" turn={board.turn} />
+        <HeroStrip hero={opp} side="opp" turn={board.turn} name="CPU" avatar={undefined} />
 
         {/* CPU intent reveal banner — visible only during the post-lock
          *  reveal window. Names each spell the CPU committed; the lane
@@ -86,7 +99,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview }: ArenaBoard
         />
 
         {/* Player strip */}
-        <HeroStrip hero={me} side="you" turn={board.turn} />
+        <HeroStrip hero={me} side="you" turn={board.turn} name={playerName} avatar={playerAvatar} />
       </div>
     </div>
   );
@@ -95,59 +108,171 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview }: ArenaBoard
 /* ───────────────────────── Hero strip ───────────────────────── */
 
 function HeroStrip({
-  hero, side, turn,
+  hero, side, turn, name, avatar,
 }: {
   hero: BoardState["a"];
   side: "you" | "opp";
   turn: number;
+  /** Display name shown next to the portrait — player nickname for "you",
+   *  "CPU" or persona name for "opp". */
+  name: string;
+  /** Avatar — emoji char, preset path, or undefined for the default mask. */
+  avatar?: string;
 }) {
   const accent = side === "you" ? "text-emerald-300" : "text-rose-300";
-  const label = side === "you" ? "Toi" : "Adv";
+  const ringColor = side === "you" ? "ring-emerald-400/70" : "ring-rose-400/70";
   const hpPct = Math.max(0, Math.min(100, (hero.hp / hero.maxHp) * 100));
+  const lowHp = hero.hp <= 5;
+  // Track previous HP so we can spawn a floating damage popup over the
+  // portrait when the hero just took damage.
+  const prevHpRef = useRef(hero.hp);
+  const [dmgPop, setDmgPop] = useState<{ n: number; key: number } | null>(null);
+  useEffect(() => {
+    const prev = prevHpRef.current;
+    if (hero.hp < prev) {
+      setDmgPop({ n: prev - hero.hp, key: Date.now() });
+      const id = window.setTimeout(() => setDmgPop(null), 1100);
+      prevHpRef.current = hero.hp;
+      return () => window.clearTimeout(id);
+    }
+    prevHpRef.current = hero.hp;
+  }, [hero.hp]);
   return (
     <div className="flex items-center gap-2 px-1">
-      <div className={"text-[10px] uppercase tracking-[0.25em] font-bold " + accent + " w-9 shrink-0"}>
-        ✦ {label}
+      {/* Portrait — avatar + name in a small circle so each side has a face.
+       *  Floating damage popup pops out of the portrait on HP loss. */}
+      <div className="flex flex-col items-center shrink-0 w-12 relative">
+        <HeroPortrait avatar={avatar} ringColor={ringColor} divineShield={hero.divineShield} />
+        <span className={"text-[8px] uppercase tracking-wider font-black truncate max-w-[56px] " + accent}>
+          {name}
+        </span>
+        <AnimatePresence>
+          {dmgPop && (
+            <motion.div
+              key={dmgPop.key}
+              initial={{ opacity: 0, y: 0, scale: 0.7 }}
+              animate={{ opacity: 1, y: -32, scale: 1.2 }}
+              exit={{ opacity: 0, y: -48 }}
+              transition={{ duration: 1, ease: "easeOut" }}
+              className="absolute top-0 left-0 right-0 flex items-center justify-center pointer-events-none text-2xl font-black text-rose-300"
+              style={{ textShadow: "0 2px 8px rgba(244,63,94,0.85), 0 0 2px black" }}
+            >
+              −{dmgPop.n}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-      {/* HP bar */}
-      <div className="flex-1 flex items-center gap-2 min-w-0">
-        <span className="text-[11px] font-black text-white tabular-nums">{hero.hp}/{hero.maxHp}</span>
-        <div className="flex-1 h-2 rounded-full bg-hairline overflow-hidden">
-          <motion.div
-            className={"h-full " + (hpPct > 50 ? "bg-emerald-400" : hpPct > 25 ? "bg-amber-400" : "bg-rose-500")}
-            animate={{ width: `${hpPct}%` }}
-            transition={{ duration: 0.4 }}
-          />
-        </div>
-        {/* Divine shield ring on hero */}
-        {hero.divineShield && (
-          <span className="text-xs" title="Bouclier divin">🛡️</span>
-        )}
-      </div>
-      {/* Mana pips */}
-      <div className="flex items-center gap-0.5 shrink-0">
-        {Array.from({ length: hero.maxMana }, (_, i) => (
-          <span
-            key={i}
+      {/* HP + mana stacked vertically — the player reads them in one column. */}
+      <div className="flex-1 flex flex-col gap-1 min-w-0">
+        {/* HP bar with numbers ON the bar for prominence. */}
+        <div className="flex items-center gap-1">
+          <motion.span
+            key={hero.hp}
+            initial={{ scale: 1.25 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 0.3 }}
             className={
-              "w-1.5 h-1.5 rounded-full ring-1 ring-black/40 " +
-              (i < hero.mana ? "bg-sky-300 shadow-[0_0_4px_rgba(125,211,252,0.7)]" : "bg-zinc-700")
+              "text-[12px] font-black tabular-nums w-12 text-right " +
+              (lowHp ? "text-rose-300" : "text-white")
             }
-          />
-        ))}
-        <span className="text-[9px] font-bold text-sky-300 ml-1 tabular-nums">{hero.mana}/{hero.maxMana}</span>
-      </div>
-      {/* Hand size */}
-      <div className="text-[9px] font-bold text-ink-muted shrink-0 ml-1">
-        🂠 {hero.hand.length}
-      </div>
-      {/* Turn counter on the player strip */}
-      {side === "you" && (
-        <div className="text-[9px] font-bold text-themed shrink-0 ml-1">
-          T{turn}
+          >
+            ❤ {hero.hp}/{hero.maxHp}
+          </motion.span>
+          <div className="flex-1 h-2.5 rounded-full bg-hairline overflow-hidden ring-1 ring-black/40">
+            <motion.div
+              className={"h-full " + (hpPct > 50 ? "bg-emerald-400" : hpPct > 25 ? "bg-amber-400" : "bg-rose-500")}
+              animate={{ width: `${hpPct}%` }}
+              transition={{ duration: 0.4 }}
+            />
+          </div>
         </div>
+        {/* Mana + hand size + turn — compact secondary row. */}
+        <div className="flex items-center gap-1 text-[9px]">
+          <span className="font-bold text-sky-300 tabular-nums w-12 text-right">⋙ {hero.mana}/{hero.maxMana}</span>
+          <div className="flex items-center gap-0.5">
+            {Array.from({ length: hero.maxMana }, (_, i) => (
+              <span
+                key={i}
+                className={
+                  "w-1.5 h-1.5 rounded-full ring-1 ring-black/40 " +
+                  (i < hero.mana ? "bg-sky-300 shadow-[0_0_4px_rgba(125,211,252,0.7)]" : "bg-zinc-700")
+                }
+              />
+            ))}
+          </div>
+          <span className="ml-auto font-bold text-ink-muted">🂠 {hero.hand.length}</span>
+          {side === "you" && <span className="font-bold text-themed">T{turn}</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Hero portrait — a small circular badge with the avatar inside. Falls
+ *  back to a generic CPU mask glyph when no avatar is provided. */
+function HeroPortrait({ avatar, ringColor, divineShield }: {
+  avatar?: string;
+  ringColor: string;
+  divineShield: boolean;
+}) {
+  const isImage = avatar && (avatar.startsWith("/") || avatar.startsWith("http") || avatar.startsWith("data:"));
+  return (
+    <div
+      className={
+        "relative w-10 h-10 rounded-full overflow-hidden ring-2 " + ringColor +
+        " bg-gradient-to-br from-zinc-700 to-zinc-900 flex items-center justify-center " +
+        (divineShield ? "shadow-[0_0_12px_-1px_rgba(252,211,77,0.85)]" : "")
+      }
+    >
+      {isImage ? (
+        <img src={avatar} alt="" className="w-full h-full object-cover" draggable={false} />
+      ) : avatar ? (
+        <span className="text-xl">{avatar}</span>
+      ) : (
+        <span className="text-xl">🤖</span>
+      )}
+      {divineShield && (
+        <span className="absolute -bottom-0.5 -right-0.5 text-[10px]" title="Bouclier divin">🛡️</span>
       )}
     </div>
+  );
+}
+
+/** Phase banner — shows the current step of the turn so the player isn't
+ *  guessing what just happened. Stays visible during planning AND during
+ *  the sequenced resolver (each step gets its own label + color). */
+function PhaseBanner({
+  step, turn,
+}: {
+  step: ArenaBoardProps["resolveStep"];
+  turn: number;
+}) {
+  const label =
+    step === "reveal-opp" ? "Adversaire dévoile son tour"  :
+    step === "spells"     ? "✨ Sorts déclenchés"          :
+    step === "summons"    ? "🌟 Invocations sur les lanes" :
+    step === "combat"     ? "⚔️ Combat sur les lanes"     :
+    step === "settle"     ? "Fin du tour…"                 :
+    "Tour " + turn + " · Planifie ton coup";
+  const tone =
+    step === "reveal-opp" ? "from-rose-500/30 to-rose-600/20 border-rose-400/50 text-rose-100"  :
+    step === "spells"     ? "from-fuchsia-500/30 to-violet-600/20 border-fuchsia-400/50 text-fuchsia-100" :
+    step === "summons"    ? "from-emerald-500/30 to-teal-600/20 border-emerald-400/50 text-emerald-100" :
+    step === "combat"     ? "from-amber-500/30 to-orange-600/20 border-amber-400/50 text-amber-100" :
+    step === "settle"     ? "from-zinc-500/30 to-zinc-700/20 border-zinc-400/50 text-zinc-100" :
+    "from-sky-500/20 to-cyan-600/15 border-sky-400/40 text-sky-100";
+  return (
+    <motion.div
+      key={step ?? "planning"}
+      initial={{ opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={
+        "self-center px-3 py-1 rounded-full bg-gradient-to-r border text-[11px] uppercase tracking-[0.18em] font-black shadow " +
+        tone
+      }
+    >
+      {label}
+    </motion.div>
   );
 }
 
@@ -196,6 +321,22 @@ function LaneSlot({
    *  player's own planned summons from rendering on the opp row, etc.). */
   showPlanned?: boolean;
 }) {
+  // Track previous HP so we can spawn a "-N" floating popup when this lane's
+  // creature takes damage. We guard by move identity to avoid false-positives
+  // when one creature dies and another spawns on the same lane.
+  const prevRef = useRef<{ hp: number; move: Creature["move"] | null } | null>(null);
+  const [dmgPop, setDmgPop] = useState<{ n: number; key: number } | null>(null);
+  useEffect(() => {
+    const prev = prevRef.current;
+    if (creature && prev && prev.move === creature.move && creature.hp < prev.hp) {
+      const dmg = prev.hp - creature.hp;
+      setDmgPop({ n: dmg, key: Date.now() });
+      const id = window.setTimeout(() => setDmgPop(null), 1000);
+      prevRef.current = { hp: creature.hp, move: creature.move };
+      return () => window.clearTimeout(id);
+    }
+    prevRef.current = creature ? { hp: creature.hp, move: creature.move } : null;
+  }, [creature]);
   if (creature) {
     const stats = CREATURE_STATS[creature.move];
     const atk = Math.max(0, stats.atk + creature.atkBuff);
@@ -266,6 +407,23 @@ function LaneSlot({
           {creature.anchored && <span className="text-[10px]" title="Ancré">⚓</span>}
           {creature.ripostePrimed && <span className="text-[10px]" title="Riposte">⚔️</span>}
         </div>
+        {/* Floating damage popup — pops up and fades when this creature's
+         *  HP just dropped. Big rose text, hard shadow, drift up. */}
+        <AnimatePresence>
+          {dmgPop && (
+            <motion.div
+              key={dmgPop.key}
+              initial={{ opacity: 0, y: 0, scale: 0.7 }}
+              animate={{ opacity: 1, y: -28, scale: 1.15 }}
+              exit={{ opacity: 0, y: -40 }}
+              transition={{ duration: 0.9, ease: "easeOut" }}
+              className="absolute inset-0 flex items-center justify-center pointer-events-none text-2xl font-black text-rose-300"
+              style={{ textShadow: "0 2px 8px rgba(244,63,94,0.85), 0 0 2px black" }}
+            >
+              −{dmgPop.n}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     );
   }

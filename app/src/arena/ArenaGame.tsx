@@ -27,8 +27,11 @@ import { ArenaBoard } from "./ArenaBoard";
 import { ArenaPlanPhase } from "./ArenaPlanPhase";
 import {
   advanceToNextTurn,
+  applySpellPhase,
+  applySummons,
+  endOfTurnCleanup,
   makeInitialBoard,
-  resolveTurn,
+  resolveCombat,
 } from "./arenaRules";
 import { cpuArenaDecision } from "./arenaAI";
 import {
@@ -50,11 +53,24 @@ const CPU_ARENA_DECK: CardId[] = [
 ];
 
 const MATCH_FOUND_SPLASH_MS = 1_800;
-/** "Adversaire joue…" preview window — long enough to read what the opp
- *  committed before the resolver applies it. */
-const OPP_REVEAL_MS = 1_800;
-/** Post-resolve pause so the player reads the damage flash before next turn. */
-const RESOLVE_PAUSE_MS = 2_000;
+/** Sequenced resolver pacing — each step shows for this long before the next
+ *  fires. Tuned to read like a real card-game animation while staying snappy
+ *  enough that a turn caps around 7-8s total. */
+const STEP_REVEAL_MS = 1_500;  // "Adversaire joue" preview
+const STEP_SPELLS_MS = 1_200;  // spells fire on both sides
+const STEP_SUMMONS_MS = 1_000; // creatures arrive on lanes
+const STEP_COMBAT_MS = 1_500;  // creature combat resolves
+/** Final pause to read the resulting board before the next turn. */
+const RESOLVE_PAUSE_MS = 1_500;
+
+/** Where we are in the sequenced resolver — drives the phase banner so the
+ *  player always sees which step is firing. `null` outside the resolver. */
+type ResolveStep =
+  | "reveal-opp"   // showing CPU intent before any effect
+  | "spells"       // both sides' spells just fired
+  | "summons"      // new creatures just landed
+  | "combat"       // lane combat just resolved
+  | "settle";      // post-combat, before next turn
 
 export function ArenaGame({
   onQuit,
@@ -80,10 +96,12 @@ export function ArenaGame({
   const [intent, setIntent] = useState<TurnIntent>({ spells: [], summons: [] });
   const [matchSplash, setMatchSplash] = useState(true);
   const [resolving, setResolving] = useState(false);
-  /** Opp intent preview: set after lock, cleared when the resolver fires.
+  /** Opp intent preview: set after lock, cleared when the spells step fires.
    *  Drives the "Adversaire joue X / summon Y" banner + ghost previews on
    *  the opp lanes so the player SEES what they committed. */
   const [oppPreview, setOppPreview] = useState<TurnIntent | null>(null);
+  /** Current step in the sequenced resolver. Drives the phase banner. */
+  const [resolveStep, setResolveStep] = useState<ResolveStep | null>(null);
 
   useEffect(() => {
     hapticMatchStart();
@@ -155,41 +173,67 @@ export function ArenaGame({
     // both intents at once anyway, so this is fair).
     const cpuIntent = cpuArenaDecision(board, "b", difficulty);
 
-    // Reveal phase: show the player what the CPU committed BEFORE the
-    // resolver applies it. Ghost summons appear on opp lanes; spells
-    // chip-strip surfaces above. Phase 2 will animate each card hitting.
+    // Pre-clean hands so the player's intent-bound cards leave their hand
+    // BEFORE the spells step shows. Same on the CPU side.
+    const startBoard = {
+      ...board,
+      a: { ...board.a, hand: removeSpentCards(board.a.hand, intent) },
+      b: { ...board.b, hand: removeSpentCards(board.b.hand, cpuIntent) },
+    };
+
+    // ─── Step 0: REVEAL — show the CPU's intent (ghost previews + banner)
+    // before any effect fires. The player reads it and bracts.
     setOppPreview(cpuIntent);
+    setResolveStep("reveal-opp");
 
+    // ─── Step 1: SPELLS — both sides' spells fire. Buffs, damage, draws all
+    // land at once (resolver internally sorts by priority).
     window.setTimeout(() => {
-      // Move both players' cards out of hand into "spent".
-      const boardAfterHandClean = {
-        ...board,
-        a: { ...board.a, hand: removeSpentCards(board.a.hand, intent) },
-        b: { ...board.b, hand: removeSpentCards(board.b.hand, cpuIntent) },
-      };
-      // Resolver fires now. The board jumps to post-state; the card cells
-      // animate damage flashes via their `key={creature.hp}` motion props.
-      const after = resolveTurn(boardAfterHandClean, intent, cpuIntent);
-      setBoard(after);
-      setIntent({ spells: [], summons: [] });
-      setOppPreview(null);
+      let b = startBoard;
+      b = applySpellPhase(b, intent, "a");
+      b = applySpellPhase(b, cpuIntent, "b");
+      setBoard(b);
+      setOppPreview(null); // ghost previews give way to the actual creatures
+      setResolveStep("spells");
 
-      // Lethal-swing haptic.
-      if (after.a.hp <= 0 || after.b.hp <= 0) {
-        window.setTimeout(() => {
-          if (after.b.hp <= 0 && after.a.hp > 0) hapticWin();
-          else hapticLoss();
-        }, 400);
-      }
-
-      // After a pause to let the player read the result, advance to the
-      // next turn (mana up, draw a card) unless the match ended.
+      // ─── Step 2: SUMMONS — new creatures land on lanes.
       window.setTimeout(() => {
-        setResolving(false);
-        if (after.phase === "match-end") return;
-        setBoard((b) => advanceToNextTurn(b));
-      }, RESOLVE_PAUSE_MS);
-    }, OPP_REVEAL_MS);
+        b = applySummons(b, intent, "a");
+        b = applySummons(b, cpuIntent, "b");
+        setBoard(b);
+        setResolveStep("summons");
+
+        // ─── Step 3: COMBAT — creatures attack on each lane.
+        window.setTimeout(() => {
+          b = resolveCombat(b);
+          b = endOfTurnCleanup(b);
+          if (b.a.hp <= 0 || b.b.hp <= 0) {
+            b = { ...b, phase: "match-end" };
+          }
+          setBoard(b);
+          setResolveStep("combat");
+
+          if (b.a.hp <= 0 || b.b.hp <= 0) {
+            window.setTimeout(() => {
+              if (b.b.hp <= 0 && b.a.hp > 0) hapticWin();
+              else hapticLoss();
+            }, 200);
+          }
+
+          // ─── Step 4: SETTLE — final pause to read, then advance to next turn.
+          window.setTimeout(() => {
+            setIntent({ spells: [], summons: [] });
+            setResolveStep("settle");
+            window.setTimeout(() => {
+              setResolving(false);
+              setResolveStep(null);
+              if (b.phase === "match-end") return;
+              setBoard((cur) => advanceToNextTurn(cur));
+            }, RESOLVE_PAUSE_MS);
+          }, STEP_COMBAT_MS);
+        }, STEP_SUMMONS_MS);
+      }, STEP_SPELLS_MS);
+    }, STEP_REVEAL_MS);
   }
 
   /* ──────────── Render ──────────── */
@@ -239,6 +283,7 @@ export function ArenaGame({
         playerSide="a"
         intent={intent}
         oppPreview={oppPreview}
+        resolveStep={resolveStep}
       />
       <ArenaPlanPhase
         board={board}

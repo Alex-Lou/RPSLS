@@ -200,8 +200,10 @@ export function resolveTurn(
 
 /** Apply one side's spells, ordered by spellPriority asc (defensive first).
  *  Each spell consumes its mana cost from the side's pool. Spells that
- *  can't be paid for at the moment they'd fire are skipped silently. */
-function applySpellPhase(board: BoardState, intent: TurnIntent, side: Side): BoardState {
+ *  can't be paid for at the moment they'd fire are skipped silently.
+ *  Exported so the UI can sequence the resolver (spell phase → summon phase
+ *  → combat) with pauses between them for readability. */
+export function applySpellPhase(board: BoardState, intent: TurnIntent, side: Side): BoardState {
   const ordered = intent.spells.slice().sort((s1, s2) => {
     return spellPriority(s1.id) - spellPriority(s2.id);
   });
@@ -224,8 +226,9 @@ function applySpellPhase(board: BoardState, intent: TurnIntent, side: Side): Boa
 /** Drop new creatures from the side's summons onto their chosen lanes. If
  *  the side already has a creature on a lane, the new one REPLACES (the old
  *  dies silently — design choice so summons can't be wasted but also can't
- *  stack). Costs 1 mana per summon; skipped if mana runs out. */
-function applySummons(board: BoardState, intent: TurnIntent, side: Side): BoardState {
+ *  stack). Costs 1 mana per summon; skipped if mana runs out.
+ *  Exported for UI sequencing — see applySpellPhase. */
+export function applySummons(board: BoardState, intent: TurnIntent, side: Side): BoardState {
   let b = board;
   for (const summon of intent.summons) {
     const hero = side === "a" ? b.a : b.b;
@@ -245,8 +248,9 @@ function applySummons(board: BoardState, intent: TurnIntent, side: Side): BoardS
 
 /** Run combat across all 3 lanes. Damage is applied SIMULTANEOUSLY (both
  *  creatures' new HP computed from the original state of the lane). Empty
- *  lane → attacker hits the opposing hero for its effective ATK. */
-function resolveCombat(board: BoardState): BoardState {
+ *  lane → attacker hits the opposing hero for its effective ATK.
+ *  Exported for UI sequencing. */
+export function resolveCombat(board: BoardState): BoardState {
   let b = board;
   for (let i = 0; i < b.lanes.length; i++) {
     b = resolveLaneCombat(b, i as LaneIndex);
@@ -290,7 +294,7 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
   return board; // both lanes empty
 }
 
-function endOfTurnCleanup(board: BoardState): BoardState {
+export function endOfTurnCleanup(board: BoardState): BoardState {
   const lanes = board.lanes.map((lane) => ({
     a: lane.a ? endOfTurnReset(lane.a) : null,
     b: lane.b ? endOfTurnReset(lane.b) : null,
