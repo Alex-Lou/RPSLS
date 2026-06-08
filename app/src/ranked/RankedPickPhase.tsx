@@ -27,7 +27,23 @@ export interface RankedPickPhaseProps {
   mana: number;
   manaMax?: number;
   passives?: CardId[];
+  /** Braise (Ember) stacks — mana discount on the next card played. The hand
+   *  uses it to display effective cost + adjust the playable check. */
+  braiseStacks?: number;
+  /** Cross-round V3 effects gathered for the chip strip. Each truthy field
+   *  renders one chip explaining the queued effect. */
+  activeEffects?: {
+    mascaradePoison: boolean;
+    bonusManaNext: number;
+    cascadeArmed: boolean;
+    echoActive: boolean;
+    anchorRoundsLeft: number;
+    gaiaCharged: boolean;
+  };
   compassRevealed?: { lane: LaneTarget | null } | null;
+  /** Oracle / Télépathie reveal — the opponent's 3 moves shown face-up on
+   *  the opp row during pick phase. */
+  oracleRevealed?: [Move, Move, Move] | null;
   /** Oracle Inverse reveal — 3 cards peeked from the opponent's notional hand,
    *  shown as a soft chip strip beside the passives during the pick phase. */
   oppHandRevealed?: CardId[] | null;
@@ -47,7 +63,7 @@ export interface RankedPickPhaseProps {
 
 export function RankedPickPhase({
   youName, opponentName,
-  picks, augurRevealed, cardPlayed, mana, manaMax = 4, passives = [], compassRevealed, oppHandRevealed,
+  picks, augurRevealed, cardPlayed, mana, manaMax = 4, passives = [], braiseStacks = 0, activeEffects, compassRevealed, oracleRevealed, oppHandRevealed,
   hand, oppHandSize, augurCooldown,
   startedAt, deadlineMs, showTimer = true,
   onPickMove, onPlayCard, onCancelCard, onClearLane, onLock,
@@ -58,7 +74,9 @@ export function RankedPickPhase({
 
   const allFilled = picks.every((p) => p !== null);
   const remaining = 3 - picks.filter(Boolean).length;
-  const reservedMana = cardPlayed ? CARDS[cardPlayed.id].cost : 0;
+  // ManaBar.spent must honor Braise discount so the displayed reserve matches
+  // what the player will actually pay at lock-time.
+  const reservedMana = cardPlayed ? Math.max(1, CARDS[cardPlayed.id].cost - braiseStacks) : 0;
   const isAugurTargeting = selectedCard === "augur";
   const isOracleTargeting = selectedCard === "oracle";
 
@@ -178,6 +196,7 @@ export function RankedPickPhase({
           picks={picks}
           oppPicks={null}
           augurRevealed={augurRevealed}
+          oracleRevealed={oracleRevealed}
           myCard={cardPlayed}
           oppCard={null}
           mode="picking"
@@ -189,13 +208,23 @@ export function RankedPickPhase({
         />
       </div>
 
-      {/* Boussole reveal + always-on passives + Oracle Inverse peek strip.
-          All compact so the ScaleToFit wrapper keeps the Lock button on-screen. */}
-      {(compassRevealed || passives.length > 0 || (oppHandRevealed && oppHandRevealed.length > 0)) && (
+      {/* Strip: Boussole reveal + passives + Oracle Inverse peek + Braise
+          discount + cross-round V3 effects. Every chip is a compact pill so
+          the ScaleToFit wrapper keeps the Lock button on-screen even with
+          many active effects. */}
+      {(compassRevealed || passives.length > 0
+        || (oppHandRevealed && oppHandRevealed.length > 0)
+        || braiseStacks > 0
+        || (activeEffects && (
+          activeEffects.mascaradePoison || activeEffects.bonusManaNext > 0 ||
+          activeEffects.cascadeArmed || activeEffects.echoActive ||
+          activeEffects.anchorRoundsLeft > 0 || activeEffects.gaiaCharged
+        ))
+      ) && (
         <div className="w-full max-w-md flex flex-wrap items-center justify-center gap-1.5 px-1">
           {compassRevealed && (
             <span className="text-[11px] font-bold rounded-full px-2 py-0.5 bg-sky-500/20 border border-sky-400/40 text-sky-200">
-              🧭 {compassRevealed.lane === null
+              {compassRevealed.lane === null
                 ? t("ranked.compass.none")
                 : t("ranked.compass.lane", { n: compassRevealed.lane + 1 })}
             </span>
@@ -220,6 +249,27 @@ export function RankedPickPhase({
               {t(CARDS[id].nameKey)}
             </span>
           ))}
+          {braiseStacks > 0 && (
+            <EffectChip icon="🔥" tone="ember" label={`Braise −${braiseStacks} mana sur la prochaine carte`} />
+          )}
+          {activeEffects?.bonusManaNext ? (
+            <EffectChip icon="⏱️" tone="sand" label={`+${activeEffects.bonusManaNext} mana au prochain round`} />
+          ) : null}
+          {activeEffects?.mascaradePoison && (
+            <EffectChip icon="🎭" tone="indigo" label="Désinformation armée — l'IA jouera à l'aveugle" />
+          )}
+          {activeEffects?.cascadeArmed && (
+            <EffectChip icon="💧" tone="sky" label="Cascade armée — win = main pleine, lose = main vide" />
+          )}
+          {activeEffects?.echoActive && (
+            <EffectChip icon="🕐" tone="violet" label="Écho actif — défaite annulée + carte refundée" />
+          )}
+          {activeEffects && activeEffects.anchorRoundsLeft > 0 && (
+            <EffectChip icon="⚓" tone="cyan" label={`Ancre ${activeEffects.anchorRoundsLeft}/2 rounds restants`} />
+          )}
+          {activeEffects?.gaiaCharged && (
+            <EffectChip icon="🛡️" tone="emerald" label="Bouclier de Gaïa chargé — 1 défaite absorbée" />
+          )}
         </div>
       )}
 
@@ -231,6 +281,7 @@ export function RankedPickPhase({
           <CardHand
             hand={hand}
             mana={mana}
+            braiseStacks={braiseStacks}
             selected={selectedCard}
             playedId={cardPlayed?.id ?? null}
             onSelect={handleSelectCard}
@@ -316,6 +367,40 @@ function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void
         );
       })}
     </div>
+  );
+}
+
+/** Cross-round effect chip — one consistent visual style for every "pending"
+ *  effect (Braise discount, Sablier/Offre bonus mana, Cascade armed, Écho
+ *  stop-loss, Ancre watch, Mascarade poison, Gaïa shield charged). Tone =
+ *  the card's signature palette so each effect reads by colour at a glance. */
+type EffectTone = "ember" | "sand" | "sky" | "cyan" | "violet" | "emerald" | "indigo";
+const EFFECT_PALETTE: Record<EffectTone, string> = {
+  ember:   "bg-orange-500/20 border-orange-400/50 text-orange-100",
+  sand:    "bg-amber-500/20 border-amber-400/50 text-amber-100",
+  sky:     "bg-sky-500/20 border-sky-400/50 text-sky-100",
+  cyan:    "bg-cyan-500/20 border-cyan-400/50 text-cyan-100",
+  violet:  "bg-violet-500/20 border-violet-400/50 text-violet-100",
+  emerald: "bg-emerald-500/20 border-emerald-400/50 text-emerald-100",
+  indigo:  "bg-indigo-500/20 border-indigo-400/50 text-indigo-100",
+};
+function EffectChip({
+  icon, tone, label,
+}: {
+  icon: string;
+  tone: EffectTone;
+  label: string;
+}) {
+  return (
+    <span
+      className={
+        "text-[11px] font-bold rounded-full px-2 py-0.5 border inline-flex items-center gap-1 " +
+        EFFECT_PALETTE[tone]
+      }
+    >
+      <span aria-hidden>{icon}</span>
+      <span>{label}</span>
+    </span>
   );
 }
 

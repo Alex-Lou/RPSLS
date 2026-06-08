@@ -24,12 +24,25 @@ const IDENTITY_KEYS = [
   "lanes.identity.cunning",
 ];
 
+/** Crépuscule resolver — returns the lane sealed in twilight by either side
+ *  this round (or null if no Crépuscule was played). When BOTH sides play it,
+ *  the player's side wins the visual (rare double, doesn't matter mechanically
+ *  because every other card on either lane is no-op'd anyway). */
+function twilightFor(myCard: PlayedCard | null, oppCard: PlayedCard | null): LaneTarget | null {
+  if (myCard?.id === "crepuscule") return (myCard as { lane: LaneTarget }).lane;
+  if (oppCard?.id === "crepuscule") return (oppCard as { lane: LaneTarget }).lane;
+  return null;
+}
+
 export interface LanesBoardProps {
   youName: string;
   opponentName: string;
   picks: [Move | null, Move | null, Move | null];
   oppPicks: [Move, Move, Move] | null;
   augurRevealed: { lane: LaneTarget; move: Move } | null;
+  /** Oracle (3m epic) / Télépathie (3m epic V3): the opponent's 3 moves are
+   *  revealed to the player face-up during the pick phase. Lane-by-lane. */
+  oracleRevealed?: [Move, Move, Move] | null;
   myCard: PlayedCard | null;
   oppCard: PlayedCard | null;
   mode: "picking" | "locked" | "reveal";
@@ -49,7 +62,7 @@ export interface LanesBoardProps {
 
 export function LanesBoard({
   youName, opponentName,
-  picks, oppPicks, augurRevealed,
+  picks, oppPicks, augurRevealed, oracleRevealed,
   myCard, oppCard, mode, laneResults, oppHandSize, compassPeek,
   onLaneClick, onOppLaneClick, augurTargeting = false,
 }: LanesBoardProps) {
@@ -100,13 +113,19 @@ export function LanesBoard({
         </div>
         {oppHandSize !== undefined && <OppHandIndicator size={oppHandSize} />}
       </div>
+      {/* Crépuscule (Twilight): lane index that's been sealed card-immune by
+          either side this round. Threaded into both rows for a consistent
+          amber tint — "this lane is pure RPSLS, no cards apply". */}
+      {(() => null)()}
       <OpponentRow
         oppPicks={oppPicks}
         oppCard={oppCard}
         augurRevealed={augurRevealed}
+        oracleRevealed={oracleRevealed}
         mode={mode}
         laneResults={laneResults}
         compassPeek={compassPeek}
+        twilightLane={twilightFor(myCard, oppCard)}
         onOppLaneClick={onOppLaneClick}
         augurTargeting={augurTargeting}
       />
@@ -118,6 +137,7 @@ export function LanesBoard({
         myCard={myCard}
         mode={mode}
         laneResults={laneResults}
+        twilightLane={twilightFor(myCard, oppCard)}
         onLaneClick={onLaneClick}
       />
       <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-emerald-300/90 truncate px-0.5">
@@ -129,15 +149,17 @@ export function LanesBoard({
 }
 
 function OpponentRow({
-  oppPicks, oppCard, augurRevealed, mode, laneResults, compassPeek,
-  onOppLaneClick, augurTargeting,
+  oppPicks, oppCard, augurRevealed, oracleRevealed, mode, laneResults, compassPeek,
+  twilightLane, onOppLaneClick, augurTargeting,
 }: {
   oppPicks: [Move, Move, Move] | null;
   oppCard: PlayedCard | null;
   augurRevealed: { lane: LaneTarget; move: Move } | null;
+  oracleRevealed?: [Move, Move, Move] | null;
   mode: "picking" | "locked" | "reveal";
   laneResults?: LaneResult[];
   compassPeek?: { lane: LaneTarget | null } | null;
+  twilightLane?: LaneTarget | null;
   onOppLaneClick?: (lane: LaneTarget) => void;
   augurTargeting: boolean;
 }) {
@@ -158,7 +180,10 @@ function OpponentRow({
       {[0, 1, 2].map((i) => {
         const lane = i as LaneTarget;
         const isAugurLane = augurRevealed?.lane === lane;
-        const augurMove = isAugurLane ? augurRevealed.move : null;
+        // Oracle reveals all 3 moves; Augur reveals just one. Augur wins when
+        // both are on the same lane (more precise / recent) — Oracle fills the
+        // others. Both pre-lock and persist through the reveal.
+        const augurMove = isAugurLane ? augurRevealed.move : (oracleRevealed?.[i] ?? null);
         const oppMove = mode === "reveal" && oppPicks ? oppPicks[i] : augurMove;
         const lr = laneResults?.[i];
         const verdict: "win" | "loss" | "draw" | null =
@@ -173,8 +198,9 @@ function OpponentRow({
           mode !== "reveal" &&
           compassPeek?.lane !== null &&
           compassPeek?.lane === lane;
+        const isTwilight = twilightLane === lane;
         return (
-          <div key={i} className="relative">
+          <div key={i} className={"relative " + (isTwilight ? "twilight-lane" : "")}>
             {oppMove ? (
               <FaceUpOppCard move={oppMove} verdict={verdict} revealed={revealed} preReveal={mode !== "reveal"} />
             ) : (
@@ -184,10 +210,12 @@ function OpponentRow({
                 clickable={augurTargeting}
                 onClick={() => onOppLaneClick?.(lane)}
                 compassMarked={showCompassPeek}
+                twilightMarked={isTwilight}
               />
             )}
             {showCard && oppCard && <CardSlot id={oppCard.id} position="tr" flipReveal />}
             {showCompassPeek && <CompassGhostCard />}
+            {isTwilight && <TwilightBadge />}
           </div>
         );
       })}
@@ -196,12 +224,13 @@ function OpponentRow({
 }
 
 function PlayerRow({
-  picks, myCard, mode, laneResults, onLaneClick,
+  picks, myCard, mode, laneResults, twilightLane, onLaneClick,
 }: {
   picks: [Move | null, Move | null, Move | null];
   myCard: PlayedCard | null;
   mode: "picking" | "locked" | "reveal";
   laneResults?: LaneResult[];
+  twilightLane?: LaneTarget | null;
   onLaneClick?: (lane: LaneTarget) => void;
 }) {
   return (
@@ -221,6 +250,7 @@ function PlayerRow({
             favoured={favoured}
             verdict={verdict}
             cardHere={cardHere}
+            twilightMarked={twilightLane === lane}
             onClick={() => onLaneClick?.(lane)}
             disabled={mode !== "picking"}
           />
@@ -230,19 +260,25 @@ function PlayerRow({
   );
 }
 
-function FaceDownCard({ index: _index, pulsing: _pulsing, clickable = false, onClick, compassMarked = false }: {
+function FaceDownCard({ index: _index, pulsing: _pulsing, clickable = false, onClick, compassMarked = false, twilightMarked = false }: {
   index: number; pulsing: boolean; clickable?: boolean; onClick?: () => void;
   /** Boussole peek: opponent's card targets THIS lane → tint the placeholder
    *  cyan so the player's eye lands here before reading the ghost-card badge. */
   compassMarked?: boolean;
+  /** Crépuscule: this lane is card-immune this round → amber tint reads "no
+   *  card effects apply here, pure RPSLS". */
+  twilightMarked?: boolean;
 }) {
   // Static, solid card — no opacity pulse (that read as "unstable/random").
   // A clickable Augur target keeps a steady highlight instead of flickering.
   // Compass-marked lane gets a cyan tint that reads as "incoming danger".
+  // Twilight gets an amber tint that reads as "sealed / immune".
   const cls =
     "aspect-[5/4] w-full rounded-xl border-2 flex items-center justify-center transition " +
     (clickable
       ? "border-violet-400/60 bg-violet-500/25 cursor-pointer hover:bg-violet-500/35 ring-2 ring-violet-400/40"
+      : twilightMarked
+      ? "border-amber-400/70 bg-amber-500/15 ring-2 ring-amber-300/40"
       : compassMarked
       ? "border-cyan-400/70 bg-cyan-500/20 ring-2 ring-cyan-300/50"
       : "border-dashed border-hairline bg-surface-2");
@@ -250,7 +286,10 @@ function FaceDownCard({ index: _index, pulsing: _pulsing, clickable = false, onC
     <div className={cls}>
       <span className={
         "text-3xl sm:text-4xl font-black " +
-        (clickable ? "text-violet-300" : compassMarked ? "text-cyan-200/80" : "text-zinc-600")
+        (clickable ? "text-violet-300"
+          : twilightMarked ? "text-amber-200/80"
+          : compassMarked ? "text-cyan-200/80"
+          : "text-zinc-600")
       }>
         {clickable ? "👁️" : "?"}
       </span>
@@ -258,6 +297,30 @@ function FaceDownCard({ index: _index, pulsing: _pulsing, clickable = false, onC
   );
   if (clickable) return <button onClick={onClick} className="w-full">{inner}</button>;
   return inner;
+}
+
+/** Crépuscule badge — small amber sun-sigil in the corner of the sealed lane.
+ *  Pulses softly so the player feels the lane is "alive but neutral". */
+function TwilightBadge() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.6 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ type: "spring", stiffness: 280, damping: 22 }}
+      className="absolute -top-1 -left-1 z-20 pointer-events-none"
+      aria-hidden
+    >
+      <motion.div
+        initial={{ opacity: 0.3 }}
+        animate={{ opacity: [0.3, 0.7, 0.3] }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute inset-0 rounded-md bg-amber-400/45 blur-md"
+      />
+      <div className="relative w-6 h-6 rounded-md bg-gradient-to-br from-amber-400/85 to-orange-700/85 border border-amber-300/70 shadow-lg shadow-amber-900/50 flex items-center justify-center">
+        <span className="text-[12px] leading-none">🌅</span>
+      </div>
+    </motion.div>
+  );
 }
 
 /** Boussole ghost card — a small cyan card silhouette in the top-right corner
@@ -308,9 +371,11 @@ function FaceUpOppCard({ move, verdict, revealed, preReveal }: {
   );
 }
 
-function LaneSlot({ index, pick, favoured, verdict, cardHere, onClick, disabled }: {
+function LaneSlot({ index, pick, favoured, verdict, cardHere, twilightMarked = false, onClick, disabled }: {
   index: number; pick: Move | null; favoured: boolean;
   verdict: "win" | "loss" | "draw" | null; cardHere: PlayedCard | null;
+  /** Crépuscule: amber tint on this lane on the player's row. */
+  twilightMarked?: boolean;
   onClick: () => void; disabled: boolean;
 }) {
   const t = useT();
@@ -323,9 +388,12 @@ function LaneSlot({ index, pick, favoured, verdict, cardHere, onClick, disabled 
   const accentText = accent === "amber" ? "text-amber-300" : accent === "sky" ? "text-sky-300" : "text-emerald-300";
   const verdictRing =
     verdict === "win" ? "ring-emerald-400/70" : verdict === "loss" ? "ring-rose-400/60" : verdict === "draw" ? "ring-zinc-500/40" : null;
+  // Twilight overrides identity rings — the amber tint reads "card-immune zone".
+  const twilightRing = twilightMarked ? "ring-amber-400/80" : null;
+  const twilightSurface = twilightMarked ? "border-amber-400/60 bg-amber-500/15" : null;
 
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className={"flex flex-col items-center gap-1 " + (twilightMarked ? "relative" : "")}>
       <div className={"flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold " + accentText}>
         <span>{identity.glyph}</span>
         <span>{title}</span>
@@ -343,8 +411,10 @@ function LaneSlot({ index, pick, favoured, verdict, cardHere, onClick, disabled 
         disabled={disabled}
         className={
           "aspect-[5/4] w-full rounded-xl border-2 transition flex items-center justify-center relative ring-2 " +
-          (verdictRing ?? (favoured ? ringFav : ringIdle)) + " " +
-          (pick ? "border-emerald-400/50 bg-emerald-600/25" : "border-dashed border-hairline bg-surface-2")
+          (verdictRing ?? twilightRing ?? (favoured ? ringFav : ringIdle)) + " " +
+          (pick
+            ? (twilightSurface ?? "border-emerald-400/50 bg-emerald-600/25")
+            : (twilightSurface ?? "border-dashed border-hairline bg-surface-2"))
         }
       >
         {pick ? (
@@ -359,6 +429,7 @@ function LaneSlot({ index, pick, favoured, verdict, cardHere, onClick, disabled 
             (accent === "amber" ? "bg-amber-300" : accent === "sky" ? "bg-sky-300" : "bg-emerald-300")
           }>✨</span>
         )}
+        {twilightMarked && <TwilightBadge />}
       </button>
     </div>
   );

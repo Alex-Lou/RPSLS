@@ -58,10 +58,12 @@ function fanGeometry(total: number) {
 }
 
 export function CardHand({
-  hand, mana, selected, playedId = null, onSelect, disabled = false, augurCooldown = 0,
+  hand, mana, braiseStacks = 0, selected, playedId = null, onSelect, disabled = false, augurCooldown = 0,
 }: {
   hand: CardId[];
   mana: number;
+  /** Braise discount in mana on the NEXT card played (min effective cost 1). */
+  braiseStacks?: number;
   selected: CardId | null;
   /** Id of the card currently committed for the round (cardPlayed.id). Used
    *  to mark self-target plays visually since they don't get a lane badge. */
@@ -99,7 +101,11 @@ export function CardHand({
         const isSelected = selected === id;
         const isPlayed = i === playedIdx;
         const onCooldown = (id === "augur" || id === "oracle") && augurCooldown > 0;
-        const playable = !disabled && card.cost <= mana && !onCooldown;
+        // Braise discount: the effective cost of the NEXT card the player
+        // plays is reduced. Floor at 1 so cards always cost at least 1 mana.
+        const effectiveCost = Math.max(1, card.cost - braiseStacks);
+        const discounted = effectiveCost < card.cost;
+        const playable = !disabled && effectiveCost <= mana && !onCooldown;
         const offset = i - mid;
         const angle = offset * geo.spread;
         const yLift = Math.abs(offset) * geo.lift;
@@ -111,6 +117,8 @@ export function CardHand({
             selected={isSelected}
             played={isPlayed}
             playable={playable}
+            effectiveCost={effectiveCost}
+            discounted={discounted}
             angle={angle}
             yLift={yLift}
             overlap={i === 0 ? 0 : -geo.overlap}
@@ -130,12 +138,16 @@ export function CardHand({
 }
 
 function CardThumb({
-  id, selected, played, playable, angle, yLift, overlap, raised, zIndex, index, compact, onClick,
+  id, selected, played, playable, effectiveCost, discounted, angle, yLift, overlap, raised, zIndex, index, compact, onClick,
 }: {
   id: CardId;
   selected: boolean;
   played: boolean;
   playable: boolean;
+  /** Cost after Braise discount — used for the pip cluster and the playable
+   *  check. When < card.cost a 🔥 marker tells the player WHY it's cheaper. */
+  effectiveCost: number;
+  discounted: boolean;
   /** Resting rotation (deg) for this slot in the fan. */
   angle: number;
   /** Resting upward lift (px) — outer cards sit higher than the centre. */
@@ -193,10 +205,15 @@ function CardThumb({
       }
     >
       <CardImage id={id} glyphSize="text-2xl sm:text-3xl" />
-      {/* Mana pips */}
+      {/* Mana pips — show the EFFECTIVE cost (post-Braise). When the discount
+       *  is active, the pips turn ember-orange + a 🔥 marker reads "discount". */}
       <div className="absolute top-0.5 left-0 right-0 flex items-center justify-center gap-0.5 z-10">
-        {Array.from({ length: card.cost }, (_, k) => (
-          <div key={k} className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white/90 ring-1 ring-black/30" />
+        {discounted && <span className="text-[8px] mr-0.5" aria-hidden>🔥</span>}
+        {Array.from({ length: effectiveCost }, (_, k) => (
+          <div key={k} className={
+            "w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ring-1 ring-black/30 " +
+            (discounted ? "bg-orange-300" : "bg-white/90")
+          } />
         ))}
       </div>
       {/* Played checkmark — the only visible feedback for self-target cards

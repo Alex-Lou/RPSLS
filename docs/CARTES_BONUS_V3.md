@@ -331,6 +331,7 @@ A playing card showing a mysterious sealed box at its center — Schrödinger's 
 **🎨 PROMPT ILLUSTRATION:**
 ```
 A playing card dominated by a massive golden (#eab308) balance scale in the center. Each of the three scale pans holds a different symbol: the left pan holds a glowing red heart (HP), the center pan holds three miniature cards (hand size), and the right pan holds a trophy icon (rounds won). The scale is tilted — one pan heavier than the others. Below the scale, three lane markers are shown but their RPSLS symbols are CROSSED OUT with golden X marks. A judge's gavel hovers above, about to strike. The background is a solemn courtroom grey-black (#0d0d0d) with faint law-text columns in gold. The card border is gold with balance-scale corner motifs. Glyph "⚖️" embossed in brilliant gold at top-right. 1024×1024 PNG with transparency on the outer card edges. Style: judicial, authoritative, dramatic, mobile-game card art.
+```
 ---
 
 **Carte #20 — GENÈSE**
@@ -443,6 +444,432 @@ A playing card showing a cosmic rebirth — a brilliant starburst of pure white-
 | V2 (proposées) | 14 | 40 |
 | **V3 (ce document)** | **20** | **60** |
 | **TOTAL** | **60** | |
+
+---
+
+## 📋 RÉALITÉ D'IMPLÉMENTATION (2026-06-08)
+
+> Cette section documente ce qui est ACTUELLEMENT en jeu sur la branche `lanes-bonus-v3`, vs la spec ci-dessus. Le total réel est **46 cartes** (15 base + 11 Lot 1 + 20 V3), pas 60 — la V2 a été remplacée par le Lot 1 plus tôt.
+
+### Contexte gameplay Constellation (sur lequel les cartes opèrent)
+
+- **Format** : Tournoi Bo3/Bo5, 3 lanes par round, picks RPSLS
+- **Mana** : round 1 = 2m, round 2 = 3m, round 3+ = 4m (5m avec passive Cadence, +3 permanent avec Marchand d'Âmes)
+- **Main** : 3 cartes max (pickable depuis un deck de 8 — les passives sortent du pool de pioche)
+- **Pioche** : +1 carte par round si tu as gagné le round précédent
+- **Défaite de round** : −1 carte aléatoire de la main (sauf passives)
+- **Une carte/round** maximum (pas de combo de cartes dans le même round → contrainte forte sur le design)
+- **Pas de timer vs CPU** (le joueur prend son temps) — les cartes time-based (Sablier) sont reskinnées en tempo
+
+### Audit des bugs trouvés & corrigés (sur la branche)
+
+| Carte | Bug initial | Statut |
+|---|---|---|
+| **Oracle** (3m base) | `void oracleRevealed` — l'état était set mais jamais passé au composant, donc rien ne s'affichait | ✅ FIX commit `9b???` — plumbed à travers RankedMatchView → RankedPickPhase → LanesBoard → OpponentRow |
+| **Télépathie** (3m V3) | Hérite du même bug Oracle puisqu'elle utilisait `setOracleRevealed` | ✅ FIX en cascade avec Oracle |
+| **Braise** (1m V3) | Le discount s'appliquait au paiement mais l'UI continuait d'afficher le coût d'origine → cartes 2m affichées injouables même quand le discount aurait permis. | ✅ FIX — state mirror + threadé `braiseStacks` à CardHand → pip orange + 🔥 + effective cost dans le check `playable` |
+| **Fardeau** (2m V3) | La CPU avait la carte forcée dans son `hand: [fardeau]` mais `chooseCpuCard` rollait `playChance` et pouvait skip (50% normal / 72% hard) → la carte poison n'était pas garantie de partir | ✅ FIX — override `cpuDecision.card = { id: forcedFardeau }` après l'appel si null |
+
+### Feedback visuel ajouté (chips strip + lane indicators)
+
+Chaque effet cross-round a maintenant un chip qui dit ce qui se passe :
+- 🔥 **Braise −N mana** sur la prochaine carte (chip + pips orange dans la main)
+- ⏱️ **+N mana au prochain round** (Sablier +1, Offre +2)
+- 🎭 **Désinformation armée** (Mascarade, l'IA jouera à l'aveugle next round)
+- 💧 **Cascade armée** (win = main pleine, lose = main vide)
+- 🕐 **Écho actif** (stop-loss prêt, défaite annulée + carte refundée)
+- ⚓ **Ancre N/2 rounds restants**
+- 🛡️ **Bouclier de Gaïa chargé** (1 défaite à absorber)
+- 🧭 **Boussole** : badge cyan + ghost-card sur la lane ciblée par la carte adverse
+- 🌅 **Crépuscule** : la lane ciblée s'illumine ambre, badge soleil dans le coin
+
+### Carte par carte — comportement RÉEL
+
+| Carte | Coût | Effet réel implémenté | Différence vs spec |
+|---|---|---|---|
+| **Sablier** | 1m | Draw +1 immédiat + Mana +1 au prochain round | Pas de choix 6s/20s (vs CPU pas de timer). Reskinné en tempo. |
+| **Rémanence** | 1m, lane | Remplace ton coup sur la lane par le coup adverse du round PRÉCÉDENT (fallback sur le coup actuel si round 1) | OK conforme. Pas de "fantôme insaisissable" — c'est juste un swap de move. |
+| **Offre** | 1m | +2 mana au prochain round | La "révélation à l'adversaire" est cosmétique vs CPU (CPU s'en fout, mais c'est annoncé via chip). |
+| **Braise** | 1m | Stack += 1 par round perdu APRÈS pose. Discount = max(1, cost - stack) sur la PROCHAINE carte (reset après play). | OK conforme. Discount maintenant **visible** dans la main. |
+| **Échappée** | 1m, lane | Vide ta lane (0-0 forcé) + pioche 1 carte | OK conforme. Limite 1/round naturelle car 1 carte/round. |
+| **Oracle Inverse** | 2m | Révèle 3 cartes random de la main notionnelle CPU (chips 🔮 visibles) | OK conforme. |
+| **Fardeau** | 2m | Force la CPU à jouer `second-wind` au prochain round | Simplification : on n'a pas de UI pour choisir "quelle carte donner" → on force toujours second-wind (carte faible no-target). |
+| **Crépuscule** | 2m, lane | Lane immunisée aux effets de cartes (les deux côtés). Badge ambre. | OK conforme. La carte qui A SET le twilight n'est PAS annulée (sinon Crépuscule s'auto-annulerait). |
+| **Cascade** | 2m | Win → main rerempli (gratuit next round). Lose → main vidée. | OK conforme. |
+| **Écho Temporel** | 2m | Si tu perds ce round, il devient draw + carte refundée + mana refundée. | Simplifié : pas de "rejeu" complet du round (CPU ne rejoue pas), juste un stop-loss. |
+| **Ancre Temporelle** | 2m | Snapshot (winsA/B, hand, deck, discard). Restauré si 2 défaites consécutives sous la garde. Chip ⚓ countdown visible. | OK conforme. |
+| **Métamorphose** | 3m | Auto-sacrifice de la carte de plus basse rareté en main + draw 1 (ou 2 si legendary sacrifiée) de rareté supérieure. | Simplification : pas de modal pour choisir quelle carte sacrifier. |
+| **Bouclier de Gaïa** | 3m, **passive** | Chargé au start. À la première round qui serait une défaite, toutes tes lanes perdues deviennent draws. Chip 🛡️ visible tant que la charge dispo. | OK conforme. |
+| **Marchand d'Âmes** | 3m | −1 carte aléatoire (proxy PV) + Mana cap +3 PERMANENT + Draw 3 | Simplifié : pas de système HP réel → discard d'une carte au lieu de PV. |
+| **Télépathie** | 3m | Révèle silencieusement les 3 moves adverses (face-up dans OpponentRow comme Oracle) | OK conforme. Le côté "silencieux vs notification" est sans effet vs CPU. |
+| **Paradoxe Temporel** | 3m | Saute la résolution complète. Refund mana + carte burned. **Limite 1/match** (ref `paradoxeUsedRef`). | OK conforme. |
+| **Bénédiction** | 3m | +1 par lane gagnée pour les DEUX joueurs ce round | OK conforme. Spec disait "+2/lane" mais on a fait "+1" pour ne pas multiplier par 5 le score. |
+| **Choix de Schrödinger** | 4m | Pour chaque lane : si le contre canonique de l'opp est différent de ton coup, on remplace ton coup par ce contre. | Simplifié : pas de vraie "superposition de 2 moves". Effet = "tu obtiens automatiquement le meilleur des 2 coups par lane". |
+| **Le Juge** | 4m | Résolution remplacée : lane 0 = round wins (A vs B), lane 1 = main size (A vs CPU oppHandSize), lane 2 = deck size (A vs CPU notional pool minus burned) | Simplifié : on n'a pas de PV → wins/hand/deck à la place. |
+| **Genèse** | 4m | Reset complet : roundWins=0, deck reshuffle full (deck+hand+discard+usedOneShot), hand vide. **Limite 1/match**. | Risque timing : applique le reset via `setTimeout(50ms)` + ré-entrée dans `startNextRound`. Fragile si match-end coincide. |
+
+### Équilibrage — observations vraies-game à valider sur device
+
+- **Sablier 1m** = très fort en early : 1m → 2 ressources (1 pioche + 1 mana). À surveiller.
+- **Braise 1m** = doit être joué tôt pour valoir le coup. Si tu perds 0 round après pose, c'est un waste 1m.
+- **Marchand 3m permanent +3 mana** = potentiellement game-changing. En Bo3 court, peut être trop cher (3m pour un effet qui se manifeste sur 2 rounds restants).
+- **Genèse 4m** = quasi inutile en Bo3 (rare d'avoir le mana à 4 avant que le match soit déjà décidé). Plus pertinente en Bo5.
+- **Le Juge 4m** = dépend complètement de l'état du match. Si tu mènes au score mais perds en main+deck, c'est risqué.
+- **Schrödinger 4m** = quasi-sweep auto si l'opp joue prévisible. Trop fort ?
+- **Bénédiction +1/lane partagé** = pari basé sur "je gagnerai plus de lanes que toi" — fonctionne en début de round si on a anticipé.
+
+### Limites connues (TODO post-validation)
+
+- **Crépuscule joué par la CPU** n'est pas visible côté joueur en pick phase (oppCard pas révélé avant reveal) → le ghost ambre ne pop que pour TES Crépuscules. À corriger via plumb de `compassPeek` enrichi.
+- **Métamorphose** : l'utilisateur ne choisit pas quoi sacrifier (auto lowest rarity). Pourrait être un modal post-MVP.
+- **Marchand "−1 carte"** : proxy PV, pas le vrai sacrifice de vie de la spec.
+- **Genèse timing** : setTimeout 50ms entre setBattle reset et startNextRound — testé OK mais théoriquement race-condition possible.
+
+---
+
+## ⚜️ BLOC SPÉCIAL — Cartes du Tournoi Épique
+
+**Concept:** Le Tournoi Épique est un événement temporaire (quelques jours par saison) où les joueurs s'affrontent dans une arène spéciale. Pendant le tournoi, chaque joueur reçoit **2 Cartes de Tournoi** ajoutées à sa main au début de chaque match. Ces cartes sont :
+
+- **Prêtées, pas possédées** — elles n'apparaissent JAMAIS dans la collection, le codex, ou les packs
+- **Usage unique absolu** — jouées une fois, elles sont consumées pour toujours. Pas dans la défausse, pas de récupération possible
+- **Non craftables, non achetables** — aucune monnaie (Éclats, Poussière, ✦ Stars) ne peut les obtenir
+- **Gagnables en jeu** — des cartes supplémentaires peuvent être gagnées en accomplissant des exploits pendant le tournoi
+- **Coût 0 mana** — ce sont des dons de l'arène, pas des cartes de deck normales. Leur rareté est leur condition d'obtention
+
+### Comment les joueurs les obtiennent
+
+Au début de chaque match du tournoi, 2 cartes sont piochées aléatoirement depuis le **Pool du Tournoi** (12 cartes) et ajoutées à la main du joueur, AU-DESSUS de la limite normale de 3 cartes (la main peut temporairement contenir 5 cartes). Si le joueur ne les joue pas, elles disparaissent à la fin du match.
+
+**Gain de cartes supplémentaires en cours de tournoi :**
+
+| Fait d'armes | Récompense |
+|-------------|-----------|
+| Gagner un round avec un Flawless Sweep (3-0) | +1 carte de tournoi aléatoire |
+| Gagner un match après avoir été mené 0-2 | +1 carte de tournoi aléatoire |
+| Gagner 3 matchs consécutifs dans le tournoi | +1 carte de tournoi aléatoire (Épique ou Légendaire) |
+| Battre un adversaire de rang supérieur | +1 carte de tournoi aléatoire |
+| Réussir un combo MIRROR (mêmes moves que l'adversaire) | +1 carte de tournoi aléatoire |
+| Gagner le tournoi (1ère place) | Les 12 cartes du pool sont débloquées pour le match FINAL |
+
+### 🟣⚜️ Cartes de Tournoi (12 cartes — coût 0 mana)
+
+> **Nouveau type de cible:** `"tournament"` — ces cartes ne suivent pas les règles normales. Elles sont jouées DEPUIS un slot spécial et leur effet est immédiat, sans consommer l'action de carte normale du round (le joueur peut encore jouer une carte normale ensuite).
+
+---
+
+**Carte T1 — FULGURANCE** ⚡
+
+- **Coût:** 0 mana
+- **Type:** tournament (usage unique absolu, détruite après usage)
+- **Glyphe:** ⚡
+- **Palette:** `#fbbf24` (jaune éclair)
+- **Effet:** JOUEZ immédiatement. Votre prochain move qui GAGNE ce round inflige +2 dégâts BONUS. Si vous gagnez plusieurs lanes, le bonus s'applique à CHAQUE lane gagnée.
+- **Impact:** Dévastateur si vous êtes confiant dans vos placements. Transforme une victoire serrée en raz-de-marée.
+- **Condition d'obtention:** Gagner un round en ayant placé vos 3 moves en moins de 5 secondes.
+- **Description i18n:** "Électrifiez vos poings. +2 dégâts sur chaque lane gagnée ce round."
+
+**🎨 PROMPT ILLUSTRATION:**
+```
+A tournament card wreathed in crackling golden lightning (#fbbf24). The center shows a clenched fist engulfed in electric discharge — bright white core with golden-yellow arcs branching outward in 5 directions (one per RPSLS move). The fist is dynamic, mid-punch, with motion blur streaks. The card background is storm-grey (#1a1a2e) with lightning-bolt patterns. The border is brilliant gold with intermittent electric sparks at the corners. A tournament ribbon banner across the top reads "TOURNOI" in gold. Glyph "⚡" embossed in white-gold at top-right. Style: high-energy, explosive, tournament-championship feel. 1024×1024 PNG.
+```
+
+---
+
+**Carte T2 — APOCALYPSE** 💥
+
+- **Coût:** 0 mana
+- **Type:** tournament (usage unique absolu)
+- **Glyphe:** 💥
+- **Palette:** `#ef4444` (rouge apocalyptique)
+- **Effet:** DÉTRUISEZ TOUTES les cartes en main des DEUX joueurs. Elles ne vont pas en défausse — elles sont RETIRÉES du match. Les deux joueurs piochent ensuite 3 nouvelles cartes de leur deck. Si le deck est vide, la défausse est mélangée.
+- **Impact:** Reset total des mains. Détruit les stratégies préparées — excellent si vous avez une main faible et soupçonnez l'adversaire de garder une Légendaire.
+- **Condition d'obtention:** Gagner un round avec un Flawless Sweep (3-0).
+- **Description i18n:** "Anéantissez toutes les mains. Les deux joueurs repiochent 3 cartes."
+
+**🎨 PROMPT ILLUSTRATION:**
+```
+A tournament card showing a mushroom cloud of fiery destruction (#ef4444) consuming a field of playing cards at the bottom. The cards are mid-disintegration — turning to ash and embers. The cloud is orange-red (#ef4444 → #f97316) with dark smoke billowing outward. Above the destruction, a beam of light pierces through, and 3 pristine new cards descend from the light — a phoenix-like rebirth. The card border is dark crimson with ember-glow edges. Tournament ribbon at top. Glyph "💥" embossed in fire-orange. 1024×1024 PNG.
+```
+
+---
+
+**Carte T3 — RÉSURRECTION** 🕊️
+
+- **Coût:** 0 mana
+- **Type:** tournament (usage unique absolu)
+- **Glyphe:** 🕊️
+- **Palette:** `#fef08a` (blanc doré céleste)
+- **Effet:** Si vous PERDEZ ce round, annulez la défaite. Le round est REJOUÉ immédiatement avec les MÊMES cartes en main. Vous gagnez +2 mana pour ce nouveau round. L'adversaire garde ses moves (il ne peut pas les changer). VOUS pouvez changer les vôtres.
+- **Impact:** Filet de sécurité divin. L'adversaire révèle sa stratégie, puis VOUS vous adaptez avec un avantage de mana. Psychologiquement dévastateur pour l'adversaire.
+- **Condition d'obtention:** Gagner un match après avoir été mené 0-2.
+- **Description i18n:** "Si vous perdez, annulez et rejouez. +2 mana. Changez vos moves."
+
+**🎨 PROMPT ILLUSTRATION:**
+```
+A tournament card with a radiant white-gold phoenix rising from ash at the center. The phoenix is mid-transformation — wings half-open, body transitioning from ash-grey (#6b7280) at the bottom to brilliant white-gold (#fef08a) at the top. A broken score marker (0-2) is being restored to (1-2) by golden light. The background is deep navy (#0f172a) with soft white-gold rays radiating from the phoenix. The border is white-gold with a subtle feathered pattern. Tournament ribbon at top. Glyph "🕊️" embossed in gold. Style: hopeful, divine, dramatic resurrection. 1024×1024 PNG.
+```
+
+---
+
+**Carte T4 — OMNISCIENCE** 👁️‍🗨️
+
+- **Coût:** 0 mana
+- **Type:** tournament (usage unique absolu)
+- **Glyphe:** 👁️‍🗨️
+- **Palette:** `#8b5cf6` (violet omniscient)
+- **Effet:** RÉVÉLEZ TOUT pour CE round : les 3 moves adverses, les 3 cartes dans sa main, ET les 2 prochaines cartes de sa pioche. L'information est TOTALE. L'adversaire ne sait PAS que vous savez (comme Télépathie, mais plus puissant).
+- **Impact:** Vision parfaite. Aucune excuse pour perdre un round où vous savez tout. Combine avec Offre (Carte V3 #3) pour un mind-game ultime.
+- **Condition d'obtention:** Réussir 5 prédictions correctes avec Augur/Oracle/Télépathie pendant le tournoi.
+- **Description i18n:** "Voyez tout : moves, main, et pioche adverse. Secret absolu."
+
+**🎨 PROMPT ILLUSTRATION:**
+```
+A tournament card dominated by a single massive, all-seeing eye (#8b5cf6) in the center. The eye's iris is a galaxy spiral — deep violet with tiny star-points. From the eye, three beams of violet light shoot downward, each illuminating a different vision: on the left, 3 RPSLS hand gestures (the opponent's moves), in the center, 3 miniature cards face-up (the opponent's hand), on the right, 2 ghostly cards still fading in (the next draws). The background is void-black (#0a0a1a) with subtle eye-shaped nebula patterns. The border is deep violet with an iris-texture ring. Tournament ribbon at top. Glyph "👁️‍🗨️" embossed in violet-white. Style: mystical, all-knowing, cosmic surveillance. 1024×1024 PNG.
+```
+
+---
+
+**Carte T5 — JOKER** 🃏
+
+- **Coût:** 0 mana
+- **Type:** tournament (usage unique absolu)
+- **Glyphe:** 🃏
+- **Palette:** `#c084fc` (violet joker)
+- **Effet:** Transforme UN de vos moves (sur UNE lane) en JOKER. Le Joker BAT TOUS les autres symboles — Rock, Paper, Scissors, Lizard, Spock. Si l'adversaire joue AUSSI un Joker sur cette même lane : draw. Le Joker remplace votre move normal sur cette lane.
+- **Impact:** Victoire garantie sur une lane. Choisissez la lane décisive. Mais si l'adversaire a aussi un Joker…
+- **Condition d'obtention:** Gagner un round où vous et l'adversaire avez joué exactement le même move sur une lane (mirror partiel).
+- **Description i18n:** "Votre move devient un Joker — il bat TOUT. Sauf un autre Joker."
+
+**🎨 PROMPT ILLUSTRATION:**
+```
+A tournament playing card featuring a majestic, grinning jester figure at center, but the jester's face is a cosmic void with star-eyes (#c084fc). The jester holds 5 cards fanned out — Rock, Paper, Scissors, Lizard, Spock — but all 5 are morphing into a single Joker card with a wild "✶" symbol. The background is a checkerboard pattern of deep purple (#1a0033) and midnight black (#0d001a) with the checker squares slowly dissolving into chaos at the edges. The border is fuchsia with alternating card-suit symbols (♠♣♥♦) in the corners. A tournament ribbon at the top. Glyph "🃏" embossed in violet-silver at top-right. Style: playful, chaotic, wild-card energy, mobile-game card art. 1024×1024 PNG.
+```
+
+---
+
+**Carte T6 — CATACLYSME** 🌪️
+
+- **Coût:** 0 mana
+- **Type:** tournament (usage unique absolu)
+- **Glyphe:** 🌪️
+- **Palette:** `#94a3b8` (gris tempête)
+- **Effet:** MÉLANGEZ ALÉATOIREMENT tous les moves DÉJÀ PLACÉS sur le plateau. Les vôtres ET ceux de l'adversaire sont redistribués aléatoirement sur les 3 lanes. Les moves eux-mêmes ne changent pas — c'est leur POSITION qui devient chaotique. Jouez cette carte APRÈS que les deux joueurs ont placé leurs moves mais AVANT la révélation.
+- **Impact:** Chaos total. Une lane que vous pensiez gagner peut soudainement devenir une défaite. L'adversaire subit le même chaos. Parfait si vous êtes en situation désespérée et que "n'importe quel autre arrangement" serait meilleur.
+- **Condition d'obtention:** Gagner un round après avoir utilisé Vortex (la carte existante).
+- **Description i18n:** "Mélangez toutes les positions. Vos moves et ceux de l'adversaire changent de lane."
+
+**🎨 PROMPT ILLUSTRATION:**
+```
+A tournament card depicting a violent tornado (#94a3b8) ripping through a 3-lane battlefield. The tornado is at center, and the 3 lanes are being sucked into it — lane markers, hand gestures, and card fragments spiraling upward in the vortex. At the bottom, the two player avatars brace themselves, their moves scattered. Debris of the old lane order fly outward. The background is storm-cloud dark (#1e293b) with lightning flashes in the tornado. The border is grey-silver with a swirling wind pattern. Tournament ribbon. Glyph "🌪️" embossed in silver. 1024×1024 PNG.
+```
+
+---
+
+**Carte T7 — PRÉMONITION** 🔮
+
+- **Coût:** 0 mana
+- **Type:** tournament (usage unique absolu)
+- **Glyphe:** 🔮
+- **Palette:** `#06b6d4` (cyan prophétique)
+- **Effet:** RÉVÉLEZ les 3 PROCHAINS moves que l'adversaire va jouer (rounds suivants, pas ce round-ci). L'information est affichée dans un panneau spécial : "Round +1: Rock, Round +2: Paper, Round +3: Scissors". Ces moves sont BLOQUÉS — l'adversaire ne pourra PAS les changer (il s'est "engagé" sans le savoir).
+- **Impact:** Connaissance parfaite des 3 prochains rounds. L'adversaire est prisonnier de ses propres choix futurs. Planifiez votre stratégie sur 3 rounds d'avance.
+- **Condition d'obtention:** Gagner 3 rounds consécutifs dans le tournoi.
+- **Description i18n:** "Voyez et bloquez les 3 prochains moves adverses. Planifiez l'avenir."
+
+**🎨 PROMPT ILLUSTRATION:**
+```
+A tournament card centered on a crystal ball (#06b6d4) floating above two hands. Inside the crystal ball, three ghostly RPSLS hand gestures appear in sequence (Rock→Paper→Scissors), connected by a luminous timeline thread. The crystal ball emits cyan light rays downward, freezing the opponent's avatar below in a block of translucent ice — they're locked into their future choices. The background is deep navy (#0c1d3b) with constellation lines connecting prophetic stars. The border is cyan with a clock-gear pattern. Tournament ribbon. Glyph "🔮" embossed in cyan-white. 1024×1024 PNG.
+```
+
+---
+
+**Carte T8 — MÉTÉORE** ☄️
+
+- **Coût:** 0 mana
+- **Type:** tournament (usage unique absolu)
+- **Glyphe:** ☄️
+- **Palette:** `#f97316` (orange météore)
+- **Effet:** Choisissez UNE lane. Cette lane est FRAPPÉE par un météore et ANNULÉE pour ce round. Ni vous ni l'adversaire ne marquez de point sur cette lane — elle est retirée du round. Les deux joueurs piochent +1 carte en compensation (le météore libère de l'énergie).
+- **Impact:** Supprimez une lane que vous alliez perdre. Le round devient un 2-lanes au lieu de 3-lanes. Utile si l'adversaire a massivement investi une lane.
+- **Condition d'obtention:** Perdre une lane avec un écart de +3 points ou plus (sur un round précédent).
+- **Description i18n:** "Annulez une lane entière. Le round se joue sur 2 lanes."
+
+**🎨 PROMPT ILLUSTRATION:**
+```
+A tournament card showing a blazing meteor (#f97316) crashing diagonally across the frame. The meteor has a brilliant white-hot core and an orange-red tail of fire and debris. It strikes one of 3 lane markers at the bottom, obliterating it — the lane shatters into fragments, leaving only 2 intact lanes. The impact creates concentric shockwave rings. The background is the dark of space (#0a0a1a) with small stars. The border is burnt orange with a cratered, rocky texture. Tournament ribbon. Glyph "☄️" embossed in fire-orange. 1024×1024 PNG.
+```
+
+---
+
+**Carte T9 — MIMÉTISME** 🦎
+
+- **Coût:** 0 mana
+- **Type:** tournament (usage unique absolu)
+- **Glyphe:** 🦎
+- **Palette:** `#10b981` (vert mimétique)
+- **Effet:** REGARDEZ la carte que l'adversaire a jouée CE round. Si elle est encore dans sa main (utilisable), COPIEZ-LA et jouez-la GRATUITEMENT comme si c'était la vôtre. Votre copie résout APRÈS la sienne. Si l'adversaire n'a pas joué de carte, MIMÉTISME est perdu.
+- **Impact:** La plus grande force de l'adversaire devient la vôtre. S'il joue Supernova, vous jouez Supernova. Miroir parfait.
+- **Condition d'obtention:** Faire face à un adversaire qui joue une carte Légendaire pendant le tournoi.
+- **Description i18n:** "Copiez la carte jouée par l'adversaire. Sa puissance est vôtre."
+
+**🎨 PROMPT ILLUSTRATION:**
+```
+A tournament card featuring a chameleon-like lizard (#10b981) at center, its skin shifting — one half is the lizard's natural scales, the other half is mirroring a golden legendary card pattern (#eab308). The lizard's tongue extends outward, touching a phantom copy of the opponent's card that's forming in mid-air. The two cards — original and copy — face each other like mirror images. The background is a jungle-green gradient (#022c22 to #064e3b) with camouflage leaf patterns. The border is emerald with a scaly texture. Tournament ribbon. Glyph "🦎" embossed in emerald. 1024×1024 PNG.
+```
+
+---
+
+**Carte T10 — TROU DE VER** 🕳️
+
+- **Coût:** 0 mana
+- **Type:** tournament (usage unique absolu)
+- **Glyphe:** 🕳️
+- **Palette:** `#6366f1` (indigo distorsion)
+- **Effet:** ÉCHANGEZ votre main ENTIÈRE avec la main de l'adversaire. POUR LE RESTE DU MATCH. Vous jouez SES cartes, il joue les VÔTRES. Les cartes "one-shot" (Épiques/Légendaires) déjà utilisées par l'ancien propriétaire restent consumées. Les passifs suivent leur nouvelle main.
+- **Impact:** Vol total d'identité de deck. Si vous aviez une main faible et lui une main forte, vous prenez l'avantage pour tout le match.
+- **Condition d'obtention:** Utiliser Heist avec succès puis gagner le round.
+- **Description i18n:** "Échangez vos mains pour le reste du match. Jouez son deck."
+
+**🎨 PROMPT ILLUSTRATION:**
+```
+A tournament card showing a swirling wormhole (#6366f1) at the center — a spiral vortex of indigo and violet connecting two hands from opposite sides. The left hand releases 3 cards into the wormhole, the right hand receives 3 DIFFERENT cards emerging from it — the exchange is mid-flow, captured in a single moment. The cards passing through the wormhole stretch and warp (Einstein-Rosen bridge effect). The background is deep space black (#050510) with gravitational lensing arcs. The border is indigo with a distorted, warped geometric pattern. Tournament ribbon. Glyph "🕳️" embossed in indigo-silver. 1024×1024 PNG.
+```
+
+---
+
+**Carte T11 — ULTIMATUM** ⚖️
+
+- **Coût:** 0 mana
+- **Type:** tournament (usage unique absolu)
+- **Glyphe:** ⚖️
+- **Palette:** `#ef4444` et `#22c55e` (rouge/vert — binaire)
+- **Effet:** Ce round est DÉCISIF. Si vous GAGNEZ ce round, vous gagnez LE MATCH ENTIER. Si vous PERDEZ ce round, vous perdez LE MATCH ENTIER. Le score précédent n'importe plus. Tout se joue sur CE round. Ne peut PAS être joué au premier round.
+- **Impact:** "All-in" ultime. Jetez toute prudence — la victoire ou la défaite se décide maintenant. Idéal si vous êtes mené 0-2 et voulez tenter un comeback sur un seul round héroïque.
+- **Condition d'obtention:** Gagner 3 matchs consécutifs dans le tournoi.
+- **Description i18n:** "Ce round décide du match. Gagnez-le et vous gagnez tout."
+
+**🎨 PROMPT ILLUSTRATION:**
+```
+A tournament card split perfectly vertically — left half brilliant green (#22c55e) with a golden "VICTOIRE" banner, right half deep crimson (#ef4444) with a dark "DÉFAITE" banner. At the center line, two colossal hands are locked in a decisive clash — one forming Rock, the other Paper — mid-impact, the moment of resolution frozen. A balance scale hangs above them, perfectly level for now, about to tip. The card border alternates green and red segments. Tournament ribbon at top. Glyph "⚖️" embossed in white at the exact center. 1024×1024 PNG.
+```
+
+---
+
+**Carte T12 — HÉRITAGE** 🏛️
+
+- **Coût:** 0 mana
+- **Type:** tournament (usage unique absolu)
+- **Glyphe:** 🏛️
+- **Palette:** `#fbbf24` (or ancestral)
+- **Effet:** JOUEZ cette carte au round 1 UNIQUEMENT. Pour chaque round que vous GAGNEZ dans CE match, vous recevez +1 carte de tournoi supplémentaire au début de votre PROCHAIN match dans le tournoi (cumulatif : 3 rounds gagnés = +3 cartes au prochain match, +2 au suivant, etc.). Les cartes gagnées sont piochées aléatoirement du pool de tournoi. Cet effet persiste PENDANT TOUT LE TOURNOI.
+- **Impact:** Investissement long terme. Sacrifiez une carte de tournoi maintenant pour en gagner potentiellement beaucoup plus tard. Récompense les joueurs qui performent bien sur la durée.
+- **Condition d'obtention:** Atteindre les demi-finales du tournoi (top 4).
+- **Description i18n:** "Chaque round gagné = +1 carte tournoi au prochain match. Cumulatif."
+
+**🎨 PROMPT ILLUSTRATION:**
+```
+A tournament card featuring an ancient golden temple (#fbbf24) at center, its columns wreathed in climbing ivy. From the temple steps, a procession of ghostly champion figures from past tournaments marches forward, each carrying a glowing card. A golden light beam shines from the temple's heart upward, splitting into multiple card-shaped rays that arc toward the future — representing the bonus cards to come. The background is warm sepia (#451a03 fading to #1a0a00) with dust motes dancing in the light. The border is antique gold with a laurel wreath pattern. Tournament ribbon. Glyph "🏛️" embossed in brilliant gold. 1024×1024 PNG.
+```
+
+---
+
+### Résumé des 12 Cartes du Tournoi Épique
+
+| # | Nom | Type | Effet clé | S'obtient en… |
+|---|------|------|-----------|---------------|
+| T1 | Fulgurance | Offensif | +2 dégâts bonus par lane gagnée | Placer ses 3 moves en <5s |
+| T2 | Apocalypse | Destructeur | Détruit toutes les mains, repioche | Flawless Sweep (3-0) |
+| T3 | Résurrection | Défensif | Annule une défaite, rejoue avec +2 mana | Comeback 0-2 → victoire |
+| T4 | Omniscience | Information | Voit moves + main + pioche adverse | 5 prédictions réussies |
+| T5 | Joker | Offensif | Un move bat TOUT sur une lane | Mirror partiel sur une lane |
+| T6 | Cataclysme | Chaos | Mélange les positions déjà placées | Gagner après Vortex |
+| T7 | Prémonition | Contrôle | Bloque les 3 prochains moves adverses | 3 rounds gagnés consécutifs |
+| T8 | Météore | Terrain | Annule une lane entière | Perdre une lane par +3 d'écart |
+| T9 | Mimétisme | Copie | Copie la carte adverse jouée ce round | Affronter une Légendaire adverse |
+| T10 | Trou de Ver | Échange | Échange les mains pour le reste du match | Heist réussi + round gagné |
+| T11 | Ultimatum | Décisif | Ce round décide du match entier | 3 matchs gagnés consécutifs |
+| T12 | Héritage | Accumulateur | +1 carte tournoi/match futur par round gagné | Atteindre les demi-finales |
+
+---
+
+### Tableau global des cartes (avec Tournoi)
+
+| Phase | Cartes | Total cumulé |
+|-------|--------|-------------|
+| Base (existantes) | 26 | 26 |
+| V2 (proposées) | 14 | 40 |
+| V3 (20 cartes) | 20 | 60 |
+| **⚜️ Tournoi Épique (ce bloc)** | **12** | **72** |
+| **TOTAL** | **72** | |
+
+---
+
+### Nouvelles mécaniques introduites (Tournoi Épique)
+
+| # | Mécanique | Carte(s) | Description |
+|---|-----------|----------|-------------|
+| 1 | **Bonus de dégâts conditionnel** | Fulgurance | Bonus si le move gagne, sur toutes les lanes gagnées |
+| 2 | **Destruction totale des mains** | Apocalypse | Retire toutes les cartes du match, repioche forcée |
+| 3 | **Annulation de défaite + replay** | Résurrection | Le round perdu est annulé et rejoué avec avantage |
+| 4 | **Vision parfaite** | Omniscience | Révèle moves + main + 2 prochaines pioches |
+| 5 | **Move invincible** | Joker | Un symbole qui bat les 5 autres |
+| 6 | **Redistribution chaotique** | Cataclysme | Mélange les positions après placement |
+| 7 | **Blocage des choix futurs** | Prémonition | L'adversaire est verrouillé sur ses 3 prochains moves |
+| 8 | **Suppression de lane** | Météore | Une lane est annulée pour le round |
+| 9 | **Copie de carte adverse** | Mimétisme | Jouer la même carte que l'adversaire |
+| 10 | **Échange de mains permanent** | Trou de Ver | Les deux joueurs échangent leurs decks pour le match |
+| 11 | **Round décisif** | Ultimatum | Un seul round décide du match entier |
+| 12 | **Héritage cumulatif** | Héritage | Les victoires rapportent des cartes pour les matchs suivants |
+
+---
+
+### Architecture technique (Tournoi Épique)
+
+#### Nouveau type de carte : `CardKind = "active" | "passive" | "tournament"`
+
+Les cartes de tournoi :
+- **NE sont PAS dans `CARDS`** — elles sont dans un registre séparé `TOURNAMENT_CARDS`
+- **NE sont PAS dans `ALL_CARD_IDS`** — elles ne peuvent jamais être ouvertes en pack ou craftées
+- **Ne sont PAS dans la collection** (`cardCollection`) — aucun joueur ne les "possède"
+- **Ne génèrent PAS de maîtrise** (`cardMastery`) — il n'y a rien à maîtriser
+- **Sont injectées** au début du match via `injectTournamentCards(deck, hand)`
+- **Sont retirées** du match après usage (ni défausse, ni `usedOneShotCards`)
+- **Sont nettoyées** à la fin du match (disparaissent de la main si non jouées)
+
+#### Nouveaux champs dans `RankedBattleState`
+
+```ts
+/** Tournament cards added to the match — separate from the player's deck.
+ *  Index 0-1 = granted at match start, index 2+ = earned in-match. */
+tournamentHand: CardId[];
+/** Cards the player earned for their NEXT tournament match. Cleared when
+ *  the tournament ends. Max 5. */
+tournamentNextMatch: CardId[];
+```
+
+#### Flux de jeu pendant le tournoi
+
+1. **Entrée dans le tournoi** → Le joueur rejoint la queue Tournoi
+2. **Début de match** → 2 cartes aléatoires du pool sont injectées dans `tournamentHand`
+3. **Pendant le match** → Si le joueur remplit une condition, une carte est ajoutée à `tournamentNextMatch`
+4. **Fin du match** → Les cartes non jouées de `tournamentHand` sont détruites
+5. **Match suivant** → `tournamentNextMatch` devient `tournamentHand` (max 5 cartes de départ)
+6. **Fin du tournoi** → Toutes les cartes de tournoi sont effacées
+
+#### i18n
+
+12 cartes × 1 clé `name` + 1 clé `desc` = 24 clés dans `en.ts` sous `ranked.tournament.*`
+
+---
+
+### Équilibrage — Notes Tournoi
+
+- **T11 ULTIMATUM** : La carte la plus risquée du jeu. À utiliser au round où vous êtes le plus confiant. Si vous la jouez au round 3 d'un BO5 et que vous menez 2-0, vous pouvez perdre le match sur un seul mauvais round. La restriction "pas au premier round" évite le "yolo round 1".
+- **T10 TROU DE VER** : Extrêmement puissant contre un deck fort. Inutile contre un deck faible. La décision dépend de votre lecture de la main adverse.
+- **T5 JOKER** : Le Joker garantit une lane, mais ne peut pas être utilisé sur plusieurs lanes. Si le match se joue sur 3 lanes, gagner 1 lane garantie ne suffit pas — il faut gagner les 2 autres.
+- **T6 CATACLYSME** : À jouer APRÈS avoir vu où l'adversaire a placé ses moves (via Télépathie, Omniscience, ou Oracle). Si vous savez que la configuration actuelle vous est défavorable, le chaos peut vous sauver.
+- **T12 HÉRITAGE** : La seule carte qui récompense la performance sur la DURÉE du tournoi. Un joueur qui gagne 3 rounds par match et joue 5 matchs peut accumuler jusqu'à +15 cartes de tournoi — un avantage colossal en finale.
 
 ---
 

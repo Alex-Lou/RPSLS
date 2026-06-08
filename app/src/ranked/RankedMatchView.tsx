@@ -95,8 +95,23 @@ export interface RankedMatchViewProps {
   manaMax?: number;
   /** Equipped passive cards — shown as an always-on strip in the pick phase. */
   passives?: CardId[];
+  /** Braise (Ember) stacks — discount in mana on the next card played. */
+  braiseStacks?: number;
+  /** Cross-round V3 effects gathered for the chip strip. Each field corresponds
+   *  to one card's pending/active state; the pick phase renders a chip per
+   *  truthy field so the player SEES what's queued for next round. */
+  activeEffects?: {
+    mascaradePoison: boolean;
+    bonusManaNext: number;
+    cascadeArmed: boolean;
+    echoActive: boolean;
+    anchorRoundsLeft: number;
+    gaiaCharged: boolean;
+  };
   /** Boussole reveal: which lane the opponent's card targets (null = none). */
   compassRevealed?: { lane: LaneTarget | null } | null;
+  /** Oracle / Télépathie reveal: opponent's 3 moves shown face-up during pick. */
+  oracleRevealed?: [Move, Move, Move] | null;
   /** Oracle Inverse reveal: 3 cards peeked from the opponent's notional hand. */
   oppHandRevealed?: CardId[] | null;
   hand: CardId[];
@@ -127,7 +142,7 @@ type Phase = "matched" | "picking" | "reveal-intro" | "reveal" | "match-end";
 export function RankedMatchView({
   nickname, match,
   round, lastResult, end,
-  picks, cardPlayed, augurRevealed, mana, manaMax, passives, compassRevealed, oppHandRevealed, hand, oppHandSize,
+  picks, cardPlayed, augurRevealed, mana, manaMax, passives, braiseStacks, activeEffects, compassRevealed, oracleRevealed, oppHandRevealed, hand, oppHandSize,
   roundWinsYou, roundWinsOpp, augurCooldown,
   onPickMove, onClearLane, onPlayCard, onCancelCard, onLock,
   revealAugurFor, onLeave, onRematch, onNext, showTimer = true,
@@ -243,7 +258,10 @@ export function RankedMatchView({
             mana={mana}
             manaMax={manaMax}
             passives={passives}
+            braiseStacks={braiseStacks}
+            activeEffects={activeEffects}
             compassRevealed={compassRevealed}
+            oracleRevealed={oracleRevealed}
             oppHandRevealed={oppHandRevealed}
             hand={hand}
             oppHandSize={oppHandSize}

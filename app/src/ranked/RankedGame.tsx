@@ -178,7 +178,6 @@ export function RankedGame({
   const oppCardsPlayedRef = useRef<CardId[]>([]);
   const [augurRevealed, setAugurRevealed] = useState<{ lane: LaneTarget; move: Move } | null>(null);
   const [oracleRevealed, setOracleRevealed] = useState<[Move, Move, Move] | null>(null);
-  void oracleRevealed; // consumed later by RankedMatchView
   /** Boussole (Surveyor): which lane the opponent's card targets this round.
    *  `{ lane: null }` = the opponent's card has no lane target (or no card). */
   const [compassRevealed, setCompassRevealed] = useState<{ lane: LaneTarget | null } | null>(null);
@@ -228,21 +227,45 @@ export function RankedGame({
    *  from an empty history so the hard AI can't read the player's habits —
    *  the player's disinformation lands one round later (consumed at draw). */
   const mascaradePoisonRef = useRef(false);
+  const [mascaradePoison, setMascaradePoisonState] = useState(false);
+  const setMascaradePoison = (b: boolean) => {
+    mascaradePoisonRef.current = b;
+    setMascaradePoisonState(b);
+  };
 
   /* ──────────── V3 bonus-card state ──────────── */
   /** Braise (Ember): once played, each subsequent ROUND LOST shaves 1 mana off
    *  the cost of your next card (cumulative, min cost = 1). The discount is
-   *  reset to 0 every time a card is actually played. */
+   *  reset to 0 every time a card is actually played. Ref + state mirror —
+   *  the ref lives across renders for synchronous logic; the state drives the
+   *  CardHand pip/playable display so the player SEES the discount. */
   const braiseActiveRef = useRef(false);
   const braiseStacksRef = useRef(0);
+  const [braiseStacks, setBraiseStacksState] = useState(0);
+  // Helper so the ref and the state never drift.
+  const setBraiseStacks = (n: number) => {
+    braiseStacksRef.current = n;
+    setBraiseStacksState(n);
+  };
   /** Extra mana granted at the start of the NEXT round only — fed by Offre
-   *  (+2), Sablier (+1). Consumed in startNextRound. */
+   *  (+2), Sablier (+1). Consumed in startNextRound. Ref + state mirror so
+   *  the UI can show "+N mana prochain round" as a chip. */
   const bonusManaNextRoundRef = useRef(0);
+  const [bonusManaNext, setBonusManaNextState] = useState(0);
+  const setBonusManaNext = (n: number) => {
+    bonusManaNextRoundRef.current = n;
+    setBonusManaNextState(n);
+  };
   /** Permanent mana-cap boost from Marchand d'Âmes (+3, repeatable). */
   const manaMaxBoostRef = useRef(0);
   /** Cascade armed this round: after resolve, fill hand to 3 on win / dump
-   *  hand on loss. */
+   *  hand on loss. Ref + state mirror for the chip. */
   const cascadeArmedRef = useRef(false);
+  const [cascadeArmed, setCascadeArmedState] = useState(false);
+  const setCascadeArmed = (b: boolean) => {
+    cascadeArmedRef.current = b;
+    setCascadeArmedState(b);
+  };
   /** Cascade just paid off: next round's draws are free (mana-discounted).
    *  Implemented by clearing the cost of the first card played next round. */
   const cascadeFreeNextRoundRef = useRef(false);
@@ -250,6 +273,11 @@ export function RankedGame({
    *  rewritten as a draw — your card is refunded, no discard penalty. The
    *  CPU isn't actually rewound (their cards are kept) — it's a "stop-loss". */
   const echoActiveRef = useRef(false);
+  const [echoActive, setEchoActiveState] = useState(false);
+  const setEchoActive = (b: boolean) => {
+    echoActiveRef.current = b;
+    setEchoActiveState(b);
+  };
   /** Ancre temporelle snapshot: state to restore if you lose the next 2 rounds.
    *  Cleared if you win any of them. */
   const anchorSnapshotRef = useRef<{
@@ -258,11 +286,21 @@ export function RankedGame({
   } | null>(null);
   /** Rounds left on the anchor watch (2 → 1 → 0). */
   const anchorRoundsLeftRef = useRef(0);
+  const [anchorRoundsLeft, setAnchorRoundsLeftState] = useState(0);
+  const setAnchorRoundsLeft = (n: number) => {
+    anchorRoundsLeftRef.current = n;
+    setAnchorRoundsLeftState(n);
+  };
   /** Anchor loss-streak counter — increments per loss while watching, restores at 2. */
   const anchorLossStreakRef = useRef(0);
   /** Gaïa (Bouclier de Gaïa): passive, charged at match start if equipped.
    *  Consumed once per match the first time the round would be a loss. */
   const gaiaChargedRef = useRef(false);
+  const [gaiaCharged, setGaiaChargedState] = useState(false);
+  const setGaiaCharged = (b: boolean) => {
+    gaiaChargedRef.current = b;
+    setGaiaChargedState(b);
+  };
   /** Once-per-match limiter for Paradoxe Temporel. */
   const paradoxeUsedRef = useRef(false);
   /** Once-per-match limiter for Genèse. */
@@ -283,7 +321,7 @@ export function RankedGame({
     hapticMatchStart();
     // Seed Bouclier de Gaïa charge if the passive is equipped — consumed once
     // per match on the first round you'd lose.
-    gaiaChargedRef.current = battle.passives.includes("gaia");
+    setGaiaCharged(battle.passives.includes("gaia"));
     const id = window.setTimeout(() => startNextRound(), MATCH_FOUND_SPLASH_MS);
     return () => window.clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -307,18 +345,18 @@ export function RankedGame({
     if (genesisPendingRef.current) {
       genesisPendingRef.current = false;
       braiseActiveRef.current = false;
-      braiseStacksRef.current = 0;
-      bonusManaNextRoundRef.current = 0;
+      setBraiseStacks(0);
+      setBonusManaNext(0);
       manaMaxBoostRef.current = 0;
-      cascadeArmedRef.current = false;
+      setCascadeArmed(false);
       cascadeFreeNextRoundRef.current = false;
-      echoActiveRef.current = false;
+      setEchoActive(false);
       anchorSnapshotRef.current = null;
-      anchorRoundsLeftRef.current = 0;
+      setAnchorRoundsLeft(0);
       anchorLossStreakRef.current = 0;
       // Re-seed gaia if equipped (it gets a fresh charge after Genèse — feels
       // right since the match is "starting over").
-      gaiaChargedRef.current = battle.passives.includes("gaia");
+      setGaiaCharged(battle.passives.includes("gaia"));
       setBattle((b) => {
         const fullSource = [...b.deck, ...b.hand, ...b.discard, ...b.usedOneShotCards];
         return {
@@ -348,7 +386,7 @@ export function RankedGame({
     // Marchand d'Âmes adds a permanent +3 ceiling on top.
     const manaCap = (battle.passives.includes("cadence") ? 5 : MAX_MANA) + manaMaxBoostRef.current;
     const bonusMana = bonusManaNextRoundRef.current;
-    bonusManaNextRoundRef.current = 0;
+    setBonusManaNext(0);
     const newMana = Math.min(manaCap, nextNo + 1 + bonusMana);
     setAugurCooldown((c) => Math.max(0, c - 1));
 
@@ -372,7 +410,7 @@ export function RankedGame({
     // Mascarade (Bluff): a poisoned read makes the hard AI plan from an empty
     // history this round — it can't counter the player's habits.
     const mascaradePoison = mascaradePoisonRef.current;
-    mascaradePoisonRef.current = false;
+    setMascaradePoison(false);
     const usedOneShots = new Set(cpuOneShotsRef.current);
     let cpuHand = BASE_CPU_HAND_POOL.filter((id) => !usedOneShots.has(id));
     // Fardeau (Burden): the burdened card is FORCED into the CPU's hand and
@@ -390,6 +428,12 @@ export function RankedGame({
       },
       LANE_COUNT,
     );
+    // Fardeau guarantee: chooseCpuCard rolls playChance and may skip even when
+    // the forced card is the only one in hand. Override here so the burdened
+    // card actually lands — that's the whole point of the card.
+    if (forcedFardeau && !cpuDecision.card) {
+      cpuDecision.card = { id: forcedFardeau } as CpuRoundDecision["card"];
+    }
     cpuDecisionRef.current = cpuDecision;
     // Clear last round's Oracle Inverse reveal — fresh round, no peek yet.
     setOppHandRevealed(null);
@@ -459,7 +503,7 @@ export function RankedGame({
       }
     } else if (card.id === "mascarade") {
       // Bluff: poison the NEXT round's CPU read (disinformation lands later).
-      mascaradePoisonRef.current = true;
+      setMascaradePoison(true);
     } else if (card.id === "boussole") {
       // Surveyor: reveal which lane the opponent's card targets this round.
       const oc = cpuDecisionRef.current?.card;
@@ -471,7 +515,7 @@ export function RankedGame({
       // Sand-bender. Vs CPU the deadline is moot, so the card grants tempo:
       // +1 card NOW + +1 mana NEXT round — keeps the time-manipulation
       // theme by trading "saved seconds" for resource velocity.
-      bonusManaNextRoundRef.current += 1;
+      setBonusManaNext(bonusManaNextRoundRef.current + 1);
       setBattle((b) => {
         const dr = drawN(b.deck, b.hand, b.discard, 1, b.hand.length + 1);
         return { ...b, deck: dr.deck, hand: dr.hand, discard: dr.discard };
@@ -480,13 +524,13 @@ export function RankedGame({
     else if (card.id === "offre") {
       // Pure mana-bank — +2 next round in exchange for telegraphing your move
       // (the CPU doesn't use that info, so vs CPU the offer is generous).
-      bonusManaNextRoundRef.current += 2;
+      setBonusManaNext(bonusManaNextRoundRef.current + 2);
     }
     else if (card.id === "braise") {
       // Comeback charge: from now on, each round you LOSE shaves 1 mana off
       // your next card's cost (cumulative; min cost 1, reset when a card lands).
       braiseActiveRef.current = true;
-      braiseStacksRef.current = 0;
+      setBraiseStacks(0);
     }
     else if (card.id === "oracle-inverse") {
       // Reveal 3 random cards from the CPU's notional hand — shown as a chip
@@ -510,7 +554,7 @@ export function RankedGame({
     else if (card.id === "cascade") {
       // All-in: WIN this round → refill hand to full for next round. LOSE →
       // empty hand. Decided at resolveAndAdvance — we just arm it here.
-      cascadeArmedRef.current = true;
+      setCascadeArmed(true);
     }
     else if (card.id === "ancre-temporelle") {
       // Snapshot the battle state RIGHT NOW (pre-resolve). Restored after
@@ -524,13 +568,13 @@ export function RankedGame({
         discard: battle.discard.slice(),
         usedOneShotCards: battle.usedOneShotCards.slice(),
       };
-      anchorRoundsLeftRef.current = 2;
+      setAnchorRoundsLeft(2);
       anchorLossStreakRef.current = 0;
     }
     else if (card.id === "echo-temporel") {
       // Stop-loss: if THIS round ends in your loss, it's rewritten as a draw
       // and your card is refunded. The CPU's card still fires and burns.
-      echoActiveRef.current = true;
+      setEchoActive(true);
     }
     else if (card.id === "metamorphose") {
       // Sacrifice one card (auto: lowest rarity in hand) → draw a card of
@@ -617,16 +661,16 @@ export function RankedGame({
     if (cardPlayed?.id === "augur") setAugurRevealed(null);
     if (cardPlayed?.id === "oracle") setOracleRevealed(null);
     if (cardPlayed?.id === "telepathie") setOracleRevealed(null);
-    if (cardPlayed?.id === "mascarade") mascaradePoisonRef.current = false;
+    if (cardPlayed?.id === "mascarade") setMascaradePoison(false);
     if (cardPlayed?.id === "boussole") setCompassRevealed(null);
     if (cardPlayed?.id === "oracle-inverse") setOppHandRevealed(null);
-    if (cardPlayed?.id === "sablier") bonusManaNextRoundRef.current = Math.max(0, bonusManaNextRoundRef.current - 1);
-    if (cardPlayed?.id === "offre") bonusManaNextRoundRef.current = Math.max(0, bonusManaNextRoundRef.current - 2);
-    if (cardPlayed?.id === "braise") { braiseActiveRef.current = false; braiseStacksRef.current = 0; }
+    if (cardPlayed?.id === "sablier") setBonusManaNext(Math.max(0, bonusManaNextRoundRef.current - 1));
+    if (cardPlayed?.id === "offre") setBonusManaNext(Math.max(0, bonusManaNextRoundRef.current - 2));
+    if (cardPlayed?.id === "braise") { braiseActiveRef.current = false; setBraiseStacks(0); }
     if (cardPlayed?.id === "fardeau") fardeauNextCpuRef.current = null;
-    if (cardPlayed?.id === "cascade") cascadeArmedRef.current = false;
-    if (cardPlayed?.id === "ancre-temporelle") { anchorSnapshotRef.current = null; anchorRoundsLeftRef.current = 0; }
-    if (cardPlayed?.id === "echo-temporel") echoActiveRef.current = false;
+    if (cardPlayed?.id === "cascade") setCascadeArmed(false);
+    if (cardPlayed?.id === "ancre-temporelle") { anchorSnapshotRef.current = null; setAnchorRoundsLeft(0); }
+    if (cardPlayed?.id === "echo-temporel") setEchoActive(false);
     if (cardPlayed?.id === "marchand-ames") manaMaxBoostRef.current = Math.max(0, manaMaxBoostRef.current - 3);
     if (cardPlayed?.id === "paradoxe") paradoxeUsedRef.current = false;
     if (cardPlayed?.id === "genese") { genesisUsedRef.current = false; genesisPendingRef.current = false; }
@@ -790,7 +834,7 @@ export function RankedGame({
 
     const gaiaCharged = gaiaChargedRef.current;
     const fx = applyCardEffects(base, myCard, oppCard, { gaiaChargedA: gaiaCharged });
-    if (fx.gaiaSavedA) gaiaChargedRef.current = false;
+    if (fx.gaiaSavedA) setGaiaCharged(false);
     // Conduit (passive): the player's combos pay +1 extra.
     const conduitActive = battle.passives.includes("conduit");
     // Combo detection uses post-Mirror picks so bonus history stays aligned
@@ -812,11 +856,11 @@ export function RankedGame({
     // The card itself is refunded to your hand (and to mana) on success.
     let echoRefund = false;
     if (!timedOut && echoActiveRef.current && finalWinner === "b") {
-      echoActiveRef.current = false;
+      setEchoActive(false);
       finalWinner = "draw";
       echoRefund = true;
     } else if (!timedOut && echoActiveRef.current) {
-      echoActiveRef.current = false; // consume the watch even on win/draw
+      setEchoActive(false); // consume the watch even on win/draw
     }
     // Trinité parfaite (Perfect Trinity): if your three picks are ALL different
     // (a true trinity), you win the round outright. Otherwise the card is wasted.
@@ -845,12 +889,16 @@ export function RankedGame({
     // Bookkeeping for cross-round effects.
     if (!timedOut) prevOppPicksRef.current = prevOppPicksThisRound;
     // Braise: every loss past the played-card moment shaves 1 off the next
-    // card's cost (cap +stacks per round, never sub-1).
-    if (braiseActiveRef.current && finalWinner === "b") braiseStacksRef.current += 1;
-    if (myCard) braiseStacksRef.current = 0; // a played card consumes the discount
+    // card's cost (cap +stacks per round, never sub-1). A played card
+    // consumes the discount → reset to 0.
+    if (braiseActiveRef.current && finalWinner === "b" && !myCard) {
+      setBraiseStacks(braiseStacksRef.current + 1);
+    } else if (myCard) {
+      setBraiseStacks(0);
+    }
     // Ancre temporelle watchdog.
     if (anchorRoundsLeftRef.current > 0) {
-      anchorRoundsLeftRef.current -= 1;
+      setAnchorRoundsLeft(anchorRoundsLeftRef.current - 1);
       if (finalWinner === "b") anchorLossStreakRef.current += 1;
       else anchorLossStreakRef.current = 0;
       if (anchorLossStreakRef.current >= 2 && anchorSnapshotRef.current) {
@@ -858,7 +906,7 @@ export function RankedGame({
         // visible reveal still plays out before the rewind.
         const snap = anchorSnapshotRef.current;
         anchorSnapshotRef.current = null;
-        anchorRoundsLeftRef.current = 0;
+        setAnchorRoundsLeft(0);
         anchorLossStreakRef.current = 0;
         window.setTimeout(() => {
           setBattle((b) => ({
@@ -875,7 +923,7 @@ export function RankedGame({
     }
     // Cascade post-resolve: WIN refills hand for free next round, LOSS dumps it.
     if (cascadeArmedRef.current) {
-      cascadeArmedRef.current = false;
+      setCascadeArmed(false);
       if (finalWinner === "a") cascadeFreeNextRoundRef.current = true;
       else if (finalWinner === "b") {
         window.setTimeout(() => {
@@ -1100,9 +1148,9 @@ export function RankedGame({
     setMana(1);
     const fresh = makeBattle(savedDeck);
     setBattle(fresh);
-    gaiaChargedRef.current = fresh.passives.includes("gaia");
+    setGaiaCharged(fresh.passives.includes("gaia"));
     cpuDecisionRef.current = null;
-    mascaradePoisonRef.current = false;
+    setMascaradePoison(false);
     playerHistoryRef.current = [];
     moodRef.current = "random";
     roundNoRef.current = 0;
@@ -1113,14 +1161,14 @@ export function RankedGame({
     oppCardsPlayedRef.current = [];
     // Reset all V3 cross-round state.
     braiseActiveRef.current = false;
-    braiseStacksRef.current = 0;
-    bonusManaNextRoundRef.current = 0;
+    setBraiseStacks(0);
+    setBonusManaNext(0);
     manaMaxBoostRef.current = 0;
-    cascadeArmedRef.current = false;
+    setCascadeArmed(false);
     cascadeFreeNextRoundRef.current = false;
-    echoActiveRef.current = false;
+    setEchoActive(false);
     anchorSnapshotRef.current = null;
-    anchorRoundsLeftRef.current = 0;
+    setAnchorRoundsLeft(0);
     anchorLossStreakRef.current = 0;
     paradoxeUsedRef.current = false;
     genesisUsedRef.current = false;
@@ -1366,7 +1414,17 @@ export function RankedGame({
         mana={mana}
         manaMax={(battle.passives.includes("cadence") ? 5 : MAX_MANA) + manaMaxBoostRef.current}
         passives={battle.passives}
+        braiseStacks={braiseStacks}
+        activeEffects={{
+          mascaradePoison,
+          bonusManaNext,
+          cascadeArmed,
+          echoActive,
+          anchorRoundsLeft,
+          gaiaCharged,
+        }}
         compassRevealed={compassRevealed}
+        oracleRevealed={oracleRevealed}
         oppHandRevealed={oppHandRevealed}
         hand={battle.hand}
         oppHandSize={battle.oppHandSize}
