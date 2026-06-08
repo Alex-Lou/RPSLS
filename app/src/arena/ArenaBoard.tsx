@@ -14,13 +14,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "../icons";
+import { MoveGlyph } from "../icons";
 import { useStore } from "../store/store";
 import { BattlePad } from "../BattlePad";
 import { useArenaPad } from "../ranked/arena";
 import { CARDS } from "../ranked/cards";
 import { useT } from "../i18n";
-import { CREATURE_STATS, type BoardState, type Creature, type LaneIndex, type Side, type TurnIntent } from "./arenaTypes";
+import { ArenaLaneSlot } from "./ArenaLaneSlot";
+import type { BoardState, LaneIndex, Side, TurnIntent } from "./arenaTypes";
 
 export interface ArenaBoardProps {
   board: BoardState;
@@ -142,7 +143,7 @@ function HeroStrip({
       {/* Portrait — avatar + name in a small circle so each side has a face.
        *  Floating damage popup pops out of the portrait on HP loss. */}
       <div className="flex flex-col items-center shrink-0 w-12 relative">
-        <HeroPortrait avatar={avatar} ringColor={ringColor} divineShield={hero.divineShield} />
+        <HeroPortrait avatar={avatar} ringColor={ringColor} divineShield={hero.divineShield} damaged={!!dmgPop} />
         <span className={"text-[8px] uppercase tracking-wider font-black truncate max-w-[56px] " + accent}>
           {name}
         </span>
@@ -209,19 +210,25 @@ function HeroStrip({
 }
 
 /** Hero portrait — a small circular badge with the avatar inside. Falls
- *  back to a generic CPU mask glyph when no avatar is provided. */
-function HeroPortrait({ avatar, ringColor, divineShield }: {
+ *  back to a generic CPU mask glyph when no avatar is provided.
+ *  `damaged` flips on for ~600ms when the hero just took damage — the ring
+ *  pulses red so the player FEELS the hit beyond the floating −N number. */
+function HeroPortrait({ avatar, ringColor, divineShield, damaged }: {
   avatar?: string;
   ringColor: string;
   divineShield: boolean;
+  damaged?: boolean;
 }) {
   const isImage = avatar && (avatar.startsWith("/") || avatar.startsWith("http") || avatar.startsWith("data:"));
   return (
-    <div
+    <motion.div
+      animate={damaged ? { scale: [1, 1.08, 0.96, 1], x: [0, -2, 2, -1, 1, 0] } : { scale: 1, x: 0 }}
+      transition={damaged ? { duration: 0.5 } : { duration: 0.2 }}
       className={
-        "relative w-10 h-10 rounded-full overflow-hidden ring-2 " + ringColor +
+        "relative w-10 h-10 rounded-full overflow-hidden ring-2 " +
+        (damaged ? "ring-rose-400 shadow-[0_0_18px_-1px_rgba(244,63,94,0.95)]" : ringColor) +
         " bg-gradient-to-br from-zinc-700 to-zinc-900 flex items-center justify-center " +
-        (divineShield ? "shadow-[0_0_12px_-1px_rgba(252,211,77,0.85)]" : "")
+        (divineShield && !damaged ? "shadow-[0_0_12px_-1px_rgba(252,211,77,0.85)]" : "")
       }
     >
       {isImage ? (
@@ -231,10 +238,13 @@ function HeroPortrait({ avatar, ringColor, divineShield }: {
       ) : (
         <span className="text-xl">🤖</span>
       )}
+      {damaged && (
+        <span className="absolute inset-0 bg-rose-500/35 pointer-events-none" aria-hidden />
+      )}
       {divineShield && (
         <span className="absolute -bottom-0.5 -right-0.5 text-[10px]" title="Bouclier divin">🛡️</span>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -283,9 +293,6 @@ function LaneRow({
 }: {
   lanes: BoardState["lanes"];
   renderSide: Side;
-  /** For the player row: their own planned summons (ghost previews).
-   *  For the opp row during reveal: the CPU's committed summons. Both show
-   *  the same ghost-card visual so the player can read either side's plan. */
   intent: TurnIntent | null;
   isPlayer: boolean;
 }) {
@@ -296,7 +303,7 @@ function LaneRow({
         const c = lanes[lane][renderSide];
         const plannedSummon = intent?.summons.find((s) => s.lane === lane) ?? null;
         return (
-          <LaneSlot
+          <ArenaLaneSlot
             key={i}
             lane={lane}
             creature={c}
@@ -310,161 +317,6 @@ function LaneRow({
   );
 }
 
-function LaneSlot({
-  creature, plannedSummon, isPlayer, showPlanned = false, lane: _lane,
-}: {
-  lane: LaneIndex;
-  creature: Creature | null;
-  plannedSummon: { lane: LaneIndex; move: Creature["move"] } | null;
-  isPlayer: boolean;
-  /** When false, the ghost-preview branch is skipped (used to suppress the
-   *  player's own planned summons from rendering on the opp row, etc.). */
-  showPlanned?: boolean;
-}) {
-  // Track previous HP so we can spawn a "-N" floating popup when this lane's
-  // creature takes damage. We guard by move identity to avoid false-positives
-  // when one creature dies and another spawns on the same lane.
-  const prevRef = useRef<{ hp: number; move: Creature["move"] | null } | null>(null);
-  const [dmgPop, setDmgPop] = useState<{ n: number; key: number } | null>(null);
-  useEffect(() => {
-    const prev = prevRef.current;
-    if (creature && prev && prev.move === creature.move && creature.hp < prev.hp) {
-      const dmg = prev.hp - creature.hp;
-      setDmgPop({ n: dmg, key: Date.now() });
-      const id = window.setTimeout(() => setDmgPop(null), 1000);
-      prevRef.current = { hp: creature.hp, move: creature.move };
-      return () => window.clearTimeout(id);
-    }
-    prevRef.current = creature ? { hp: creature.hp, move: creature.move } : null;
-  }, [creature]);
-  if (creature) {
-    const stats = CREATURE_STATS[creature.move];
-    const atk = Math.max(0, stats.atk + creature.atkBuff);
-    const lowHp = creature.hp <= 1;
-    const pal = MOVE_PALETTE[creature.move];
-    const rim = moveRim(pal.hex);
-    const glow = moveGlow(pal.hex);
-    // Side affinity tinting: player creatures get an emerald inner badge,
-    // opp creatures get a rose one — visual ownership cue independent of
-    // the move's signature color (kept on the frame rim).
-    const sideTint = isPlayer ? "rgba(52,211,153,0.55)" : "rgba(244,63,94,0.55)";
-    return (
-      <motion.div
-        layout
-        initial={{ opacity: 0, y: isPlayer ? 12 : -12, scale: 0.85 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        // Layout shake when HP drops — `key={creature.hp}` triggers a
-        // damage flash on re-render. (Phase 2 will add a real hit anim.)
-        className={
-          "aspect-[5/4] w-full rounded-xl relative flex flex-col items-center justify-center overflow-hidden transition " +
-          (creature.divineShield ? "" : "")
-        }
-        style={{
-          background: "linear-gradient(160deg, rgba(20,22,32,0.94) 0%, rgba(10,12,20,0.94) 100%)",
-          border: `2px solid ${creature.divineShield ? "rgba(252,211,77,0.95)" : rim}`,
-          boxShadow:
-            (creature.divineShield
-              ? "0 0 20px -2px rgba(252,211,77,0.7), "
-              : `0 0 14px -3px ${glow}, `) +
-            `inset 0 1px 0 rgba(255,255,255,0.08), inset 0 0 0 1px ${sideTint}30`,
-        }}
-      >
-        {/* Subtle pad-side dot ribbon top-left to anchor "who owns this" */}
-        <div
-          className="absolute top-1 left-1 w-2 h-2 rounded-full"
-          style={{ background: sideTint, boxShadow: `0 0 6px ${sideTint}` }}
-          aria-hidden
-        />
-        {/* Glyph occupies most of the card, like the in-hand cards */}
-        <MoveGlyph move={creature.move} className="w-10 h-10 sm:w-12 sm:h-12" />
-        {/* Move name label sits between glyph and stats — tiny, rim-colored */}
-        <span
-          className="text-[7px] uppercase tracking-wider font-black leading-none mt-0.5"
-          style={{ color: rim }}
-        >
-          {creature.move}
-        </span>
-        {/* ATK and HP corner badges — bigger, "card-like", easier to scan */}
-        <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between px-1 pb-0.5">
-          <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-amber-500/85 text-amber-50 text-[10px] font-black leading-none tabular-nums shadow">
-            ⚔ {atk}
-            {creature.atkBuff > 0 && <span className="text-[7px] opacity-90">+{creature.atkBuff}</span>}
-            {creature.atkBuff < 0 && <span className="text-[7px] opacity-90">{creature.atkBuff}</span>}
-          </span>
-          <motion.span
-            key={creature.hp}
-            initial={{ scale: 1.3, color: "#fda4af" }}
-            animate={{ scale: 1, color: lowHp ? "#fb7185" : "#fee2e2" }}
-            transition={{ duration: 0.3 }}
-            className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-rose-600/85 text-[10px] font-black leading-none tabular-nums shadow"
-          >
-            ❤ {creature.hp}/{stats.hp}
-          </motion.span>
-        </div>
-        {/* Status icons row top-right */}
-        <div className="absolute top-1 right-1 flex items-center gap-0.5">
-          {creature.divineShield && <span className="text-[10px]" title="Bouclier divin">🛡️</span>}
-          {creature.anchored && <span className="text-[10px]" title="Ancré">⚓</span>}
-          {creature.ripostePrimed && <span className="text-[10px]" title="Riposte">⚔️</span>}
-        </div>
-        {/* Floating damage popup — pops up and fades when this creature's
-         *  HP just dropped. Big rose text, hard shadow, drift up. */}
-        <AnimatePresence>
-          {dmgPop && (
-            <motion.div
-              key={dmgPop.key}
-              initial={{ opacity: 0, y: 0, scale: 0.7 }}
-              animate={{ opacity: 1, y: -28, scale: 1.15 }}
-              exit={{ opacity: 0, y: -40 }}
-              transition={{ duration: 0.9, ease: "easeOut" }}
-              className="absolute inset-0 flex items-center justify-center pointer-events-none text-2xl font-black text-rose-300"
-              style={{ textShadow: "0 2px 8px rgba(244,63,94,0.85), 0 0 2px black" }}
-            >
-              −{dmgPop.n}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    );
-  }
-
-  if (plannedSummon && showPlanned) {
-    // Ghost-preview of the planned summon — semi-transparent until lock.
-    // Same move-tinted rim as the real creature, but dashed border + 60%
-    // opacity so the player reads "this WILL be there, not yet committed".
-    const pal = MOVE_PALETTE[plannedSummon.move];
-    const rim = moveRim(pal.hex);
-    return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.7 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="aspect-[5/4] w-full rounded-xl relative flex flex-col items-center justify-center overflow-hidden"
-        style={{
-          background: "linear-gradient(160deg, rgba(20,22,32,0.55) 0%, rgba(10,12,20,0.55) 100%)",
-          border: `2px dashed ${rim}`,
-          boxShadow: `0 0 10px -3px ${moveGlow(pal.hex)}80`,
-        }}
-      >
-        <MoveGlyph move={plannedSummon.move} className="w-10 h-10 sm:w-12 sm:h-12 opacity-80" />
-        <span
-          className="text-[7px] uppercase tracking-wider font-bold leading-none mt-0.5 opacity-90"
-          style={{ color: rim }}
-        >
-          {plannedSummon.move}
-        </span>
-        <span className="absolute bottom-0.5 left-0 right-0 text-center text-[8px] text-emerald-200/90 uppercase tracking-[0.18em] font-black">
-          en attente
-        </span>
-      </motion.div>
-    );
-  }
-
-  return (
-    <div className="aspect-[5/4] w-full rounded-xl border-2 border-dashed border-hairline bg-black/15 flex items-center justify-center">
-      <span className="text-[9px] uppercase tracking-[0.2em] text-zinc-600 font-bold">vide</span>
-    </div>
-  );
-}
 
 /** Opp-reveal banner — surfaces the CPU's committed intent during the
  *  reveal window. Lists each spell as a chip with the card's glyph + name +

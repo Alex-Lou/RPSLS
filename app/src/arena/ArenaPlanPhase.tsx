@@ -24,8 +24,10 @@ import { MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "../icons";
 import { hapticAlert, hapticTap } from "../haptic";
 import { CARDS } from "../ranked/cards";
 import { CardImage } from "../ranked/CardImage";
+import { useT } from "../i18n";
 import type { CardId } from "../ranked/rankedTypes";
 import { arenaSupported } from "./arenaCardEffects";
+import { ArenaCardInspect } from "./ArenaCardInspect";
 import type {
   BoardState,
   LaneIndex,
@@ -71,6 +73,7 @@ export function ArenaPlanPhase({
   board, intent, intentCost, disabled,
   onAddSpell, onRemoveSpell, onAddSummon, onRemoveSummon, onLock,
 }: ArenaPlanPhaseProps) {
+  const t = useT();
   const me = board.a;
   const manaLeft = me.mana - intentCost;
   const canLock = !disabled && intentCost <= me.mana;
@@ -82,11 +85,16 @@ export function ArenaPlanPhase({
     | { kind: "spell"; id: CardId; targetKind: SpellTargetKind }
     | null
   >(null);
+  /** Inspect mode — long-press / tap-info on a hand card surfaces its
+   *  full description. Independent of `targeting` so the player can read
+   *  a card without committing to play it. */
+  const [inspecting, setInspecting] = useState<CardId | null>(null);
 
   function pickMoveToSummon(mv: Move) {
     if (disabled) return;
     if (manaLeft < 1) { hapticAlert(); return; }
     hapticTap();
+    setInspecting(null); // close any open spell inspect when going to summon
     setTargeting({ kind: "summon", move: mv });
   }
 
@@ -95,8 +103,17 @@ export function ArenaPlanPhase({
     const card = CARDS[id];
     if (!arenaSupported(id)) { hapticAlert(); return; }
     if (manaLeft < card.cost) { hapticAlert(); return; }
+    // Two-tap UX: first tap surfaces the inspect panel so the player reads
+    // what the card actually DOES. Second tap on the SAME card commits.
+    // Tap a different card → switches inspect to the new card.
+    if (inspecting !== id) {
+      hapticTap();
+      setInspecting(id);
+      return;
+    }
     const targetKind = CARD_TARGET_KIND[id] ?? "global";
     hapticTap();
+    setInspecting(null);
     if (targetKind === "self" || targetKind === "global" || targetKind === "hero") {
       // No further input needed — commit immediately.
       onAddSpell({ id, kind: targetKind } as PlayedSpell);
@@ -122,6 +139,7 @@ export function ArenaPlanPhase({
   function cancelTargeting() {
     hapticTap();
     setTargeting(null);
+    setInspecting(null);
   }
 
   return (
@@ -190,12 +208,29 @@ export function ArenaPlanPhase({
         </div>
       )}
 
+      {/* Card inspect panel — appears on the FIRST tap of a hand card so the
+       *  player reads the effect before committing. A second tap on the
+       *  same card commits / opens targeting. The "Lancer" CTA inside is a
+       *  shortcut for that second tap. */}
+      <AnimatePresence>
+        {inspecting && (
+          <ArenaCardInspect
+            id={inspecting}
+            targetKind={CARD_TARGET_KIND[inspecting] ?? "global"}
+            t={t}
+            onCommit={() => pickCardToCast(inspecting)}
+            onClose={() => setInspecting(null)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Mana summary */}
       <div className="text-center text-[10px] text-ink-muted font-bold tabular-nums">
         Mana planifié : <span className={intentCost > me.mana ? "text-rose-300" : "text-sky-300"}>
           {intentCost}/{me.mana}
         </span>
-        {intentCost === 0 && <span className="text-ink-faint"> · touche une carte ou un coup ↓</span>}
+        {intentCost === 0 && !inspecting && <span className="text-ink-faint"> · touche une carte ou un coup ↓</span>}
+        {inspecting && <span className="text-amber-300"> · re-touche la carte pour la jouer</span>}
       </div>
 
       {/* RPSLS move picker — summon row. Same dark-glass + neon-rim aesthetic
@@ -249,6 +284,7 @@ export function ArenaPlanPhase({
             const supported = arenaSupported(id);
             const cannotAfford = manaLeft < card.cost;
             const isTargeting = targeting?.kind === "spell" && targeting.id === id;
+            const isInspecting = inspecting === id;
             return (
               <button
                 key={`${id}-${i}`}
@@ -256,7 +292,11 @@ export function ArenaPlanPhase({
                 disabled={!supported || cannotAfford || disabled}
                 className={
                   "relative w-[52px] h-[72px] sm:w-[58px] sm:h-[80px] rounded-xl overflow-hidden bg-surface-raised shrink-0 transition " +
-                  "ring-2 " + (isTargeting ? "ring-amber-300 scale-105" : "ring-white/20") +
+                  "ring-2 " + (
+                    isTargeting ? "ring-amber-300 scale-105"
+                    : isInspecting ? "ring-sky-300 scale-110"
+                    : "ring-white/20"
+                  ) +
                   (!supported ? " grayscale opacity-30" : cannotAfford ? " opacity-40" : "")
                 }
                 title={supported ? undefined : "Carte pas encore disponible en Arena"}
@@ -312,3 +352,4 @@ export function ArenaPlanPhase({
     </div>
   );
 }
+

@@ -109,6 +109,10 @@ interface AppState {
   /** Ranked card collection */
   unlockCard: (id: string) => void;
   setRankedDeck: (deck: string[]) => void;
+  /** Record a finished Constellation Pro (arena) match — increments the
+   *  appropriate field of player.arenaStats. The sync subscriber pushes
+   *  the change to the cloud via the existing playerSync pipeline. */
+  recordArenaMatch: (outcome: "win" | "loss" | "draw") => void;
   /** Spend {@link PACK_COST} éclats to open a pack of 3 cards. Duplicates
    *  are auto-converted to poussière. Returns the result, or `null` when
    *  the player cannot afford the pack. */
@@ -339,6 +343,15 @@ export const useStore = create<AppState>()(
         const col = s.player.cardCollection ?? [];
         if (col.includes(id)) return s;
         return { player: { ...s.player, cardCollection: [...col, id] } };
+      }),
+      recordArenaMatch: (outcome) => set((s) => {
+        const cur = s.player.arenaStats ?? { wins: 0, losses: 0, draws: 0 };
+        const next = {
+          wins:   cur.wins + (outcome === "win" ? 1 : 0),
+          losses: cur.losses + (outcome === "loss" ? 1 : 0),
+          draws:  cur.draws + (outcome === "draw" ? 1 : 0),
+        };
+        return { player: { ...s.player, arenaStats: next } };
       }),
       setRankedDeck: (deck) => set((s) => ({
         player: { ...s.player, rankedDeck: deck },

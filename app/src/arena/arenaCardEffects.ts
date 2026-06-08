@@ -20,13 +20,20 @@
  */
 
 import { drawCards, damageHero, healHero, damageCreature, makeCreature } from "./arenaRules";
-import type {
-  BoardState,
-  PlayedSpell,
-  Side,
-  LaneState,
-  Creature,
-} from "./arenaTypes";
+import {
+  getMyCreatureOnLane,
+  getOppCreatureOnLane,
+  withMyCreatureOnLane,
+  withOppCreatureOnLane,
+  withSideHero,
+  oppSide,
+} from "./arenaSpellHelpers";
+import {
+  applyGaia, applySablier, applyOffre, applyRempart, applyBenediction,
+  applyOracleInverse, applyCascade, applyEchappee, applyMascarade, applySangsue,
+  applyTrouNoir, applyMarchandAmes, applyParadoxe, applyJuge, applyGenese,
+} from "./arenaPhase2Spells";
+import { type BoardState, type Creature, type LaneState, type PlayedSpell, type Side } from "./arenaTypes";
 import type { CardId } from "../ranked/rankedTypes";
 
 export interface ArenaSpellContext {
@@ -42,21 +49,41 @@ const PRIORITY_TABLE: Partial<Record<CardId, number>> = {
   aegis:        100,
   anchor:       110,
   riposte:      120,
+  // Healing / hp recovery (140) — lands BEFORE buffs so a healed creature
+  // benefits from a same-turn ATK boost.
+  "second-wind": 140,
+  gaia:         145,
+  // Mana / tempo (160) — fires early so the extra mana can be spent on
+  // the same turn.
+  sablier:      160,
+  offre:        170,
   // Buffs / debuffs (200)
   precision:    200,
   surge:        210,
   tide:         220,
+  rempart:      225,
+  benediction:  228,
   curse:        230,
   // Utility / draw (300)
   prescience:   300,
   augur:        310,
   oracle:       320,
+  "oracle-inverse": 325,
   mirror:       330,
+  cascade:      335,
+  echappee:     340,
+  mascarade:    345,
   // Direct damage / removal (400)
   heist:        400,
+  sangsue:      405,
   supernova:    410,
   vortex:       420,
-  "second-wind": 150, // healing is a setup move
+  "trou-noir":  430,
+  "marchand-ames": 440,
+  paradoxe:     450,
+  // Hand / board wipes (500) — fire LAST so prior effects are accounted for.
+  juge:         500,
+  genese:       510,
 };
 
 export function spellPriority(id: CardId): number {
@@ -90,10 +117,30 @@ export function applyArenaSpell(ctx: ArenaSpellContext): BoardState {
     case "augur":       return applyAugur(board, side);
     case "oracle":      return applyOracle(board, side);
     case "mirror":      return applyMirror(board, side, spell);
+    // ── Healing ──
+    case "gaia":        return applyGaia(board, side);
+    // ── Mana / tempo ──
+    case "sablier":     return applySablier(board, side);
+    case "offre":       return applyOffre(board, side);
+    // ── Buffs / debuffs ──
+    case "rempart":     return applyRempart(board, side);
+    case "benediction": return applyBenediction(board, side);
+    // ── Utility / draw ──
+    case "oracle-inverse": return applyOracleInverse(board, side);
+    case "cascade":     return applyCascade(board, side);
+    case "echappee":    return applyEchappee(board, side, spell);
+    case "mascarade":   return applyMascarade(board, side);
     // ── Direct damage / removal ──
     case "heist":       return applyHeist(board, side);
+    case "sangsue":     return applySangsue(board, side, spell);
     case "supernova":   return applySupernova(board, side, spell);
     case "vortex":      return applyVortex(board, side);
+    case "trou-noir":   return applyTrouNoir(board, side, spell);
+    case "marchand-ames": return applyMarchandAmes(board, side);
+    case "paradoxe":    return applyParadoxe(board);
+    // ── Hand / board wipes ──
+    case "juge":        return applyJuge(board);
+    case "genese":      return applyGenese(board);
     default:
       // Unadapted card — no-op for MVP. Phase 2 fills these in.
       // eslint-disable-next-line no-console
@@ -101,48 +148,6 @@ export function applyArenaSpell(ctx: ArenaSpellContext): BoardState {
       return board;
   }
 }
-
-/* ───────────────────────── Helpers ───────────────────────── */
-
-function getMyCreatureOnLane(
-  board: BoardState, side: Side, lane: number,
-): Creature | null {
-  return side === "a" ? board.lanes[lane].a : board.lanes[lane].b;
-}
-
-function getOppCreatureOnLane(
-  board: BoardState, side: Side, lane: number,
-): Creature | null {
-  return side === "a" ? board.lanes[lane].b : board.lanes[lane].a;
-}
-
-function withMyCreatureOnLane(
-  board: BoardState, side: Side, lane: number, c: Creature | null,
-): BoardState {
-  const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
-  const cur = { ...lanes[lane] };
-  if (side === "a") cur.a = c; else cur.b = c;
-  lanes[lane] = cur;
-  return { ...board, lanes };
-}
-
-function withOppCreatureOnLane(
-  board: BoardState, side: Side, lane: number, c: Creature | null,
-): BoardState {
-  const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
-  const cur = { ...lanes[lane] };
-  if (side === "a") cur.b = c; else cur.a = c;
-  lanes[lane] = cur;
-  return { ...board, lanes };
-}
-
-function withSideHero(
-  board: BoardState, side: Side, hero: BoardState["a"],
-): BoardState {
-  return side === "a" ? { ...board, a: hero } : { ...board, b: hero };
-}
-
-function oppSide(side: Side): Side { return side === "a" ? "b" : "a"; }
 
 /* ───────────────────────── Individual spells ───────────────────────── */
 
@@ -293,3 +298,7 @@ function applyVortex(board: BoardState, side: Side): BoardState {
   }
   return { ...board, lanes };
 }
+
+/* Phase 2 spells (gaia, sablier, offre, rempart, benediction, oracle-inverse,
+ * cascade, echappee, mascarade, sangsue, trou-noir, marchand-ames, paradoxe,
+ * juge, genese) live in arenaPhase2Spells.ts — imported above. */

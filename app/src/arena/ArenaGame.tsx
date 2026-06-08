@@ -79,6 +79,7 @@ export function ArenaGame({
 }) {
   const player = useStore((s) => s.player);
   const difficulty = player.difficulty ?? "normal";
+  const recordArenaMatch = useStore((s) => s.recordArenaMatch);
 
   // Player deck — filter out cards we haven't adapted to Arena yet so the
   // hand never contains a no-op card. Falls back to a curated default if
@@ -109,15 +110,22 @@ export function ArenaGame({
     return () => window.clearTimeout(id);
   }, []);
 
-  // Match-end haptic — fired once when the phase flips.
+  // Match-end haptic + stat record. Fired once when the phase flips.
+  // recordArenaMatch lives in the store and is sync'd to the cloud via the
+  // existing playerSync subscriber (fingerprint covers arenaStats now).
   const matchEndedRef = useRef(false);
   useEffect(() => {
     if (board.phase !== "match-end") return;
     if (matchEndedRef.current) return;
     matchEndedRef.current = true;
-    const youWon = board.b.hp <= 0 && board.a.hp > 0;
-    if (youWon) hapticMatchWin(); else hapticMatchLoss();
-  }, [board.phase, board.a.hp, board.b.hp]);
+    const aDead = board.a.hp <= 0;
+    const bDead = board.b.hp <= 0;
+    const outcome: "win" | "loss" | "draw" =
+      aDead && bDead ? "draw" : bDead ? "win" : "loss";
+    if (outcome === "win") hapticMatchWin();
+    else if (outcome === "loss") hapticMatchLoss();
+    recordArenaMatch(outcome);
+  }, [board.phase, board.a.hp, board.b.hp, recordArenaMatch]);
 
   /* ──────────── Intent builders ──────────── */
 
