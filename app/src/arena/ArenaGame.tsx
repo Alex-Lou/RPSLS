@@ -50,7 +50,11 @@ const CPU_ARENA_DECK: CardId[] = [
 ];
 
 const MATCH_FOUND_SPLASH_MS = 1_800;
-const RESOLVE_PAUSE_MS = 2_200;
+/** "Adversaire joue…" preview window — long enough to read what the opp
+ *  committed before the resolver applies it. */
+const OPP_REVEAL_MS = 1_800;
+/** Post-resolve pause so the player reads the damage flash before next turn. */
+const RESOLVE_PAUSE_MS = 2_000;
 
 export function ArenaGame({
   onQuit,
@@ -76,6 +80,10 @@ export function ArenaGame({
   const [intent, setIntent] = useState<TurnIntent>({ spells: [], summons: [] });
   const [matchSplash, setMatchSplash] = useState(true);
   const [resolving, setResolving] = useState(false);
+  /** Opp intent preview: set after lock, cleared when the resolver fires.
+   *  Drives the "Adversaire joue X / summon Y" banner + ghost previews on
+   *  the opp lanes so the player SEES what they committed. */
+  const [oppPreview, setOppPreview] = useState<TurnIntent | null>(null);
 
   useEffect(() => {
     hapticMatchStart();
@@ -147,37 +155,41 @@ export function ArenaGame({
     // both intents at once anyway, so this is fair).
     const cpuIntent = cpuArenaDecision(board, "b", difficulty);
 
-    // Move both players' cards out of hand into "spent" (resolver consumes
-    // the mana via the spells/summons themselves, but the cards must leave
-    // the hand). We pre-clean the hands here so the resolver sees the
-    // post-play hand state.
-    const boardAfterHandClean = {
-      ...board,
-      a: { ...board.a, hand: removeSpentCards(board.a.hand, intent) },
-      b: { ...board.b, hand: removeSpentCards(board.b.hand, cpuIntent) },
-    };
+    // Reveal phase: show the player what the CPU committed BEFORE the
+    // resolver applies it. Ghost summons appear on opp lanes; spells
+    // chip-strip surfaces above. Phase 2 will animate each card hitting.
+    setOppPreview(cpuIntent);
 
-    // Apply the resolver. Animation is "instant" for MVP — Phase 2 will
-    // interpolate between board states.
-    const after = resolveTurn(boardAfterHandClean, intent, cpuIntent);
-    setBoard(after);
-    setIntent({ spells: [], summons: [] });
-
-    // Reveal haptic on lethal swing.
-    if (after.a.hp <= 0 || after.b.hp <= 0) {
-      window.setTimeout(() => {
-        if (after.b.hp <= 0 && after.a.hp > 0) hapticWin();
-        else hapticLoss();
-      }, 400);
-    }
-
-    // After a pause to let the player read the result, advance to the next
-    // turn (mana up, draw a card) unless the match ended.
     window.setTimeout(() => {
-      setResolving(false);
-      if (after.phase === "match-end") return;
-      setBoard((b) => advanceToNextTurn(b));
-    }, RESOLVE_PAUSE_MS);
+      // Move both players' cards out of hand into "spent".
+      const boardAfterHandClean = {
+        ...board,
+        a: { ...board.a, hand: removeSpentCards(board.a.hand, intent) },
+        b: { ...board.b, hand: removeSpentCards(board.b.hand, cpuIntent) },
+      };
+      // Resolver fires now. The board jumps to post-state; the card cells
+      // animate damage flashes via their `key={creature.hp}` motion props.
+      const after = resolveTurn(boardAfterHandClean, intent, cpuIntent);
+      setBoard(after);
+      setIntent({ spells: [], summons: [] });
+      setOppPreview(null);
+
+      // Lethal-swing haptic.
+      if (after.a.hp <= 0 || after.b.hp <= 0) {
+        window.setTimeout(() => {
+          if (after.b.hp <= 0 && after.a.hp > 0) hapticWin();
+          else hapticLoss();
+        }, 400);
+      }
+
+      // After a pause to let the player read the result, advance to the
+      // next turn (mana up, draw a card) unless the match ended.
+      window.setTimeout(() => {
+        setResolving(false);
+        if (after.phase === "match-end") return;
+        setBoard((b) => advanceToNextTurn(b));
+      }, RESOLVE_PAUSE_MS);
+    }, OPP_REVEAL_MS);
   }
 
   /* ──────────── Render ──────────── */
@@ -226,6 +238,7 @@ export function ArenaGame({
         board={board}
         playerSide="a"
         intent={intent}
+        oppPreview={oppPreview}
       />
       <ArenaPlanPhase
         board={board}

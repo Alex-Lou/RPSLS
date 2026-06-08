@@ -20,7 +20,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { MOVES } from "../engine/game";
 import type { Move } from "../engine/game";
-import { MoveGlyph, MOVE_PALETTE } from "../icons";
+import { MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "../icons";
 import { hapticAlert, hapticTap } from "../haptic";
 import { CARDS } from "../ranked/cards";
 import { CardImage } from "../ranked/CardImage";
@@ -198,27 +198,44 @@ export function ArenaPlanPhase({
         {intentCost === 0 && <span className="text-ink-faint"> · touche une carte ou un coup ↓</span>}
       </div>
 
-      {/* RPSLS move picker — summon row */}
-      <div className="grid grid-cols-5 gap-1.5 max-w-md mx-auto w-full">
+      {/* RPSLS move picker — summon row. Same dark-glass + neon-rim aesthetic
+       *  as the Ranked picker (PickerBar in RankedPickPhase): the glyph stays
+       *  the only colored thing, the frame is dark with a per-move rim and
+       *  glow that blends ~45% toward the active theme accent. Reads cleanly
+       *  on every theme background instead of fighting it. */}
+      <div className="grid grid-cols-5 gap-1.5 sm:gap-2 max-w-md mx-auto w-full">
         {MOVES.map((mv) => {
           const pal = MOVE_PALETTE[mv];
           const cannotAfford = manaLeft < 1;
           const isTargeting = targeting?.kind === "summon" && targeting.move === mv;
+          const rim = moveRim(pal.hex);
+          const glow = moveGlow(pal.hex);
           return (
             <button
               key={mv}
               onClick={() => pickMoveToSummon(mv)}
               disabled={cannotAfford || disabled}
               className={
-                "relative aspect-[4/5] rounded-xl flex flex-col items-center justify-center gap-0.5 py-1 transition " +
-                "bg-gradient-to-br " + pal.from + " " + pal.to + " ring-2 " + pal.ring +
-                (cannotAfford ? " opacity-30 grayscale" : "") +
-                (isTargeting ? " ring-amber-300 scale-105" : "")
+                "relative aspect-[4/5] rounded-xl flex flex-col items-center justify-center gap-0.5 py-1 transition active:scale-92 " +
+                (cannotAfford ? "opacity-30 grayscale " : "") +
+                (isTargeting ? "scale-105 " : "")
               }
+              style={{
+                background: "linear-gradient(160deg, rgba(20,22,32,0.92) 0%, rgba(10,12,20,0.92) 100%)",
+                border: `2px solid ${isTargeting ? "rgba(252, 211, 77, 0.9)" : rim}`,
+                boxShadow: isTargeting
+                  ? "0 0 18px -2px rgba(252, 211, 77, 0.7), inset 0 1px 0 rgba(255,255,255,0.08)"
+                  : `0 0 12px -2px ${glow}, inset 0 1px 0 rgba(255,255,255,0.08)`,
+              }}
             >
-              <MoveGlyph move={mv} className="w-8 h-8" />
-              <span className="text-[7px] uppercase tracking-wider font-bold text-white/90">{mv}</span>
-              <span className="text-[7px] font-bold text-sky-300">1m</span>
+              <MoveGlyph move={mv} className="w-9 h-9 sm:w-10 sm:h-10" />
+              <span className="text-[8px] uppercase tracking-wider font-bold leading-none" style={{ color: rim }}>
+                {mv}
+              </span>
+              {/* Mana cost pip in the corner — kept tiny, doesn't fight the glyph. */}
+              <span className="absolute top-1 right-1 inline-flex items-center gap-0.5 px-1 py-0.5 rounded-full bg-black/70 backdrop-blur-sm">
+                <span className="w-1 h-1 rounded-full bg-sky-300" />
+              </span>
             </button>
           );
         })}
