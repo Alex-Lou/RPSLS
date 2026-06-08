@@ -2,8 +2,8 @@
  * ArenaMatchSplash — cinematic intro shown for ~1.8s before the match
  * UI takes over.
  *
- * Replaces the bland "Match en préparation…" text with a Hearthstone-
- * style face-off: player avatar slides in from the left, CPU portrait
+ * Replaces the bland "Match en préparation…" text with a fighting-game
+ * face-off: player avatar slides in from the left, CPU portrait
  * slides in from the right, "VS" pulses in the centre, then a brief
  * "GO!" beat tips the camera into the board. Pure CSS/motion, no asset
  * dependency beyond the existing avatar resolution.

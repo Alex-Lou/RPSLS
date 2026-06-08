@@ -47,7 +47,7 @@ export function ArenaHowItWorks({ onClose }: { onClose: () => void }) {
             sub={[
               "1. Tu reçois +1 max-mana (tour N a N max-mana, jusqu'à 10). Ta mana se REMPLIT.",
               "2. Tu pioches 1 carte (l'opp aussi, en parallèle).",
-              "3. Tu PLANIFIES en même temps que l'opp (pas de tour-par-tour Hearthstone — vous jouez SIMULTANÉMENT).",
+              "3. Tu PLANIFIES en même temps que l'opp (vous jouez SIMULTANÉMENT — pas chacun son tour).",
               "4. Tu peux: tape un coup RPSLS pour invoquer (1 mana, sur ta lane vide), tape une carte pour la jouer (coût variable, vise selon le type).",
               "5. Tape ✓ FIN DE TOUR. L'opp lock aussi.",
               "6. Résolution: SORTS (les 2 côtés) → SUMMONS → COMBAT lane 1 → lane 2 → lane 3.",

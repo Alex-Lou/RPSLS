@@ -94,9 +94,9 @@ const fr: Record<string, string> = {
   // ── Constellation Classée (Phase A) ──
   "mode.ranked_constellation": "Constellation Classée",
   "mode.ranked_constellation.tag": "Cartes + mana · tournoi",
-  // ── Constellation Pro (mini-HS, BETA) ──
+  // ── Constellation Pro (BETA) ──
   "mode.arena_pro": "Constellation Pro",
-  "mode.arena_pro.tag": "Mini-Hearthstone · créatures + sorts · 20 PV",
+  "mode.arena_pro.tag": "Mini-CCG · créatures + sorts · 20 PV",
   "arena.matchFound": "Match en préparation…",
   "arena.tagline": "Premier héros à 0 PV perd. Invoquez, lancez des sorts, jouez intelligent.",
   "arena.endTurn": "Fin de tour",

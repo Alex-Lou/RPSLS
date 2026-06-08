@@ -3,7 +3,7 @@
 **Date :** 2026-06-08
 **Statut :** MVP in progress (branche `constellation-pro`)
 
-> Mode séparé inspiré de Hearthstone. **Ne touche PAS au Ranked actuel.** Réutilise tout ce qui peut l'être (thèmes, fonds, pads, avatars, deck, art, codex, monnaies).
+> Mode CCG séparé (créatures persistantes + sorts + mana scalable). **Ne touche PAS au Ranked actuel.** Réutilise tout ce qui peut l'être (thèmes, fonds, pads, avatars, deck, art, codex, monnaies).
 
 ---
 
@@ -198,6 +198,6 @@ app/src/arena/
 
 - **Power creep** : multi-card par tour permet des combos de fou. Tester d'abord, équilibrer après.
 - **Game length** : si trop long (>15 min), réduire HP de départ à 15.
-- **CPU AI** : Hearthstone-like AI est dur. MVP = greedy (joue toujours la carte la plus chère qu'il peut, summon sur lane vide, attaque héros si lane libre). Itérer.
+- **CPU AI** : un vrai CCG AI est dur. MVP = greedy (joue toujours la carte la plus chère qu'il peut, summon sur lane vide, attaque héros si lane libre). Itérer.
 - **UI density** : 3 lanes × 2 côtés × créatures + sorts + main + mana + HP héros = beaucoup d'info à afficher. Préparer un layout généreux.
 - **Cohabitation** avec les 30 cartes non-adaptées : afficher "Bientôt en Arena" pour éviter qu'elles se jouent et explosent le jeu.

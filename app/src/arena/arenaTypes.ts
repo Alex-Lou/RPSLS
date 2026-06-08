@@ -1,5 +1,5 @@
 /**
- * Constellation Pro — pure types for the mini-Hearthstone-like mode.
+ * Constellation Pro — pure types for the mini-CCG mode.
  *
  * Separate from the Ranked types (`ranked/rankedTypes.ts`) because the
  * game shape is fundamentally different: persistent creatures on lanes,
@@ -62,7 +62,7 @@ export const CREATURE_STATS: Record<Move, CreatureStats> = {
 };
 
 /** A creature sitting on a lane. Carries persistent damage between turns
- *  (HS-style: wounded creatures stay wounded). Buffs are one-turn flags. */
+ *  (CCG-style: wounded creatures stay wounded). Buffs are one-turn flags. */
 export interface Creature {
   move: Move;
   /** Owner side. */
@@ -77,7 +77,7 @@ export interface Creature {
   anchored: boolean;
   /** Riposte: if THIS creature dies during combat resolution, the killer dies too. */
   ripostePrimed: boolean;
-  /** TAUNT (Hearthstone-borrowed): while this creature is on the board,
+  /** TAUNT (TCG-classic): while this creature is on the board,
    *  opponent's lane creatures cannot bypass to hit my HERO directly
    *  (they hit nothing instead — opp must clear my taunt-bearer first).
    *  Set inherently on Rock creatures at summon. */

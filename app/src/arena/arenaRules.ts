@@ -109,7 +109,7 @@ export function healHero(hero: HeroState, amount: number): HeroState {
 
 /** Pull `n` cards from the deck → hand (reshuffles discard into deck if the
  *  deck runs dry mid-draw). Returns the new HeroState. Cap at HAND_CAP — extra
- *  cards are "burned" (lost to the void, HS-style overdraw). */
+ *  cards are "burned" (lost to the void — classic overdraw rule). */
 export function drawCards(hero: HeroState, n: number): HeroState {
   let { hand, deck, discard } = hero;
   hand = hand.slice();
@@ -139,7 +139,7 @@ export function makeCreature(move: Move, side: Side): Creature {
     divineShield: false,
     anchored: false,
     ripostePrimed: false,
-    // Hearthstone-borrowed: Rock creatures inherently have TAUNT — they
+    // Rock creatures inherently have TAUNT — they
     // block opp's undefended-lane attacks against my hero. Other moves
     // start without taunt (Crepuscule / Riposte spells can grant it later).
     taunt: move === "rock",
@@ -277,7 +277,7 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
 
   if (ca && cb) {
     // Both creatures present → trade. Damage values computed BEFORE either
-    // dies so trades are symmetric (Hearthstone-style).
+    // dies so trades are symmetric (CCG-style).
     const atkA = creatureEffectiveAtk(ca);
     const atkB = creatureEffectiveAtk(cb);
     const dmgToA = atkB + (moveCountersMove(cb.move, ca.move) ? 1 : 0);
@@ -292,7 +292,7 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
     return { ...board, lanes };
   }
 
-  // TAUNT (Hearthstone): if the would-be-attacked side has ANY taunt creature
+  // TAUNT: if the would-be-attacked side has ANY taunt creature
   // anywhere on the board, the undefended-lane attack is deflected — the
   // attacker hits nothing (the taunt-bearer "demands attention" but isn't on
   // this lane to be hit either, so opp's lane creature wastes its turn).

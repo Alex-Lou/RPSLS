@@ -16,7 +16,7 @@ Living doc — coché au fur et à mesure. Quand toutes les cases sont cochées,
 2. **Modèle de tour** — **Simultané** (RPSLS-style) : les deux joueurs planifient en parallèle, lock, le resolver fire.
 3. **Types de cartes** — **Créatures + sorts** : les 5 coups RPSLS deviennent des créatures persistantes avec ATK/HP ; les 46 cartes existantes (registry `ranked/cards.ts`) deviennent des sorts.
 4. **Timing** — Démarrage immédiat, branche séparée, MVP en 2-3 sessions.
-5. **Reuse** — "tu reprends tous les codes du Constell Ranked normal déjà existant pour les thèmes, goodies, etc et t'en fais un mini Hearthstone". Aucune duplication de registry / d'art / de thème.
+5. **Reuse** — réutiliser tous les assets/registries du Constellation Ranked (thèmes, goodies, cards). Aucune duplication de registry / d'art / de thème.
 6. **Pas de regression** sur Ranked actuel : le mode séparé doit cohabiter sans toucher au code existant.
 
 ---

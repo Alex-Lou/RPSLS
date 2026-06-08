@@ -94,9 +94,9 @@ const en: Record<string, string> = {
   // ── Constellation Ranked (Phase A) ──
   "mode.ranked_constellation": "Constellation Ranked",
   "mode.ranked_constellation.tag": "Cards + mana · tournament",
-  // ── Constellation Pro (mini-HS, BETA) ──
+  // ── Constellation Pro (BETA) ──
   "mode.arena_pro": "Constellation Pro",
-  "mode.arena_pro.tag": "Mini-Hearthstone · creatures + spells · 20 HP",
+  "mode.arena_pro.tag": "Mini-CCG · creatures + spells · 20 HP",
   "arena.matchFound": "Match starting…",
   "arena.tagline": "First hero to 0 HP loses. Summon creatures, cast spells, play smart.",
   "arena.endTurn": "End turn",

@@ -144,7 +144,7 @@ export function ArenaPlanPhase({
   return (
     <div className="flex flex-col gap-1 px-2 pb-1.5 shrink-0">
       {/* Targeting hint — instructs the player to tap a lane ON THE BOARD
-       *  itself now (Hearthstone-style direct target). The board's player
+       *  itself now (CCG-style direct target). The board's player
        *  row pulses while targeting is active; this strip just reminds. */}
       <div className="h-6 flex items-center justify-center">
         <AnimatePresence>

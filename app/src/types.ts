@@ -135,7 +135,7 @@ export interface Player {
    *  apart from the global `stats` so the mode reports its OWN results
    *  ("son propre enregistrement"). */
   classeStats?: { wins: number; losses: number; draws: number };
-  /** Constellation Pro (mini-Hearthstone arena) own record — separate from
+  /** Constellation Pro (mini-CCG arena) own record — separate from
    *  Ranked and Classé. Cloud-synced via playerSync so it survives a
    *  reinstall. Recorded by ArenaGame at phase=match-end. */
   arenaStats?: { wins: number; losses: number; draws: number };

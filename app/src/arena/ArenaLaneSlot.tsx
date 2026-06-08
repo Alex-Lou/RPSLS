@@ -30,7 +30,7 @@ export interface ArenaLaneSlotProps {
   chargeAttack?: boolean;
   /** When true, the lane is a valid drop target — frame pulses ambre + the
    *  whole slot becomes a button. Used by the lifted-targeting flow so the
-   *  player taps directly on the board (Hearthstone-style direct manip).
+   *  player taps directly on the board (CCG-style direct manip).
    *  Works on BOTH empty slots (summon, mirror) AND creature slots (aegis,
    *  curse, etc.) — the parent decides via `validLanes`. */
   clickable?: boolean;

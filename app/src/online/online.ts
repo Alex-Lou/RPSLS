@@ -64,7 +64,7 @@ export interface PlayerProgress {
   classeWins?: number;
   classeLosses?: number;
   classeDraws?: number;
-  /** Constellation Pro (mini-Hearthstone arena) record — optional for
+  /** Constellation Pro (mini-CCG arena) record — optional for
    *  back-compat with older server builds that don't know about Arena yet. */
   arenaWins?: number;
   arenaLosses?: number;

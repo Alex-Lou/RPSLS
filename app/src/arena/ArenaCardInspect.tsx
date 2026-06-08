@@ -1,7 +1,7 @@
 /**
  * ArenaCardInspect — fullscreen modal preview of a hand card.
  *
- * Hearthstone-style: tap a card in hand → the card POPS to a big readable
+ * CCG-style: tap a card in hand → the card POPS to a big readable
  * size in the center of the screen with full art, description, target hint
  * and a clear "Lancer" CTA. Tap outside / Fermer to dismiss. The board
  * underneath is dimmed so the player focuses on the card text.

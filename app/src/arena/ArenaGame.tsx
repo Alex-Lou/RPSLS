@@ -84,7 +84,7 @@ export function ArenaGame({
   /** Current step in the sequenced resolver. Drives the phase banner. */
   const [resolveStep, setResolveStep] = useState<ResolveStep | null>(null);
   /** Active targeting (lifted from ArenaPlanPhase) — when set, tapping a
-   *  lane on the BOARD itself commits the spell/summon. Hearthstone-style
+   *  lane on the BOARD itself commits the spell/summon. CCG-style
    *  direct manipulation instead of separate "Lane 1/2/3" buttons. */
   const [targeting, setTargeting] = useState<ArenaTargeting>(null);
   /** Which lane is CURRENTLY animating its combat exchange — drives the
