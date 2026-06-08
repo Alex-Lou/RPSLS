@@ -139,6 +139,10 @@ export function makeCreature(move: Move, side: Side): Creature {
     divineShield: false,
     anchored: false,
     ripostePrimed: false,
+    // Hearthstone-borrowed: Rock creatures inherently have TAUNT — they
+    // block opp's undefended-lane attacks against my hero. Other moves
+    // start without taunt (Crepuscule / Riposte spells can grant it later).
+    taunt: move === "rock",
   };
 }
 
@@ -156,12 +160,12 @@ export function damageCreature(c: Creature, dmg: number): Creature | null {
   return { ...c, hp };
 }
 
-/** A creature's "per-turn" buffs (atkBuff, divineShield, anchored, riposte)
- *  reset at the END of the turn so they don't snowball forever. Persistent
- *  damage (hp loss) stays. */
+/** A creature's "per-turn" buffs (atkBuff, anchored, riposte) reset at the
+ *  END of the turn so they don't snowball forever. Persistent damage stays.
+ *  - divineShield: persists across turns until consumed by damage.
+ *  - taunt: persists (intrinsic to the creature, doesn't expire). */
 export function endOfTurnReset(c: Creature): Creature {
   return { ...c, atkBuff: 0, anchored: false, ripostePrimed: false };
-  // NB: divineShield persists across turns intentionally (HS-style: until consumed).
 }
 
 /* ───────────────────────── Resolver ───────────────────────── */
@@ -246,6 +250,13 @@ export function applySummons(board: BoardState, intent: TurnIntent, side: Side):
   return b;
 }
 
+/** Run combat on a SINGLE lane — exported so the UI can sequence the
+ *  3-lane combat phase one lane at a time (better readability + per-lane
+ *  shake/death anim cues). The full-board resolver below just chains this. */
+export function resolveLaneCombatAt(board: BoardState, laneIdx: LaneIndex): BoardState {
+  return resolveLaneCombat(board, laneIdx);
+}
+
 /** Run combat across all 3 lanes. Damage is applied SIMULTANEOUSLY (both
  *  creatures' new HP computed from the original state of the lane). Empty
  *  lane → attacker hits the opposing hero for its effective ATK.
@@ -281,13 +292,25 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
     return { ...board, lanes };
   }
 
+  // TAUNT (Hearthstone): if the would-be-attacked side has ANY taunt creature
+  // anywhere on the board, the undefended-lane attack is deflected — the
+  // attacker hits nothing (the taunt-bearer "demands attention" but isn't on
+  // this lane to be hit either, so opp's lane creature wastes its turn).
+  const hasTaunt = (side: Side): boolean =>
+    board.lanes.some((l) => {
+      const c = side === "a" ? l.a : l.b;
+      return !!c && c.taunt;
+    });
+
   if (ca && !cb) {
-    // A's creature attacks B's hero unopposed.
+    // A's creature would attack B's hero unopposed — UNLESS B has a taunt
+    // creature elsewhere on the board.
+    if (hasTaunt("b")) return board;
     return { ...board, b: damageHero(board.b, creatureEffectiveAtk(ca)) };
   }
 
   if (cb && !ca) {
-    // B's creature attacks A's hero unopposed.
+    if (hasTaunt("a")) return board;
     return { ...board, a: damageHero(board.a, creatureEffectiveAtk(cb)) };
   }
 

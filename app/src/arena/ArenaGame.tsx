@@ -34,26 +34,19 @@ import {
   applySummons,
   endOfTurnCleanup,
   makeInitialBoard,
-  resolveCombat,
+  resolveLaneCombatAt,
 } from "./arenaRules";
 import { cpuArenaDecision } from "./arenaAI";
 import {
   HERO_MAX_HP,
+  type ArenaTargeting,
   type BoardState,
   type LaneIndex,
   type PlayedSpell,
   type PlannedSummon,
   type TurnIntent,
 } from "./arenaTypes";
-import { arenaSupported } from "./arenaCardEffects";
-
-/** Bot opponent deck — a curated set of Arena-supported spells so the CPU
- *  always has playable cards. (Player deck comes from store.player.rankedDeck.) */
-const CPU_ARENA_DECK: CardId[] = [
-  "aegis", "precision", "anchor", "second-wind",
-  "surge", "augur", "curse", "mirror",
-  "heist", "tide", "oracle", "supernova",
-];
+import { CPU_ARENA_DECK, buildPlayerDeck, removeSpentCards } from "./arenaDecks";
 
 const MATCH_FOUND_SPLASH_MS = 1_800;
 /** Sequenced resolver pacing — each step shows for this long before the next
@@ -62,7 +55,9 @@ const MATCH_FOUND_SPLASH_MS = 1_800;
 const STEP_REVEAL_MS = 1_500;  // "Adversaire joue" preview
 const STEP_SPELLS_MS = 1_200;  // spells fire on both sides
 const STEP_SUMMONS_MS = 1_000; // creatures arrive on lanes
-const STEP_COMBAT_MS = 1_500;  // creature combat resolves
+/** Combat now runs lane-by-lane (~380ms shake + ~280ms pause × 3 lanes,
+ *  ≈ 1800ms). Add a buffer so cleanup + the death-ghost overlays finish. */
+const STEP_COMBAT_MS = 2_200;
 /** Final pause to read the resulting board before the next turn. */
 const RESOLVE_PAUSE_MS = 1_500;
 
@@ -110,6 +105,34 @@ export function ArenaGame({
   const [playerPreview, setPlayerPreview] = useState<TurnIntent | null>(null);
   /** Current step in the sequenced resolver. Drives the phase banner. */
   const [resolveStep, setResolveStep] = useState<ResolveStep | null>(null);
+  /** Active targeting (lifted from ArenaPlanPhase) — when set, tapping a
+   *  lane on the BOARD itself commits the spell/summon. Hearthstone-style
+   *  direct manipulation instead of separate "Lane 1/2/3" buttons. */
+  const [targeting, setTargeting] = useState<ArenaTargeting>(null);
+
+  /** Route a board-lane tap to the active targeting intent. Called by
+   *  ArenaBoard when a lane slot is clicked while targeting is non-null. */
+  function handleBoardLaneTap(lane: LaneIndex) {
+    if (!targeting) return;
+    if (targeting.kind === "summon") {
+      hapticTap();
+      setIntent((cur) => ({
+        ...cur,
+        summons: [...cur.summons.filter((s) => s.lane !== lane), { lane, move: targeting.move }],
+      }));
+      setTargeting(null);
+      return;
+    }
+    if (targeting.kind === "spell" && targeting.targetKind === "lane") {
+      hapticTap();
+      setIntent((cur) => ({
+        ...cur,
+        spells: [...cur.spells, { id: targeting.id, kind: "lane", lane }],
+      }));
+      setTargeting(null);
+      return;
+    }
+  }
 
   useEffect(() => {
     hapticMatchStart();
@@ -222,31 +245,50 @@ export function ArenaGame({
         setPlayerPreview(null);
         setResolveStep("summons");
 
-        // ─── Step 3: COMBAT — TWO sub-steps so the player SEES the impact.
-        // 3a) Flip the step to "combat" BEFORE running the resolver so the
-        //     shake animation in ArenaLaneSlot fires on creatures that are
-        //     still alive (pre-combat HP). The board itself is unchanged.
-        // 3b) After ~SHAKE_MS the resolver runs, deaths happen, dmg popups
-        //     trigger via the new HP values.
-        const SHAKE_MS = 450;
+        // ─── Step 3: COMBAT — LANE BY LANE for clarity. Each lane gets:
+        //     - shake animation playing on its (still-alive) creatures
+        //     - then the resolver fires for THAT lane only
+        //     - HP popups + death ghosts surface naturally via the diff
+        //     - brief pause, then next lane
+        //   The overall step stays "combat" the whole time; only the board
+        //   state advances one lane at a time.
+        const LANE_SHAKE_MS = 380;
+        const LANE_PAUSE_MS = 280;
         window.setTimeout(() => {
           setResolveStep("combat");
 
+          // Recursive helper that walks lanes 0 → 1 → 2.
+          const runLane = (laneIdx: 0 | 1 | 2) => {
+            window.setTimeout(() => {
+              b = resolveLaneCombatAt(b, laneIdx);
+              setBoard(b);
+              // If a hero died from a lane attack mid-combat, short-circuit
+              // the remaining lanes — nothing to attack anyway.
+              if (b.a.hp <= 0 || b.b.hp <= 0) return;
+              if (laneIdx < 2) {
+                window.setTimeout(() => runLane((laneIdx + 1) as 0 | 1 | 2), LANE_PAUSE_MS);
+              }
+            }, LANE_SHAKE_MS);
+          };
+          runLane(0);
+
+          // After all 3 lanes have had their window (3 × (shake + pause)),
+          // run the cleanup + HP check. This timer fires once regardless
+          // of the per-lane chain.
+          const TOTAL_COMBAT_MS = LANE_SHAKE_MS * 3 + LANE_PAUSE_MS * 2 + 100;
           window.setTimeout(() => {
-            b = resolveCombat(b);
             b = endOfTurnCleanup(b);
             if (b.a.hp <= 0 || b.b.hp <= 0) {
               b = { ...b, phase: "match-end" };
             }
             setBoard(b);
-
             if (b.a.hp <= 0 || b.b.hp <= 0) {
               window.setTimeout(() => {
                 if (b.b.hp <= 0 && b.a.hp > 0) hapticWin();
                 else hapticLoss();
               }, 200);
             }
-          }, SHAKE_MS);
+          }, TOTAL_COMBAT_MS);
 
           // ─── Step 4: SETTLE — final pause to read, then advance to next turn.
           window.setTimeout(() => {
@@ -306,6 +348,8 @@ export function ArenaGame({
           oppPreview={oppPreview}
           playerPreview={playerPreview}
           resolveStep={resolveStep}
+          targeting={targeting}
+          onLaneTap={handleBoardLaneTap}
         />
       </ScaleToFit>
       <ArenaPlanPhase
@@ -313,6 +357,8 @@ export function ArenaGame({
         intent={intent}
         intentCost={intentCost(intent)}
         disabled={resolving}
+        targeting={targeting}
+        onSetTargeting={setTargeting}
         onAddSpell={addSpell}
         onRemoveSpell={removeSpell}
         onAddSummon={addSummon}
@@ -323,35 +369,7 @@ export function ArenaGame({
   );
 }
 
-/** Strip the cards the side committed (spells + summons → wait, summons are
- *  moves, not cards) from their hand BEFORE the resolver runs, so the next
- *  turn's draw starts from a clean hand. Spells go to discard. */
-function removeSpentCards(hand: CardId[], intent: TurnIntent): CardId[] {
-  let out = hand.slice();
-  for (const s of intent.spells) {
-    const i = out.indexOf(s.id);
-    if (i >= 0) out = [...out.slice(0, i), ...out.slice(i + 1)];
-  }
-  return out;
-}
+// Deck construction + spent-card cleanup live in arenaDecks.ts now.
 
-/** Build the player's Arena deck from their saved Ranked deck, filtering out
- *  un-adapted cards. Pads with a curated default if too short. */
-function buildPlayerDeck(saved: CardId[] | undefined): CardId[] {
-  const FILLER: CardId[] = [
-    "aegis", "precision", "anchor", "second-wind",
-    "surge", "curse", "mirror", "tide",
-  ];
-  const base = (saved ?? []).filter(arenaSupported);
-  if (base.length >= 6) return base;
-  // Top up with filler — duplicates allowed since deck-of-8 is small.
-  const out = base.slice();
-  for (const f of FILLER) {
-    if (out.length >= 8) break;
-    out.push(f);
-  }
-  return out;
-}
-
-// Silence unused — these may be used by the board for showing creature stats.
+// Re-export HERO_MAX_HP for callers that need the win-condition constant.
 export { HERO_MAX_HP };

@@ -28,6 +28,7 @@ import { useT } from "../i18n";
 import type { CardId } from "../ranked/rankedTypes";
 import { arenaSupported } from "./arenaCardEffects";
 import { ArenaCardInspect } from "./ArenaCardInspect";
+import { CARD_TARGET_KIND as SHARED_TARGET_KIND, type ArenaTargeting } from "./arenaTypes";
 import type {
   BoardState,
   LaneIndex,
@@ -37,31 +38,23 @@ import type {
 } from "./arenaTypes";
 
 /** Spell target shape needed by a given card — drives the targeting UI. */
-type SpellTargetKind = "lane" | "self" | "hero" | "global";
+// SpellTargetKind is exported from arenaTypes (used elsewhere).
 
-const CARD_TARGET_KIND: Partial<Record<CardId, SpellTargetKind>> = {
-  aegis:        "lane",     // (could also be self — picker offers both)
-  precision:    "lane",
-  anchor:       "lane",
-  "second-wind": "self",
-  prescience:   "self",
-  surge:        "lane",
-  curse:        "lane",
-  mirror:       "lane",
-  riposte:      "lane",
-  augur:        "global",
-  heist:        "self",
-  tide:         "global",
-  oracle:       "self",
-  vortex:       "global",
-  supernova:    "hero",     // (default to hero; lane is a sub-target via the picker)
-};
+// CARD_TARGET_KIND lives in arenaTypes.ts now (re-exported as SHARED_TARGET_KIND
+// in the import header) so the lifted targeting state in ArenaGame can read
+// the same table without circular imports.
+const CARD_TARGET_KIND = SHARED_TARGET_KIND;
 
 export interface ArenaPlanPhaseProps {
   board: BoardState;
   intent: TurnIntent;
   intentCost: number;
   disabled: boolean;
+  /** Active targeting (lifted to ArenaGame so the board can also commit
+   *  lane taps). null = idle. */
+  targeting: ArenaTargeting;
+  /** Setter for the lifted targeting state. */
+  onSetTargeting: (t: ArenaTargeting) => void;
   onAddSpell: (spell: PlayedSpell) => void;
   onRemoveSpell: (idx: number) => void;
   onAddSummon: (summon: PlannedSummon) => void;
@@ -71,23 +64,21 @@ export interface ArenaPlanPhaseProps {
 
 export function ArenaPlanPhase({
   board, intent, intentCost, disabled,
-  onAddSpell, onRemoveSpell, onAddSummon, onRemoveSummon, onLock,
+  targeting, onSetTargeting,
+  onAddSpell, onRemoveSpell, onRemoveSummon, onLock,
 }: ArenaPlanPhaseProps) {
   const t = useT();
   const me = board.a;
   const manaLeft = me.mana - intentCost;
   const canLock = !disabled && intentCost <= me.mana;
+  // `targeting` + `onSetTargeting` are LIFTED to ArenaGame (so the board
+  // can also commit lane taps). The local setTargeting alias below keeps
+  // the rest of this file readable.
+  const setTargeting = onSetTargeting;
 
-  /** Targeting mode — set when the player taps a card or a move button.
-   *  null = idle (no pending target). */
-  const [targeting, setTargeting] = useState<
-    | { kind: "summon"; move: Move }
-    | { kind: "spell"; id: CardId; targetKind: SpellTargetKind }
-    | null
-  >(null);
-  /** Inspect mode — long-press / tap-info on a hand card surfaces its
-   *  full description. Independent of `targeting` so the player can read
-   *  a card without committing to play it. */
+  /** Inspect mode — first tap on a hand card surfaces a full-screen modal
+   *  description. Independent of `targeting` so the player can read a
+   *  card without committing to play it. */
   const [inspecting, setInspecting] = useState<CardId | null>(null);
 
   function pickMoveToSummon(mv: Move) {
@@ -122,19 +113,9 @@ export function ArenaPlanPhase({
     setTargeting({ kind: "spell", id, targetKind });
   }
 
-  function pickLaneTarget(lane: LaneIndex) {
-    if (!targeting) return;
-    if (targeting.kind === "summon") {
-      onAddSummon({ lane, move: targeting.move });
-      setTargeting(null);
-      return;
-    }
-    if (targeting.kind === "spell" && targeting.targetKind === "lane") {
-      onAddSpell({ id: targeting.id, kind: "lane", lane });
-      setTargeting(null);
-      return;
-    }
-  }
+  // pickLaneTarget lives in ArenaGame now (handleBoardLaneTap) — lifted
+  // along with the targeting state so the BOARD's lane slots can commit
+  // the target directly. This file no longer needs a local helper.
 
   function cancelTargeting() {
     hapticTap();
@@ -144,7 +125,9 @@ export function ArenaPlanPhase({
 
   return (
     <div className="flex flex-col gap-1 px-2 pb-1.5 shrink-0">
-      {/* Targeting hint — fixed-height slot so the layout doesn't bounce. */}
+      {/* Targeting hint — instructs the player to tap a lane ON THE BOARD
+       *  itself now (Hearthstone-style direct target). The board's player
+       *  row pulses while targeting is active; this strip just reminds. */}
       <div className="h-6 flex items-center justify-center">
         <AnimatePresence>
           {targeting && (
@@ -154,8 +137,8 @@ export function ArenaPlanPhase({
               exit={{ opacity: 0, y: -4 }}
               className="text-[11px] uppercase tracking-[0.15em] text-amber-300 font-bold flex items-center gap-2"
             >
-              {targeting.kind === "summon" && <>Touche une lane pour invoquer {targeting.move.toUpperCase()}</>}
-              {targeting.kind === "spell" && targeting.targetKind === "lane" && <>Touche une lane pour cibler</>}
+              {targeting.kind === "summon" && <>↑ Touche une lane verte pour invoquer {targeting.move.toUpperCase()}</>}
+              {targeting.kind === "spell" && targeting.targetKind === "lane" && <>↑ Touche une lane sur le board</>}
               <button
                 onClick={cancelTargeting}
                 className="px-2 py-0.5 rounded-full bg-hairline text-[10px] font-bold"
@@ -164,21 +147,6 @@ export function ArenaPlanPhase({
           )}
         </AnimatePresence>
       </div>
-
-      {/* Lane target buttons — only visible when targeting */}
-      {targeting && (
-        <div className="grid grid-cols-3 gap-2 max-w-md mx-auto w-full">
-          {[0, 1, 2].map((i) => (
-            <button
-              key={i}
-              onClick={() => pickLaneTarget(i as LaneIndex)}
-              className="py-2 rounded-xl bg-amber-500/20 border border-amber-400/50 text-amber-100 text-[10px] font-bold uppercase tracking-wider hover:bg-amber-500/30 transition"
-            >
-              Lane {i + 1}
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* Queued summons + spells chips */}
       {(intent.spells.length > 0 || intent.summons.length > 0) && (

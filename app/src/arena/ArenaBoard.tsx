@@ -40,13 +40,25 @@ export interface ArenaBoardProps {
   /** Current step in the sequenced resolver — drives the phase banner so
    *  the player always knows what's about to happen / just happened. */
   resolveStep?: "reveal-opp" | "spells" | "summons" | "combat" | "settle" | null;
+  /** Active targeting (lifted from ArenaPlanPhase) — when set on a lane
+   *  target, the board's player-side lane slots become tappable + pulse. */
+  targeting?: { kind: "summon" } | { kind: "spell"; targetKind: string } | null;
+  /** Called when the player taps a lane slot while targeting is active. */
+  onLaneTap?: (lane: LaneIndex) => void;
 }
 
-export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPreview, resolveStep }: ArenaBoardProps) {
+export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPreview, resolveStep, targeting, onLaneTap }: ArenaBoardProps) {
   // Combat shake fires when the resolver lands on the "combat" step. The
   // creatures shake toward their opposing side for ~400ms BEFORE the death
   // animations + dmg popups land, so the player feels the impact happen.
   const combatShake = resolveStep === "combat";
+  // When targeting is active and wants a lane (summon, or spell with
+  // lane target), the player-side lane slots pulse + become tappable.
+  const acceptingLaneTaps =
+    !!targeting && (
+      targeting.kind === "summon" ||
+      (targeting.kind === "spell" && (targeting as { targetKind?: string }).targetKind === "lane")
+    );
   const padId = useArenaPad(useStore((s) => s.player.padId));
   // Player identity for the hero portrait — pulls avatar + nickname from
   // the store so the board reads as "alex vs CPU" instead of "Toi vs Adv".
@@ -126,6 +138,8 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
           intent={intent}
           isPlayer={true}
           combatShake={combatShake}
+          acceptingTaps={acceptingLaneTaps}
+          onLaneTap={onLaneTap}
         />
 
         {/* Player strip */}
@@ -181,12 +195,17 @@ function PhaseBanner({
 
 function LaneRow({
   lanes, renderSide, intent, isPlayer, combatShake = false,
+  acceptingTaps = false, onLaneTap,
 }: {
   lanes: BoardState["lanes"];
   renderSide: Side;
   intent: TurnIntent | null;
   isPlayer: boolean;
   combatShake?: boolean;
+  /** When true (player row only, while targeting is active) lane slots
+   *  become tappable + show a pulsing outline. */
+  acceptingTaps?: boolean;
+  onLaneTap?: (lane: LaneIndex) => void;
 }) {
   return (
     <div className="grid grid-cols-3 gap-2 sm:gap-3">
@@ -203,6 +222,8 @@ function LaneRow({
             isPlayer={isPlayer}
             showPlanned={!!intent}
             combatShake={combatShake}
+            clickable={acceptingTaps}
+            onClick={acceptingTaps && onLaneTap ? () => onLaneTap(lane) : undefined}
           />
         );
       })}

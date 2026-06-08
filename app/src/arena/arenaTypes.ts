@@ -77,6 +77,11 @@ export interface Creature {
   anchored: boolean;
   /** Riposte: if THIS creature dies during combat resolution, the killer dies too. */
   ripostePrimed: boolean;
+  /** TAUNT (Hearthstone-borrowed): while this creature is on the board,
+   *  opponent's lane creatures cannot bypass to hit my HERO directly
+   *  (they hit nothing instead — opp must clear my taunt-bearer first).
+   *  Set inherently on Rock creatures at summon. */
+  taunt: boolean;
 }
 
 export type LaneIndex = 0 | 1 | 2;
@@ -145,6 +150,61 @@ export interface ArenaMatchResult {
   finalB: HeroState;
   turns: number;
 }
+
+/* ───────────────────────── Targeting (UI-level) ───────────────────────── */
+
+/** Spell target shape needed by a given card — drives the targeting UI.
+ *  `lane`     = need a board lane (the next lane tap commits)
+ *  `self`     = the spell hits my hero (auto-target, no further input)
+ *  `hero`     = the spell hits the opp hero (auto-target)
+ *  `global`   = board-wide / no target */
+export type SpellTargetKind = "lane" | "self" | "hero" | "global";
+
+/** Per-card target metadata. Used by the targeting machinery to decide
+ *  whether tapping a card opens a lane picker or commits immediately.
+ *  Typed as `Partial<Record<CardId, …>>` — cards without an entry default
+ *  to "global" on lookup (see ArenaPlanPhase.CARD_TARGET_KIND fallback). */
+export const CARD_TARGET_KIND: Partial<Record<CardId, SpellTargetKind>> = {
+  aegis:        "lane",
+  precision:    "lane",
+  anchor:       "lane",
+  "second-wind": "self",
+  prescience:   "self",
+  surge:        "lane",
+  curse:        "lane",
+  mirror:       "lane",
+  riposte:      "lane",
+  augur:        "global",
+  heist:        "self",
+  tide:         "global",
+  oracle:       "self",
+  vortex:       "global",
+  supernova:    "hero",
+  // Phase 2 spells
+  gaia:         "self",
+  sablier:      "self",
+  offre:        "self",
+  rempart:      "self",
+  benediction:  "self",
+  "oracle-inverse": "global",
+  cascade:      "self",
+  echappee:     "lane",
+  mascarade:    "global",
+  sangsue:      "lane",
+  "trou-noir":  "lane",
+  "marchand-ames": "self",
+  paradoxe:     "global",
+  juge:         "global",
+  genese:       "global",
+};
+
+/** Active targeting state shared across the board + plan phase so that
+ *  tapping a lane on the board can commit the same spell/summon the
+ *  player started picking in the hand. Held in ArenaGame, passed down. */
+export type ArenaTargeting =
+  | { kind: "summon"; move: Move }
+  | { kind: "spell"; id: CardId; targetKind: SpellTargetKind }
+  | null;
 
 /* ───────────────────────── RPSLS counter table ───────────────────────── */
 

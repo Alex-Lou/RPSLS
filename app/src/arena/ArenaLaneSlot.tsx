@@ -27,16 +27,27 @@ export interface ArenaLaneSlotProps {
    *  by ArenaGame's resolveStep transitioning to "combat". The shake fires
    *  BEFORE damage is applied so the player sees who hit whom. */
   combatShake?: boolean;
+  /** When true, the lane is a valid drop target — frame pulses ambre + the
+   *  whole slot becomes a button. Used by the lifted-targeting flow so the
+   *  player taps directly on the board (Hearthstone-style direct manip). */
+  clickable?: boolean;
+  /** Tap handler — only called when `clickable` is true. */
+  onClick?: () => void;
 }
 
 export function ArenaLaneSlot({
   creature, plannedSummon, isPlayer, showPlanned = false, combatShake = false,
+  clickable = false, onClick,
 }: ArenaLaneSlotProps) {
   // Track previous HP so we can spawn a "-N" floating popup when this lane's
   // creature takes damage. We guard by move identity to avoid false-positives
   // when one creature dies and another spawns on the same lane.
   const prevRef = useRef<{ hp: number; move: Creature["move"] | null } | null>(null);
   const [dmgPop, setDmgPop] = useState<{ n: number; key: number } | null>(null);
+  /** Death overlay — when a creature that WAS here is now gone, render a
+   *  brief shatter/fade animation for ~600ms before the slot becomes empty.
+   *  Tracks the move that just died so we can show its glyph one last time. */
+  const [deathGhost, setDeathGhost] = useState<{ move: Creature["move"]; key: number } | null>(null);
   useEffect(() => {
     const prev = prevRef.current;
     if (creature && prev && prev.move === creature.move && creature.hp < prev.hp) {
@@ -44,6 +55,14 @@ export function ArenaLaneSlot({
       setDmgPop({ n: dmg, key: Date.now() });
       const id = window.setTimeout(() => setDmgPop(null), 1000);
       prevRef.current = { hp: creature.hp, move: creature.move };
+      return () => window.clearTimeout(id);
+    }
+    // Death transition: previously had a creature here, now null. Pop the
+    // ghost overlay so the player SEES the death (shatter + spin out).
+    if (!creature && prev && prev.move !== null) {
+      setDeathGhost({ move: prev.move, key: Date.now() });
+      const id = window.setTimeout(() => setDeathGhost(null), 650);
+      prevRef.current = null;
       return () => window.clearTimeout(id);
     }
     prevRef.current = creature ? { hp: creature.hp, move: creature.move } : null;
@@ -117,6 +136,7 @@ export function ArenaLaneSlot({
           {creature.divineShield && <span className="text-[10px]" title="Bouclier divin">🛡️</span>}
           {creature.anchored && <span className="text-[10px]" title="Ancré">⚓</span>}
           {creature.ripostePrimed && <span className="text-[10px]" title="Riposte">⚔️</span>}
+          {creature.taunt && <span className="text-[10px]" title="Provocation — protège le héros">🪨</span>}
         </div>
         {/* Floating damage popup */}
         <AnimatePresence>
@@ -166,9 +186,51 @@ export function ArenaLaneSlot({
     );
   }
 
-  return (
-    <div className="aspect-[5/4] w-full rounded-xl border-2 border-dashed border-hairline bg-black/15 flex items-center justify-center">
+  // Empty slot — but wrapped as a BUTTON when clickable, with pulsing amber
+  // ring so the targeting flow shows valid drops directly on the board.
+  // Also hosts the death-ghost overlay (kept for ~650ms after a death).
+  const baseEmpty = (
+    <div className="aspect-[5/4] w-full rounded-xl border-2 border-dashed border-hairline bg-black/15 flex items-center justify-center relative overflow-hidden">
       <span className="text-[9px] uppercase tracking-[0.2em] text-zinc-600 font-bold">vide</span>
+      <AnimatePresence>
+        {deathGhost && (
+          <motion.div
+            key={deathGhost.key}
+            initial={{ opacity: 1, scale: 1, rotate: 0 }}
+            animate={{ opacity: 0, scale: 0.4, rotate: isPlayer ? 25 : -25 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.65, ease: "easeIn" }}
+            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+            style={{ filter: "drop-shadow(0 0 12px rgba(244,63,94,0.7))" }}
+          >
+            <MoveGlyph move={deathGhost.move} className="w-12 h-12 opacity-90" />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
+  if (clickable) {
+    return (
+      <button
+        onClick={onClick}
+        className="w-full focus:outline-none"
+        aria-label="Choisir cette lane"
+      >
+        <motion.div
+          animate={{ scale: [1, 1.04, 1], boxShadow: [
+            "0 0 0 0 rgba(252,211,77,0)",
+            "0 0 14px 2px rgba(252,211,77,0.55)",
+            "0 0 0 0 rgba(252,211,77,0)",
+          ] }}
+          transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+          className="aspect-[5/4] w-full rounded-xl border-2 border-amber-300/80 bg-amber-500/20 flex items-center justify-center relative overflow-hidden"
+        >
+          <span className="text-[11px] uppercase tracking-[0.25em] text-amber-100 font-black">
+            ✦ jouer ici
+          </span>
+        </motion.div>
+      </button>
+    );
+  }
+  return baseEmpty;
 }
