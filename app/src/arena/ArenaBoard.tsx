@@ -22,6 +22,7 @@ import { useT } from "../i18n";
 import { ArenaLaneSlot } from "./ArenaLaneSlot";
 import { ArenaHeroStrip } from "./ArenaHeroStrip";
 import { CardSlot } from "../ranked/CardSlot";
+import { BigCardReveal } from "../ranked/BigCardReveal";
 import { isValidLaneTarget, targetLabelFor, LANE_SPELL_TARGET_SIDE } from "./arenaTypes";
 import type { ArenaTargeting, BoardState, LaneIndex, Side, TurnIntent } from "./arenaTypes";
 
@@ -48,6 +49,10 @@ export interface ArenaBoardProps {
   /** Hero-hit flash event — set briefly when a creature lands an attack
    *  on a hero. The targeted side's HP bar flashes white→red dramatically. */
   heroHit?: { side: "you" | "opp"; lane: LaneIndex; key: number } | null;
+  /** Taunt block flash — set when an undefended attack is DEFLECTED by a
+   *  taunt creature on the defender's side. Pops a "🪨 PROVOCATION" chip
+   *  on the defender's row so the player UNDERSTANDS why no damage happened. */
+  tauntBlock?: { defenderSide: "a" | "b"; key: number } | null;
   /** Active targeting (lifted from ArenaPlanPhase) — when set on a lane
    *  target, the BOARD highlights ONLY the lane slots a spell of that
    *  kind can actually target (my creature for buffs, opp creature for
@@ -59,7 +64,7 @@ export interface ArenaBoardProps {
   onLaneTap?: (lane: LaneIndex, side: Side) => void;
 }
 
-export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPreview, resolveStep, combatLane = null, heroHit = null, targeting, onLaneTap }: ArenaBoardProps) {
+export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPreview, resolveStep, combatLane = null, heroHit = null, tauntBlock = null, targeting, onLaneTap }: ArenaBoardProps) {
   // Compute per-side per-lane validity once — drives the slot highlights
   // for BOTH rows so cards targeting opp creatures light up the OPP row.
   const targetLabel = targetLabelFor(targeting ?? null);
@@ -121,6 +126,42 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
             "radial-gradient(closest-side, rgba(0,0,0,0.7), rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.18) 100%)",
         }}
       />
+
+      {/* TAUNT BLOCK CHIP — when an undefended attack is deflected, a big
+       *  "🪨 PROVOCATION BLOQUE !" chip pops near the defender's side so
+       *  the player UNDERSTANDS why no damage was taken (Alex's "rock
+       *  doesn't lose HP" confusion). */}
+      <AnimatePresence>
+        {tauntBlock && (
+          <motion.div
+            key={tauntBlock.key}
+            initial={{ opacity: 0, scale: 0.6, y: tauntBlock.defenderSide === (playerSide === "a" ? "a" : "b") ? 20 : -20 }}
+            animate={{ opacity: 1, scale: 1.1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className={
+              "absolute left-1/2 -translate-x-1/2 z-40 pointer-events-none px-3 py-1.5 rounded-full bg-amber-400 text-black text-[12px] uppercase tracking-[0.18em] font-black shadow-2xl border-2 border-amber-600 " +
+              (tauntBlock.defenderSide === playerSide ? "bottom-[42%]" : "top-[42%]")
+            }
+          >
+            🪨 PROVOCATION BLOQUE !
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* BIG CARD REVEAL — center-stage card flips during reveal step,
+       *  mirrors Ranked Pro. Opp card lands top-right, player card lands
+       *  bottom-left. Shows during the reveal-opp step only (after that,
+       *  the lane-corner CardSlot stickers take over for the rest of
+       *  the resolver). */}
+      <AnimatePresence>
+        {resolveStep === "reveal-opp" && oppPreview && oppPreview.spells.length > 0 && (
+          <BigCardReveal key={"opp-" + oppPreview.spells[0].id} id={oppPreview.spells[0].id} side="opp" />
+        )}
+        {resolveStep === "reveal-opp" && playerPreview && playerPreview.spells.length > 0 && (
+          <BigCardReveal key={"you-" + playerPreview.spells[0].id} id={playerPreview.spells[0].id} side="you" />
+        )}
+      </AnimatePresence>
 
       <div className="relative flex flex-col gap-1.5 p-2 sm:p-3 flex-1 min-h-0">
         {/* Opponent strip — HP bar flashes when an attack lands on opp hero.

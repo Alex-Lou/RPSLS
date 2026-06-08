@@ -36,6 +36,10 @@ export interface ResolverFlowArgs {
   setResolveStep: (s: ResolveStep | null) => void;
   setCombatLane: (l: LaneIndex | null) => void;
   setHeroHit: (h: { side: "you" | "opp"; lane: LaneIndex; key: number } | null) => void;
+  /** Set when an undefended-lane attack is DEFLECTED by a taunt creature
+   *  elsewhere on the defender's board. `defenderSide` is which side owns
+   *  the taunt. The UI pops a "🪨 PROVOCATION BLOQUE" chip on that side. */
+  setTauntBlock: (b: { defenderSide: "a" | "b"; key: number } | null) => void;
   /** Called BEFORE the resolver advances to the next turn — clears the
    *  player's pending intent and stops the "resolving" lock. */
   onSettle: (finalBoard: BoardState) => void;
@@ -61,7 +65,7 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
   const {
     startBoard, playerIntent, cpuIntent,
     setBoard, setOppPreview, setPlayerPreview, setResolveStep,
-    setCombatLane, setHeroHit,
+    setCombatLane, setHeroHit, setTauntBlock,
     onSettle, onAdvanceTurn, onMatchEnd,
   } = args;
 
@@ -94,11 +98,27 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
           const lane = b.lanes[laneIdx];
           const aHitsB = !!lane.a && !lane.b;
           const bHitsA = !!lane.b && !lane.a;
+          // TAUNT DEFLECTION DETECTION — if A attacks undefended but B has
+          // a taunt creature anywhere on the board, the attack is blocked
+          // (the rules engine handles this; we surface it as a UI chip).
+          const bHasTaunt = b.lanes.some((l) => !!l.b && l.b.taunt);
+          const aHasTaunt = b.lanes.some((l) => !!l.a && l.a.taunt);
+          const aDeflectedByB = aHitsB && bHasTaunt;
+          const bDeflectedByA = bHitsA && aHasTaunt;
           setCombatLane(laneIdx);
-          // Mid-charge: flash the targeted hero BEFORE damage is committed.
+          // Mid-charge: flash the targeted hero BEFORE damage is committed,
+          // OR pop the taunt block if the attack will be deflected.
           window.setTimeout(() => {
-            if (aHitsB) setHeroHit({ side: "opp", lane: laneIdx, key: Date.now() });
-            if (bHitsA) setHeroHit({ side: "you", lane: laneIdx, key: Date.now() + 1 });
+            if (aDeflectedByB) {
+              setTauntBlock({ defenderSide: "b", key: Date.now() });
+            } else if (aHitsB) {
+              setHeroHit({ side: "opp", lane: laneIdx, key: Date.now() });
+            }
+            if (bDeflectedByA) {
+              setTauntBlock({ defenderSide: "a", key: Date.now() + 1 });
+            } else if (bHitsA) {
+              setHeroHit({ side: "you", lane: laneIdx, key: Date.now() + 1 });
+            }
           }, LANE_CHARGE_MS * 0.55);
           window.setTimeout(() => {
             b = resolveLaneCombatAt(b, laneIdx);

@@ -62,6 +62,15 @@ export function ArenaPage({ onBack }: { onBack: () => void }) {
     onBack();
   }
 
+  function handleRematch() {
+    // Fresh match → fresh coin: clear prep, restore player's theme so the
+    // prep screen renders against the menu palette (then coin re-picks
+    // theme/pad), bounce back to prep stage.
+    applyTheme(playerThemeId);
+    setPrep(null);
+    setStage("prep");
+  }
+
   if (stage === "prep") {
     return (
       <div className="flex flex-col flex-1 min-h-0">
@@ -73,7 +82,7 @@ export function ArenaPage({ onBack }: { onBack: () => void }) {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <ArenaPadProvider value={prep?.padId ?? null}>
-        <ArenaGame onQuit={handleQuitGame} />
+        <ArenaGame onQuit={handleQuitGame} onRematch={handleRematch} />
       </ArenaPadProvider>
     </div>
   );

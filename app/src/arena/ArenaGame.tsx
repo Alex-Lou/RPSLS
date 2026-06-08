@@ -45,9 +45,13 @@ import { runResolverFlow, type ResolveStep } from "./arenaResolverFlow";
 const MATCH_FOUND_SPLASH_MS = 1_800;
 
 export function ArenaGame({
-  onQuit,
+  onQuit, onRematch,
 }: {
   onQuit: () => void;
+  /** Called when the player taps "Rejouer" on the match-end screen.
+   *  Bubbled up so ArenaPage can route back to the prep screen (fresh
+   *  coin flip → fresh theme/pad for the new match). */
+  onRematch?: () => void;
 }) {
   const player = useStore((s) => s.player);
   const difficulty = player.difficulty ?? "normal";
@@ -91,6 +95,11 @@ export function ArenaGame({
    *  hero. Drives the dramatic HP-bar flash on the hit hero strip. Keyed by
    *  side + lane so consecutive hits on the same hero re-trigger the anim. */
   const [heroHit, setHeroHit] = useState<{ side: "you" | "opp"; lane: LaneIndex; key: number } | null>(null);
+  /** Taunt block: set when an undefended-lane attack is DEFLECTED by a
+   *  taunt creature elsewhere. Pop a chip on the defender side so the
+   *  player UNDERSTANDS why no damage was taken (Alex's "rock cuts my
+   *  scissors but I don't lose HP" confusion). */
+  const [tauntBlock, setTauntBlock] = useState<{ defenderSide: "a" | "b"; key: number } | null>(null);
 
   /** Route a board-lane tap to the active targeting intent. Called by
    *  ArenaBoard when a lane slot is clicked while targeting is non-null.
@@ -212,6 +221,7 @@ export function ArenaGame({
       setResolveStep,
       setCombatLane,
       setHeroHit,
+      setTauntBlock,
       onSettle: () => setIntent({ spells: [], summons: [] }),
       onAdvanceTurn: () => {
         setResolving(false);
@@ -236,9 +246,11 @@ export function ArenaGame({
         board={board}
         onQuit={onQuit}
         onRematch={() => {
-          // Soft reset: rebuild the board fresh and let the lifecycle re-run.
-          // The match-end haptic/stat record already fired, so this is purely
-          // a re-init. Re-mount via key change is the cleanest path.
+          // Bubble up to ArenaPage so a FRESH coin flip + new theme + new
+          // CPU persona is picked for the rematch (Alex: "rematch doit refaire
+          // le coin pour éventuellement changer de thème"). If no parent
+          // handler, fall back to a local soft-reset.
+          if (onRematch) { onRematch(); return; }
           matchEndedRef.current = false;
           setBoard(makeInitialBoard(playerDeck.current, CPU_ARENA_DECK));
           setIntent({ spells: [], summons: [] });
@@ -271,6 +283,7 @@ export function ArenaGame({
           resolveStep={resolveStep}
           combatLane={combatLane}
           heroHit={heroHit}
+          tauntBlock={tauntBlock}
           targeting={targeting}
           onLaneTap={handleBoardLaneTap}
         />
