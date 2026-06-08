@@ -50,8 +50,9 @@ export interface ArenaBoardProps {
    *  on a hero. The targeted side's HP bar flashes white→red dramatically. */
   heroHit?: { side: "you" | "opp"; lane: LaneIndex; key: number } | null;
   /** Taunt block flash — set when an undefended attack is DEFLECTED by a
-   *  taunt creature on the defender's side. Pops a "🪨 PROVOCATION" chip
-   *  on the defender's row so the player UNDERSTANDS why no damage happened. */
+   *  taunt creature on the defender's side. Pops a "🪨 ATTAQUE DÉTOURNÉE !"
+   *  chip on the defender's row so the player UNDERSTANDS why no damage
+   *  happened (a Rock elsewhere on the board pulled the attack onto it). */
   tauntBlock?: { defenderSide: "a" | "b"; key: number } | null;
   /** Active targeting (lifted from ArenaPlanPhase) — when set on a lane
    *  target, the BOARD highlights ONLY the lane slots a spell of that
@@ -128,9 +129,12 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
       />
 
       {/* TAUNT BLOCK CHIP — when an undefended attack is deflected, a big
-       *  "🪨 PROVOCATION BLOQUE !" chip pops near the defender's side so
-       *  the player UNDERSTANDS why no damage was taken (Alex's "rock
-       *  doesn't lose HP" confusion). */}
+       *  "🪨 ATTAQUE DÉTOURNÉE !" chip pops near the defender's side so
+       *  the player UNDERSTANDS why no damage was taken (Alex's "rock cuts
+       *  my scissors but I don't lose HP" confusion). Old wording was
+       *  "PROVOCATION BLOQUE" which was ambiguous — could be read as the
+       *  taunt FAILING. New wording is unambiguous: the attack got
+       *  redirected (= no damage on hero). */}
       <AnimatePresence>
         {tauntBlock && (
           <motion.div
@@ -144,7 +148,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
               (tauntBlock.defenderSide === playerSide ? "bottom-[42%]" : "top-[42%]")
             }
           >
-            🪨 PROVOCATION BLOQUE !
+            🪨 ATTAQUE DÉTOURNÉE !
           </motion.div>
         )}
       </AnimatePresence>

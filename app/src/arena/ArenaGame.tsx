@@ -23,7 +23,10 @@ import {
 import { useStore } from "../store/store";
 import { CARDS } from "../ranked/cards";
 import type { CardId } from "../ranked/rankedTypes";
-import { ScaleToFit } from "../match/sharedMatchUI";
+import {
+  FloatingMatchBackButton, ScaleToFit, useAndroidBackPrompt,
+  type MatchBackHandle,
+} from "../match/sharedMatchUI";
 import { ArenaBoard } from "./ArenaBoard";
 import { ArenaMatchEnd } from "./ArenaMatchEnd";
 import { ArenaMatchSplash } from "./ArenaMatchSplash";
@@ -101,6 +104,35 @@ export function ArenaGame({
    *  scissors but I don't lose HP" confusion). */
   const [tauntBlock, setTauntBlock] = useState<{ defenderSide: "a" | "b"; key: number } | null>(null);
 
+  /** Imperative handle on the floating back button — lets the Android
+   *  back-gesture trigger the SAME confirmation modal instead of just
+   *  silently exiting the match. */
+  const backRef = useRef<MatchBackHandle | null>(null);
+
+  // Match-end guard — also gates handleForfeit so we never double-record.
+  // Declared BEFORE handleForfeit so the closure binds the real ref.
+  const matchEndedRef = useRef(false);
+
+  /** Forfeit handler: records a LOSS on arenaStats + bounces back out.
+   *  Set `matchEndedRef` so the existing match-end useEffect doesn't
+   *  also try to record an outcome (would double-count). */
+  function handleForfeit() {
+    if (matchEndedRef.current) { onQuit(); return; }
+    matchEndedRef.current = true;
+    hapticMatchLoss();
+    recordArenaMatch("loss");
+    onQuit();
+  }
+
+  /** Android system back: route through the SAME confirm modal so the
+   *  player can't accidentally throw the match by swiping. During the
+   *  match-end screen (board.phase === "match-end") we never reach this
+   *  return path — the Match-End component owns its own back button. */
+  useAndroidBackPrompt(() => {
+    if (board.phase === "match-end" || matchSplash) { onQuit(); return; }
+    backRef.current?.triggerConfirm();
+  });
+
   /** Route a board-lane tap to the active targeting intent. Called by
    *  ArenaBoard when a lane slot is clicked while targeting is non-null.
    *  `side` is the row that was tapped — the board only forwards taps
@@ -141,7 +173,8 @@ export function ArenaGame({
   // Match-end haptic + stat record. Fired once when the phase flips.
   // recordArenaMatch lives in the store and is sync'd to the cloud via the
   // existing playerSync subscriber (fingerprint covers arenaStats now).
-  const matchEndedRef = useRef(false);
+  // matchEndedRef is declared above (alongside handleForfeit) so a forfeit
+  // can flip the same guard.
   useEffect(() => {
     if (board.phase !== "match-end") return;
     if (matchEndedRef.current) return;
@@ -269,6 +302,22 @@ export function ArenaGame({
 
   return (
     <div className="relative flex-1 flex flex-col min-h-0 gap-2">
+      {/* Floating back / forfeit — same component every other match surface
+       *  uses (Classic, Ranked, Lanes). The confirm modal pops first; on
+       *  confirm we record a LOSS on arenaStats and bounce out. Hidden on
+       *  match-end (the end screen owns its own back button). */}
+      <FloatingMatchBackButton
+        ref={backRef}
+        onClick={handleForfeit}
+        label="Quitter le match"
+        confirm={{
+          title: "Abandonner le match ?",
+          body: "C'est compté comme une défaite dans tes stats Constellation Pro. Tu peux toujours rejouer juste après.",
+          confirmLabel: "Forfait",
+          cancelLabel: "Continuer",
+          severity: "danger",
+        }}
+      />
       {/* The board area can grow tall (2 hero strips + 2 lane rows + chips +
        *  phase banner) so we wrap it in ScaleToFit: on short viewports it
        *  uniformly scales down to fit, never clipping the opp portrait or
