@@ -276,10 +276,18 @@ export function ArenaLaneSlot({
           boxShadow: `0 0 10px -3px ${moveGlow(pal.hex)}80`,
         }}
       >
-        {/* "EN ATTENTE" chip — top-right corner so it never overlaps the
-         *  move name at the bottom (Alex's complaint). */}
-        <span className="absolute top-1 right-1 px-1 py-0.5 rounded text-[8px] text-emerald-200/95 uppercase tracking-[0.15em] font-black bg-black/55 backdrop-blur-sm">
-          en attente
+        {/* "EN ATTENTE" → 3 dots animés (loading) — plus écolo visuellement
+         *  qu'un texte qui crie. Position top-right, ne chevauche jamais le
+         *  nom du move au centre. */}
+        <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded bg-black/55 backdrop-blur-sm flex items-center gap-0.5" aria-label="en attente">
+          {[0, 1, 2].map((i) => (
+            <motion.span
+              key={i}
+              animate={{ opacity: [0.25, 1, 0.25], scale: [0.85, 1.1, 0.85] }}
+              transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut", delay: i * 0.18 }}
+              className="w-1 h-1 rounded-full bg-emerald-300 shadow-[0_0_4px_rgba(110,231,183,0.7)]"
+            />
+          ))}
         </span>
         <div className="flex flex-col items-center justify-center">
           <MoveGlyph move={plannedSummon.move} className="w-12 h-12 sm:w-14 sm:h-14 opacity-85" />
