@@ -30,14 +30,36 @@ export const CPU_ARENA_DECK: CardId[] = [
 
 /** Build the player's Arena deck from their saved Ranked deck. Drops cards
  *  without an Arena adaptation, then pads with a sensible default if the
- *  resulting deck is too short to draw meaningfully. */
+ *  resulting deck is too short to draw meaningfully.
+ *
+ *  CRITICAL BALANCE: the filler MUST include at least one direct-damage
+ *  spell (Heist, Supernova) so the player has a way to push lethal even
+ *  when every lane has an opp creature blocking the path. Without this,
+ *  the CPU's "always-summon" fill of all 3 lanes leaves the player with
+ *  ZERO way to damage the opp hero (Alex's "opp ne perd jamais de vie"
+ *  symptom). Direct-damage spells fix that. */
 export function buildPlayerDeck(saved: CardId[] | undefined): CardId[] {
   const FILLER: CardId[] = [
+    // Defensive / buffs
     "aegis", "precision", "anchor", "second-wind",
+    // Direct damage / reach (KEEP — without these the player can't push lethal)
+    "heist", "supernova",
+    // Tempo / draw / control
     "surge", "curse", "mirror", "tide",
   ];
   const base = (saved ?? []).filter(arenaSupported);
-  if (base.length >= 6) return base;
+  if (base.length >= 6) {
+    // Even when the saved deck is long enough, force-include a direct
+    // damage spell if it's missing — otherwise the player can be locked
+    // out of damaging the opp hero entirely.
+    if (!base.includes("heist") && !base.includes("supernova")) {
+      const out = base.slice();
+      if (out.length < 8) out.push("heist");
+      if (out.length < 8) out.push("supernova");
+      return out;
+    }
+    return base;
+  }
   // Top up with filler — duplicates allowed since deck-of-8 is small.
   const out = base.slice();
   for (const f of FILLER) {

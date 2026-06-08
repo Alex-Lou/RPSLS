@@ -140,9 +140,22 @@ export function cpuArenaDecision(
   // Easy keeps a bit of randomness (30%), normal/hard always summon if
   // there's an open lane and mana for it.
   const summonSkip = difficulty === "easy" ? 0.3 : 0;
+  // HARD CAP: max 2 summons per turn. Without this, the CPU stacks all 3
+  // lanes every turn → player has zero undefended path to reach opp hero
+  // (Alex's "opp ne perd jamais de vie" symptom). Leaving one lane open
+  // also makes for real tactical games instead of "wall of creatures".
+  const MAX_SUMMONS_PER_TURN = 2;
+  // Count existing creatures already on the board — if the CPU already
+  // has ≥ 2 lanes occupied, don't summon a 3rd (saturates the board).
+  const myExistingCreatures = [0, 1, 2].reduce(
+    (acc, i) => acc + (sideCreature(board, side, i as LaneIndex) ? 1 : 0),
+    0,
+  );
+  const lanesAvailableForSummon = Math.max(0, MAX_SUMMONS_PER_TURN - myExistingCreatures);
   let summonsThisTurn = 0;
   for (const lane of laneOrder) {
     if (mana < 1) break;
+    if (summonsThisTurn >= lanesAvailableForSummon) break;
     if (sideCreature(board, side, lane)) continue;
     if (Math.random() < summonSkip) continue;
     const opp = sideCreature(board, oppSide, lane);
@@ -152,9 +165,9 @@ export function cpuArenaDecision(
     summonsThisTurn += 1;
   }
   // Fallback: if for any reason no summon happened and we still have ≥ 1
-  // mana + at least one empty lane, FORCE one — a boring "CPU did nothing"
-  // turn is worse than a suboptimal summon.
-  if (summonsThisTurn === 0 && mana >= 1 && difficulty !== "easy") {
+  // mana + at least one empty lane (under the cap), FORCE one — a boring
+  // "CPU did nothing" turn is worse than a suboptimal summon.
+  if (summonsThisTurn === 0 && mana >= 1 && difficulty !== "easy" && lanesAvailableForSummon > 0) {
     for (const lane of laneOrder) {
       if (sideCreature(board, side, lane)) continue;
       const opp = sideCreature(board, oppSide, lane);
