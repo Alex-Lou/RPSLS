@@ -108,8 +108,10 @@ export interface RankedMatchViewProps {
     anchorRoundsLeft: number;
     gaiaCharged: boolean;
   };
-  /** Boussole reveal: which lane the opponent's card targets (null = none). */
-  compassRevealed?: { lane: LaneTarget | null } | null;
+  /** Boussole (Phare) reveal: opp card scheduled for THIS round — `lane` is
+   *  null if the card has no lane target; `cardId` names the card so the chip
+   *  can say "Adv jouera Surge → lane 2". */
+  compassRevealed?: { lane: LaneTarget | null; cardId?: CardId } | null;
   /** Oracle / Télépathie reveal: opponent's 3 moves shown face-up during pick. */
   oracleRevealed?: [Move, Move, Move] | null;
   /** Oracle Inverse reveal: 3 cards peeked from the opponent's notional hand. */

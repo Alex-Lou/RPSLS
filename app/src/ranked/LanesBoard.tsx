@@ -53,8 +53,9 @@ export interface LanesBoardProps {
    *  null if the opponent's card has no lane target (or no card played).
    *  When present, the targeted opp lane gets a cyan ghost-card badge so the
    *  player SEES where the incoming card will land and can react (anchor,
-   *  aegis, crepuscule, etc.). Picking phase only — reveal already shows it. */
-  compassPeek?: { lane: LaneTarget | null } | null;
+   *  aegis, crepuscule, etc.). Picking phase only — reveal already shows it.
+   *  `cardId` is the opp card's identity for the chip; not used in board. */
+  compassPeek?: { lane: LaneTarget | null; cardId?: CardId } | null;
   onLaneClick?: (lane: LaneTarget) => void;
   onOppLaneClick?: (lane: LaneTarget) => void;
   augurTargeting?: boolean;

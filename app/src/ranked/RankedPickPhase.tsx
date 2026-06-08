@@ -40,7 +40,7 @@ export interface RankedPickPhaseProps {
     anchorRoundsLeft: number;
     gaiaCharged: boolean;
   };
-  compassRevealed?: { lane: LaneTarget | null } | null;
+  compassRevealed?: { lane: LaneTarget | null; cardId?: CardId } | null;
   /** Oracle / Télépathie reveal — the opponent's 3 moves shown face-up on
    *  the opp row during pick phase. */
   oracleRevealed?: [Move, Move, Move] | null;
@@ -224,9 +224,13 @@ export function RankedPickPhase({
         <div className="w-full max-w-md flex flex-wrap items-center justify-center gap-1.5 px-1">
           {compassRevealed && (
             <span className="text-[11px] font-bold rounded-full px-2 py-0.5 bg-sky-500/20 border border-sky-400/40 text-sky-200">
-              {compassRevealed.lane === null
-                ? t("ranked.compass.none")
-                : t("ranked.compass.lane", { n: compassRevealed.lane + 1 })}
+              {compassRevealed.cardId
+                ? (compassRevealed.lane === null
+                    ? t("ranked.compass.cardOnly", { name: t(CARDS[compassRevealed.cardId].nameKey) })
+                    : t("ranked.compass.cardLane", { name: t(CARDS[compassRevealed.cardId].nameKey), n: compassRevealed.lane + 1 }))
+                : (compassRevealed.lane === null
+                    ? t("ranked.compass.none")
+                    : t("ranked.compass.lane", { n: compassRevealed.lane + 1 }))}
             </span>
           )}
           {passives.map((id) => (

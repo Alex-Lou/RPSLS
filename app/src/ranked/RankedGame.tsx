@@ -178,9 +178,17 @@ export function RankedGame({
   const oppCardsPlayedRef = useRef<CardId[]>([]);
   const [augurRevealed, setAugurRevealed] = useState<{ lane: LaneTarget; move: Move } | null>(null);
   const [oracleRevealed, setOracleRevealed] = useState<[Move, Move, Move] | null>(null);
-  /** Boussole (Surveyor): which lane the opponent's card targets this round.
-   *  `{ lane: null }` = the opponent's card has no lane target (or no card). */
-  const [compassRevealed, setCompassRevealed] = useState<{ lane: LaneTarget | null } | null>(null);
+  /** Boussole (Phare): the opponent's card scheduled for THIS round —
+   *  surfaced at the START of the round (before the player picks) when the
+   *  player armed Boussole the round BEFORE. `lane: null` = the card has no
+   *  lane target (e.g. Vortex). `cardId` lets the chip name the threat.
+   *  See pharePendingRef + the look-ahead block in startNextRound. */
+  const [compassRevealed, setCompassRevealed] = useState<{ lane: LaneTarget | null; cardId?: CardId } | null>(null);
+  /** Phare pending: the player played Boussole this round → next round, before
+   *  they pick, reveal the opp card identity + lane so they can plan picks
+   *  AND react with a counter card in the same round. Resolves the "1 card
+   *  per round" tension by decoupling the reveal from the counter slot. */
+  const pharePendingRef = useRef(false);
   const [mana, setMana] = useState(1);
   const [battle, setBattle] = useState<RankedBattleState>(() => makeBattle(savedDeck));
   const [lastResult, setLastResult] = useState<RankedRoundResultData | null>(null);
@@ -354,6 +362,7 @@ export function RankedGame({
       anchorSnapshotRef.current = null;
       setAnchorRoundsLeft(0);
       anchorLossStreakRef.current = 0;
+      pharePendingRef.current = false;
       // Re-seed gaia if equipped (it gets a fresh charge after Genèse — feels
       // right since the match is "starting over").
       setGaiaCharged(battle.passives.includes("gaia"));
@@ -438,6 +447,23 @@ export function RankedGame({
     // Clear last round's Oracle Inverse reveal — fresh round, no peek yet.
     setOppHandRevealed(null);
 
+    // Phare (Boussole armed last round): the cpuDecision for THIS round is
+    // now known → surface it BEFORE the player picks so they can both
+    // reposition their RPSLS moves AND play a counter card (Anchor / Aegis /
+    // Crépuscule) without sacrificing their card slot to the reveal. This is
+    // the entire reason the card was re-designed: in-round reveal was dead.
+    if (pharePendingRef.current) {
+      pharePendingRef.current = false;
+      const oc = cpuDecision.card;
+      if (oc) {
+        const lane = "lane" in oc ? (oc.lane as LaneTarget) : null;
+        setCompassRevealed({ lane, cardId: oc.id });
+      } else {
+        // Opp played no card this round → tell the player explicitly.
+        setCompassRevealed({ lane: null });
+      }
+    }
+
     // Reset round-time state.
     setPicks([null, null, null]);
     setCardPlayed(null);
@@ -505,10 +531,12 @@ export function RankedGame({
       // Bluff: poison the NEXT round's CPU read (disinformation lands later).
       setMascaradePoison(true);
     } else if (card.id === "boussole") {
-      // Surveyor: reveal which lane the opponent's card targets this round.
-      const oc = cpuDecisionRef.current?.card;
-      const lane = oc && "lane" in oc ? (oc.lane as LaneTarget) : null;
-      setCompassRevealed({ lane });
+      // Boussole (re-designed): reveal happens at the START OF NEXT ROUND so
+      // the player can BOTH plan their picks AND play a counter card with the
+      // same mana — the old in-round reveal was useless because the player
+      // had already burned their card slot on Boussole itself. The chip +
+      // compass peek visuals fire in startNextRound when this flag is set.
+      pharePendingRef.current = true;
     }
     /* ─────────── V3 instant effects ─────────── */
     else if (card.id === "sablier") {
@@ -662,7 +690,11 @@ export function RankedGame({
     if (cardPlayed?.id === "oracle") setOracleRevealed(null);
     if (cardPlayed?.id === "telepathie") setOracleRevealed(null);
     if (cardPlayed?.id === "mascarade") setMascaradePoison(false);
-    if (cardPlayed?.id === "boussole") setCompassRevealed(null);
+    if (cardPlayed?.id === "boussole") {
+      // Cancel the look-ahead arming AND any visual already on board.
+      pharePendingRef.current = false;
+      setCompassRevealed(null);
+    }
     if (cardPlayed?.id === "oracle-inverse") setOppHandRevealed(null);
     if (cardPlayed?.id === "sablier") setBonusManaNext(Math.max(0, bonusManaNextRoundRef.current - 1));
     if (cardPlayed?.id === "offre") setBonusManaNext(Math.max(0, bonusManaNextRoundRef.current - 2));
@@ -956,6 +988,13 @@ export function RankedGame({
     // CPU successfully Heisted us → grant the victim (us) a free draw next round.
     if (oppHeistSuccess) compensationDrawNextRef.current = true;
 
+    // Échappée +1 mana payoff for next round — applied OUTSIDE the setBattle
+    // closure so it's a clean separate state update. The draw 1 still lives
+    // inside setBattle (below) because it mutates the deck/hand together.
+    if (!timedOut && cardPlayed?.id === "echappee") {
+      setBonusManaNext(bonusManaNextRoundRef.current + 1);
+    }
+
     // Battle state update: discard played card, spend mana, lose 1 card if loss.
     // Braise discount: the next card costs (cost - braiseStacks), min 1. The
     // discount is applied here so the player only pays the reduced cost.
@@ -976,7 +1015,10 @@ export function RankedGame({
           discardAfter = [...discardAfter, myCard.id];
         }
       }
-      // Échappée draws 1 card immediately (above the cap by 1 if necessary).
+      // Échappée draws 1 card immediately (above the cap by 1 if necessary)
+      // AND grants +1 mana at the start of next round — the payoff that turns
+      // a blind sacrifice ("I might lose this lane") into a tempo trade
+      // ("I burn the lane for a card NOW + a fatter mana pool next round").
       if (myCard?.id === "echappee") {
         const dr = drawN(b.deck, handAfter, discardAfter, 1, handAfter.length + 1);
         handAfter = dr.hand;
@@ -1175,6 +1217,7 @@ export function RankedGame({
     genesisPendingRef.current = false;
     fardeauNextCpuRef.current = null;
     prevOppPicksRef.current = null;
+    pharePendingRef.current = false;
     if (deadlineTimerRef.current) {
       window.clearTimeout(deadlineTimerRef.current);
       deadlineTimerRef.current = null;
