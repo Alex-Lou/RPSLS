@@ -12,8 +12,8 @@
 
 import type { BackgroundId, Difficulty, PadId, Player, ThemeId } from "../types";
 import { PAD_META } from "../types";
-import type { OnlineClient, PlayerProgress } from "./online";
-import { useStore } from "../store/store";
+import { type OnlineClient, type PlayerProgress, normalizeServerUrl } from "./online";
+import { useStore, DEFAULT_CLOUD_URL } from "../store/store";
 import { THEMES } from "../theme/theme";
 import { BACKGROUNDS_BY_ID } from "../theme/themes";
 import { isAvatarImage } from "../theme/avatar";
@@ -242,6 +242,59 @@ export function pushPlayerState(client: OnlineClient | null) {
   store.applyServerSync({ syncedAt: progress.updatedAt });
 }
 
+const ONE_SHOT_TIMEOUT = 8_000;
+
+/** Transient one-shot push for when there is NO active OnlinePage WebSocket.
+ *  Without this, any state change while the player is on the Shop / DeckManager /
+ *  any non-online surface dies in localStorage and is LOST on reinstall — the
+ *  exact "j'ai plus les cartes que j'ai achetées" symptom. Mirrors bootSync's
+ *  ephemeral connect → hello → state_loaded → sync_state → close lifecycle. */
+function pushPlayerStateOneShot(): void {
+  const state = useStore.getState();
+  const player = state.player;
+  if (!player.id) return;
+  const url = state.serverConfig?.cloudUrl || DEFAULT_CLOUD_URL;
+  const normalized = normalizeServerUrl(url);
+  if (!normalized) return;
+  const wsUrl = normalized.replace(/\/+$/, "") + "/ws";
+
+  let ws: WebSocket;
+  try { ws = new WebSocket(wsUrl); } catch { return; }
+  const timeout = setTimeout(() => { try { ws.close(); } catch { /* */ } }, ONE_SHOT_TIMEOUT);
+
+  ws.onopen = () => {
+    try {
+      ws.send(JSON.stringify({
+        type: "hello",
+        nickname: player.nickname || "Anonymous",
+        player_id: player.id,
+        claim_token: player.claimToken || "",
+      }));
+    } catch { /* */ }
+  };
+
+  ws.onmessage = (ev) => {
+    let msg: { type?: string };
+    try { msg = JSON.parse(ev.data as string); } catch { return; }
+    // Once the server has accepted us (state_loaded), push CURRENT local state.
+    // We deliberately don't merge here — the live local state (with the new pack
+    // contents) is the source of truth; bootSync at next launch handles the
+    // proper union-merge. The goal here is just to persist the change.
+    if (msg.type === "state_loaded") {
+      try {
+        const progress = buildProgressFromPlayer(useStore.getState().player);
+        ws.send(JSON.stringify({ type: "sync_state", state: progress }));
+        useStore.getState().applyServerSync({ syncedAt: progress.updatedAt });
+      } catch { /* */ }
+      // Give the server a moment to ack, then close.
+      setTimeout(() => { clearTimeout(timeout); try { ws.close(); } catch { /* */ } }, 300);
+    }
+  };
+
+  ws.onerror = () => clearTimeout(timeout);
+  ws.onclose = () => clearTimeout(timeout);
+}
+
 /** Global reference to the active online client, set by OnlinePage when
  *  a connection is established. Used by the background sync subscriber. */
 let _activeClient: OnlineClient | null = null;
@@ -293,7 +346,15 @@ export function startSyncSubscriber() {
     if (_debounce) clearTimeout(_debounce);
     _debounce = setTimeout(() => {
       _debounce = null;
-      pushPlayerState(_activeClient);
+      // Prefer the live OnlinePage socket when it's open (no extra connection
+      // cost), otherwise fire a one-shot transient WS so the state actually
+      // lands on the server. Without this fallback, every pack/craft/codex
+      // claim made off the OnlinePage was lost on reinstall.
+      if (_activeClient && _activeClient.status === "open") {
+        pushPlayerState(_activeClient);
+      } else {
+        pushPlayerStateOneShot();
+      }
     }, 500);
   });
 }
