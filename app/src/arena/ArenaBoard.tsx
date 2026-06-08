@@ -21,7 +21,8 @@ import { CARDS } from "../ranked/cards";
 import { useT } from "../i18n";
 import { ArenaLaneSlot } from "./ArenaLaneSlot";
 import { ArenaHeroStrip } from "./ArenaHeroStrip";
-import { isValidLaneTarget, targetLabelFor } from "./arenaTypes";
+import { CardSlot } from "../ranked/CardSlot";
+import { isValidLaneTarget, targetLabelFor, LANE_SPELL_TARGET_SIDE } from "./arenaTypes";
 import type { ArenaTargeting, BoardState, LaneIndex, Side, TurnIntent } from "./arenaTypes";
 
 export interface ArenaBoardProps {
@@ -67,12 +68,42 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
     a: l.a ? { move: l.a.move } : null,
     b: l.b ? { move: l.b.move } : null,
   }));
+
+  /** Compute the lane-card "stickers" each row should display in the corner
+   *  of the targeted slot — same pattern as Ranked's LanesBoard CardSlot
+   *  (Alex's "je veux la voir collée sur la lane comme dans Constellation
+   *  Ranked"). Each sticker = an emerald-rim card chip on PLAYER's side
+   *  ownership / rose-rim on CPU's. Position bottom-* for "you" owner,
+   *  top-* for "opp" owner so both can be on the same lane without overlap. */
+  const oppSide: Side = playerSide === "a" ? "b" : "a";
+  function stickersForSide(rowSide: Side) {
+    const out: Array<{ lane: LaneIndex; id: import("../ranked/rankedTypes").CardId; owner: "you" | "opp"; position: "tl" | "tr" | "bl" | "br" }> = [];
+    // Player's own intent — cast spells the player commits.
+    const playerSpells = (playerPreview ?? intent).spells;
+    for (const s of playerSpells) {
+      if (s.kind !== "lane") continue;
+      const tgt = LANE_SPELL_TARGET_SIDE[s.id] ?? "my-creature";
+      const targetSide: Side = tgt === "opp-creature" ? oppSide : playerSide;
+      if (targetSide === rowSide) out.push({ lane: s.lane, id: s.id, owner: "you", position: "bl" });
+    }
+    // CPU's intent — only visible during the reveal/spells window.
+    const cpuSpells = oppPreview?.spells ?? [];
+    for (const s of cpuSpells) {
+      if (s.kind !== "lane") continue;
+      const tgt = LANE_SPELL_TARGET_SIDE[s.id] ?? "my-creature";
+      // For CPU, "my-creature" = oppSide, "opp-creature" = playerSide
+      const targetSide: Side = tgt === "opp-creature" ? playerSide : oppSide;
+      if (targetSide === rowSide) out.push({ lane: s.lane, id: s.id, owner: "opp", position: "tr" });
+    }
+    return out;
+  }
+  const playerRowStickers = stickersForSide(playerSide);
+  const oppRowStickers = stickersForSide(oppSide);
   const padId = useArenaPad(useStore((s) => s.player.padId));
   // Player identity for the hero portrait — pulls avatar + nickname from
   // the store so the board reads as "alex vs CPU" instead of "Toi vs Adv".
   const playerAvatar = useStore((s) => s.player.avatar);
   const playerName = useStore((s) => s.player.nickname) || "Toi";
-  const oppSide: Side = playerSide === "a" ? "b" : "a";
   const me = board[playerSide];
   const opp = board[oppSide];
 
@@ -110,6 +141,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
           validLanes={[0, 1, 2].map((i) => isValidLaneTarget(targeting ?? null, oppSide, i as LaneIndex, laneShape, playerSide))}
           targetLabel={targetLabel}
           onLaneTap={onLaneTap ? (l) => onLaneTap(l, oppSide) : undefined}
+          stickers={oppRowStickers}
         />
 
         {/* CENTER STATUS ZONE — single bar that owns the phase chip + the
@@ -135,6 +167,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
           validLanes={[0, 1, 2].map((i) => isValidLaneTarget(targeting ?? null, playerSide, i as LaneIndex, laneShape, playerSide))}
           targetLabel={targetLabel}
           onLaneTap={onLaneTap ? (l) => onLaneTap(l, playerSide) : undefined}
+          stickers={playerRowStickers}
         />
 
         {/* Player strip — HP bar flashes when an attack lands on player hero. */}
@@ -265,20 +298,20 @@ function IntentChips({ intent, side }: { intent: TurnIntent; side: "you" | "opp"
 function LaneRow({
   lanes, renderSide, intent, isPlayer, combatLane = null,
   validLanes = [false, false, false], targetLabel = "", onLaneTap,
+  stickers = [],
 }: {
   lanes: BoardState["lanes"];
   renderSide: Side;
   intent: TurnIntent | null;
   isPlayer: boolean;
-  /** Which lane is "live" in the per-lane combat anim — its creature on
-   *  this side gets the CHARGE animation; the other two stay still. */
   combatLane?: LaneIndex | null;
-  /** Per-lane validity for the active targeting. Slots where this is true
-   *  become tappable + pulsate; invalid slots stay non-interactive. */
   validLanes?: boolean[];
-  /** Label shown on each valid slot ("✦ Invoquer ici", "✦ Cible ta créature"). */
   targetLabel?: string;
   onLaneTap?: (lane: LaneIndex) => void;
+  /** Card stickers to render in the corner of the targeted slot — same
+   *  pattern as Ranked's CardSlot. Computed in the parent so both rows
+   *  stay in sync. */
+  stickers?: Array<{ lane: LaneIndex; id: import("../ranked/rankedTypes").CardId; owner: "you" | "opp"; position: "tl" | "tr" | "bl" | "br" }>;
 }) {
   return (
     <div className="grid grid-cols-3 gap-2 sm:gap-3">
@@ -288,19 +321,26 @@ function LaneRow({
         const plannedSummon = intent?.summons.find((s) => s.lane === lane) ?? null;
         const inCombat = combatLane === lane;
         const valid = validLanes[i] ?? false;
+        const laneStickers = stickers.filter((s) => s.lane === lane);
         return (
-          <ArenaLaneSlot
-            key={i}
-            lane={lane}
-            creature={c}
-            plannedSummon={plannedSummon}
-            isPlayer={isPlayer}
-            showPlanned={!!intent}
-            chargeAttack={inCombat}
-            clickable={valid}
-            clickableLabel={targetLabel}
-            onClick={valid && onLaneTap ? () => onLaneTap(lane) : undefined}
-          />
+          <div key={i} className="relative">
+            <ArenaLaneSlot
+              lane={lane}
+              creature={c}
+              plannedSummon={plannedSummon}
+              isPlayer={isPlayer}
+              showPlanned={!!intent}
+              chargeAttack={inCombat}
+              clickable={valid}
+              clickableLabel={targetLabel}
+              onClick={valid && onLaneTap ? () => onLaneTap(lane) : undefined}
+            />
+            {/* Card stickers — small CardSlot badges showing which spells
+             *  hit this lane this turn (mirrors Ranked LanesBoard pattern). */}
+            {laneStickers.map((s, idx) => (
+              <CardSlot key={`${s.id}-${idx}`} id={s.id} position={s.position} />
+            ))}
+          </div>
         );
       })}
     </div>

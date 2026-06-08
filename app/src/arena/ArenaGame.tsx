@@ -93,8 +93,11 @@ export function ArenaGame({
   const [heroHit, setHeroHit] = useState<{ side: "you" | "opp"; lane: LaneIndex; key: number } | null>(null);
 
   /** Route a board-lane tap to the active targeting intent. Called by
-   *  ArenaBoard when a lane slot is clicked while targeting is non-null. */
-  function handleBoardLaneTap(lane: LaneIndex) {
+   *  ArenaBoard when a lane slot is clicked while targeting is non-null.
+   *  `side` is the row that was tapped — the board only forwards taps
+   *  from rows where the spell's per-side validity is true, so we can
+   *  trust it without re-validating here. */
+  function handleBoardLaneTap(lane: LaneIndex, _side: "a" | "b") {
     if (!targeting) return;
     if (targeting.kind === "summon") {
       hapticTap();
@@ -117,10 +120,14 @@ export function ArenaGame({
   }
 
   useEffect(() => {
+    // CRITICAL: run on EVERY matchSplash=true (not just mount) — the
+    // rematch button sets matchSplash back to true, but the original
+    // effect had [] deps so the timer never fired again → splash stuck.
+    if (!matchSplash) return;
     hapticMatchStart();
     const id = window.setTimeout(() => setMatchSplash(false), MATCH_FOUND_SPLASH_MS);
     return () => window.clearTimeout(id);
-  }, []);
+  }, [matchSplash]);
 
   // Match-end haptic + stat record. Fired once when the phase flips.
   // recordArenaMatch lives in the store and is sync'd to the cloud via the
@@ -239,6 +246,9 @@ export function ArenaGame({
           setPlayerPreview(null);
           setResolveStep(null);
           setResolving(false);
+          setCombatLane(null);
+          setHeroHit(null);
+          setTargeting(null);
           setMatchSplash(true);
         }}
       />

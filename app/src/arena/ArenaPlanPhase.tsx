@@ -28,6 +28,7 @@ import { useT } from "../i18n";
 import type { CardId } from "../ranked/rankedTypes";
 import { arenaSupported } from "./arenaCardEffects";
 import { ArenaCardInspect } from "./ArenaCardInspect";
+import { ArenaHowItWorks } from "./ArenaHowItWorks";
 import { CARD_TARGET_KIND as SHARED_TARGET_KIND, LANE_SPELL_TARGET_SIDE, type ArenaTargeting } from "./arenaTypes";
 import type {
   BoardState,
@@ -80,6 +81,7 @@ export function ArenaPlanPhase({
    *  description. Independent of `targeting` so the player can read a
    *  card without committing to play it. */
   const [inspecting, setInspecting] = useState<CardId | null>(null);
+  const [howOpen, setHowOpen] = useState(false);
 
   function pickMoveToSummon(mv: Move) {
     if (disabled) return;
@@ -311,26 +313,38 @@ export function ArenaPlanPhase({
         </div>
       )}
 
-      {/* Lock button — compact (was py-2 px-6 text-sm, now py-1.5 px-5 text-xs)
-       *  so it stops eating ~6% of the screen for a single button. */}
-      <button
-        onClick={onLock}
-        disabled={!canLock}
-        className={
-          "self-center mt-0.5 px-5 py-1.5 rounded-xl font-bold text-white text-xs transition " +
-          (canLock
-            ? "shadow-md"
-            : "bg-hairline text-ink-faint cursor-not-allowed")
-        }
-        style={canLock ? {
-          background: "linear-gradient(to right, var(--theme-primary), var(--theme-secondary))",
-          boxShadow: "0 4px 14px -4px color-mix(in oklab, var(--theme-primary) 55%, transparent)",
-          fontFamily: "var(--font-headline)",
-          letterSpacing: "0.08em",
-        } : undefined}
-      >
-        ✓ FIN DE TOUR
-      </button>
+      {/* Lock button + "Comment ça marche" — side-by-side. The "?" opens
+       *  a fullscreen explanation modal so the player can read up on
+       *  cibles / persistance / shields without leaving the match. */}
+      <div className="flex items-center justify-center gap-2 mt-0.5">
+        <button
+          onClick={() => setHowOpen(true)}
+          className="w-9 h-9 rounded-full bg-zinc-900 border border-emerald-700/50 text-emerald-300 text-sm font-black active:scale-95"
+          aria-label="Comment ça marche"
+          title="Comment ça marche"
+        >
+          ?
+        </button>
+        <button
+          onClick={onLock}
+          disabled={!canLock}
+          className={
+            "px-5 py-1.5 rounded-xl font-bold text-white text-xs transition " +
+            (canLock
+              ? "shadow-md"
+              : "bg-hairline text-ink-faint cursor-not-allowed")
+          }
+          style={canLock ? {
+            background: "linear-gradient(to right, var(--theme-primary), var(--theme-secondary))",
+            boxShadow: "0 4px 14px -4px color-mix(in oklab, var(--theme-primary) 55%, transparent)",
+            fontFamily: "var(--font-headline)",
+            letterSpacing: "0.08em",
+          } : undefined}
+        >
+          ✓ FIN DE TOUR
+        </button>
+      </div>
+      <AnimatePresence>{howOpen && <ArenaHowItWorks onClose={() => setHowOpen(false)} />}</AnimatePresence>
     </div>
   );
 }
