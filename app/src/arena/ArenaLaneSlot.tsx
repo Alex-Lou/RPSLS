@@ -30,15 +30,20 @@ export interface ArenaLaneSlotProps {
   chargeAttack?: boolean;
   /** When true, the lane is a valid drop target — frame pulses ambre + the
    *  whole slot becomes a button. Used by the lifted-targeting flow so the
-   *  player taps directly on the board (Hearthstone-style direct manip). */
+   *  player taps directly on the board (Hearthstone-style direct manip).
+   *  Works on BOTH empty slots (summon, mirror) AND creature slots (aegis,
+   *  curse, etc.) — the parent decides via `validLanes`. */
   clickable?: boolean;
+  /** Label shown ON the valid slot overlay ("✦ Invoquer ici", "✦ Cible
+   *  ta créature", "✦ Cible cette créature"). */
+  clickableLabel?: string;
   /** Tap handler — only called when `clickable` is true. */
   onClick?: () => void;
 }
 
 export function ArenaLaneSlot({
   creature, plannedSummon, isPlayer, showPlanned = false, chargeAttack = false,
-  clickable = false, onClick,
+  clickable = false, clickableLabel = "✦ jouer ici", onClick,
 }: ArenaLaneSlotProps) {
   // Track previous HP so we can spawn a "-N" floating popup when this lane's
   // creature takes damage. We guard by move identity to avoid false-positives
@@ -80,25 +85,29 @@ export function ArenaLaneSlot({
     // opp creatures get a rose one — visual ownership cue independent of
     // the move's signature color (kept on the frame rim).
     const sideTint = isPlayer ? "rgba(52,211,153,0.55)" : "rgba(244,63,94,0.55)";
-    // CHARGE animation — the creature actually advances toward the opp,
-    // lands a hit (small bounce + flash), then retreats. Way more legible
-    // than a wiggle. Player creatures lunge UP, opp creatures lunge DOWN.
-    // The lunge distance is meant to clearly cross the lane midline.
+    // CHARGE animation — SLAM-style: wind-up → 60px lunge crossing the lane
+    // midline → recoil from the impact → snap back. Adds rotate for weight,
+    // brightness apex 1.85 + drop-shadow doré 22px so the creature looks
+    // FORGED OF LIGHT at the impact frame. Way more imposing than a wiggle.
     const chargeAnim = chargeAttack
       ? {
           y: isPlayer
-            ? [0, -22, -38, -32, 0]    // up → apex → tiny bounce-back at impact → return
-            : [0, 22, 38, 32, 0],
-          scale: [1, 1.08, 1.18, 1.10, 1],
+            ? [0, -30, -60, -56, -20, 0]   // wind-up → SLAM → recoil → snap back
+            : [0, 30, 60, 56, 20, 0],
+          scale: [1, 1.08, 1.28, 1.20, 1.05, 1],
+          rotate: isPlayer
+            ? [0, -2, -4, -2, 0, 0]
+            : [0, 2, 4, 2, 0, 0],
           filter: [
             "brightness(1) drop-shadow(0 0 0 transparent)",
-            "brightness(1.3) drop-shadow(0 0 8px rgba(252,211,77,0.55))",
-            "brightness(1.6) drop-shadow(0 0 14px rgba(252,211,77,0.95))",
-            "brightness(1.3) drop-shadow(0 0 6px rgba(252,211,77,0.6))",
+            "brightness(1.25) drop-shadow(0 0 8px rgba(252,211,77,0.55))",
+            "brightness(1.85) drop-shadow(0 0 22px rgba(252,211,77,1))",
+            "brightness(1.45) drop-shadow(0 0 14px rgba(252,211,77,0.85))",
+            "brightness(1.1) drop-shadow(0 0 4px rgba(252,211,77,0.4))",
             "brightness(1) drop-shadow(0 0 0 transparent)",
           ],
         }
-      : { y: 0, scale: 1, filter: "brightness(1) drop-shadow(0 0 0 transparent)" };
+      : { y: 0, scale: 1, rotate: 0, filter: "brightness(1) drop-shadow(0 0 0 transparent)" };
     return (
       <motion.div
         layout
@@ -106,7 +115,7 @@ export function ArenaLaneSlot({
         animate={{ opacity: 1, ...chargeAnim }}
         transition={
           chargeAttack
-            ? { duration: 0.5, ease: "easeOut", times: [0, 0.35, 0.55, 0.72, 1] }
+            ? { duration: 0.72, ease: "easeOut", times: [0, 0.2, 0.42, 0.55, 0.78, 1] }
             : undefined
         }
         className="aspect-[5/4] w-full rounded-xl relative flex flex-col items-center justify-center overflow-hidden transition"
@@ -121,6 +130,25 @@ export function ArenaLaneSlot({
             `inset 0 1px 0 rgba(255,255,255,0.08), inset 0 0 0 1px ${sideTint}30`,
         }}
       >
+        {/* Radial burst overlay — at the apex of the charge, a bright
+         *  white → amber ring expands outward from the creature's center.
+         *  Drives the "impact" feel beyond the lunge alone. */}
+        <AnimatePresence>
+          {chargeAttack && (
+            <motion.div
+              key="charge-burst"
+              initial={{ opacity: 0, scale: 0.4 }}
+              animate={{ opacity: [0, 1, 0.7, 0], scale: [0.4, 1.4, 2.2, 2.8] }}
+              transition={{ duration: 0.6, ease: "easeOut", times: [0, 0.35, 0.6, 1], delay: 0.16 }}
+              className="absolute inset-0 pointer-events-none rounded-xl"
+              style={{
+                background:
+                  "radial-gradient(circle, rgba(255,255,255,0.85) 0%, rgba(252,211,77,0.6) 35%, transparent 70%)",
+                mixBlendMode: "screen",
+              }}
+            />
+          )}
+        </AnimatePresence>
         {/* Side-affinity dot top-left */}
         <div
           className="absolute top-1 left-1 w-2 h-2 rounded-full"
@@ -174,6 +202,32 @@ export function ArenaLaneSlot({
             </motion.div>
           )}
         </AnimatePresence>
+        {/* TARGETING OVERLAY — when this creature slot is a valid target
+         *  for the active spell (e.g. Curse on opp, Aegis on mine), overlay
+         *  a pulsing amber ring + the label so the player KNOWS this is
+         *  what to tap. Transparent button captures the tap. */}
+        {clickable && onClick && (
+          <button
+            onClick={onClick}
+            aria-label={clickableLabel}
+            className="absolute inset-0 z-20 flex items-end justify-center focus:outline-none"
+          >
+            <motion.div
+              animate={{
+                boxShadow: [
+                  "0 0 0 0 rgba(252,211,77,0)",
+                  "inset 0 0 0 3px rgba(252,211,77,0.9), 0 0 18px 2px rgba(252,211,77,0.6)",
+                  "0 0 0 0 rgba(252,211,77,0)",
+                ],
+              }}
+              transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute inset-0 rounded-xl pointer-events-none"
+            />
+            <span className="relative mb-1 px-1.5 py-0.5 rounded bg-amber-400/90 text-black text-[9px] uppercase tracking-wider font-black shadow-lg">
+              {clickableLabel}
+            </span>
+          </button>
+        )}
       </motion.div>
     );
   }
@@ -234,7 +288,7 @@ export function ArenaLaneSlot({
       <button
         onClick={onClick}
         className="w-full focus:outline-none"
-        aria-label="Choisir cette lane"
+        aria-label={clickableLabel}
       >
         <motion.div
           animate={{ scale: [1, 1.04, 1], boxShadow: [
@@ -245,8 +299,8 @@ export function ArenaLaneSlot({
           transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
           className="aspect-[5/4] w-full rounded-xl border-2 border-amber-300/80 bg-amber-500/20 flex items-center justify-center relative overflow-hidden"
         >
-          <span className="text-[11px] uppercase tracking-[0.25em] text-amber-100 font-black">
-            ✦ jouer ici
+          <span className="text-[10px] uppercase tracking-[0.2em] text-amber-100 font-black text-center px-1">
+            {clickableLabel}
           </span>
         </motion.div>
       </button>

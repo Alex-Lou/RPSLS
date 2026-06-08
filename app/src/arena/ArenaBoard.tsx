@@ -12,7 +12,7 @@
  * the plan phase, which routes back to ArenaGame's handlers.
  */
 
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { MoveGlyph } from "../icons";
 import { useStore } from "../store/store";
 import { BattlePad } from "../BattlePad";
@@ -21,7 +21,8 @@ import { CARDS } from "../ranked/cards";
 import { useT } from "../i18n";
 import { ArenaLaneSlot } from "./ArenaLaneSlot";
 import { ArenaHeroStrip } from "./ArenaHeroStrip";
-import type { BoardState, LaneIndex, Side, TurnIntent } from "./arenaTypes";
+import { isValidLaneTarget, targetLabelFor } from "./arenaTypes";
+import type { ArenaTargeting, BoardState, LaneIndex, Side, TurnIntent } from "./arenaTypes";
 
 export interface ArenaBoardProps {
   board: BoardState;
@@ -47,20 +48,25 @@ export interface ArenaBoardProps {
    *  on a hero. The targeted side's HP bar flashes white→red dramatically. */
   heroHit?: { side: "you" | "opp"; lane: LaneIndex; key: number } | null;
   /** Active targeting (lifted from ArenaPlanPhase) — when set on a lane
-   *  target, the board's player-side lane slots become tappable + pulse. */
-  targeting?: { kind: "summon" } | { kind: "spell"; targetKind: string } | null;
-  /** Called when the player taps a lane slot while targeting is active. */
-  onLaneTap?: (lane: LaneIndex) => void;
+   *  target, the BOARD highlights ONLY the lane slots a spell of that
+   *  kind can actually target (my creature for buffs, opp creature for
+   *  debuffs, my empty for summons, etc.). */
+  targeting?: ArenaTargeting;
+  /** Called when the player taps a lane slot while targeting is active.
+   *  Receives BOTH the lane AND the side that was tapped, so the parent
+   *  can decide what to do (commit to my row, commit to opp row, etc.). */
+  onLaneTap?: (lane: LaneIndex, side: Side) => void;
 }
 
 export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPreview, resolveStep, combatLane = null, heroHit = null, targeting, onLaneTap }: ArenaBoardProps) {
-  // When targeting is active and wants a lane (summon, or spell with
-  // lane target), the player-side lane slots pulse + become tappable.
-  const acceptingLaneTaps =
-    !!targeting && (
-      targeting.kind === "summon" ||
-      (targeting.kind === "spell" && (targeting as { targetKind?: string }).targetKind === "lane")
-    );
+  // Compute per-side per-lane validity once — drives the slot highlights
+  // for BOTH rows so cards targeting opp creatures light up the OPP row.
+  const targetLabel = targetLabelFor(targeting ?? null);
+  // Project the lanes shape to what isValidLaneTarget expects.
+  const laneShape = board.lanes.map((l) => ({
+    a: l.a ? { move: l.a.move } : null,
+    b: l.b ? { move: l.b.move } : null,
+  }));
   const padId = useArenaPad(useStore((s) => s.player.padId));
   // Player identity for the hero portrait — pulls avatar + nickname from
   // the store so the board reads as "alex vs CPU" instead of "Toi vs Adv".
@@ -92,13 +98,18 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
           incomingAttackKey={heroHit?.side === "opp" ? heroHit.key : null}
         />
 
-        {/* Opponent lane row — ghost previews of opp summons during reveal. */}
+        {/* Opponent lane row — ghost previews of opp summons during reveal.
+         *  Slots become tappable when a spell targets OPP creatures (Curse,
+         *  Sangsue, Trou Noir). */}
         <LaneRow
           lanes={board.lanes}
           renderSide={oppSide}
           intent={oppPreview ?? null}
           isPlayer={false}
           combatLane={combatLane}
+          validLanes={[0, 1, 2].map((i) => isValidLaneTarget(targeting ?? null, oppSide, i as LaneIndex, laneShape, playerSide))}
+          targetLabel={targetLabel}
+          onLaneTap={onLaneTap ? (l) => onLaneTap(l, oppSide) : undefined}
         />
 
         {/* CENTER STATUS ZONE — single bar that owns the phase chip + the
@@ -113,15 +124,17 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
           playerPreview={playerPreview}
         />
 
-        {/* Player lane row */}
+        {/* Player lane row — slots become tappable when targeting wants
+         *  THIS side (summon → my empty; aegis/surge → my creature; etc.). */}
         <LaneRow
           lanes={board.lanes}
           renderSide={playerSide}
           intent={intent}
           isPlayer={true}
           combatLane={combatLane}
-          acceptingTaps={acceptingLaneTaps}
-          onLaneTap={onLaneTap}
+          validLanes={[0, 1, 2].map((i) => isValidLaneTarget(targeting ?? null, playerSide, i as LaneIndex, laneShape, playerSide))}
+          targetLabel={targetLabel}
+          onLaneTap={onLaneTap ? (l) => onLaneTap(l, playerSide) : undefined}
         />
 
         {/* Player strip — HP bar flashes when an attack lands on player hero. */}
@@ -137,14 +150,11 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
 
 /** Center status zone — UNIFIED replacement for the old (PhaseBanner +
  *  OppRevealBanner × 2) stack. ONE element at the center between the two
- *  rows, switching content based on what's happening:
- *    • planning  — "Tour N · Premier à 0 ❤"
- *    • reveal-opp — "Adversaire dévoile" + chips of both sides' intents
- *    • spells    — "✨ Sorts en cours"
- *    • summons   — "🌟 Invocations"
- *    • combat    — "⚔️ Combat — Lane {N}"
- *    • settle    — "Fin du tour…"
- *  Always one ROW high so the layout doesn't jump when content swaps. */
+ *  rows. CRITICAL: this container has a FIXED HEIGHT — content variations
+ *  (1 line idle vs 2 lines reveal) NEVER change the layout. The chip is
+ *  vertically centered; reveal-mode intent chips render as an absolute
+ *  overlay below the chip so they don't push the rows around. This is
+ *  what makes the pad "stable" like the Ranked LanesBoard. */
 function CenterStatus({
   step, turn, combatLane, oppPreview, playerPreview,
 }: {
@@ -154,35 +164,40 @@ function CenterStatus({
   oppPreview: TurnIntent | null | undefined;
   playerPreview: TurnIntent | null | undefined;
 }) {
-  // Reveal step gets a 2-line layout: title chip on top + intent chips below.
-  // Everything else is a single chip.
-  if (step === "reveal-opp" && (oppPreview || playerPreview)) {
-    return (
-      <div className="flex flex-col items-center gap-1 py-0.5">
-        <Chip label="Adversaire dévoile son tour" tone="rose" />
-        <div className="flex flex-wrap items-center justify-center gap-1.5">
-          {playerPreview && <IntentChips intent={playerPreview} side="you" />}
-          {oppPreview && <IntentChips intent={oppPreview} side="opp" />}
-        </div>
-      </div>
-    );
-  }
   const laneLabel = combatLane !== null ? ` — Lane ${combatLane + 1}` : "";
   const label =
+    step === "reveal-opp" ? "Adversaire dévoile son tour" :
     step === "spells"  ? "✨ Sorts en cours" :
     step === "summons" ? "🌟 Invocations" :
     step === "combat"  ? "⚔️ Combat" + laneLabel :
     step === "settle"  ? "Fin du tour…" :
     "Tour " + turn + " · Premier à 0 ❤";
   const tone: ChipTone =
+    step === "reveal-opp" ? "rose" :
     step === "spells"  ? "fuchsia" :
     step === "summons" ? "emerald" :
     step === "combat"  ? "amber"   :
     step === "settle"  ? "zinc"    :
     "sky";
+  const showOverlayChips = step === "reveal-opp" && (oppPreview || playerPreview);
   return (
-    <div className="flex items-center justify-center py-0.5">
+    <div className="relative h-7 flex items-center justify-center">
       <Chip label={label} tone={tone} stepKey={step ?? "planning"} />
+      {/* Intent chips overlay during reveal — absolute so the row swap
+       *  doesn't change the board's measured height. */}
+      <AnimatePresence>
+        {showOverlayChips && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            className="absolute left-0 right-0 top-full mt-0.5 z-20 flex flex-wrap items-center justify-center gap-1.5 pointer-events-none px-2"
+          >
+            {playerPreview && <IntentChips intent={playerPreview} side="you" />}
+            {oppPreview && <IntentChips intent={oppPreview} side="opp" />}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -249,7 +264,7 @@ function IntentChips({ intent, side }: { intent: TurnIntent; side: "you" | "opp"
 
 function LaneRow({
   lanes, renderSide, intent, isPlayer, combatLane = null,
-  acceptingTaps = false, onLaneTap,
+  validLanes = [false, false, false], targetLabel = "", onLaneTap,
 }: {
   lanes: BoardState["lanes"];
   renderSide: Side;
@@ -258,9 +273,11 @@ function LaneRow({
   /** Which lane is "live" in the per-lane combat anim — its creature on
    *  this side gets the CHARGE animation; the other two stay still. */
   combatLane?: LaneIndex | null;
-  /** When true (player row only, while targeting is active) lane slots
-   *  become tappable + show a pulsing outline. */
-  acceptingTaps?: boolean;
+  /** Per-lane validity for the active targeting. Slots where this is true
+   *  become tappable + pulsate; invalid slots stay non-interactive. */
+  validLanes?: boolean[];
+  /** Label shown on each valid slot ("✦ Invoquer ici", "✦ Cible ta créature"). */
+  targetLabel?: string;
   onLaneTap?: (lane: LaneIndex) => void;
 }) {
   return (
@@ -270,6 +287,7 @@ function LaneRow({
         const c = lanes[lane][renderSide];
         const plannedSummon = intent?.summons.find((s) => s.lane === lane) ?? null;
         const inCombat = combatLane === lane;
+        const valid = validLanes[i] ?? false;
         return (
           <ArenaLaneSlot
             key={i}
@@ -279,8 +297,9 @@ function LaneRow({
             isPlayer={isPlayer}
             showPlanned={!!intent}
             chargeAttack={inCombat}
-            clickable={acceptingTaps}
-            onClick={acceptingTaps && onLaneTap ? () => onLaneTap(lane) : undefined}
+            clickable={valid}
+            clickableLabel={targetLabel}
+            onClick={valid && onLaneTap ? () => onLaneTap(lane) : undefined}
           />
         );
       })}

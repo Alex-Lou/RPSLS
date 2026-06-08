@@ -206,6 +206,71 @@ export type ArenaTargeting =
   | { kind: "spell"; id: CardId; targetKind: SpellTargetKind }
   | null;
 
+/** For lane-targeted spells, WHICH side + WHICH slot kind they need so the
+ *  board can highlight ONLY the valid slots (instead of "all empty mine"
+ *  for everything). Drives the per-lane "✦ Cible ta créature" / "✦ Cible
+ *  cette créature" / "✦ Invoquer ici" labels.
+ *
+ *  - "my-creature"             → highlight MY lanes that have a creature
+ *  - "opp-creature"            → highlight OPP lanes that have a creature
+ *  - "my-empty-opp-occupied"   → highlight MY lanes that are empty AND opp has a creature
+ *  - "my-empty"                → highlight MY empty lanes (used by summons) */
+export type LaneTargetSide = "my-creature" | "opp-creature" | "my-empty-opp-occupied" | "my-empty";
+
+export const LANE_SPELL_TARGET_SIDE: Partial<Record<CardId, LaneTargetSide>> = {
+  aegis:      "my-creature",
+  precision:  "my-creature",
+  anchor:     "my-creature",
+  surge:      "my-creature",
+  riposte:    "my-creature",
+  echappee:   "my-creature",
+  curse:      "opp-creature",
+  sangsue:    "opp-creature",
+  "trou-noir": "opp-creature",
+  mirror:     "my-empty-opp-occupied",
+};
+
+/** Returns whether `lane` on `side` is a valid drop target for the active
+ *  ArenaTargeting. Used by ArenaLaneSlot's clickable + label so each card
+ *  highlights ONLY the slots it can actually target. */
+export function isValidLaneTarget(
+  targeting: ArenaTargeting,
+  side: Side,
+  lane: LaneIndex,
+  lanes: { a: { move: Move } | null; b: { move: Move } | null }[],
+  playerSide: Side,
+): boolean {
+  if (!targeting) return false;
+  const isPlayerRow = side === playerSide;
+  const mine = lanes[lane][playerSide];
+  const opp  = lanes[lane][playerSide === "a" ? "b" : "a"];
+  if (targeting.kind === "summon") {
+    return isPlayerRow && !mine;
+  }
+  if (targeting.kind === "spell" && targeting.targetKind === "lane") {
+    const tgtSide = LANE_SPELL_TARGET_SIDE[targeting.id] ?? "my-creature";
+    if (tgtSide === "my-creature") return isPlayerRow && !!mine;
+    if (tgtSide === "opp-creature") return !isPlayerRow && !!opp;
+    if (tgtSide === "my-empty-opp-occupied") return isPlayerRow && !mine && !!opp;
+    if (tgtSide === "my-empty") return isPlayerRow && !mine;
+  }
+  return false;
+}
+
+/** Human-readable label shown ON the valid slot (instead of generic "play here"). */
+export function targetLabelFor(targeting: ArenaTargeting): string {
+  if (!targeting) return "";
+  if (targeting.kind === "summon") return "✦ Invoquer ici";
+  if (targeting.kind === "spell" && targeting.targetKind === "lane") {
+    const tgtSide = LANE_SPELL_TARGET_SIDE[targeting.id] ?? "my-creature";
+    if (tgtSide === "my-creature") return "✦ Cible ta créature";
+    if (tgtSide === "opp-creature") return "✦ Cible cette créature";
+    if (tgtSide === "my-empty-opp-occupied") return "✦ Mirror ici";
+    if (tgtSide === "my-empty") return "✦ Ici";
+  }
+  return "✦";
+}
+
 /* ───────────────────────── RPSLS counter table ───────────────────────── */
 
 /** Returns true when `attacker` "counters" `defender" per RPSLS rules

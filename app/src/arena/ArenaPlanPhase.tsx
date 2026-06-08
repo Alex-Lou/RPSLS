@@ -28,7 +28,7 @@ import { useT } from "../i18n";
 import type { CardId } from "../ranked/rankedTypes";
 import { arenaSupported } from "./arenaCardEffects";
 import { ArenaCardInspect } from "./ArenaCardInspect";
-import { CARD_TARGET_KIND as SHARED_TARGET_KIND, type ArenaTargeting } from "./arenaTypes";
+import { CARD_TARGET_KIND as SHARED_TARGET_KIND, LANE_SPELL_TARGET_SIDE, type ArenaTargeting } from "./arenaTypes";
 import type {
   BoardState,
   LaneIndex,
@@ -137,8 +137,14 @@ export function ArenaPlanPhase({
               exit={{ opacity: 0, y: -4 }}
               className="text-[11px] uppercase tracking-[0.15em] text-amber-300 font-bold flex items-center gap-2"
             >
-              {targeting.kind === "summon" && <>↑ Touche une lane verte pour invoquer {targeting.move.toUpperCase()}</>}
-              {targeting.kind === "spell" && targeting.targetKind === "lane" && <>↑ Touche une lane sur le board</>}
+              {targeting.kind === "summon" && <>↑ Touche une LANE VIDE de ton côté pour invoquer {targeting.move.toUpperCase()}</>}
+              {targeting.kind === "spell" && targeting.targetKind === "lane" && (() => {
+                const side = LANE_SPELL_TARGET_SIDE[targeting.id] ?? "my-creature";
+                if (side === "my-creature") return <>↑ Touche TA CRÉATURE à cibler</>;
+                if (side === "opp-creature") return <>↑ Touche la CRÉATURE ADVERSE à cibler</>;
+                if (side === "my-empty-opp-occupied") return <>↑ Touche UNE LANE VIDE face à un adversaire</>;
+                return <>↑ Touche une lane de ton côté</>;
+              })()}
               <button
                 onClick={cancelTargeting}
                 className="px-2 py-0.5 rounded-full bg-hairline text-[10px] font-bold"
