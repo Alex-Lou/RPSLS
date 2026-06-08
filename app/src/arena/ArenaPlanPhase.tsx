@@ -268,8 +268,10 @@ export function ArenaPlanPhase({
         })}
       </div>
 
-      {/* Hand fanout — spell cards. Compact size (44px wide) so the board
-       *  remains dominant, hand stays a quick-scan strip. */}
+      {/* Hand strip — compact (44-48px wide) cards with their NAMES visible
+       *  underneath so the player recognises what's in hand without having
+       *  to tap each one. The modal inspect (on tap) still gives the full
+       *  card text. */}
       {me.hand.length > 0 ? (
         <div className="flex items-end justify-center gap-1 px-1 overflow-x-auto">
           {me.hand.map((id, i) => {
@@ -279,12 +281,12 @@ export function ArenaPlanPhase({
             const isTargeting = targeting?.kind === "spell" && targeting.id === id;
             const isInspecting = inspecting === id;
             return (
+              <div key={`${id}-${i}`} className="flex flex-col items-center gap-0.5 shrink-0">
               <button
-                key={`${id}-${i}`}
                 onClick={() => pickCardToCast(id)}
                 disabled={!supported || cannotAfford || disabled}
                 className={
-                  "relative w-[44px] h-[60px] sm:w-[48px] sm:h-[66px] rounded-lg overflow-hidden bg-surface-raised shrink-0 transition " +
+                  "relative w-[44px] h-[60px] sm:w-[48px] sm:h-[66px] rounded-lg overflow-hidden bg-surface-raised transition " +
                   "ring-2 " + (
                     isTargeting ? "ring-amber-300 scale-110"
                     : isInspecting ? "ring-sky-300 scale-110"
@@ -314,6 +316,18 @@ export function ArenaPlanPhase({
                   </div>
                 )}
               </button>
+              {/* Name label beneath the card — truncated to the card width
+               *  so the player can scan their hand without tapping each. */}
+              <span
+                className={
+                  "text-[8px] sm:text-[9px] font-bold uppercase tracking-wider truncate max-w-[48px] leading-none " +
+                  (cannotAfford || !supported ? "text-ink-faint" : "text-ink")
+                }
+                title={t(card.nameKey)}
+              >
+                {t(card.nameKey)}
+              </span>
+              </div>
             );
           })}
         </div>

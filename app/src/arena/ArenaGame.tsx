@@ -25,6 +25,8 @@ import { CARDS } from "../ranked/cards";
 import type { CardId } from "../ranked/rankedTypes";
 import { ScaleToFit } from "../match/sharedMatchUI";
 import { ArenaBoard } from "./ArenaBoard";
+import { ArenaMatchEnd } from "./ArenaMatchEnd";
+import { ArenaMatchSplash } from "./ArenaMatchSplash";
 import { ArenaPlanPhase } from "./ArenaPlanPhase";
 import {
   advanceToNextTurn,
@@ -265,40 +267,28 @@ export function ArenaGame({
   /* ──────────── Render ──────────── */
 
   if (matchSplash) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 px-4">
-        <div className="text-[10px] uppercase tracking-[0.3em] text-themed font-bold">
-          Constellation Pro
-        </div>
-        <div className="text-2xl font-extrabold text-white">Match en préparation…</div>
-        <div className="text-xs text-ink-muted text-center max-w-xs">
-          Premier héros à 0 PV perd. Invoquez des créatures, lancez des sorts, jouez intelligent.
-        </div>
-      </div>
-    );
+    return <ArenaMatchSplash playerName={player.nickname || "Toi"} playerAvatar={player.avatar} />;
   }
 
   if (board.phase === "match-end") {
-    const youWon = board.b.hp <= 0 && board.a.hp > 0;
-    const draw = board.a.hp <= 0 && board.b.hp <= 0;
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 px-4">
-        <div className={
-          "text-4xl font-extrabold " +
-          (draw ? "text-ink-muted" : youWon ? "text-emerald-300" : "text-rose-300")
-        }>
-          {draw ? "ÉGALITÉ" : youWon ? "VICTOIRE" : "DÉFAITE"}
-        </div>
-        <div className="text-sm text-ink-muted">
-          Toi {board.a.hp} PV · Adv {board.b.hp} PV · Tour {board.turn}
-        </div>
-        <button
-          onClick={onQuit}
-          className="mt-4 px-6 py-2.5 rounded-2xl font-bold text-white bg-themed shadow-lg"
-        >
-          Retour au menu
-        </button>
-      </div>
+      <ArenaMatchEnd
+        board={board}
+        onQuit={onQuit}
+        onRematch={() => {
+          // Soft reset: rebuild the board fresh and let the lifecycle re-run.
+          // The match-end haptic/stat record already fired, so this is purely
+          // a re-init. Re-mount via key change is the cleanest path.
+          matchEndedRef.current = false;
+          setBoard(makeInitialBoard(playerDeck.current, CPU_ARENA_DECK));
+          setIntent({ spells: [], summons: [] });
+          setOppPreview(null);
+          setPlayerPreview(null);
+          setResolveStep(null);
+          setResolving(false);
+          setMatchSplash(true);
+        }}
+      />
     );
   }
 

@@ -49,7 +49,8 @@ export function cpuArenaDecision(
   let mana = side === "a" ? board.a.mana : board.b.mana;
   const hero = side === "a" ? board.a : board.b;
   const oppSide: Side = side === "a" ? "b" : "a";
-  const oppHero = side === "a" ? board.b : board.a;
+  // oppHero (the hero we're attacking) is now computed inside the lethal
+  // block as `playerHero` — keep this local out so we don't shadow it.
 
   // Hand of playable spells (filter out cards we haven't adapted to Arena yet).
   const playableHand = hero.hand.filter(arenaSupported);
@@ -81,8 +82,30 @@ export function cpuArenaDecision(
     }
   }
 
-  /* ─── 2. Burst lethal vs an exposed hero ─── */
-  if (oppHero.hp <= 6 && Math.random() >= skipChance) {
+  /* ─── 2. Lethal check — compute the damage WE can dump on the opp hero
+   *      this turn and prioritize it if it kills. Includes:
+   *      - Existing creatures' undefended ATK (lanes where player has none)
+   *      - Supernova on hero (6 dmg, 4 mana)
+   *      - Heist (3 dmg, 3 mana)
+   *      - Paradoxe (5 dmg both, 3 mana — risky if we're also low)
+   *      Adversaire AI is "side", so "us" attacks the hero on `oppSide`. */
+  const playerHero = side === "a" ? board.b : board.a; // the hero we're trying to kill
+  let lethalDmg = 0;
+  for (let i = 0; i < 3; i++) {
+    const lane = i as LaneIndex;
+    const myC = sideCreature(board, side, lane);
+    const oppC = sideCreature(board, oppSide, lane);
+    if (myC && !oppC) {
+      // Undefended → we'll hit hero for myC.atk
+      lethalDmg += CREATURE_STATS[myC.move].atk + myC.atkBuff;
+    }
+  }
+  const couldLethal = lethalDmg + (playableHand.includes("supernova") && mana >= 4 ? 6 : 0)
+                                + (playableHand.includes("heist") && mana >= 3 ? 3 : 0)
+                                >= playerHero.hp;
+
+  /* ─── 2b. Burst lethal vs an exposed hero — push spells if lethal is on. */
+  if ((playerHero.hp <= 6 || couldLethal) && Math.random() >= skipChance) {
     if (mana >= 4 && playableHand.includes("supernova")) {
       intent.spells.push({ id: "supernova", kind: "hero" });
       consume(playableHand, "supernova");
@@ -112,14 +135,33 @@ export function cpuArenaDecision(
     return score(l2) - score(l1);
   });
 
+  // Summon skip chance — much lower than the spell skip so the CPU
+  // RELIABLY develops board, instead of standing still on its mana.
+  // Easy keeps a bit of randomness (30%), normal/hard always summon if
+  // there's an open lane and mana for it.
+  const summonSkip = difficulty === "easy" ? 0.3 : 0;
+  let summonsThisTurn = 0;
   for (const lane of laneOrder) {
     if (mana < 1) break;
     if (sideCreature(board, side, lane)) continue;
-    if (Math.random() < skipChance) continue;
+    if (Math.random() < summonSkip) continue;
     const opp = sideCreature(board, oppSide, lane);
     const choice = pickBestMove(opp);
     intent.summons.push({ lane, move: choice });
     mana -= 1;
+    summonsThisTurn += 1;
+  }
+  // Fallback: if for any reason no summon happened and we still have ≥ 1
+  // mana + at least one empty lane, FORCE one — a boring "CPU did nothing"
+  // turn is worse than a suboptimal summon.
+  if (summonsThisTurn === 0 && mana >= 1 && difficulty !== "easy") {
+    for (const lane of laneOrder) {
+      if (sideCreature(board, side, lane)) continue;
+      const opp = sideCreature(board, oppSide, lane);
+      intent.summons.push({ lane, move: pickBestMove(opp) });
+      mana -= 1;
+      break;
+    }
   }
 
   /* ─── 4. Spend remaining mana — biggest spells first ─── */

@@ -351,7 +351,18 @@ export const useStore = create<AppState>()(
           losses: cur.losses + (outcome === "loss" ? 1 : 0),
           draws:  cur.draws + (outcome === "draw" ? 1 : 0),
         };
-        return { player: { ...s.player, arenaStats: next } };
+        // Éclats reward — mirrors the existing eclatsReward(mode, outcome)
+        // scale for casual modes. Constellation Pro is higher-effort (longer
+        // matches, deeper strategy) so it pays slightly above Constellation
+        // Ranked: win 20, draw 10, loss 5.
+        const reward = outcome === "win" ? 20 : outcome === "draw" ? 10 : 5;
+        return {
+          player: {
+            ...s.player,
+            arenaStats: next,
+            eclats: (s.player.eclats ?? 0) + reward,
+          },
+        };
       }),
       setRankedDeck: (deck) => set((s) => ({
         player: { ...s.player, rankedDeck: deck },
