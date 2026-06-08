@@ -34,12 +34,15 @@ export interface ArenaBoardProps {
    *  lock and resolver. Ghost previews on opp lanes + chip strip of their
    *  spells so the player SEES what's incoming before damage lands. */
   oppPreview?: TurnIntent | null;
+  /** Player-side mirror of oppPreview — shows what YOU just committed
+   *  (chip strip). Same lifetime as oppPreview. */
+  playerPreview?: TurnIntent | null;
   /** Current step in the sequenced resolver — drives the phase banner so
    *  the player always knows what's about to happen / just happened. */
   resolveStep?: "reveal-opp" | "spells" | "summons" | "combat" | "settle" | null;
 }
 
-export function ArenaBoard({ board, playerSide, intent, oppPreview, resolveStep }: ArenaBoardProps) {
+export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPreview, resolveStep }: ArenaBoardProps) {
   // Combat shake fires when the resolver lands on the "combat" step. The
   // creatures shake toward their opposing side for ~400ms BEFORE the death
   // animations + dmg popups land, so the player feels the impact happen.
@@ -95,6 +98,12 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, resolveStep 
 
         {/* Center divider */}
         <div className="h-px bg-gradient-to-r from-transparent via-emerald-400/30 to-transparent my-0.5" />
+
+        {/* Player reveal banner — mirror of opp's, names YOUR queued spells
+         *  during the same window so the player reads BOTH sides at once. */}
+        {playerPreview && (playerPreview.spells.length > 0 || playerPreview.summons.length > 0) && (
+          <OppRevealBanner intent={playerPreview} side="you" />
+        )}
 
         {/* Player lane row */}
         <LaneRow
@@ -289,7 +298,10 @@ function PhaseBanner({
     step === "summons"    ? "🌟 Invocations sur les lanes" :
     step === "combat"     ? "⚔️ Combat sur les lanes"     :
     step === "settle"     ? "Fin du tour…"                 :
-    "Tour " + turn + " · Planifie ton coup";
+    // Default (planning) — keep the WIN CONDITION visible at all times so
+    // the player never forgets the objective. Alex's feedback: "Je ne
+    // comprends pas trop comment gagner ou perdre des points".
+    "Tour " + turn + " · Premier à 0 ❤ gagne";
   const tone =
     step === "reveal-opp" ? "from-rose-500/30 to-rose-600/20 border-rose-400/50 text-rose-100"  :
     step === "spells"     ? "from-fuchsia-500/30 to-violet-600/20 border-fuchsia-400/50 text-fuchsia-100" :
@@ -346,26 +358,30 @@ function LaneRow({
 }
 
 
-/** Opp-reveal banner — surfaces the CPU's committed intent during the
- *  reveal window. Lists each spell as a chip with the card's glyph + name +
- *  cost so the player can read what's about to fire. Summons land as ghost
- *  previews on the opp lane row, not here. */
-function OppRevealBanner({ intent }: { intent: TurnIntent }) {
+/** Reveal banner — names every spell + summon committed by one side during
+ *  the resolver's reveal/spells window. Renders for both sides: rose tone
+ *  for the opp, emerald tone for the player ("Tu joues"). */
+function OppRevealBanner({ intent, side = "opp" }: { intent: TurnIntent; side?: "opp" | "you" }) {
   const t = useT();
+  const labelColor = side === "you" ? "text-emerald-300" : "text-rose-300";
+  const label = side === "you" ? "Tu joues" : "Adversaire joue";
+  const summonTone = side === "you"
+    ? "bg-emerald-500/20 border-emerald-400/50 text-emerald-100"
+    : "bg-rose-500/20 border-rose-400/50 text-rose-100";
   return (
     <motion.div
-      initial={{ opacity: 0, y: -8 }}
+      initial={{ opacity: 0, y: side === "you" ? 8 : -8 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -4 }}
+      exit={{ opacity: 0, y: side === "you" ? 4 : -4 }}
       className="flex flex-wrap items-center justify-center gap-1.5 px-2 -mt-1"
     >
-      <span className="text-[10px] uppercase tracking-[0.2em] text-rose-300 font-black">
-        Adversaire joue
+      <span className={"text-[10px] uppercase tracking-[0.2em] font-black " + labelColor}>
+        {label}
       </span>
       {intent.summons.map((s, i) => (
         <span
           key={`sm-${i}`}
-          className="inline-flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-0.5 bg-rose-500/20 border border-rose-400/50 text-rose-100"
+          className={"inline-flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-0.5 border " + summonTone}
         >
           <MoveGlyph move={s.move} className="w-3 h-3" />
           <span>L{s.lane + 1}</span>

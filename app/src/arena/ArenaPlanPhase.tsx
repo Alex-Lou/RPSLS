@@ -208,21 +208,28 @@ export function ArenaPlanPhase({
         </div>
       )}
 
-      {/* Card inspect panel — appears on the FIRST tap of a hand card so the
-       *  player reads the effect before committing. A second tap on the
-       *  same card commits / opens targeting. The "Lancer" CTA inside is a
-       *  shortcut for that second tap. */}
-      <AnimatePresence>
-        {inspecting && (
-          <ArenaCardInspect
-            id={inspecting}
-            targetKind={CARD_TARGET_KIND[inspecting] ?? "global"}
-            t={t}
-            onCommit={() => pickCardToCast(inspecting)}
-            onClose={() => setInspecting(null)}
-          />
-        )}
-      </AnimatePresence>
+      {/* Card inspect panel slot — RESERVED HEIGHT (h-24 ≈ 96px) so that
+       *  opening/closing the panel doesn't change the plan-phase height,
+       *  which would otherwise re-trigger the board's ScaleToFit and the
+       *  whole board would visibly jump (Alex flagged: "Arena se resize
+       *  quand je choisis ou place une carte"). The panel itself uses
+       *  absolute positioning inside the slot so the layout stays still
+       *  whether the panel is shown or not. */}
+      <div className="relative h-24 max-w-md mx-auto w-full">
+        <AnimatePresence>
+          {inspecting && (
+            <div className="absolute inset-0">
+              <ArenaCardInspect
+                id={inspecting}
+                targetKind={CARD_TARGET_KIND[inspecting] ?? "global"}
+                t={t}
+                onCommit={() => pickCardToCast(inspecting)}
+                onClose={() => setInspecting(null)}
+              />
+            </div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* Mana summary */}
       <div className="text-center text-[10px] text-ink-muted font-bold tabular-nums">

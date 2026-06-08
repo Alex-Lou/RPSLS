@@ -102,6 +102,10 @@ export function ArenaGame({
    *  Drives the "Adversaire joue X / summon Y" banner + ghost previews on
    *  the opp lanes so the player SEES what they committed. */
   const [oppPreview, setOppPreview] = useState<TurnIntent | null>(null);
+  /** Player intent preview: mirror of oppPreview for OUR side. Set when the
+   *  resolver kicks off so the player can read what they themselves locked
+   *  in. Cleared when the player starts a new turn. */
+  const [playerPreview, setPlayerPreview] = useState<TurnIntent | null>(null);
   /** Current step in the sequenced resolver. Drives the phase banner. */
   const [resolveStep, setResolveStep] = useState<ResolveStep | null>(null);
 
@@ -190,26 +194,30 @@ export function ArenaGame({
       b: { ...board.b, hand: removeSpentCards(board.b.hand, cpuIntent) },
     };
 
-    // ─── Step 0: REVEAL — show the CPU's intent (ghost previews + banner)
-    // before any effect fires. The player reads it and bracts.
+    // ─── Step 0: REVEAL — show BOTH sides' intents (ghost previews +
+    //     banners) before any effect fires. The player reads both at once.
     setOppPreview(cpuIntent);
+    setPlayerPreview(intent);
     setResolveStep("reveal-opp");
 
     // ─── Step 1: SPELLS — both sides' spells fire. Buffs, damage, draws all
-    // land at once (resolver internally sorts by priority).
+    // land at once (resolver internally sorts by priority). Both preview
+    // banners stay visible so the player can read what hit what.
     window.setTimeout(() => {
       let b = startBoard;
       b = applySpellPhase(b, intent, "a");
       b = applySpellPhase(b, cpuIntent, "b");
       setBoard(b);
-      setOppPreview(null); // ghost previews give way to the actual creatures
       setResolveStep("spells");
 
-      // ─── Step 2: SUMMONS — new creatures land on lanes.
+      // ─── Step 2: SUMMONS — new creatures land on lanes. THIS is when
+      //     the preview banners give way to the actual board.
       window.setTimeout(() => {
         b = applySummons(b, intent, "a");
         b = applySummons(b, cpuIntent, "b");
         setBoard(b);
+        setOppPreview(null);
+        setPlayerPreview(null);
         setResolveStep("summons");
 
         // ─── Step 3: COMBAT — TWO sub-steps so the player SEES the impact.
@@ -306,6 +314,7 @@ export function ArenaGame({
           playerSide="a"
           intent={intent}
           oppPreview={oppPreview}
+          playerPreview={playerPreview}
           resolveStep={resolveStep}
         />
       </ScaleToFit>
