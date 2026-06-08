@@ -40,6 +40,10 @@ export interface ArenaBoardProps {
 }
 
 export function ArenaBoard({ board, playerSide, intent, oppPreview, resolveStep }: ArenaBoardProps) {
+  // Combat shake fires when the resolver lands on the "combat" step. The
+  // creatures shake toward their opposing side for ~400ms BEFORE the death
+  // animations + dmg popups land, so the player feels the impact happen.
+  const combatShake = resolveStep === "combat";
   const padId = useArenaPad(useStore((s) => s.player.padId));
   // Player identity for the hero portrait — pulls avatar + nickname from
   // the store so the board reads as "alex vs CPU" instead of "Toi vs Adv".
@@ -86,6 +90,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, resolveStep 
           renderSide={oppSide}
           intent={oppPreview ?? null}
           isPlayer={false}
+          combatShake={combatShake}
         />
 
         {/* Center divider */}
@@ -97,6 +102,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, resolveStep 
           renderSide={playerSide}
           intent={intent}
           isPlayer={true}
+          combatShake={combatShake}
         />
 
         {/* Player strip */}
@@ -165,26 +171,46 @@ function HeroStrip({
       </div>
       {/* HP + mana stacked vertically — the player reads them in one column. */}
       <div className="flex-1 flex flex-col gap-1 min-w-0">
-        {/* HP bar with numbers ON the bar for prominence. */}
-        <div className="flex items-center gap-1">
+        {/* HP bar — taller, segmented every 5 HP, glow on the filled portion,
+         *  pulse at low HP. The numeric readout sits ON the left so it's the
+         *  first thing the eye lands on. */}
+        <div className="flex items-center gap-1.5">
           <motion.span
             key={hero.hp}
-            initial={{ scale: 1.25 }}
-            animate={{ scale: 1 }}
+            initial={{ scale: 1.35, color: "#fda4af" }}
+            animate={{ scale: 1, color: lowHp ? "#fb7185" : "#ffffff" }}
             transition={{ duration: 0.3 }}
-            className={
-              "text-[12px] font-black tabular-nums w-12 text-right " +
-              (lowHp ? "text-rose-300" : "text-white")
-            }
+            className="text-[13px] font-black tabular-nums w-12 text-right"
           >
             ❤ {hero.hp}/{hero.maxHp}
           </motion.span>
-          <div className="flex-1 h-2.5 rounded-full bg-hairline overflow-hidden ring-1 ring-black/40">
+          <div
+            className={
+              "relative flex-1 h-3 rounded-full bg-zinc-900/80 overflow-hidden ring-1 ring-black/50 " +
+              (lowHp ? "animate-pulse" : "")
+            }
+          >
             <motion.div
-              className={"h-full " + (hpPct > 50 ? "bg-emerald-400" : hpPct > 25 ? "bg-amber-400" : "bg-rose-500")}
+              className={
+                "h-full transition-colors " +
+                (hpPct > 50 ? "bg-gradient-to-r from-emerald-500 to-emerald-300 shadow-[inset_0_0_8px_rgba(110,231,183,0.6)]" :
+                 hpPct > 25 ? "bg-gradient-to-r from-amber-500 to-amber-300 shadow-[inset_0_0_8px_rgba(252,211,77,0.6)]" :
+                 "bg-gradient-to-r from-rose-600 to-rose-400 shadow-[inset_0_0_8px_rgba(251,113,133,0.6)]")
+              }
               animate={{ width: `${hpPct}%` }}
-              transition={{ duration: 0.4 }}
+              transition={{ duration: 0.45 }}
             />
+            {/* Per-5-HP tick marks so 12/20 reads as "more than half" at a
+             *  glance instead of math. Drawn over the bar with low opacity. */}
+            <div className="absolute inset-0 flex pointer-events-none">
+              {Array.from({ length: Math.max(1, Math.floor(hero.maxHp / 5)) - 1 }, (_, i) => (
+                <div
+                  key={i}
+                  className="border-r border-black/40"
+                  style={{ width: `${100 / Math.max(1, Math.floor(hero.maxHp / 5))}%` }}
+                />
+              ))}
+            </div>
           </div>
         </div>
         {/* Mana + hand size + turn — compact secondary row. */}
@@ -289,12 +315,13 @@ function PhaseBanner({
 /* ───────────────────────── Lane row ───────────────────────── */
 
 function LaneRow({
-  lanes, renderSide, intent, isPlayer,
+  lanes, renderSide, intent, isPlayer, combatShake = false,
 }: {
   lanes: BoardState["lanes"];
   renderSide: Side;
   intent: TurnIntent | null;
   isPlayer: boolean;
+  combatShake?: boolean;
 }) {
   return (
     <div className="grid grid-cols-3 gap-2 sm:gap-3">
@@ -310,6 +337,7 @@ function LaneRow({
             plannedSummon={plannedSummon}
             isPlayer={isPlayer}
             showPlanned={!!intent}
+            combatShake={combatShake}
           />
         );
       })}

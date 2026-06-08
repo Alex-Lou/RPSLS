@@ -23,10 +23,14 @@ export interface ArenaLaneSlotProps {
   /** When false, the ghost-preview branch is skipped (used to suppress the
    *  player's own planned summons from rendering on the opp row, etc.). */
   showPlanned?: boolean;
+  /** When true, the creature shakes toward its opponent for ~400ms — driven
+   *  by ArenaGame's resolveStep transitioning to "combat". The shake fires
+   *  BEFORE damage is applied so the player sees who hit whom. */
+  combatShake?: boolean;
 }
 
 export function ArenaLaneSlot({
-  creature, plannedSummon, isPlayer, showPlanned = false,
+  creature, plannedSummon, isPlayer, showPlanned = false, combatShake = false,
 }: ArenaLaneSlotProps) {
   // Track previous HP so we can spawn a "-N" floating popup when this lane's
   // creature takes damage. We guard by move identity to avoid false-positives
@@ -56,11 +60,17 @@ export function ArenaLaneSlot({
     // opp creatures get a rose one — visual ownership cue independent of
     // the move's signature color (kept on the frame rim).
     const sideTint = isPlayer ? "rgba(52,211,153,0.55)" : "rgba(244,63,94,0.55)";
+    // Combat shake: player creature lunges UP toward opp; opp creature lunges
+    // DOWN toward player. Two cycles, ±5px on each axis for a real "hit".
+    const shakeAnim = combatShake
+      ? { x: [0, isPlayer ? -3 : 3, isPlayer ? 4 : -4, 0], y: [0, isPlayer ? -6 : 6, isPlayer ? 4 : -4, 0] }
+      : { x: 0, y: 0 };
     return (
       <motion.div
         layout
         initial={{ opacity: 0, y: isPlayer ? 12 : -12, scale: 0.85 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
+        animate={{ opacity: 1, scale: 1, ...shakeAnim }}
+        transition={combatShake ? { duration: 0.4, ease: "easeOut" } : undefined}
         className="aspect-[5/4] w-full rounded-xl relative flex flex-col items-center justify-center overflow-hidden transition"
         style={{
           background: "linear-gradient(160deg, rgba(20,22,32,0.94) 0%, rgba(10,12,20,0.94) 100%)",

@@ -23,6 +23,7 @@ import {
 import { useStore } from "../store/store";
 import { CARDS } from "../ranked/cards";
 import type { CardId } from "../ranked/rankedTypes";
+import { ScaleToFit } from "../match/sharedMatchUI";
 import { ArenaBoard } from "./ArenaBoard";
 import { ArenaPlanPhase } from "./ArenaPlanPhase";
 import {
@@ -211,22 +212,31 @@ export function ArenaGame({
         setBoard(b);
         setResolveStep("summons");
 
-        // ─── Step 3: COMBAT — creatures attack on each lane.
+        // ─── Step 3: COMBAT — TWO sub-steps so the player SEES the impact.
+        // 3a) Flip the step to "combat" BEFORE running the resolver so the
+        //     shake animation in ArenaLaneSlot fires on creatures that are
+        //     still alive (pre-combat HP). The board itself is unchanged.
+        // 3b) After ~SHAKE_MS the resolver runs, deaths happen, dmg popups
+        //     trigger via the new HP values.
+        const SHAKE_MS = 450;
         window.setTimeout(() => {
-          b = resolveCombat(b);
-          b = endOfTurnCleanup(b);
-          if (b.a.hp <= 0 || b.b.hp <= 0) {
-            b = { ...b, phase: "match-end" };
-          }
-          setBoard(b);
           setResolveStep("combat");
 
-          if (b.a.hp <= 0 || b.b.hp <= 0) {
-            window.setTimeout(() => {
-              if (b.b.hp <= 0 && b.a.hp > 0) hapticWin();
-              else hapticLoss();
-            }, 200);
-          }
+          window.setTimeout(() => {
+            b = resolveCombat(b);
+            b = endOfTurnCleanup(b);
+            if (b.a.hp <= 0 || b.b.hp <= 0) {
+              b = { ...b, phase: "match-end" };
+            }
+            setBoard(b);
+
+            if (b.a.hp <= 0 || b.b.hp <= 0) {
+              window.setTimeout(() => {
+                if (b.b.hp <= 0 && b.a.hp > 0) hapticWin();
+                else hapticLoss();
+              }, 200);
+            }
+          }, SHAKE_MS);
 
           // ─── Step 4: SETTLE — final pause to read, then advance to next turn.
           window.setTimeout(() => {
@@ -286,13 +296,19 @@ export function ArenaGame({
 
   return (
     <div className="relative flex-1 flex flex-col min-h-0 gap-2">
-      <ArenaBoard
-        board={board}
-        playerSide="a"
-        intent={intent}
-        oppPreview={oppPreview}
-        resolveStep={resolveStep}
-      />
+      {/* The board area can grow tall (2 hero strips + 2 lane rows + chips +
+       *  phase banner) so we wrap it in ScaleToFit: on short viewports it
+       *  uniformly scales down to fit, never clipping the opp portrait or
+       *  the player HP bar. The plan phase stays shrink-0 below it. */}
+      <ScaleToFit align="center">
+        <ArenaBoard
+          board={board}
+          playerSide="a"
+          intent={intent}
+          oppPreview={oppPreview}
+          resolveStep={resolveStep}
+        />
+      </ScaleToFit>
       <ArenaPlanPhase
         board={board}
         intent={intent}
