@@ -143,7 +143,7 @@ export function ArenaPlanPhase({
   }
 
   return (
-    <div className="flex flex-col gap-1.5 px-2 pb-2 shrink-0">
+    <div className="flex flex-col gap-1 px-2 pb-1.5 shrink-0">
       {/* Targeting hint — fixed-height slot so the layout doesn't bounce. */}
       <div className="h-6 flex items-center justify-center">
         <AnimatePresence>
@@ -208,28 +208,21 @@ export function ArenaPlanPhase({
         </div>
       )}
 
-      {/* Card inspect panel slot — RESERVED HEIGHT (h-24 ≈ 96px) so that
-       *  opening/closing the panel doesn't change the plan-phase height,
-       *  which would otherwise re-trigger the board's ScaleToFit and the
-       *  whole board would visibly jump (Alex flagged: "Arena se resize
-       *  quand je choisis ou place une carte"). The panel itself uses
-       *  absolute positioning inside the slot so the layout stays still
-       *  whether the panel is shown or not. */}
-      <div className="relative h-24 max-w-md mx-auto w-full">
-        <AnimatePresence>
-          {inspecting && (
-            <div className="absolute inset-0">
-              <ArenaCardInspect
-                id={inspecting}
-                targetKind={CARD_TARGET_KIND[inspecting] ?? "global"}
-                t={t}
-                onCommit={() => pickCardToCast(inspecting)}
-                onClose={() => setInspecting(null)}
-              />
-            </div>
-          )}
-        </AnimatePresence>
-      </div>
+      {/* Card inspect — now a FULLSCREEN MODAL (z-50 overlay) rather than
+       *  an inline panel, so opening it doesn't touch the plan-phase
+       *  height. Zero reflow on the board, fixes Alex's "Arena se resize
+       *  quand je choisis une carte" complaint. */}
+      <AnimatePresence>
+        {inspecting && (
+          <ArenaCardInspect
+            id={inspecting}
+            targetKind={CARD_TARGET_KIND[inspecting] ?? "global"}
+            t={t}
+            onCommit={() => pickCardToCast(inspecting)}
+            onClose={() => setInspecting(null)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Mana summary */}
       <div className="text-center text-[10px] text-ink-muted font-bold tabular-nums">
@@ -240,12 +233,10 @@ export function ArenaPlanPhase({
         {inspecting && <span className="text-amber-300"> · re-touche la carte pour la jouer</span>}
       </div>
 
-      {/* RPSLS move picker — summon row. Same dark-glass + neon-rim aesthetic
-       *  as the Ranked picker (PickerBar in RankedPickPhase): the glyph stays
-       *  the only colored thing, the frame is dark with a per-move rim and
-       *  glow that blends ~45% toward the active theme accent. Reads cleanly
-       *  on every theme background instead of fighting it. */}
-      <div className="grid grid-cols-5 gap-1.5 sm:gap-2 max-w-md mx-auto w-full">
+      {/* RPSLS move picker — compact strip. Was aspect-[4/5] cards that
+       *  took 15% of the screen; now h-12 pills so the board reclaims the
+       *  vertical space. Same dark-glass + neon-rim aesthetic. */}
+      <div className="grid grid-cols-5 gap-1 sm:gap-1.5 max-w-md mx-auto w-full">
         {MOVES.map((mv) => {
           const pal = MOVE_PALETTE[mv];
           const cannotAfford = manaLeft < 1;
@@ -258,7 +249,7 @@ export function ArenaPlanPhase({
               onClick={() => pickMoveToSummon(mv)}
               disabled={cannotAfford || disabled}
               className={
-                "relative aspect-[4/5] rounded-xl flex flex-col items-center justify-center gap-0.5 py-1 transition active:scale-92 " +
+                "relative h-12 sm:h-14 rounded-lg flex items-center justify-center transition active:scale-92 " +
                 (cannotAfford ? "opacity-30 grayscale " : "") +
                 (isTargeting ? "scale-105 " : "")
               }
@@ -266,26 +257,21 @@ export function ArenaPlanPhase({
                 background: "linear-gradient(160deg, rgba(20,22,32,0.92) 0%, rgba(10,12,20,0.92) 100%)",
                 border: `2px solid ${isTargeting ? "rgba(252, 211, 77, 0.9)" : rim}`,
                 boxShadow: isTargeting
-                  ? "0 0 18px -2px rgba(252, 211, 77, 0.7), inset 0 1px 0 rgba(255,255,255,0.08)"
-                  : `0 0 12px -2px ${glow}, inset 0 1px 0 rgba(255,255,255,0.08)`,
+                  ? "0 0 14px -2px rgba(252, 211, 77, 0.7), inset 0 1px 0 rgba(255,255,255,0.08)"
+                  : `0 0 8px -2px ${glow}, inset 0 1px 0 rgba(255,255,255,0.08)`,
               }}
             >
-              <MoveGlyph move={mv} className="w-9 h-9 sm:w-10 sm:h-10" />
-              <span className="text-[8px] uppercase tracking-wider font-bold leading-none" style={{ color: rim }}>
-                {mv}
-              </span>
-              {/* Mana cost pip in the corner — kept tiny, doesn't fight the glyph. */}
-              <span className="absolute top-1 right-1 inline-flex items-center gap-0.5 px-1 py-0.5 rounded-full bg-black/70 backdrop-blur-sm">
-                <span className="w-1 h-1 rounded-full bg-sky-300" />
-              </span>
+              <MoveGlyph move={mv} className="w-8 h-8 sm:w-9 sm:h-9" />
+              <span className="absolute top-0.5 right-0.5 w-1 h-1 rounded-full bg-sky-300" />
             </button>
           );
         })}
       </div>
 
-      {/* Hand fanout — spell cards */}
+      {/* Hand fanout — spell cards. Compact size (44px wide) so the board
+       *  remains dominant, hand stays a quick-scan strip. */}
       {me.hand.length > 0 ? (
-        <div className="flex items-end justify-center gap-1 px-1 pt-1 overflow-x-auto">
+        <div className="flex items-end justify-center gap-1 px-1 overflow-x-auto">
           {me.hand.map((id, i) => {
             const card = CARDS[id];
             const supported = arenaSupported(id);
@@ -298,9 +284,9 @@ export function ArenaPlanPhase({
                 onClick={() => pickCardToCast(id)}
                 disabled={!supported || cannotAfford || disabled}
                 className={
-                  "relative w-[52px] h-[72px] sm:w-[58px] sm:h-[80px] rounded-xl overflow-hidden bg-surface-raised shrink-0 transition " +
+                  "relative w-[44px] h-[60px] sm:w-[48px] sm:h-[66px] rounded-lg overflow-hidden bg-surface-raised shrink-0 transition " +
                   "ring-2 " + (
-                    isTargeting ? "ring-amber-300 scale-105"
+                    isTargeting ? "ring-amber-300 scale-110"
                     : isInspecting ? "ring-sky-300 scale-110"
                     : "ring-white/20"
                   ) +
@@ -337,24 +323,25 @@ export function ArenaPlanPhase({
         </div>
       )}
 
-      {/* Lock button */}
+      {/* Lock button — compact (was py-2 px-6 text-sm, now py-1.5 px-5 text-xs)
+       *  so it stops eating ~6% of the screen for a single button. */}
       <button
         onClick={onLock}
         disabled={!canLock}
         className={
-          "mt-1 px-6 py-2 rounded-2xl font-bold text-white text-sm transition " +
+          "self-center mt-0.5 px-5 py-1.5 rounded-xl font-bold text-white text-xs transition " +
           (canLock
-            ? "shadow-lg"
+            ? "shadow-md"
             : "bg-hairline text-ink-faint cursor-not-allowed")
         }
         style={canLock ? {
           background: "linear-gradient(to right, var(--theme-primary), var(--theme-secondary))",
-          boxShadow: "0 8px 24px -8px color-mix(in oklab, var(--theme-primary) 55%, transparent)",
+          boxShadow: "0 4px 14px -4px color-mix(in oklab, var(--theme-primary) 55%, transparent)",
           fontFamily: "var(--font-headline)",
-          letterSpacing: "0.06em",
+          letterSpacing: "0.08em",
         } : undefined}
       >
-        ✓ Fin de tour
+        ✓ FIN DE TOUR
       </button>
     </div>
   );

@@ -88,9 +88,9 @@ export function ArenaLaneSlot({
           style={{ background: sideTint, boxShadow: `0 0 6px ${sideTint}` }}
           aria-hidden
         />
-        <MoveGlyph move={creature.move} className="w-10 h-10 sm:w-12 sm:h-12" />
+        <MoveGlyph move={creature.move} className="w-14 h-14 sm:w-16 sm:h-16" />
         <span
-          className="text-[7px] uppercase tracking-wider font-black leading-none mt-0.5"
+          className="text-[9px] uppercase tracking-wider font-black leading-none mt-0.5"
           style={{ color: rim }}
         >
           {creature.move}
@@ -152,9 +152,9 @@ export function ArenaLaneSlot({
           boxShadow: `0 0 10px -3px ${moveGlow(pal.hex)}80`,
         }}
       >
-        <MoveGlyph move={plannedSummon.move} className="w-10 h-10 sm:w-12 sm:h-12 opacity-80" />
+        <MoveGlyph move={plannedSummon.move} className="w-14 h-14 sm:w-16 sm:h-16 opacity-80" />
         <span
-          className="text-[7px] uppercase tracking-wider font-bold leading-none mt-0.5 opacity-90"
+          className="text-[9px] uppercase tracking-wider font-bold leading-none mt-0.5 opacity-90"
           style={{ color: rim }}
         >
           {plannedSummon.move}
