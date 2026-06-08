@@ -12,6 +12,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { CARDS } from "../ranked/cards";
+import { useT } from "../i18n";
+import type { CardId } from "../ranked/rankedTypes";
 import type { HeroState } from "./arenaTypes";
 
 export interface ArenaHeroStripProps {
@@ -28,11 +31,16 @@ export interface ArenaHeroStripProps {
    *  rose ring pulse. The KEY is what triggers the re-render of the
    *  AnimatePresence overlay so consecutive hits all animate. */
   incomingAttackKey?: number | null;
+  /** Augur reveal — when the OPPOSING side cast Augur on this hero,
+   *  shows the hero's hand (up to 4 cards) as small chips for this turn.
+   *  Cleared by `advanceToNextTurn` (arenaRules) so it auto-disappears. */
+  augurRevealed?: CardId[];
 }
 
 export function ArenaHeroStrip({
-  hero, side, turn, name, avatar, incomingAttackKey,
+  hero, side, turn, name, avatar, incomingAttackKey, augurRevealed,
 }: ArenaHeroStripProps) {
+  const t = useT();
   const accent = side === "you" ? "text-emerald-300" : "text-rose-300";
   const ringColor = side === "you" ? "ring-emerald-400/70" : "ring-rose-400/70";
   const hpPct = Math.max(0, Math.min(100, (hero.hp / hero.maxHp) * 100));
@@ -177,6 +185,33 @@ export function ArenaHeroStrip({
           <span className="ml-auto font-bold text-ink-muted">🂠 {hero.hand.length}</span>
           {side === "you" && <span className="font-bold text-themed">T{turn}</span>}
         </div>
+        {/* Augur peek — when the OPPOSING player cast Augur on me, my hand
+         *  is revealed to them. The chips render on MY strip so the player
+         *  reading this strip (the opp) SEES what's been peeked. Pulses
+         *  amber + auto-clears at end of turn (via advanceToNextTurn). */}
+        {augurRevealed && augurRevealed.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-wrap items-center gap-1 mt-0.5"
+          >
+            <span className="text-[9px] uppercase tracking-wider font-black text-amber-300">👁 Augur :</span>
+            {augurRevealed.slice(0, 4).map((id, i) => {
+              const card = CARDS[id];
+              if (!card) return null;
+              return (
+                <span
+                  key={`${id}-${i}`}
+                  className="inline-flex items-center gap-0.5 text-[9px] font-bold rounded-full px-1.5 py-0.5 bg-amber-500/25 border border-amber-400/55 text-amber-100"
+                  title={t(card.descKey)}
+                >
+                  <span>{card.glyph}</span>
+                  <span className="max-w-[60px] truncate">{t(card.nameKey)}</span>
+                </span>
+              );
+            })}
+          </motion.div>
+        )}
       </div>
     </div>
   );

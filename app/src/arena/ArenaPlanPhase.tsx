@@ -16,7 +16,7 @@
  * MVP: simple-but-readable. Phase 2 polishes the animations.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { MOVES } from "../engine/game";
 import type { Move } from "../engine/game";
@@ -91,28 +91,46 @@ export function ArenaPlanPhase({
     setTargeting({ kind: "summon", move: mv });
   }
 
-  function pickCardToCast(id: CardId) {
+  /** Commit a card — fire if no target needed, else enter targeting. */
+  function commitCard(id: CardId) {
     if (disabled) return;
     const card = CARDS[id];
     if (!arenaSupported(id)) { hapticAlert(); return; }
     if (manaLeft < card.cost) { hapticAlert(); return; }
-    // Two-tap UX: first tap surfaces the inspect panel so the player reads
-    // what the card actually DOES. Second tap on the SAME card commits.
-    // Tap a different card → switches inspect to the new card.
-    if (inspecting !== id) {
-      hapticTap();
-      setInspecting(id);
-      return;
-    }
-    const targetKind = CARD_TARGET_KIND[id] ?? "global";
     hapticTap();
     setInspecting(null);
+    const targetKind = CARD_TARGET_KIND[id] ?? "global";
     if (targetKind === "self" || targetKind === "global" || targetKind === "hero") {
-      // No further input needed — commit immediately.
       onAddSpell({ id, kind: targetKind } as PlayedSpell);
       return;
     }
     setTargeting({ kind: "spell", id, targetKind });
+  }
+
+  /** Long-press detection — Alex's preference: single tap = commit, hold
+   *  ~1.4s = open the inspect modal to READ the card. The pointer handlers
+   *  arm a timer on press; if the timer fires before release, it sets
+   *  longPressedRef so the release suppresses the commit. */
+  const pressTimerRef = useRef<number | null>(null);
+  const longPressedRef = useRef(false);
+  const LONG_PRESS_MS = 1_400;
+  function startPress(id: CardId) {
+    longPressedRef.current = false;
+    if (pressTimerRef.current) window.clearTimeout(pressTimerRef.current);
+    pressTimerRef.current = window.setTimeout(() => {
+      longPressedRef.current = true;
+      hapticTap();
+      setInspecting(id);
+    }, LONG_PRESS_MS);
+  }
+  function endPress(id: CardId, fire: boolean) {
+    if (pressTimerRef.current) {
+      window.clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+    if (fire && !longPressedRef.current) {
+      commitCard(id);
+    }
   }
 
   // pickLaneTarget lives in ArenaGame now (handleBoardLaneTap) — lifted
@@ -194,7 +212,7 @@ export function ArenaPlanPhase({
             id={inspecting}
             targetKind={CARD_TARGET_KIND[inspecting] ?? "global"}
             t={t}
-            onCommit={() => pickCardToCast(inspecting)}
+            onCommit={() => commitCard(inspecting)}
             onClose={() => setInspecting(null)}
           />
         )}
@@ -205,8 +223,8 @@ export function ArenaPlanPhase({
         Mana planifié : <span className={intentCost > me.mana ? "text-rose-300" : "text-sky-300"}>
           {intentCost}/{me.mana}
         </span>
-        {intentCost === 0 && !inspecting && <span className="text-ink-faint"> · touche une carte ou un coup ↓</span>}
-        {inspecting && <span className="text-amber-300"> · re-touche la carte pour la jouer</span>}
+        {intentCost === 0 && !inspecting && <span className="text-ink-faint"> · tape une carte / un coup · hold 1.5s pour lire</span>}
+        {inspecting && <span className="text-amber-300"> · lis puis tape ✓ JOUER pour confirmer</span>}
       </div>
 
       {/* RPSLS move picker — compact strip. Was aspect-[4/5] cards that
@@ -259,7 +277,10 @@ export function ArenaPlanPhase({
             return (
               <div key={`${id}-${i}`} className="flex flex-col items-center gap-0.5 shrink-0">
               <button
-                onClick={() => pickCardToCast(id)}
+                onPointerDown={() => startPress(id)}
+                onPointerUp={() => endPress(id, true)}
+                onPointerLeave={() => endPress(id, false)}
+                onPointerCancel={() => endPress(id, false)}
                 disabled={!supported || cannotAfford || disabled}
                 className={
                   "relative w-[44px] h-[60px] sm:w-[48px] sm:h-[66px] rounded-lg overflow-hidden bg-surface-raised transition " +

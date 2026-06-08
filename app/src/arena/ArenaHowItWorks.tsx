@@ -41,6 +41,24 @@ export function ArenaHowItWorks({ onClose }: { onClose: () => void }) {
         </div>
         <div className="p-4 space-y-4 text-sm text-zinc-200">
           <Section title="🎯 Objectif" body="Premier joueur à amener le héros adverse à 0 ❤ gagne. Tu commences à 20 ❤." />
+          <Section
+            title="🔄 Comment se déroule UN TOUR"
+            body=""
+            sub={[
+              "1. Tu reçois +1 max-mana (tour N a N max-mana, jusqu'à 10). Ta mana se REMPLIT.",
+              "2. Tu pioches 1 carte (l'opp aussi, en parallèle).",
+              "3. Tu PLANIFIES en même temps que l'opp (pas de tour-par-tour Hearthstone — vous jouez SIMULTANÉMENT).",
+              "4. Tu peux: tape un coup RPSLS pour invoquer (1 mana, sur ta lane vide), tape une carte pour la jouer (coût variable, vise selon le type).",
+              "5. Tape ✓ FIN DE TOUR. L'opp lock aussi.",
+              "6. Résolution: SORTS (les 2 côtés) → SUMMONS → COMBAT lane 1 → lane 2 → lane 3.",
+              "7. Combat: 2 créatures face à face = elles s'entre-tapent (ATK vs HP, +1 si counter RPSLS). UNE seule créature face à une lane vide opp = elle FRAPPE LE HÉROS OPP direct.",
+              "8. Tour suivant. Pas de limite de tour (sauf sudden death au tour 30).",
+            ]}
+          />
+          <Section
+            title="💥 Exemple concret"
+            body="Tour 3: tu as 3 mana. Tu invoques un Scissors (1m, ATK 4 HP 1) dans la lane 3 + tu joues Surge (1m, +3 ATK ce tour) dessus. Opp ne défend pas la lane 3 → ton Scissors (4+3=7 ATK) tape le héros opp pour -7 HP."
+          />
           <Section title="⋙ Mana" body="1 mana au tour 1, +1 chaque tour jusqu'à 10. Tes coups RPSLS coûtent 1 mana, tes sorts ont leur propre coût (1-4 mana)." />
           <Section title="🪨 Créatures qui RESTENT sur les lanes" body="Quand tu invoques un coup RPSLS, la créature PERSISTE sur sa lane d'un tour à l'autre — elle garde ses blessures, ses buffs, son shield. Elle ne disparaît QUE si ses HP tombent à 0 (animation rose qui éclate)." />
           <Section title="⚔️ Combat à chaque fin de tour" body="Si deux créatures sont face à face sur une même lane: elles se frappent simultanément (ATK contre HP). Counter RPSLS = +1 ATK bonus (rock bat scissors, etc.). Si UNE seule créature est sur la lane (l'autre lane libre): elle frappe directement le héros adverse." />

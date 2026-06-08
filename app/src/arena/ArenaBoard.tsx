@@ -123,10 +123,13 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
       />
 
       <div className="relative flex flex-col gap-1.5 p-2 sm:p-3 flex-1 min-h-0">
-        {/* Opponent strip — HP bar flashes when an attack lands on opp hero. */}
+        {/* Opponent strip — HP bar flashes when an attack lands on opp hero.
+         *  Augur revealed on opp = my augurRevealedB (I cast augur on side b),
+         *  i.e. board.augurRevealedB if I'm side a, else board.augurRevealedA. */}
         <ArenaHeroStrip
           hero={opp} side="opp" turn={board.turn} name="CPU" avatar={undefined}
           incomingAttackKey={heroHit?.side === "opp" ? heroHit.key : null}
+          augurRevealed={playerSide === "a" ? board.augurRevealedB : board.augurRevealedA}
         />
 
         {/* Opponent lane row — ghost previews of opp summons during reveal.
@@ -170,10 +173,12 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
           stickers={playerRowStickers}
         />
 
-        {/* Player strip — HP bar flashes when an attack lands on player hero. */}
+        {/* Player strip — HP bar flashes when an attack lands on player hero.
+         *  Augur cast on me = opp's augurRevealed on my side. */}
         <ArenaHeroStrip
           hero={me} side="you" turn={board.turn} name={playerName} avatar={playerAvatar}
           incomingAttackKey={heroHit?.side === "you" ? heroHit.key : null}
+          augurRevealed={playerSide === "a" ? board.augurRevealedA : board.augurRevealedB}
         />
       </div>
     </div>

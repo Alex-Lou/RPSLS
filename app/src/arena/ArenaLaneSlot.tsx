@@ -269,23 +269,27 @@ export function ArenaLaneSlot({
       <motion.div
         initial={{ opacity: 0, scale: 0.7 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="aspect-[5/4] w-full rounded-xl relative flex flex-col items-center justify-center overflow-hidden"
+        className="aspect-[5/4] w-full rounded-xl relative flex items-center justify-center overflow-hidden"
         style={{
           background: "linear-gradient(160deg, rgba(20,22,32,0.55) 0%, rgba(10,12,20,0.55) 100%)",
           border: `2px dashed ${rim}`,
           boxShadow: `0 0 10px -3px ${moveGlow(pal.hex)}80`,
         }}
       >
-        <MoveGlyph move={plannedSummon.move} className="w-14 h-14 sm:w-16 sm:h-16 opacity-80" />
-        <span
-          className="text-[9px] uppercase tracking-wider font-bold leading-none mt-0.5 opacity-90"
-          style={{ color: rim }}
-        >
-          {plannedSummon.move}
-        </span>
-        <span className="absolute bottom-0.5 left-0 right-0 text-center text-[8px] text-emerald-200/90 uppercase tracking-[0.18em] font-black">
+        {/* "EN ATTENTE" chip — top-right corner so it never overlaps the
+         *  move name at the bottom (Alex's complaint). */}
+        <span className="absolute top-1 right-1 px-1 py-0.5 rounded text-[8px] text-emerald-200/95 uppercase tracking-[0.15em] font-black bg-black/55 backdrop-blur-sm">
           en attente
         </span>
+        <div className="flex flex-col items-center justify-center">
+          <MoveGlyph move={plannedSummon.move} className="w-12 h-12 sm:w-14 sm:h-14 opacity-85" />
+          <span
+            className="text-[9px] uppercase tracking-wider font-bold leading-none mt-1 opacity-90"
+            style={{ color: rim }}
+          >
+            {plannedSummon.move}
+          </span>
+        </div>
       </motion.div>
     );
   }

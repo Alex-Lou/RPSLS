@@ -120,14 +120,17 @@ export function cpuArenaDecision(
 
   /* ─── 3. Develop board — summon on empty lanes ─── */
   // Sort lanes by "openness" (empty mine + empty opp first, so we don't trade
-  // immediately if we don't have to).
-  const laneOrder: LaneIndex[] = [0, 1, 2];
+  // immediately if we don't have to). On TIES, the lane order is RANDOMIZED
+  // so the CPU doesn't always fill 1 → 2 → 3 (Alex's "previsible pattern"
+  // complaint): we add a Math.random() jitter before sorting by score.
+  const laneOrder: LaneIndex[] = ([0, 1, 2] as LaneIndex[])
+    .map((l) => ({ l, jitter: Math.random() }))
+    .sort((a, b) => a.jitter - b.jitter)
+    .map((x) => x.l);
   laneOrder.sort((l1, l2) => {
     const score = (l: LaneIndex) => {
       const mine = sideCreature(board, side, l);
       const opp = sideCreature(board, oppSide, l);
-      // Empty mine + empty opp = best (free dmg to hero). Empty mine + opp = trade.
-      // Mine present = skip.
       if (mine) return 0;
       if (!opp) return 2;
       return 1;
