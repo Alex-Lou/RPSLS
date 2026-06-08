@@ -23,10 +23,11 @@ export interface ArenaLaneSlotProps {
   /** When false, the ghost-preview branch is skipped (used to suppress the
    *  player's own planned summons from rendering on the opp row, etc.). */
   showPlanned?: boolean;
-  /** When true, the creature shakes toward its opponent for ~400ms — driven
-   *  by ArenaGame's resolveStep transitioning to "combat". The shake fires
-   *  BEFORE damage is applied so the player sees who hit whom. */
-  combatShake?: boolean;
+  /** When true, this creature is the one CURRENTLY attacking in the lane-by-
+   *  lane combat phase. It plays a real charge animation: lunge toward its
+   *  opponent (player → up, opp → down), scale up at the apex, then return.
+   *  Way more readable than a generic wiggle — the player SEES who hit. */
+  chargeAttack?: boolean;
   /** When true, the lane is a valid drop target — frame pulses ambre + the
    *  whole slot becomes a button. Used by the lifted-targeting flow so the
    *  player taps directly on the board (Hearthstone-style direct manip). */
@@ -36,7 +37,7 @@ export interface ArenaLaneSlotProps {
 }
 
 export function ArenaLaneSlot({
-  creature, plannedSummon, isPlayer, showPlanned = false, combatShake = false,
+  creature, plannedSummon, isPlayer, showPlanned = false, chargeAttack = false,
   clickable = false, onClick,
 }: ArenaLaneSlotProps) {
   // Track previous HP so we can spawn a "-N" floating popup when this lane's
@@ -79,19 +80,38 @@ export function ArenaLaneSlot({
     // opp creatures get a rose one — visual ownership cue independent of
     // the move's signature color (kept on the frame rim).
     const sideTint = isPlayer ? "rgba(52,211,153,0.55)" : "rgba(244,63,94,0.55)";
-    // Combat shake: player creature lunges UP toward opp; opp creature lunges
-    // DOWN toward player. Two cycles, ±5px on each axis for a real "hit".
-    const shakeAnim = combatShake
-      ? { x: [0, isPlayer ? -3 : 3, isPlayer ? 4 : -4, 0], y: [0, isPlayer ? -6 : 6, isPlayer ? 4 : -4, 0] }
-      : { x: 0, y: 0 };
+    // CHARGE animation — the creature actually advances toward the opp,
+    // lands a hit (small bounce + flash), then retreats. Way more legible
+    // than a wiggle. Player creatures lunge UP, opp creatures lunge DOWN.
+    // The lunge distance is meant to clearly cross the lane midline.
+    const chargeAnim = chargeAttack
+      ? {
+          y: isPlayer
+            ? [0, -22, -38, -32, 0]    // up → apex → tiny bounce-back at impact → return
+            : [0, 22, 38, 32, 0],
+          scale: [1, 1.08, 1.18, 1.10, 1],
+          filter: [
+            "brightness(1) drop-shadow(0 0 0 transparent)",
+            "brightness(1.3) drop-shadow(0 0 8px rgba(252,211,77,0.55))",
+            "brightness(1.6) drop-shadow(0 0 14px rgba(252,211,77,0.95))",
+            "brightness(1.3) drop-shadow(0 0 6px rgba(252,211,77,0.6))",
+            "brightness(1) drop-shadow(0 0 0 transparent)",
+          ],
+        }
+      : { y: 0, scale: 1, filter: "brightness(1) drop-shadow(0 0 0 transparent)" };
     return (
       <motion.div
         layout
         initial={{ opacity: 0, y: isPlayer ? 12 : -12, scale: 0.85 }}
-        animate={{ opacity: 1, scale: 1, ...shakeAnim }}
-        transition={combatShake ? { duration: 0.4, ease: "easeOut" } : undefined}
+        animate={{ opacity: 1, ...chargeAnim }}
+        transition={
+          chargeAttack
+            ? { duration: 0.5, ease: "easeOut", times: [0, 0.35, 0.55, 0.72, 1] }
+            : undefined
+        }
         className="aspect-[5/4] w-full rounded-xl relative flex flex-col items-center justify-center overflow-hidden transition"
         style={{
+          zIndex: chargeAttack ? 30 : 1,
           background: "linear-gradient(160deg, rgba(20,22,32,0.94) 0%, rgba(10,12,20,0.94) 100%)",
           border: `2px solid ${creature.divineShield ? "rgba(252,211,77,0.95)" : rim}`,
           boxShadow:

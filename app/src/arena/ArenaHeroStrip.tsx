@@ -23,10 +23,15 @@ export interface ArenaHeroStripProps {
   name: string;
   /** Avatar — emoji char, preset path, or undefined for the default mask. */
   avatar?: string;
+  /** Bumped every time an enemy lane creature attacks THIS hero (undefended
+   *  lane attack). Drives a dramatic HP-bar flash: white sweep + shake +
+   *  rose ring pulse. The KEY is what triggers the re-render of the
+   *  AnimatePresence overlay so consecutive hits all animate. */
+  incomingAttackKey?: number | null;
 }
 
 export function ArenaHeroStrip({
-  hero, side, turn, name, avatar,
+  hero, side, turn, name, avatar, incomingAttackKey,
 }: ArenaHeroStripProps) {
   const accent = side === "you" ? "text-emerald-300" : "text-rose-300";
   const ringColor = side === "you" ? "ring-emerald-400/70" : "ring-rose-400/70";
@@ -74,8 +79,15 @@ export function ArenaHeroStrip({
       {/* HP + mana stacked vertically — the player reads them in one column. */}
       <div className="flex-1 flex flex-col gap-1 min-w-0">
         {/* HP bar — taller, segmented every 5 HP, glow on the filled portion,
-         *  pulse at low HP. */}
-        <div className="flex items-center gap-1.5">
+         *  pulse at low HP. Wrapped in a motion.div that SHAKES + flashes
+         *  ring rose each time an attack lands on this hero. */}
+        <motion.div
+          key={incomingAttackKey ?? "hp-idle"}
+          initial={incomingAttackKey ? { x: 0 } : undefined}
+          animate={incomingAttackKey ? { x: [0, -6, 7, -5, 3, 0] } : undefined}
+          transition={incomingAttackKey ? { duration: 0.55, ease: "easeOut" } : undefined}
+          className="flex items-center gap-1.5"
+        >
           <motion.span
             key={hero.hp}
             initial={{ scale: 1.35, color: "#fda4af" }}
@@ -111,8 +123,43 @@ export function ArenaHeroStrip({
                 />
               ))}
             </div>
+            {/* White IMPACT sweep — when an attack lands on THIS hero, a bright
+             *  white-to-rose flash sweeps across the HP bar, then fades. */}
+            <AnimatePresence>
+              {incomingAttackKey && (
+                <motion.div
+                  key={incomingAttackKey}
+                  initial={{ opacity: 0.95, x: "-100%" }}
+                  animate={{ opacity: [0.95, 0.8, 0], x: ["-100%", "0%", "100%"] }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.55, ease: "easeOut", times: [0, 0.45, 1] }}
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    background:
+                      "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.85) 35%, rgba(244,63,94,0.7) 55%, transparent 100%)",
+                    mixBlendMode: "screen",
+                  }}
+                />
+              )}
+            </AnimatePresence>
+            {/* Outer ring pulse — rose halo when hit. */}
+            <AnimatePresence>
+              {incomingAttackKey && (
+                <motion.div
+                  key={`ring-${incomingAttackKey}`}
+                  initial={{ opacity: 0.9, scale: 1 }}
+                  animate={{ opacity: 0, scale: 1.5 }}
+                  transition={{ duration: 0.6, ease: "easeOut" }}
+                  className="absolute -inset-1 rounded-full pointer-events-none"
+                  style={{
+                    boxShadow:
+                      "0 0 12px 3px rgba(244,63,94,0.85), inset 0 0 8px rgba(244,63,94,0.6)",
+                  }}
+                />
+              )}
+            </AnimatePresence>
           </div>
-        </div>
+        </motion.div>
         {/* Mana + hand size + turn — compact secondary row. */}
         <div className="flex items-center gap-1 text-[9px]">
           <span className="font-bold text-sky-300 tabular-nums w-12 text-right">⋙ {hero.mana}/{hero.maxMana}</span>
