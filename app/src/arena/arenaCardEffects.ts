@@ -20,6 +20,7 @@
  */
 
 import { drawCards, damageHero, healHero, damageCreature, makeCreature } from "./arenaRules";
+import { alog } from "./arenaLog";
 import {
   getMyCreatureOnLane,
   getOppCreatureOnLane,
@@ -164,26 +165,33 @@ function isDetached(c: Creature | null | undefined): boolean {
  *  becomes the dedicated "rebuild the tank" tool when its charge is spent. */
 function applyAegis(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   // Alex feedback A 2026-06-09 : Aegis Pro = 1 cast par hero par match.
-  // Casse les stalemates où l'opp re-cast Aegis chaque tour → Pierre /
-  // Lézard invincibles. 2e cast fizzle silencieusement.
+  // CRITIQUE : le lock est appliqué AVANT toute fizzle branch pour qu'on
+  // ne puisse PAS bypass en castant sur une cible invalide (empty lane,
+  // Spock Détaché). Sinon opp peut spam Aegis "perdues" sur null pour
+  // garder le lock à false.
   const heroBefore = side === "a" ? board.a : board.b;
-  if (heroBefore.aegisCastThisMatch) return board;
-  let updated: BoardState;
+  if (heroBefore.aegisCastThisMatch) {
+    alog("spell", `${side} aegis FIZZLE (lock déjà actif)`);
+    return board;
+  }
+  // Verrou immédiat : aegisCastThisMatch=true peu importe le succès cast.
+  const locked = withSideHero(board, side, { ...heroBefore, aegisCastThisMatch: true });
   if (spell.kind === "lane") {
-    const c = getMyCreatureOnLane(board, side, spell.lane);
-    if (!c || isDetached(c)) return board;
+    const c = getMyCreatureOnLane(locked, side, spell.lane);
+    if (!c || isDetached(c)) {
+      alog("spell", `${side} aegis lane fizzle (cible invalide) — lock pris quand même`);
+      return locked;
+    }
     const refilled = c.move === "rock"
       ? { ...c, divineShield: true, provocationCharges: Math.max(c.provocationCharges, 1) }
       : { ...c, divineShield: true };
-    updated = withMyCreatureOnLane(board, side, spell.lane, refilled);
-  } else if (spell.kind === "self") {
-    updated = withSideHero(board, side, { ...heroBefore, divineShield: true });
-  } else {
-    return board;
+    return withMyCreatureOnLane(locked, side, spell.lane, refilled);
   }
-  // Lock further casts on this hero.
-  const heroAfter = side === "a" ? updated.a : updated.b;
-  return withSideHero(updated, side, { ...heroAfter, aegisCastThisMatch: true });
+  if (spell.kind === "self") {
+    const heroLocked = side === "a" ? locked.a : locked.b;
+    return withSideHero(locked, side, { ...heroLocked, divineShield: true });
+  }
+  return locked;
 }
 
 /** Anchor — my creature on that lane is IMMUNE to enemy spells this turn.
