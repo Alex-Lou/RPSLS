@@ -563,15 +563,40 @@ function LaneRow({
             {/* Card stickers — small CardSlot badges showing which spells
              *  hit this lane this turn (mirrors Ranked LanesBoard pattern).
              *  Owner "you" gets a swoop-from-hand entry anim so the player
-             *  sees the cast land on the lane in real time. */}
-            {laneStickers.map((s, idx) => (
-              <CardSlot
-                key={`${s.id}-${idx}`}
-                id={s.id}
-                position={s.position}
-                flyFromHand={s.owner === "you"}
-              />
-            ))}
+             *  sees the cast land on the lane in real time.
+             *
+             *  Round 11 Alex fix #3 : éventail multi-cartes par lane. Si plus
+             *  d'un sticker même position, fan-out rotation + offset X pour
+             *  qu'ils ne se cachent pas les uns sur les autres. */}
+            {(() => {
+              const byPos = new Map<string, typeof laneStickers>();
+              for (const s of laneStickers) {
+                if (!byPos.has(s.position)) byPos.set(s.position, []);
+                byPos.get(s.position)!.push(s);
+              }
+              const out: React.ReactNode[] = [];
+              byPos.forEach((group) => {
+                group.forEach((s, idx) => {
+                  const count = group.length;
+                  const fanAngle = count > 1 ? (idx - (count - 1) / 2) * 10 : 0; // -10° à +10°
+                  const fanShiftX = count > 1 ? (idx - (count - 1) / 2) * 8 : 0; // -8px à +8px
+                  out.push(
+                    <div
+                      key={`${s.id}-${idx}-${s.position}`}
+                      className="absolute inset-0 pointer-events-none"
+                      style={{
+                        transform: `rotate(${fanAngle}deg) translateX(${fanShiftX}px)`,
+                        transformOrigin: s.position.includes("b") ? "bottom center" : "top center",
+                        zIndex: 5 + idx,
+                      }}
+                    >
+                      <CardSlot id={s.id} position={s.position} flyFromHand={s.owner === "you"} />
+                    </div>,
+                  );
+                });
+              });
+              return out;
+            })()}
           </div>
         );
       })}

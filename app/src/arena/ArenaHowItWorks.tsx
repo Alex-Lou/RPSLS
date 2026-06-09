@@ -82,6 +82,16 @@ export function ArenaHowItWorks({ onClose }: { onClose: () => void }) {
             body="Quand l'attaque d'une créature adverse est annulée par TA Pierre (Provocation), tu vois pop la chip jaune 🪨 ATTAQUE DÉTOURNÉE ! au centre du board. C'est juste la confirmation visuelle que ton héros vient d'être sauvé. La pierre n'encaisse rien, l'attaque part simplement dans le vide. Pour casser cette protection: l'opp doit poser une Feuille (Étouffe) OU détruire ta Pierre en combat / par un sort."
           />
           <Section
+            title="🚨 Pourquoi MA Pierre ne défend pas ?"
+            body=""
+            sub={[
+              "Anti-taunt côté opp : si l'opp a une FEUILLE 📄 (Étouffe) ou un SPOCK 🖖 (Logique) vivant n'importe où sur son board, TA Pierre Provocation est CANCELLÉE. Toutes les attaques opp atteignent ton héros directement.",
+              "Pierre déjà consommée : chaque Provoc a 2 charges max (1 base + 1 Voie Pierre). Une fois consommées → Pierre devient passive, aucune deflection.",
+              "Pierre détruite : si ta Pierre est morte (combat counter ou Curse), pas de deflection (évidemment).",
+              "Ta Pierre TOUTES les défend tant que les conditions sont remplies — peu importe ta Voie. Le label 'Voie de la Pierre' sur l'opp signifie juste qu'il a +1 charge initiale.",
+            ]}
+          />
+          <Section
             title="🛡️ Sorts de défense (en plus des passifs)"
             body=""
             sub={[
