@@ -303,22 +303,33 @@ export function applySpellPhase(board: BoardState, intent: TurnIntent, side: Sid
  *  (documented bias — alternative is random which breaks reproducibility).
  *  Same priority WITHIN a side : original tap order (intent.spells order). */
 export function applyAllSpells(board: BoardState, intentA: TurnIntent, intentB: TurnIntent): BoardState {
-  // Alex flag 2026-06-09 : "3 sorts cast T6 alors que cap=2" — le check UI
-  // (ArenaGame.addSpell) bloquait normalement mais une voie de bypass
-  // restait ouverte (drag-drop ? double tap rapide ?). Filet de sécurité
-  // côté engine : truncate à MAX_SPELLS_PER_TURN AVANT traitement, peu
-  // importe ce que l'UI a laissé passer.
-  const safeIntentA = intentA.spells.length > MAX_SPELLS_PER_TURN
-    ? { ...intentA, spells: intentA.spells.slice(0, MAX_SPELLS_PER_TURN) }
-    : intentA;
-  const safeIntentB = intentB.spells.length > MAX_SPELLS_PER_TURN
-    ? { ...intentB, spells: intentB.spells.slice(0, MAX_SPELLS_PER_TURN) }
-    : intentB;
+  // Alex feedback 2026-06-09 v2 : aligné sur les caps UI (ArenaGame.addSpell)
+  // — max MAX_SPELLS_PER_TURN sorts lane-target + 1 sort utility (self/hero)
+  // par tour. Total max 3 sorts/tour. Le filet engine truncate selon les
+  // mêmes règles pour rester cohérent avec ce que l'UI a laissé passer.
+  const truncateByCaps = (intent: TurnIntent): TurnIntent => {
+    let laneCount = 0;
+    let utilityCount = 0;
+    const kept: PlayedSpell[] = [];
+    for (const s of intent.spells) {
+      if (s.kind === "lane") {
+        if (laneCount >= MAX_SPELLS_PER_TURN) continue;
+        laneCount++;
+      } else {
+        if (utilityCount >= 1) continue;
+        utilityCount++;
+      }
+      kept.push(s);
+    }
+    return kept.length === intent.spells.length ? intent : { ...intent, spells: kept };
+  };
+  const safeIntentA = truncateByCaps(intentA);
+  const safeIntentB = truncateByCaps(intentB);
   if (safeIntentA !== intentA) {
-    alog("spell", `BYPASS BLOCKED a — intent had ${intentA.spells.length} spells, truncated to ${MAX_SPELLS_PER_TURN}`);
+    alog("spell", `BYPASS BLOCKED a — intent had ${intentA.spells.length} spells (cap lane=${MAX_SPELLS_PER_TURN} + utility=1), truncated to ${safeIntentA.spells.length}`);
   }
   if (safeIntentB !== intentB) {
-    alog("spell", `BYPASS BLOCKED b — intent had ${intentB.spells.length} spells, truncated to ${MAX_SPELLS_PER_TURN}`);
+    alog("spell", `BYPASS BLOCKED b — intent had ${intentB.spells.length} spells (cap lane=${MAX_SPELLS_PER_TURN} + utility=1), truncated to ${safeIntentB.spells.length}`);
   }
   const combined: Array<{ spell: PlayedSpell; side: Side; idx: number }> = [
     ...safeIntentA.spells.map((spell, idx) => ({ spell, side: "a" as Side, idx })),
