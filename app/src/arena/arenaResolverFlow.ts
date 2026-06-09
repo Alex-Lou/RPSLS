@@ -39,6 +39,11 @@ function logBoardSnapshot(b: BoardState, tag: string): void {
   for (let i = 0; i < 3; i++) {
     alog("state", `${tag} L${i} a:${fmt(b.lanes[i].a)} b:${fmt(b.lanes[i].b)}`);
   }
+  // Alex feedback : "ajouter les cartes de chacun dans les logs" → mains
+  // visibles côté joueur ET côté CPU pour analyse CCG post-mortem.
+  // Format compact : main=[id1,id2,...] deck=N discard=M mana=X/Y.
+  alog("hand", `${tag} a hand=[${b.a.hand.join(",")}] deck=${b.a.deck.length} discard=${b.a.discard.length} mana=${b.a.mana}/${b.a.maxMana}${b.a.killBonusPending ? " +K" : ""}${b.a.aegisCastThisMatch ? " [AEGIS-LOCK]" : ""}`);
+  alog("hand", `${tag} b hand=[${b.b.hand.join(",")}] deck=${b.b.deck.length} discard=${b.b.discard.length} mana=${b.b.mana}/${b.b.maxMana}${b.b.killBonusPending ? " +K" : ""}${b.b.aegisCastThisMatch ? " [AEGIS-LOCK]" : ""}`);
 }
 
 /** Resolver step labels — kept in sync with ArenaBoard's banner switch. */

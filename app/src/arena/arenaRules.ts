@@ -606,6 +606,11 @@ export function advanceToNextTurn(board: BoardState): BoardState {
     };
     alog("state", `L${i} a:${fmt(la)} b:${fmt(lb)}`);
   }
+  // Cartes dispos (Alex feedback : "ajouter les cartes de chacun dans les
+  // logs pour voir ce que chacun aurait pu/du jouer"). Mains complètes
+  // listées avec mana + flags (kill bonus pending, aegis lock).
+  alog("hand", `a hand=[${board.a.hand.join(",")}] deck=${board.a.deck.length} discard=${board.a.discard.length} mana=${board.a.mana}/${board.a.maxMana}${board.a.killBonusPending ? " +K" : ""}${board.a.aegisCastThisMatch ? " [AEGIS-LOCK]" : ""}`);
+  alog("hand", `b hand=[${board.b.hand.join(",")}] deck=${board.b.deck.length} discard=${board.b.discard.length} mana=${board.b.mana}/${board.b.maxMana}${board.b.killBonusPending ? " +K" : ""}${board.b.aegisCastThisMatch ? " [AEGIS-LOCK]" : ""}`);
   // Alex feedback 2026-06-09 D : "récompenser l'agression" → si tu as
   // tué une créature opp ce tour, tu pioches +1 carte bonus au tour
   // suivant. killBonusPending reset après la pioche bonus.
