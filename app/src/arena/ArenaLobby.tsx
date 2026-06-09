@@ -66,7 +66,10 @@ export function ArenaLobby({
           Constellation Pro
         </h1>
         <p className="mt-1 text-ink-muted text-xs sm:text-sm">
-          3 lanes · Créatures persistantes · 5 affinités RPSLS · Cartes bonus
+          3 lanes · Créatures qui restent · Combat RPSLS + Cartes + Mana
+        </p>
+        <p className="text-[10px] text-ink-faint mt-0.5">
+          Mode CCG-style — stats / classements indépendants
         </p>
       </div>
 
@@ -121,8 +124,8 @@ export function ArenaLobby({
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-fuchsia-500/40 to-violet-500/40 flex items-center justify-center text-base">🎴</div>
           <div className="text-left">
-            <div className="font-bold text-sm text-ink">Gérer mon Deck</div>
-            <div className="text-[10px] text-ink-faint">8 cartes — Constellation Pro</div>
+            <div className="font-bold text-sm text-ink">Gérer mon Deck Pro</div>
+            <div className="text-[10px] text-ink-faint">Compose tes 8 cartes (filtre Arena)</div>
           </div>
         </div>
         <span style={{ color: "var(--theme-secondary)" }}>›</span>

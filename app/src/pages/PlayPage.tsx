@@ -29,7 +29,7 @@ type View =
   | { kind: "constellation_prep" }
   | { kind: "lanes_cpu"; winTo: number }
   | { kind: "ranked_lobby" }
-  | { kind: "ranked_deck" }
+  | { kind: "ranked_deck"; from?: "ranked" | "arena" }
   | { kind: "ranked_bracket" }
   // Pre-match staging: deck check + pad swap + coin flip for the arena.
   | { kind: "ranked_prep"; oppName: string; oppAvatar: string }
@@ -134,7 +134,7 @@ export function PlayPage({
           <ArenaLobby
             key="arena-lobby"
             onTraining={() => setView({ kind: "arena_pro" })}
-            onManageDeck={() => setView({ kind: "ranked_deck" })}
+            onManageDeck={() => setView({ kind: "ranked_deck", from: "arena" })}
             onGoShop={() => setView({ kind: "ranked_lobby" })}
             onBack={() => setView({ kind: "select" })}
           />
@@ -205,14 +205,16 @@ export function PlayPage({
               );
               setView({ kind: "ranked_bracket" });
             }}
-            onManageDeck={() => setView({ kind: "ranked_deck" })}
+            onManageDeck={() => setView({ kind: "ranked_deck", from: "ranked" })}
             onGoShop={onNavigate ? () => onNavigate("shop") : undefined}
           />
         )}
         {view.kind === "ranked_deck" && (
           <DeckManager
             key="ranked-deck"
-            onClose={() => setView({ kind: "ranked_lobby" })}
+            onClose={() => setView({
+              kind: view.from === "arena" ? "arena_lobby" : "ranked_lobby",
+            })}
           />
         )}
         {view.kind === "ranked_bracket" && (

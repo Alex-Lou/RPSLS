@@ -41,7 +41,7 @@ export function ArenaHowItWorks({ onClose }: { onClose: () => void }) {
             ✕
           </button>
         </div>
-        <div className="p-4 space-y-4 text-sm text-zinc-200">
+        <div className="p-4 sm:p-5 space-y-5 text-[15px] text-zinc-100">
           <Section title="🎯 Objectif" body="Premier joueur à amener le héros adverse à 0 ❤ gagne. Tu commences à 20 ❤." />
           <Section
             title="🔄 Comment se déroule UN TOUR"
@@ -135,32 +135,32 @@ function PassiveGrid() {
       <h3 className="text-[12px] font-black uppercase tracking-wider text-emerald-200/95 mb-1">
         🎴 LES 5 SYMBOLES — pouvoir, force, faiblesse, contres
       </h3>
-      <p className="text-[12px] leading-relaxed text-zinc-400 mb-2">
+      <p className="text-[13.5px] leading-relaxed text-zinc-300 mb-3">
         Chaque symbole RPSLS a une <strong className="text-emerald-200">nature passive</strong> gratuite (badge en haut-droit de la créature) ET ses 2 contres RPSLS qui le tuent en combat de lane. Lis ces 5 cartes une fois — c'est ta strat de tout le match.
       </p>
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         {moves.map((move) => {
           const p = CREATURE_PASSIVES[move];
           const stats = CREATURE_STATS[move];
           const notes = MOVE_DESIGN_NOTES[move];
           return (
-            <div key={move} className="rounded-lg bg-zinc-900/70 border border-zinc-800 p-2">
-              <div className="flex items-center gap-2 mb-1">
-                <span className={"text-[14px] px-1.5 py-0.5 rounded font-black tracking-wider shadow leading-none " + (toneBg[p.tone] ?? "bg-zinc-400 text-black")}>
+            <div key={move} className="rounded-lg bg-zinc-900/70 border border-zinc-800 p-2.5">
+              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                <span className={"text-[15px] px-1.5 py-0.5 rounded font-black tracking-wider shadow leading-none " + (toneBg[p.tone] ?? "bg-zinc-400 text-black")}>
                   {p.glyph}
                 </span>
-                <span className="text-[13px] font-black text-zinc-100">{moveLabel[move]}</span>
-                <span className="text-[10.5px] text-zinc-500 tabular-nums ml-auto">⚔ {stats.atk} · ❤ {stats.hp}</span>
-                <span className="text-[11px] font-bold text-emerald-300 whitespace-nowrap">{p.name}</span>
+                <span className="text-[15px] font-black text-zinc-50">{moveLabel[move]}</span>
+                <span className="text-[12px] text-zinc-400 tabular-nums ml-auto">⚔ {stats.atk} · ❤ {stats.hp}</span>
+                <span className="text-[13px] font-bold text-emerald-300 whitespace-nowrap">{p.name}</span>
               </div>
-              <div className="space-y-0.5 pl-1">
-                <p className="text-[11.5px] leading-snug text-emerald-200/90">
+              <div className="space-y-1 pl-1">
+                <p className="text-[13px] leading-snug text-emerald-200/95">
                   <span className="font-black">💪 Bon —</span> {notes.good}
                 </p>
-                <p className="text-[11.5px] leading-snug text-rose-200/90">
+                <p className="text-[13px] leading-snug text-rose-200/95">
                   <span className="font-black">🔻 Moins bon —</span> {notes.bad}
                 </p>
-                <p className="text-[11.5px] leading-snug text-amber-200/90">
+                <p className="text-[13px] leading-snug text-amber-200/95">
                   <span className="font-black">⚠ 2 contres —</span> {notes.counters}
                 </p>
               </div>
@@ -168,8 +168,8 @@ function PassiveGrid() {
           );
         })}
       </div>
-      <div className="mt-2 rounded-lg bg-emerald-950/60 border border-emerald-800/40 p-2">
-        <p className="text-[11.5px] leading-snug text-emerald-100/90">
+      <div className="mt-3 rounded-lg bg-emerald-950/60 border border-emerald-800/40 p-2.5">
+        <p className="text-[13px] leading-snug text-emerald-100/95">
           <span className="font-black text-emerald-300">🎯 Stratégie d'ouverture —</span> Pose une <strong>Pierre</strong> tôt (1 mana, défense). Si opp pose une Pierre, dégaine <strong>Feuille</strong> (cassure board-wide) ou <strong>Spock</strong> (cassure + immunité). Garde <strong>Ciseaux</strong> pour percer un Aegis adverse. <strong>Lézard</strong> = carte-piège anti-finisher. <strong>Spock</strong> = ancrage anti-sorts ET 2e levier anti-Pierre.
         </p>
       </div>
@@ -180,12 +180,12 @@ function PassiveGrid() {
 function Section({ title, body, sub }: { title: string; body: string; sub?: string[] }) {
   return (
     <div>
-      <h3 className="text-[12px] font-black uppercase tracking-wider text-emerald-200/95 mb-1">{title}</h3>
-      {body && <p className="text-[13px] leading-relaxed text-zinc-300">{body}</p>}
+      <h3 className="text-[14px] font-black uppercase tracking-wider text-emerald-200/95 mb-1.5">{title}</h3>
+      {body && <p className="text-[14.5px] leading-relaxed text-zinc-200">{body}</p>}
       {sub && (
-        <ul className="mt-1 space-y-1">
+        <ul className="mt-1.5 space-y-1.5">
           {sub.map((line, i) => (
-            <li key={i} className="text-[12.5px] leading-relaxed text-zinc-300 pl-3 -indent-2">
+            <li key={i} className="text-[14px] leading-relaxed text-zinc-200 pl-3.5 -indent-2.5">
               • {line}
             </li>
           ))}
