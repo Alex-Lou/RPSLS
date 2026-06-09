@@ -75,6 +75,19 @@ export function ArenaConstellationBar({
         move={affinity}
         className="w-4 h-4 shrink-0 opacity-90 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
       />
+      {/* Round 9 fix Alex point #2 : label texte "Voie de X" pour que le
+       *  joueur SACHE quel style l'autre a choisi (et donc quels bonus
+       *  s'appliquent aux créatures opp). */}
+      <span
+        className="text-[9px] uppercase tracking-wider font-bold leading-none"
+        style={{ color: accentColor }}
+      >
+        {affinity === "rock" ? "Pierre" :
+         affinity === "paper" ? "Feuille" :
+         affinity === "scissors" ? "Ciseau" :
+         affinity === "lizard" ? "Lézard" :
+         "Spock"}
+      </span>
       <div className="flex items-center gap-0.5">
         {Array.from({ length: STAR_COUNT }).map((_, i) => {
           const filled = i < filledCount;

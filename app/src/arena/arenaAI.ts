@@ -259,6 +259,21 @@ function pickBestMove(opp: Creature | null): Move {
     ];
     return bag[Math.floor(Math.random() * bag.length)];
   }
+  // Round 9 fix Alex point #3 : avant le CPU counterait l'opp à 100% si
+  // possible. Devenait pénible (joueur a l'impression que CPU triche).
+  // Maintenant 30% du temps, CPU joue weighted random au lieu de counter
+  // parfait — laisse au joueur des fenêtres pour gagner ses lanes. Le 70%
+  // restant le CPU reste agressif et counter optimalement.
+  if (Math.random() < 0.30) {
+    const bag: Move[] = [
+      "rock", "rock", "rock",
+      "spock", "spock",
+      "scissors", "scissors",
+      "lizard",
+      "paper",
+    ];
+    return bag[Math.floor(Math.random() * bag.length)];
+  }
   for (const mv of MOVES) {
     if (moveCountersMove(mv, opp.move)) {
       // Among counters, pick the one with the best ATK/HP for this trade.

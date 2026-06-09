@@ -85,8 +85,11 @@ export const SPELLS_MS = 1_200;
 export const SUMMONS_MS = 1_000;
 export const COMBAT_MS = 3_000;
 export const SETTLE_MS = 1_500;
-const LANE_CHARGE_MS = 520;
-const LANE_PAUSE_MS = 320;
+// Round 9 fix Alex point #1 : anim attaque lane lag un peu — accélération
+// du charge (520→380ms) + pause inter-lane (320→200ms). Plus snappy sans
+// sacrifier la lisibilité du combat.
+const LANE_CHARGE_MS = 380;
+const LANE_PAUSE_MS = 200;
 
 /** Run the sequenced resolver. Schedules a chain of setTimeouts that drive
  *  the visual flow. Returns nothing — the caller's React state is the only

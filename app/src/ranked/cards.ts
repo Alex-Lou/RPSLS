@@ -124,8 +124,11 @@ export const CARDS: Record<CardId, RankedCard> = {
 
   /* 🟣 EPICS — 3 mana */
   heist: {
+    // Round 9 fix Alex point #4 : Heist target était "lane" mais applyHeist
+    // ignore la lane (damage hero direct + draw 1). Changé en "none" pour
+    // que l'effet soit immédiat sans cible — cohérent avec la mécanique.
     id: "heist", cost: 3, rarity: "epic",
-    target: "lane", palette: "orange", glyph: "🏴‍☠️",
+    target: "none", palette: "orange", glyph: "🏴‍☠️",
     nameKey: "ranked.cards.heist.name", descKey: "ranked.cards.heist.desc",
     targetHintKey: "ranked.cards.heist.targetHint",
     art: "/Cards Bonus/heist.png",
