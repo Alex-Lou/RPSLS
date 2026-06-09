@@ -582,6 +582,29 @@ export function advanceToNextTurn(board: BoardState): BoardState {
   const nextTurn = board.turn + 1;
   alogSetTurn(nextTurn);
   alog("turn", `=== Tour ${nextTurn} === a.hp=${board.a.hp} b.hp=${board.b.hp}`);
+  // Snapshot du board pour suivi externe (Alex flag : "tu dois avoir des
+  // logs qui disent ce que je vois au front"). Format compact :
+  // L0 a:rock(1/3,⚔1,🛡1) b:rock(3/3,⚔0L,🛡1)
+  // L1 a:∅ b:scissors(1/1,⚔4)
+  // L2 a:paper(1/3,⚔3F) b:∅
+  for (let i = 0; i < 3; i++) {
+    const la = board.lanes[i].a;
+    const lb = board.lanes[i].b;
+    const fmt = (c: typeof la): string => {
+      if (!c) return "∅";
+      const stats = CREATURE_STATS[c.move];
+      const atk = creatureEffectiveAtk(c);
+      const flags: string[] = [];
+      if (c.divineShield) flags.push("🛡");
+      if (c.dodgeCharge) flags.push("✨");
+      if (c.taunt && c.provocationCharges > 0) flags.push(`P${c.provocationCharges}`);
+      if (c.summonedThisTurn && (c.move === "rock" || c.move === "lizard")) flags.push("L");
+      if (c.move === "paper" && c.wiltedSteps > 0) flags.push(`F${c.wiltedSteps}`);
+      if (c.combatBlunted) flags.push("É");
+      return `${c.move}(${c.hp}/${stats.hp},⚔${atk}${flags.length ? "," + flags.join("") : ""})`;
+    };
+    alog("state", `L${i} a:${fmt(la)} b:${fmt(lb)}`);
+  }
   // Alex feedback 2026-06-09 D : "récompenser l'agression" → si tu as
   // tué une créature opp ce tour, tu pioches +1 carte bonus au tour
   // suivant. killBonusPending reset après la pioche bonus.
