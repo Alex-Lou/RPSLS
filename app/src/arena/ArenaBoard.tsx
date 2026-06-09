@@ -268,16 +268,19 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
         )}
       </AnimatePresence>
 
-      <div className="relative p-3 sm:p-4 flex flex-col gap-3 sm:gap-4 [@media(max-height:560px)]:p-1.5 [@media(max-height:560px)]:gap-1.5">
-        {/* Opponent strip — HP bar flashes when an attack lands on opp hero.
-         *  Augur revealed on opp = my augurRevealedB (I cast augur on side b),
-         *  i.e. board.augurRevealedB if I'm side a, else board.augurRevealedA. */}
+      {/* Opp HeroStrip — Alex feedback 2026-06-09 point #1 : sortie du wrapper
+       *  board (était à l'intérieur, prenait de la place). Position en TOP
+       *  HEADER, +/- même niveau que burger+back, hors pad. Compact padding
+       *  pour tenir en 1-2 lignes. Lanes opp gagnent l'espace ainsi libéré. */}
+      <div className="px-3 pt-1 pb-0.5 sm:pt-2 sm:pb-1 [@media(max-height:560px)]:pt-0.5 [@media(max-height:560px)]:pb-0">
         <ArenaHeroStrip
-          hero={opp} side="opp" turn={board.turn} name="CPU" avatar={undefined}
+          hero={opp} board={board} side="opp" turn={board.turn} name="CPU" avatar={undefined}
           incomingAttackKey={heroHit?.side === "opp" ? heroHit.key : null}
           augurRevealed={playerSide === "a" ? board.augurRevealedB : board.augurRevealedA}
         />
+      </div>
 
+      <div className="relative px-3 pb-3 sm:px-4 sm:pb-4 flex flex-col gap-4 sm:gap-5 [@media(max-height:560px)]:px-1.5 [@media(max-height:560px)]:pb-1.5 [@media(max-height:560px)]:gap-2">
         {/* Opponent lane row — ghost previews of opp summons during reveal.
          *  Slots become tappable when a spell targets OPP creatures (Curse,
          *  Sangsue, Trou Noir). */}
@@ -299,13 +302,19 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
         {/* CENTER STATUS ZONE — single bar that owns the phase chip + the
          *  current event ("Adversaire dévoile" / "Sorts" / "Combat Lane N").
          *  Replaces the previous 3-stack (phase banner + 2 reveal banners)
-         *  so the eye has ONE thing to read at the center. */}
-        <CenterStatus
-          step={resolveStep ?? null}
-          turn={board.turn}
-          oppPreview={oppPreview}
-          playerPreview={playerPreview}
-        />
+         *  so the eye has ONE thing to read at the center.
+         *
+         *  Alex feedback 2026-06-09 point #2 : pad trop serré, agrandir le
+         *  board. Réduit le my-* du wrapper (was my-2 sm:my-3) pour rendre
+         *  le pad plus dense et combler l'espace vide vers la main strip. */}
+        <div className="my-0.5 sm:my-1 [@media(max-height:560px)]:my-0">
+          <CenterStatus
+            step={resolveStep ?? null}
+            turn={board.turn}
+            oppPreview={oppPreview}
+            playerPreview={playerPreview}
+          />
+        </div>
 
         {/* Player lane row — slots become tappable when targeting wants
          *  THIS side (summon → my empty; aegis/surge → my creature; etc.). */}
@@ -327,7 +336,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
         {/* Player strip — HP bar flashes when an attack lands on player hero.
          *  Augur cast on me = opp's augurRevealed on my side. */}
         <ArenaHeroStrip
-          hero={me} side="you" turn={board.turn} name={playerName} avatar={playerAvatar}
+          hero={me} board={board} side="you" turn={board.turn} name={playerName} avatar={playerAvatar}
           incomingAttackKey={heroHit?.side === "you" ? heroHit.key : null}
           augurRevealed={playerSide === "a" ? board.augurRevealedA : board.augurRevealedB}
         />

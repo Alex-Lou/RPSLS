@@ -21,6 +21,7 @@
 
 import { drawCards, damageHero, healHero, damageCreature, makeCreature } from "./arenaRules";
 import { alog } from "./arenaLog";
+import { applyFinisher } from "./arenaFinishers";
 import {
   getMyCreatureOnLane,
   getOppCreatureOnLane,
@@ -85,6 +86,14 @@ const PRIORITY_TABLE: Partial<Record<CardId, number>> = {
   // Hand / board wipes (500) — fire LAST so prior effects are accounted for.
   juge:         500,
   genese:       510,
+  // Finishers Lot D — fire EARLY (priority 60) so leur effet est en place
+  // avant les autres sorts du tour (buff/debuff/dmg). C'est le climax du
+  // hero, l'effet "écrase" la résolution.
+  "finisher-forteresse":   60,
+  "finisher-verger":       60,
+  "finisher-lame":         60,
+  "finisher-metamorphose": 60,
+  "finisher-calcul":       60,
 };
 
 export function spellPriority(id: CardId): number {
@@ -142,6 +151,13 @@ export function applyArenaSpell(ctx: ArenaSpellContext): BoardState {
     // ── Hand / board wipes ──
     case "juge":        return applyJuge(board);
     case "genese":      return applyGenese(board);
+    // ── Finishers Lot D — Constellation Pro ──
+    case "finisher-forteresse":
+    case "finisher-verger":
+    case "finisher-lame":
+    case "finisher-metamorphose":
+    case "finisher-calcul":
+      return applyFinisher(board, side, spell.id);
     default:
       // Unadapted card — no-op for MVP. Phase 2 fills these in.
       // eslint-disable-next-line no-console
@@ -302,12 +318,17 @@ function applySupernova(board: BoardState, side: Side, spell: PlayedSpell): Boar
   if (spell.kind === "hero") {
     const oppS = oppSide(side);
     const oppHero = oppS === "a" ? board.a : board.b;
+    alog("spell", `${side} SUPERNOVA → 6 dmg hero ${oppS}`);
     return withSideHero(board, oppS, damageHero(oppHero, 6));
   }
   if (spell.kind === "lane") {
     const opp = getOppCreatureOnLane(board, side, spell.lane);
     // Spock's Logique fizzle hostile spells, just like Anchor.
-    if (!opp || opp.anchored || opp.spellImmune) return board;
+    if (!opp || opp.anchored || opp.spellImmune) {
+      alog("spell", `${side} SUPERNOVA L${spell.lane} fizzle (cible invalide ou anchored)`);
+      return board;
+    }
+    alog("spell", `${side} SUPERNOVA L${spell.lane} → 6 dmg creature opp`);
     const damaged = damageCreature(opp, 6);
     return withOppCreatureOnLane(board, side, spell.lane, damaged);
   }

@@ -201,10 +201,12 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
               alog("combat", `L${laneIdx} POST-RESOLVE same-ref (pas de mutation)`);
             }
             setBoard(b);
-            if (b.a.hp <= 0 || b.b.hp <= 0) {
-              setCombatLane(null);
-              return;
-            }
+            // Alex feedback 2026-06-09 "résolution complète des 3 lanes" : NE
+            // PLUS early-exit sur match-end interim. On résout les 3 lanes
+            // pour permettre l'égalité (a≤0 ET b≤0). Verdict final calculé
+            // après les 3 lanes (endOfTurnCleanup + draw check ci-dessous).
+            // NOTE : le VRAI "but d'or" = mort subite RPSLS quand égalité
+            // absolue (HP+ATK identiques) — Lot H futur, pas implémenté ici.
             if (laneIdx < 2) {
               window.setTimeout(() => {
                 setCombatLane(null);
@@ -217,18 +219,31 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
         };
         runLane(0);
 
-        // After all 3 lanes — cleanup + HP check.
+        // After all 3 lanes — cleanup + HP check + draw detection.
         const TOTAL_COMBAT_MS = LANE_CHARGE_MS * 3 + LANE_PAUSE_MS * 2 + 200;
         window.setTimeout(() => {
           b = endOfTurnCleanup(b);
-          if (b.a.hp <= 0 || b.b.hp <= 0) {
+          const aDead = b.a.hp <= 0;
+          const bDead = b.b.hp <= 0;
+          if (aDead || bDead) {
             b = { ...b, phase: "match-end" };
           }
+          if (aDead && bDead) {
+            alog("turn", `MATCH END — ÉGALITÉ (a.hp=${b.a.hp}, b.hp=${b.b.hp}) → tie-break Mort subite à venir (Lot H)`);
+          }
           setBoard(b);
-          if ((b.a.hp <= 0 || b.b.hp <= 0) && onMatchEnd) {
+          if ((aDead || bDead) && onMatchEnd) {
+            // Alex feedback 2026-06-09 point #6 : laisser respirer l'UI 1.6s
+            // avant la transition match-end screen (était 200ms = transition
+            // brutale). Donne le temps de voir le dernier état du board.
             window.setTimeout(() => {
-              onMatchEnd(b.b.hp <= 0 && b.a.hp > 0);
-            }, 200);
+              // Convention onMatchEnd(playerWon) : true = player win.
+              // Égalité (aDead && bDead) → null. Pour MVP on traite comme
+              // "ni victoire ni défaite" (player NOT wins) — ArenaMatchEnd
+              // gérera l'affichage du label "Égalité".
+              const playerWon = bDead && !aDead;
+              onMatchEnd(playerWon);
+            }, 1600);
           }
         }, TOTAL_COMBAT_MS);
 

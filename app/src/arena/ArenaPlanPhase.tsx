@@ -370,7 +370,11 @@ export function ArenaPlanPhase({
             const isTargeting = targeting?.kind === "spell" && targeting.id === id;
             const isInspecting = inspecting === id;
             const targetKind = CARD_TARGET_KIND[id] ?? "global";
-            const canDragCard = supported && !cannotAfford && !disabled && targetKind === "lane";
+            // Alex feedback 2026-06-09 : badge LOCK sur les Aegis si le hero
+            // a déjà cast Aegis ce match (lock activé). Visuel grayscale +
+            // chip "🔒 LOCK" pour clarifier que la carte est inutile.
+            const aegisLocked = id === "aegis" && !!me.aegisCastThisMatch;
+            const canDragCard = supported && !cannotAfford && !disabled && targetKind === "lane" && !aegisLocked;
             return (
               <div key={`${id}-${i}`} className="flex flex-col items-center gap-0.5 shrink-0">
               <motion.div
@@ -404,19 +408,25 @@ export function ArenaPlanPhase({
                 onPointerUp={() => endPress(id, true)}
                 onPointerLeave={() => endPress(id, false)}
                 onPointerCancel={() => endPress(id, false)}
-                disabled={!supported || cannotAfford || disabled}
+                disabled={!supported || cannotAfford || disabled || aegisLocked}
                 className={
                   "relative w-[44px] h-[60px] sm:w-[48px] sm:h-[66px] rounded-lg overflow-hidden bg-surface-raised transition " +
                   "ring-2 " + (
                     isTargeting ? "ring-amber-300 scale-110"
                     : isInspecting ? "ring-sky-300 scale-110"
+                    : aegisLocked ? "ring-zinc-600/60"
                     : "ring-white/20"
                   ) +
-                  (!supported ? " grayscale opacity-30" : cannotAfford ? " opacity-40" : "")
+                  (!supported ? " grayscale opacity-30" : aegisLocked ? " grayscale opacity-50" : cannotAfford ? " opacity-40" : "")
                 }
-                title={supported ? undefined : "Carte pas encore disponible en Arena"}
+                title={aegisLocked ? "Aegis déjà utilisé ce match (lock)" : supported ? undefined : "Carte pas encore disponible en Arena"}
               >
                 <CardImage id={id} glyphSize="text-xl" />
+                {aegisLocked && (
+                  <div className="absolute inset-x-0 bottom-0 bg-zinc-900/85 text-zinc-300 text-[8px] font-bold uppercase tracking-wider text-center py-0.5 backdrop-blur-sm">
+                    🔒 LOCK
+                  </div>
+                )}
                 <div className="absolute top-0.5 left-0.5 z-10 inline-flex items-center justify-center gap-0.5 px-1 py-0.5 rounded-full bg-black/65 backdrop-blur-sm">
                   {Array.from({ length: card.cost }, (_, k) => (
                     <span key={k} className="w-1 h-1 rounded-full bg-sky-300" />

@@ -22,17 +22,18 @@
  */
 
 import { alog, alogSetTurn, csnap } from "./arenaLog";
+import { AFFINITY_TO_FINISHER } from "./arenaFinishers";
+import { resolveLaneCombatAt as _rlCombatAt, resolveCombat as _rCombat } from "./arenaCombat";
 import {
   CREATURE_STATS,
   HERO_MAX_HP,
   MANA_CAP,
+  MAX_SPELLS_PER_TURN,
   STARTING_HAND_SIZE,
-  moveCountersMove,
   type ArenaMatchResult,
   type BoardState,
   type Creature,
   type HeroState,
-  type LaneIndex,
   type LaneState,
   type PlayedSpell,
   type Side,
@@ -70,6 +71,7 @@ export function makeHero(deckIds: CardId[], affinity?: Move): HeroState {
     discard: [],
     divineShield: false,
     affinity,
+    constellationCount: 0,
   };
 }
 
@@ -211,25 +213,8 @@ export function damageCreature(c: Creature, dmg: number): Creature | null {
   return { ...c, hp };
 }
 
-/** Set combatBlunted on a surviving Scissors. Idempotent — re-flagging an
- *  already-blunted Scissors is a no-op. */
-function bluntOnCombat(c: Creature): Creature {
-  if (c.move === "scissors" && !c.combatBlunted) {
-    return { ...c, combatBlunted: true };
-  }
-  return c;
-}
-
-/** Variant used by Tranchant (Scissors) attackers — bypasses divineShield.
- *  Esquive still applies (it's intrinsic to the defender's nature). */
-function damageCreaturePierce(c: Creature, dmg: number): Creature | null {
-  if (dmg <= 0) return c;
-  if (c.dodgeCharge) return { ...c, dodgeCharge: false };
-  // skip divineShield — pierced by Tranchant
-  const hp = c.hp - dmg;
-  if (hp <= 0) return null;
-  return { ...c, hp };
-}
+// bluntOnCombat / damageCreaturePierce → déplacés dans ./arenaCombat.ts
+// (refactor 2026-06-09 : arenaRules.ts dépassait 700 lignes).
 
 /** A creature's "per-turn" buffs (atkBuff, anchored, riposte) reset at the
  *  END of the turn so they don't snowball forever. Persistent damage stays.
@@ -318,9 +303,37 @@ export function applySpellPhase(board: BoardState, intent: TurnIntent, side: Sid
  *  (documented bias — alternative is random which breaks reproducibility).
  *  Same priority WITHIN a side : original tap order (intent.spells order). */
 export function applyAllSpells(board: BoardState, intentA: TurnIntent, intentB: TurnIntent): BoardState {
+  // Alex feedback 2026-06-09 v2 : aligné sur les caps UI (ArenaGame.addSpell)
+  // — max MAX_SPELLS_PER_TURN sorts lane-target + 1 sort utility (self/hero)
+  // par tour. Total max 3 sorts/tour. Le filet engine truncate selon les
+  // mêmes règles pour rester cohérent avec ce que l'UI a laissé passer.
+  const truncateByCaps = (intent: TurnIntent): TurnIntent => {
+    let laneCount = 0;
+    let utilityCount = 0;
+    const kept: PlayedSpell[] = [];
+    for (const s of intent.spells) {
+      if (s.kind === "lane") {
+        if (laneCount >= MAX_SPELLS_PER_TURN) continue;
+        laneCount++;
+      } else {
+        if (utilityCount >= 1) continue;
+        utilityCount++;
+      }
+      kept.push(s);
+    }
+    return kept.length === intent.spells.length ? intent : { ...intent, spells: kept };
+  };
+  const safeIntentA = truncateByCaps(intentA);
+  const safeIntentB = truncateByCaps(intentB);
+  if (safeIntentA !== intentA) {
+    alog("spell", `BYPASS BLOCKED a — intent had ${intentA.spells.length} spells (cap lane=${MAX_SPELLS_PER_TURN} + utility=1), truncated to ${safeIntentA.spells.length}`);
+  }
+  if (safeIntentB !== intentB) {
+    alog("spell", `BYPASS BLOCKED b — intent had ${intentB.spells.length} spells (cap lane=${MAX_SPELLS_PER_TURN} + utility=1), truncated to ${safeIntentB.spells.length}`);
+  }
   const combined: Array<{ spell: PlayedSpell; side: Side; idx: number }> = [
-    ...intentA.spells.map((spell, idx) => ({ spell, side: "a" as Side, idx })),
-    ...intentB.spells.map((spell, idx) => ({ spell, side: "b" as Side, idx })),
+    ...safeIntentA.spells.map((spell, idx) => ({ spell, side: "a" as Side, idx })),
+    ...safeIntentB.spells.map((spell, idx) => ({ spell, side: "b" as Side, idx })),
   ];
   combined.sort((x, y) => {
     const pdiff = spellPriority(x.spell.id) - spellPriority(y.spell.id);
@@ -334,10 +347,12 @@ export function applyAllSpells(board: BoardState, intentA: TurnIntent, intentB: 
   for (const { spell, side } of combined) {
     const card = CARDS[spell.id as CardId];
     const hero = side === "a" ? b.a : b.b;
-    if (hero.mana < card.cost) continue;
+    // Lot D — CALCUL QUANTIQUE : tous mes sorts coûtent −1m (min 0).
+    const effectiveCost = hero.calculActive ? Math.max(0, card.cost - 1) : card.cost;
+    if (hero.mana < effectiveCost) continue;
     b = {
       ...b,
-      [side]: { ...hero, mana: hero.mana - card.cost },
+      [side]: { ...hero, mana: hero.mana - effectiveCost },
     } as BoardState;
     const ctx: ArenaSpellContext = { board: b, side, spell };
     b = applyArenaSpell(ctx);
@@ -368,203 +383,63 @@ export function applySummons(board: BoardState, intent: TurnIntent, side: Side):
     } else {
       alog("summon", `${side} pose ${summon.move} L${summon.lane} affinity=${hero.affinity ?? "∅"}`);
     }
+    // Lot C — Constellation 3⭐ : Alex feedback 2026-06-09 — passage en mode
+    // SIMULTANÉ (vs cumulé). Le compteur compte les Voie-créatures VIVANTES
+    // sur le board, pas les poses cumulées. Force le joueur à garder ses 3
+    // Voies en vie pour atteindre 3⭐.
+    const aliveVoieCount = countAliveAffinity(lanes, side, hero.affinity);
+    const unlocked = aliveVoieCount >= 3 && !hero.finisherUnlocked;
+    if (hero.affinity && summon.move === hero.affinity) {
+      alog("summon", `${side} constellation ⭐ ${aliveVoieCount}/3 ${unlocked ? "→ FINISHER UNLOCKED" : ""}`);
+    }
+    // Lot D — Injection automatique de la carte Finisher dans la main au
+    // moment où on passe 3⭐ pour la 1ère fois. Choix selon l'Affinité.
+    let nextHand = hero.hand;
+    if (unlocked && hero.affinity) {
+      const finisherId = AFFINITY_TO_FINISHER[hero.affinity];
+      nextHand = [...hero.hand, finisherId];
+      alog("summon", `${side} → carte Finisher [${finisherId}] injectée en main`);
+    }
     b = {
       ...b,
       lanes,
-      [side]: { ...hero, mana: hero.mana - 1 },
+      [side]: {
+        ...hero,
+        mana: hero.mana - 1,
+        hand: nextHand,
+        constellationCount: aliveVoieCount,
+        finisherUnlocked: hero.finisherUnlocked || unlocked,
+      },
     } as BoardState;
   }
   return b;
 }
 
-/** Run combat on a SINGLE lane — exported so the UI can sequence the
- *  3-lane combat phase one lane at a time (better readability + per-lane
- *  shake/death anim cues). The full-board resolver below just chains this. */
-export function resolveLaneCombatAt(board: BoardState, laneIdx: LaneIndex): BoardState {
-  return resolveLaneCombat(board, laneIdx);
+/** Lot C v2 — Count les créatures de `side` qui correspondent à son Affinité
+ *  ET sont vivantes. Utilisé pour la Constellation 3⭐ SIMULTANÉE (Alex
+ *  feedback 2026-06-09) : il faut maintenir 3 Voies en vie en même temps
+ *  pour débloquer le Finisher, pas juste poser 3× cumulés. */
+export function countAliveAffinity(
+  lanes: readonly LaneState[],
+  side: Side,
+  affinity: Move | undefined,
+): number {
+  if (!affinity) return 0;
+  let count = 0;
+  for (const lane of lanes) {
+    const c = lane[side];
+    if (c && c.move === affinity) count++;
+  }
+  return count;
 }
 
-/** Run combat across all 3 lanes. Damage is applied SIMULTANEOUSLY (both
- *  creatures' new HP computed from the original state of the lane). Empty
- *  lane → attacker hits the opposing hero for its effective ATK.
- *  Exported for UI sequencing. */
-export function resolveCombat(board: BoardState): BoardState {
-  let b = board;
-  for (let i = 0; i < b.lanes.length; i++) {
-    b = resolveLaneCombat(b, i as LaneIndex);
-    if (b.a.hp <= 0 || b.b.hp <= 0) break; // short-circuit on lethal
-  }
-  return b;
-}
-
-function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
-  const lane = board.lanes[laneIdx];
-  const ca = lane.a;
-  const cb = lane.b;
-  alog("combat", `L${laneIdx} ENTER ca=${ca?.move ?? "∅"} cb=${cb?.move ?? "∅"}`);
-
-  // 🔴 BUG FIX 2026-06-09 (TDZ "Cannot access 'c' before initialization") :
-  // hasAntiTaunt + findDeflector + consumeProvocation déclarés ICI (top
-  // de la fonction) au lieu d'après les counter branches. Le minifier de
-  // Vite renomme les const en variables courtes (`c`), et l'appel à
-  // findDeflector depuis le branche A-wins/B-wins se faisait AVANT
-  // l'initialisation du const hasAntiTaunt → TDZ throw → cascade silencieuse
-  // qui bloquait tous les combats des lanes suivantes. Maintenant déclarés
-  // AVANT toute utilisation, le hoisting fonctionne pour findDeflector
-  // (function declaration) et hasAntiTaunt est dans son scope au moment
-  // de la call.
-  const hasAntiTaunt = (b: BoardState, side: Side): boolean =>
-    b.lanes.some((l) => {
-      const c = side === "a" ? l.a : l.b;
-      return !!c && (c.move === "paper" || c.move === "spock");
-    });
-  function findDeflector(b: BoardState, defenderSide: Side): { lane: LaneIndex; side: Side } | null {
-    const attackerSide: Side = defenderSide === "a" ? "b" : "a";
-    if (hasAntiTaunt(b, attackerSide)) return null;
-    for (let i = 0; i < 3; i++) {
-      const lane = i as LaneIndex;
-      const c = defenderSide === "a" ? b.lanes[lane].a : b.lanes[lane].b;
-      if (c && c.taunt && c.provocationCharges > 0) {
-        return { lane, side: defenderSide };
-      }
-    }
-    return null;
-  }
-  function consumeProvocation(board: BoardState, deflector: { lane: LaneIndex; side: Side }): BoardState {
-    const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
-    const cur = lanes[deflector.lane];
-    const rock = deflector.side === "a" ? cur.a : cur.b;
-    if (!rock) return board;
-    const decremented: Creature = { ...rock, provocationCharges: Math.max(0, rock.provocationCharges - 1) };
-    lanes[deflector.lane] = deflector.side === "a" ? { ...cur, a: decremented } : { ...cur, b: decremented };
-    return { ...board, lanes };
-  }
-
-  if (ca && cb) {
-    const counterAB = moveCountersMove(ca.move, cb.move);
-    const counterBA = moveCountersMove(cb.move, ca.move);
-    alog("combat", `L${laneIdx} BOTH-PRESENT counterAB=${counterAB} counterBA=${counterBA}`);
-
-    if (counterAB && !counterBA) {
-      alog("combat", `L${laneIdx} branch=A-wins`);
-      const winnerA = bluntOnCombat(ca);
-      alog("combat", `L${laneIdx} step=bluntDone winnerA=${winnerA.move}`);
-      const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
-      if (cb.dodgeCharge) {
-        alog("combat", `L${laneIdx} A wins → ESQUIVE save B (dodge consumed)`);
-        lanes[laneIdx] = { a: winnerA, b: { ...cb, dodgeCharge: false } };
-        return { ...board, lanes };
-      }
-      if (cb.divineShield && !ca.pierces) {
-        alog("combat", `L${laneIdx} A wins → AEGIS save B (shield consumed)`);
-        lanes[laneIdx] = { a: winnerA, b: { ...cb, divineShield: false } };
-        return { ...board, lanes };
-      }
-      alog("combat", `L${laneIdx} step=noSave killing-B`);
-      lanes[laneIdx] = { a: winnerA, b: null };
-      const updatedBoard = { ...board, lanes, a: { ...board.a, killBonusPending: true } };
-      alog("combat", `L${laneIdx} step=updatedBoardBuilt`);
-      const deflect = findDeflector(updatedBoard, "b");
-      alog("combat", `L${laneIdx} step=deflectCheck deflect=${deflect ? `L${deflect.lane}/${deflect.side}` : "null"}`);
-      if (deflect) {
-        alog("combat", `L${laneIdx} A wins → B die. Poursuite hero b → DEFLECTED par Pierre L${deflect.lane}`);
-        return consumeProvocation(updatedBoard, deflect);
-      }
-      const atkA = creatureEffectiveAtk(winnerA);
-      alog("combat", `L${laneIdx} step=atkComputed atkA=${atkA}`);
-      alog("combat", `L${laneIdx} A wins → B die. Poursuite hero b atk=${atkA}`);
-      const finalBoard = { ...updatedBoard, b: damageHero(updatedBoard.b, atkA) };
-      alog("combat", `L${laneIdx} step=finalBoardReturn b.hp=${finalBoard.b.hp}`);
-      return finalBoard;
-    }
-    if (counterBA && !counterAB) {
-      alog("combat", `L${laneIdx} branch=B-wins (counterBA && !counterAB)`);
-      const winnerB = bluntOnCombat(cb);
-      const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
-      if (ca.dodgeCharge) {
-        alog("combat", `L${laneIdx} B wins → ESQUIVE save A (dodge consumed)`);
-        lanes[laneIdx] = { a: { ...ca, dodgeCharge: false }, b: winnerB };
-        return { ...board, lanes };
-      }
-      if (ca.divineShield && !cb.pierces) {
-        alog("combat", `L${laneIdx} B wins → AEGIS save A (shield consumed)`);
-        lanes[laneIdx] = { a: { ...ca, divineShield: false }, b: winnerB };
-        return { ...board, lanes };
-      }
-      lanes[laneIdx] = { a: null, b: winnerB };
-      // Alex feedback D : kill bonus pour le côté attaquant (B a tué A).
-      const updatedBoard = { ...board, lanes, b: { ...board.b, killBonusPending: true } };
-      const deflect = findDeflector(updatedBoard, "a");
-      if (deflect) {
-        alog("combat", `L${laneIdx} B wins → A die. Poursuite hero a → DEFLECTED par Pierre L${deflect.lane}`);
-        return consumeProvocation(updatedBoard, deflect);
-      }
-      const atkB = creatureEffectiveAtk(winnerB);
-      alog("combat", `L${laneIdx} B wins → A die. Poursuite hero a atk=${atkB}`);
-      return { ...updatedBoard, a: damageHero(updatedBoard.a, atkB) };
-    }
-
-    // Mirror match (same symbol on both sides) → normal ATK/HP trade.
-    // Damage values computed BEFORE either dies so trades are symmetric.
-    const atkA = creatureEffectiveAtk(ca);
-    const atkB = creatureEffectiveAtk(cb);
-    // Tranchant (Scissors) bypasses opp Aegis. The attacker's flag controls
-    // what the DEFENDER's shield can do.
-    let newA: Creature | null = cb.pierces
-      ? damageCreaturePierce(ca, atkB)
-      : damageCreature(ca, atkB);
-    let newB: Creature | null = ca.pierces
-      ? damageCreaturePierce(cb, atkA)
-      : damageCreature(cb, atkA);
-    // Riposte: if a creature died AND was riposte-primed, its killer dies too.
-    if (!newA && ca.ripostePrimed && newB) newB = null;
-    if (!newB && cb.ripostePrimed && newA) newA = null;
-    // Émoussé — Ciseaux that SURVIVED a combat exchange lose 1 ATK
-    // permanently. The flag is consumed: subsequent combats keep it but
-    // creatureEffectiveAtk reads it once (−1 cap stays).
-    if (newA && newA.move === "scissors" && !newA.combatBlunted) {
-      newA = { ...newA, combatBlunted: true };
-    }
-    if (newB && newB.move === "scissors" && !newB.combatBlunted) {
-      newB = { ...newB, combatBlunted: true };
-    }
-    const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
-    lanes[laneIdx] = { a: newA, b: newB };
-    // Alex feedback D : mirror trade kill bonus — chaque side qui a tué
-    // récupère un bonus. Si A killed B → A gets bonus. Si both died → both
-    // bonus (mutual destruction = double récompense, agressivité OK).
-    const heroA = !newB ? { ...board.a, killBonusPending: true } : board.a;
-    const heroB = !newA ? { ...board.b, killBonusPending: true } : board.b;
-    return { ...board, lanes, a: heroA, b: heroB };
-  }
-
-  // TAUNT (Provocation) — findDeflector + hasAntiTaunt + consumeProvocation
-  // sont déclarés en haut de cette fonction (voir TDZ fix).
-
-  if (ca && !cb) {
-    const deflect = findDeflector(board, "b");
-    if (deflect) {
-      alog("combat", `L${laneIdx} ${csnap(ca)} undefended → hero b DEFLECTED par Pierre L${deflect.lane}`);
-      return consumeProvocation(board, deflect);
-    }
-    const atk = creatureEffectiveAtk(ca);
-    alog("combat", `L${laneIdx} ${csnap(ca)} undefended → hero b atk=${atk}`);
-    return { ...board, b: damageHero(board.b, atk) };
-  }
-
-  if (cb && !ca) {
-    const deflect = findDeflector(board, "a");
-    if (deflect) {
-      alog("combat", `L${laneIdx} ${csnap(cb)} undefended → hero a DEFLECTED par Pierre L${deflect.lane}`);
-      return consumeProvocation(board, deflect);
-    }
-    const atk = creatureEffectiveAtk(cb);
-    alog("combat", `L${laneIdx} ${csnap(cb)} undefended → hero a atk=${atk}`);
-    return { ...board, a: damageHero(board.a, atk) };
-  }
-
-  return board; // both lanes empty
-}
+// resolveLaneCombat / resolveLaneCombatAt / resolveCombat → re-exportés
+// depuis ./arenaCombat (refactor 2026-06-09 : arenaRules.ts dépassait 700
+// lignes). Imports en haut du fichier, re-exports ici pour préserver le
+// contract des callsites qui importent depuis "./arenaRules".
+const resolveCombat = _rCombat;
+export const resolveLaneCombatAt = _rlCombatAt;
+export { resolveCombat };
 
 export function endOfTurnCleanup(board: BoardState): BoardState {
   const lanes = board.lanes.map((lane) => ({

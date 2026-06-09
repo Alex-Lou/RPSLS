@@ -53,6 +53,35 @@ export interface HeroState {
    *  tour. Set à true dans resolveLaneCombat quand une mort est causée,
    *  reset à false au début du tour suivant après la pioche bonus. */
   killBonusPending?: boolean;
+  /** Lot C — Constellation 3⭐ : compteur cumulé de summons d'Affinité.
+   *  Chaque fois que le hero pose son symbole d'Affinité, on incrémente.
+   *  À 3 / 3, la constellation est complète → le Finisher se débloque
+   *  (Lot D injecte la carte Finisher dans la main). Persiste tout le
+   *  match (pas de reset). 0 si pas d'affinité choisie ou si aucune
+   *  Affinité-summon faite jusqu'ici. Cap visuel à 3 mais la valeur
+   *  peut dépasser — le Finisher est unique, déclencher 1× par match. */
+  constellationCount: number;
+  /** Lot C — flag "Finisher déjà débloqué", évite de redéclencher l'effet
+   *  d'unlock à chaque tour une fois passé 3 ⭐. Set à true au moment où
+   *  constellationCount atteint 3 pour la 1ère fois. */
+  finisherUnlocked?: boolean;
+  /** Lot D — Finisher déjà cast ce match (1× par match max). La carte
+   *  Finisher est injectée dans la main à 3⭐ ; après usage elle est
+   *  consommée et ne peut pas être ré-injectée. */
+  finisherUsed?: boolean;
+  /** Lot D — flag VERGER ÉTERNEL : Fanaison off + heal hero +1/tour persistent
+   *  jusqu'à la fin du match. Vérifié dans endOfTurnReset + creatureEffectiveAtk. */
+  vergerActive?: boolean;
+  /** Lot D — flag LAME COSMIQUE : Tranchant pierce TOUT (Aegis, Provoc,
+   *  anti-taunt) pour toutes mes créatures Tranchant. Vérifié dans
+   *  resolveLaneCombat (save check) et findDeflector (skip). */
+  lameActive?: boolean;
+  /** Lot D — flag MÉTAMORPHOSE : Esquive infinie pour mes Lézard (dodge
+   *  refresh à chaque endOfTurnReset). */
+  metamorphoseActive?: boolean;
+  /** Lot D — flag CALCUL QUANTIQUE : tous mes sorts coûtent −1m (min 0).
+   *  Vérifié dans applyAllSpells.cost. */
+  calculActive?: boolean;
   /** Mana available THIS turn. Refreshes to maxMana at the start of each turn. */
   mana: number;
   /** Mana ceiling — increments by 1 every turn up to MANA_CAP. */

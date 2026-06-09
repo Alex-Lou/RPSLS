@@ -23,6 +23,7 @@ import {
 import { useStore } from "../store/store";
 import { CARDS } from "../ranked/cards";
 import type { CardId } from "../ranked/rankedTypes";
+import type { Move } from "../engine/game";
 import {
   FloatingMatchBackButton, ScaleToFit, useAndroidBackPrompt,
   type MatchBackHandle,
@@ -48,7 +49,11 @@ import {
 import { buildCpuDeckMirroring, buildPlayerDeck, removeSpentCards } from "./arenaDecks";
 import { runResolverFlow, type ResolveStep } from "./arenaResolverFlow";
 
-const MATCH_FOUND_SPLASH_MS = 1_800;
+// Alex feedback 2026-06-09 point #7 : décompte+GO trop rapide. Bumpé de
+// 1800 → 2600ms pour laisser le "GO!" durer un peu et faire monter le
+// suspense (anim splash interne dure ~1.35s + 0.45s = ~1.8s, on garde
+// 800ms de plus sur "GO!" final).
+const MATCH_FOUND_SPLASH_MS = 2_600;
 
 export function ArenaGame({
   onQuit, onRematch,
@@ -73,10 +78,13 @@ export function ArenaGame({
     ),
   ));
   // Constellation Pro v2 Couche 1 — Affinité du joueur passée au moteur.
-  // Le CPU n'a pas (encore) d'affinité fixe — Lot ulterieur (random ou
-  // adaptive). Player affinity locked at match start, change in lobby pour
-  // le prochain match.
+  // Le CPU prend une Affinité ALÉATOIRE à chaque match pour la symétrie
+  // (Constellation 3⭐ s'allume aussi côté opp) — pas d'adaptive selon
+  // le joueur pour garder une part d'imprévisibilité.
   const playerAffinity = useRef(player.arenaAffinity);
+  const cpuAffinity = useRef<Move>(
+    (["rock", "paper", "scissors", "lizard", "spock"] as const)[Math.floor(Math.random() * 5)],
+  );
 
   // Wipe the log buffer at match start so each match has a clean diagnostic
   // history (Alex flag : "tu pers tout finalement"). Called once at mount.
@@ -87,7 +95,7 @@ export function ArenaGame({
   }
 
   const [board, setBoard] = useState<BoardState>(() =>
-    makeInitialBoard(playerDeck.current, buildCpuDeckMirroring(playerDeck.current), playerAffinity.current, undefined),
+    makeInitialBoard(playerDeck.current, buildCpuDeckMirroring(playerDeck.current), playerAffinity.current, cpuAffinity.current),
   );
   const [intent, setIntent] = useState<TurnIntent>({ spells: [], summons: [] });
   const [matchSplash, setMatchSplash] = useState(true);
@@ -224,7 +232,26 @@ export function ArenaGame({
     // Pour spells non-lane (self / hero / global), simple check sur id.
     hapticTap();
     setIntent((cur) => {
-      if (cur.spells.length >= MAX_SPELLS_PER_TURN) return cur;
+      // Alex feedback 2026-06-09 point #2 : cap MAX_SPELLS_PER_TURN s'applique
+      // SEULEMENT aux sorts qui ciblent une LANE (offensive / debuff / buff
+      // creature). Les sorts "hero/self" (Second Wind heal, Sangsue heal,
+      // etc.) ne touchent pas la lane d'attaque → exempt du cap. Permet le
+      // combo Anchor lane + Second Wind hero le même tour. Cap utility
+      // séparé : max 1 par tour pour éviter le spam Second Wind+Sangsue.
+      const laneCount = cur.spells.filter((s) => s.kind === "lane").length;
+      const utilityCount = cur.spells.filter((s) => s.kind !== "lane").length;
+      if (spell.kind === "lane" && laneCount >= MAX_SPELLS_PER_TURN) return cur;
+      if (spell.kind !== "lane" && utilityCount >= 1) return cur;
+      // Alex feedback 2026-06-09 (round 4) : 1 carte en main = 1 cast max.
+      // Avant le check duplicate refusait seulement (même id + même lane),
+      // donc une seule copie en main pouvait être cast 2× sur 2 lanes
+      // différentes (effet appliqué 2× mais 1 seule copie consommée par
+      // removeSpentCards) — bug double-effect. Fix : compter les usages
+      // de spell.id dans cur.spells et refuser si dépasse le nombre de
+      // copies en main.
+      const usageCount = cur.spells.filter((s) => s.id === spell.id).length;
+      const handCount = board.a.hand.filter((id) => id === spell.id).length;
+      if (usageCount >= handCount) return cur;
       const duplicate = cur.spells.some((s) => {
         if (s.id !== spell.id) return false;
         if (s.kind !== spell.kind) return false;
@@ -232,6 +259,18 @@ export function ArenaGame({
         return true; // same id + same non-lane target → dup
       });
       if (duplicate) return cur;
+      // Alex feedback 2026-06-09 (option A) : Aegis ET Anchor sur la MÊME
+      // lane le même tour = mutual exclusion. Force un choix entre défense
+      // physique (Aegis) et défense magique (Anchor). Le 2e fizzle.
+      if ((spell.id === "aegis" || spell.id === "anchor") && spell.kind === "lane") {
+        const conflict = cur.spells.some((s) => {
+          if (s.kind !== "lane" || spell.kind !== "lane") return false;
+          if (s.lane !== spell.lane) return false;
+          const otherId = spell.id === "aegis" ? "anchor" : "aegis";
+          return s.id === otherId;
+        });
+        if (conflict) return cur;
+      }
       return { ...cur, spells: [...cur.spells, spell] };
     });
   }
@@ -323,7 +362,7 @@ export function ArenaGame({
           // handler, fall back to a local soft-reset.
           if (onRematch) { onRematch(); return; }
           matchEndedRef.current = false;
-          setBoard(makeInitialBoard(playerDeck.current, buildCpuDeckMirroring(playerDeck.current), playerAffinity.current, undefined));
+          setBoard(makeInitialBoard(playerDeck.current, buildCpuDeckMirroring(playerDeck.current), playerAffinity.current, cpuAffinity.current));
           setIntent({ spells: [], summons: [] });
           setOppPreview(null);
           setPlayerPreview(null);

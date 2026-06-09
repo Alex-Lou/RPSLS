@@ -347,6 +347,46 @@ export const CARDS: Record<CardId, RankedCard> = {
     targetHintKey: "ranked.cards.genese.targetHint",
     art: "/Cards Bonus/genese.png",
   },
+
+  /* ✦ FINISHERS Constellation Pro — 1× par match, injectés à 3⭐, cost 4 mais
+     l'effet justifie le prix (impact massif sur le board ou le hero pour le
+     reste du match). Pro-only : arenaSupported() permet le cast en mode Pro
+     uniquement. Glyphs emoji en placeholder (art final à faire). */
+  "finisher-forteresse": {
+    id: "finisher-forteresse", cost: 4, rarity: "legendary",
+    target: "none", palette: "amber", glyph: "🛡️",
+    nameKey: "ranked.cards.finisher-forteresse.name", descKey: "ranked.cards.finisher-forteresse.desc",
+    targetHintKey: "ranked.cards.finisher-forteresse.targetHint",
+    art: null,
+  },
+  "finisher-verger": {
+    id: "finisher-verger", cost: 4, rarity: "legendary",
+    target: "none", palette: "emerald", glyph: "🌿",
+    nameKey: "ranked.cards.finisher-verger.name", descKey: "ranked.cards.finisher-verger.desc",
+    targetHintKey: "ranked.cards.finisher-verger.targetHint",
+    art: null,
+  },
+  "finisher-lame": {
+    id: "finisher-lame", cost: 4, rarity: "legendary",
+    target: "none", palette: "rose", glyph: "⚔️",
+    nameKey: "ranked.cards.finisher-lame.name", descKey: "ranked.cards.finisher-lame.desc",
+    targetHintKey: "ranked.cards.finisher-lame.targetHint",
+    art: null,
+  },
+  "finisher-metamorphose": {
+    id: "finisher-metamorphose", cost: 4, rarity: "legendary",
+    target: "none", palette: "lime", glyph: "🐉",
+    nameKey: "ranked.cards.finisher-metamorphose.name", descKey: "ranked.cards.finisher-metamorphose.desc",
+    targetHintKey: "ranked.cards.finisher-metamorphose.targetHint",
+    art: null,
+  },
+  "finisher-calcul": {
+    id: "finisher-calcul", cost: 4, rarity: "legendary",
+    target: "none", palette: "cyan", glyph: "🌠",
+    nameKey: "ranked.cards.finisher-calcul.name", descKey: "ranked.cards.finisher-calcul.desc",
+    targetHintKey: "ranked.cards.finisher-calcul.targetHint",
+    art: null,
+  },
 };
 
 export const ALL_CARD_IDS: CardId[] = Object.keys(CARDS) as CardId[];

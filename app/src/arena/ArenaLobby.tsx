@@ -14,7 +14,7 @@
  * tournament bracket on the placeholder buttons.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
 import { levelFromXp } from "../engine/leveling";
@@ -60,6 +60,15 @@ export function ArenaLobby({
   const player = useStore((s) => s.player);
   const setArenaAffinity = useStore((s) => s.setArenaAffinity);
   const affinity: Move = player.arenaAffinity ?? "rock";
+  // BUG fix 2026-06-09 : le ?? "rock" était un fallback display SEULEMENT,
+  // le store gardait undefined si le joueur ne tapait pas explicitement.
+  // ArenaGame lisait alors undefined → "affinity=∅" en match (pas de
+  // bonus Voie, pas de Constellation). Solution KISS : persister le
+  // défaut immédiatement au mount du lobby. Le joueur peut toujours
+  // changer en tapant une autre Voie.
+  useEffect(() => {
+    if (!player.arenaAffinity) setArenaAffinity("rock");
+  }, [player.arenaAffinity, setArenaAffinity]);
   const stats = player.arenaStats ?? { wins: 0, losses: 0, draws: 0 };
   const total = stats.wins + stats.losses + stats.draws;
   const winrate = stats.wins + stats.losses > 0
