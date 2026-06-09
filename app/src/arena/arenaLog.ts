@@ -44,13 +44,16 @@ export function alog(category: string, ...args: unknown[]): void {
   const entry: ArenaLogEntry = { ts: Date.now(), turn: currentTurn, category, msg };
   buffer.push(entry);
   if (buffer.length > MAX_BUFFER) buffer.shift();
-  // Notify subscribers — copy the set to a list so a subscriber that
-  // unsubscribes during notify doesn't mutate the iteration.
   for (const cb of Array.from(listeners)) cb();
-  // Fallback: also send to console so `adb logcat | grep arena` still
-  // works for offline diagnosis when needed.
+  // Console line for `adb logcat | grep arena:` (fallback offline diag).
   // eslint-disable-next-line no-console
   console.log(`[arena:${category}] T${currentTurn} ${msg}`);
+  // Expose buffer on window so I can query it from DevTools via
+  // `adb forward tcp:9222 ...` + Runtime.evaluate when live-tailing
+  // remotely. Tauri WebView Chromium exposes window like a browser.
+  if (typeof window !== "undefined") {
+    (window as unknown as { __arenaLogs__?: ArenaLogEntry[] }).__arenaLogs__ = buffer;
+  }
 }
 
 /** Snapshot of the current buffer — returned as a NEW array so callers
