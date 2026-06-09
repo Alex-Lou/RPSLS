@@ -68,43 +68,54 @@ export function ArenaLaneSlot({
   // Track previous HP so we can spawn a "-N" floating popup when this lane's
   // creature takes damage. We guard by move identity to avoid false-positives
   // when one creature dies and another spawns on the same lane.
-  const prevRef = useRef<{ hp: number; move: Creature["move"] | null; shield: boolean } | null>(null);
+  const prevRef = useRef<{ hp: number; move: Creature["move"] | null; shield: boolean; dodge: boolean } | null>(null);
   const [dmgPop, setDmgPop] = useState<{ n: number; key: number } | null>(null);
   /** "🛡️ ABSORBÉ" chip — when the previous tick had a divine shield AND
    *  the current tick has none AND HP didn't change, we know the shield
    *  just ate the hit. Alex's "le lézard ne perd pas de vie" complaint. */
   const [shieldBlocked, setShieldBlocked] = useState<{ key: number } | null>(null);
+  /** "✨ ESQUIVÉ" chip — when dodgeCharge true→false with HP unchanged. */
+  const [dodgedHit, setDodgedHit] = useState<{ key: number } | null>(null);
   /** Death overlay — when a creature that WAS here is now gone, render a
    *  brief shatter/fade animation for ~600ms before the slot becomes empty.
    *  Tracks the move that just died so we can show its glyph one last time. */
   const [deathGhost, setDeathGhost] = useState<{ move: Creature["move"]; key: number } | null>(null);
   useEffect(() => {
     const prev = prevRef.current;
+    const snap = creature
+      ? { hp: creature.hp, move: creature.move, shield: creature.divineShield, dodge: creature.dodgeCharge }
+      : null;
     if (creature && prev && prev.move === creature.move && creature.hp < prev.hp) {
       const dmg = prev.hp - creature.hp;
       setDmgPop({ n: dmg, key: Date.now() });
       const id = window.setTimeout(() => setDmgPop(null), 1000);
-      prevRef.current = { hp: creature.hp, move: creature.move, shield: creature.divineShield };
+      prevRef.current = snap;
       return () => window.clearTimeout(id);
     }
-    // SHIELD ABSORBED — prev had shield, now doesn't, HP unchanged. The
-    // resolver consumed the shield in lieu of damage. Pop a clear chip
-    // so the player sees WHY 0 damage was taken.
+    // SHIELD ABSORBED — prev had shield, now doesn't, HP unchanged.
     if (creature && prev && prev.move === creature.move && prev.shield && !creature.divineShield && creature.hp === prev.hp) {
       setShieldBlocked({ key: Date.now() });
       const id = window.setTimeout(() => setShieldBlocked(null), 1400);
-      prevRef.current = { hp: creature.hp, move: creature.move, shield: creature.divineShield };
+      prevRef.current = snap;
       return () => window.clearTimeout(id);
     }
-    // Death transition: previously had a creature here, now null. Pop the
-    // ghost overlay so the player SEES the death (shatter + spin out).
+    // DODGE ESQUIVÉ — prev had dodge, now doesn't, HP unchanged. Alex
+    // feedback : "animations pour les effets de type esquive du lézard
+    // au premier tour" — manquait avant.
+    if (creature && prev && prev.move === creature.move && prev.dodge && !creature.dodgeCharge && creature.hp === prev.hp) {
+      setDodgedHit({ key: Date.now() });
+      const id = window.setTimeout(() => setDodgedHit(null), 1400);
+      prevRef.current = snap;
+      return () => window.clearTimeout(id);
+    }
+    // Death transition.
     if (!creature && prev && prev.move !== null) {
       setDeathGhost({ move: prev.move, key: Date.now() });
       const id = window.setTimeout(() => setDeathGhost(null), 650);
       prevRef.current = null;
       return () => window.clearTimeout(id);
     }
-    prevRef.current = creature ? { hp: creature.hp, move: creature.move, shield: creature.divineShield } : null;
+    prevRef.current = snap;
   }, [creature]);
 
   if (creature) {
@@ -366,6 +377,23 @@ export function ArenaLaneSlot({
             >
               <span className="px-1.5 py-0.5 rounded bg-amber-300/95 text-black text-[9px] uppercase tracking-wider font-black shadow-lg whitespace-nowrap">
                 🛡️ ABSORBÉ
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        {/* Dodge chip — pops when dodgeCharge (Lézard Esquive) absorbed the hit. */}
+        <AnimatePresence>
+          {dodgedHit && (
+            <motion.div
+              key={dodgedHit.key}
+              initial={{ opacity: 0, scale: 0.5, y: 4 }}
+              animate={{ opacity: 1, scale: 1, y: -22 }}
+              exit={{ opacity: 0, y: -34 }}
+              transition={{ duration: 1.2, ease: "easeOut" }}
+              className="absolute inset-0 flex items-center justify-center pointer-events-none"
+            >
+              <span className="px-1.5 py-0.5 rounded bg-violet-300/95 text-black text-[9px] uppercase tracking-wider font-black shadow-lg whitespace-nowrap">
+                ✨ ESQUIVÉ
               </span>
             </motion.div>
           )}
