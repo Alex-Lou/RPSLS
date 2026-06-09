@@ -119,12 +119,26 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
   const opp = board[oppSide];
 
   return (
-    <div
-      className="relative w-full max-w-2xl mx-auto rounded-2xl overflow-hidden
-                 border border-emerald-900/40
-                 shadow-[inset_0_0_36px_rgba(0,0,0,0.55)]
-                 [@media(max-height:560px)]:max-w-md"
-    >
+    <div className="w-full max-w-2xl mx-auto flex flex-col gap-1.5 sm:gap-2 [@media(max-height:560px)]:max-w-md [@media(max-height:560px)]:gap-1">
+      {/* ════════ OPP HERO STRIP — Alex feedback 2026-06-10 : SORTIE TOTALE
+       *  du pad. Position tout en haut près du burger, AUCUN backdrop pad
+       *  derrière. Lisible et aéré. ════════ */}
+      <div className="px-1">
+        <ArenaHeroStrip
+          hero={opp} board={board} side="opp" turn={board.turn} name="CPU" avatar={undefined}
+          incomingAttackKey={heroHit?.side === "opp" ? heroHit.key : null}
+          augurRevealed={playerSide === "a" ? board.augurRevealedB : board.augurRevealedA}
+        />
+      </div>
+
+      {/* ════════ LE PAD DE JEU — uniquement lanes + center status. Plus
+       *  large + plus haut (min-height), les strips ne mangent plus son
+       *  espace. ════════ */}
+      <div
+        className="relative w-full rounded-2xl overflow-hidden
+                   border border-emerald-900/40
+                   shadow-[inset_0_0_36px_rgba(0,0,0,0.55)]"
+      >
       {/* Backdrop — same pad system as Ranked, so themes carry over. */}
       <div className="absolute inset-0 pointer-events-none">
         <BattlePad padId={padId} className="w-full h-full" compact />
@@ -268,19 +282,10 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
         )}
       </AnimatePresence>
 
-      {/* Opp HeroStrip — Alex feedback 2026-06-09 point #1 : sortie du wrapper
-       *  board (était à l'intérieur, prenait de la place). Position en TOP
-       *  HEADER, +/- même niveau que burger+back, hors pad. Compact padding
-       *  pour tenir en 1-2 lignes. Lanes opp gagnent l'espace ainsi libéré. */}
-      <div className="px-3 pt-1 pb-0.5 sm:pt-2 sm:pb-1 [@media(max-height:560px)]:pt-0.5 [@media(max-height:560px)]:pb-0">
-        <ArenaHeroStrip
-          hero={opp} board={board} side="opp" turn={board.turn} name="CPU" avatar={undefined}
-          incomingAttackKey={heroHit?.side === "opp" ? heroHit.key : null}
-          augurRevealed={playerSide === "a" ? board.augurRevealedB : board.augurRevealedA}
-        />
-      </div>
+      {/* Opp strip déplacé HORS du pad (tout en haut, voir début du return).
+       *  Le pad ne contient plus que les lanes + center status. */}
 
-      <div className="relative px-5 pb-5 sm:px-6 sm:pb-6 flex flex-col gap-6 sm:gap-7 min-h-[420px] sm:min-h-[480px] [@media(max-height:560px)]:px-2 [@media(max-height:560px)]:pb-2 [@media(max-height:560px)]:gap-2.5 [@media(max-height:560px)]:min-h-0">
+      <div className="relative px-5 py-6 sm:px-6 sm:py-7 flex flex-col justify-between gap-5 sm:gap-6 min-h-[440px] sm:min-h-[520px] [@media(max-height:560px)]:px-2 [@media(max-height:560px)]:py-2 [@media(max-height:560px)]:gap-2.5 [@media(max-height:560px)]:min-h-0 [@media(max-height:560px)]:justify-center">
         {/* Opponent lane row — ghost previews of opp summons during reveal.
          *  Slots become tappable when a spell targets OPP creatures (Curse,
          *  Sangsue, Trou Noir). */}
@@ -333,8 +338,16 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
           summoningMove={targeting?.kind === "summon"}
         />
 
-        {/* Player strip — HP bar flashes when an attack lands on player hero.
-         *  Augur cast on me = opp's augurRevealed on my side. */}
+        {/* Player strip déplacé HORS du pad (voir après la fermeture du pad). */}
+      </div>
+      {/* ════════ FIN DU CONTENU INTERNE DU PAD ════════ */}
+      </div>
+      {/* ════════ FIN DU PAD (div avec backdrop BattlePad) ════════ */}
+
+      {/* ════════ PLAYER HERO STRIP — Alex feedback 2026-06-10 : SORTIE TOTALE
+       *  du pad. Position tout en bas, juste au-dessus de la main jouable,
+       *  AUCUN backdrop pad derrière. Plus aéré, ergonomique. ════════ */}
+      <div className="px-1">
         <ArenaHeroStrip
           hero={me} board={board} side="you" turn={board.turn} name={playerName} avatar={playerAvatar}
           incomingAttackKey={heroHit?.side === "you" ? heroHit.key : null}
