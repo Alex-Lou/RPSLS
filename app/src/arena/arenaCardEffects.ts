@@ -318,12 +318,17 @@ function applySupernova(board: BoardState, side: Side, spell: PlayedSpell): Boar
   if (spell.kind === "hero") {
     const oppS = oppSide(side);
     const oppHero = oppS === "a" ? board.a : board.b;
+    alog("spell", `${side} SUPERNOVA → 6 dmg hero ${oppS}`);
     return withSideHero(board, oppS, damageHero(oppHero, 6));
   }
   if (spell.kind === "lane") {
     const opp = getOppCreatureOnLane(board, side, spell.lane);
     // Spock's Logique fizzle hostile spells, just like Anchor.
-    if (!opp || opp.anchored || opp.spellImmune) return board;
+    if (!opp || opp.anchored || opp.spellImmune) {
+      alog("spell", `${side} SUPERNOVA L${spell.lane} fizzle (cible invalide ou anchored)`);
+      return board;
+    }
+    alog("spell", `${side} SUPERNOVA L${spell.lane} → 6 dmg creature opp`);
     const damaged = damageCreature(opp, 6);
     return withOppCreatureOnLane(board, side, spell.lane, damaged);
   }

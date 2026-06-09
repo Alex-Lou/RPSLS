@@ -201,10 +201,12 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
               alog("combat", `L${laneIdx} POST-RESOLVE same-ref (pas de mutation)`);
             }
             setBoard(b);
-            // Alex feedback 2026-06-09 point #5 "but d'or" : NE PLUS early-exit
-            // sur match-end interim. On résout les 3 lanes complètes pour
-            // permettre l'égalité (a≤0 ET b≤0). Le verdict final est calculé
-            // après les 3 lanes (cf endOfTurnCleanup + draw check ci-dessous).
+            // Alex feedback 2026-06-09 "résolution complète des 3 lanes" : NE
+            // PLUS early-exit sur match-end interim. On résout les 3 lanes
+            // pour permettre l'égalité (a≤0 ET b≤0). Verdict final calculé
+            // après les 3 lanes (endOfTurnCleanup + draw check ci-dessous).
+            // NOTE : le VRAI "but d'or" = mort subite RPSLS quand égalité
+            // absolue (HP+ATK identiques) — Lot H futur, pas implémenté ici.
             if (laneIdx < 2) {
               window.setTimeout(() => {
                 setCombatLane(null);

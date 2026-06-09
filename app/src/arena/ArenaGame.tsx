@@ -228,7 +228,16 @@ export function ArenaGame({
     // Pour spells non-lane (self / hero / global), simple check sur id.
     hapticTap();
     setIntent((cur) => {
-      if (cur.spells.length >= MAX_SPELLS_PER_TURN) return cur;
+      // Alex feedback 2026-06-09 point #2 : cap MAX_SPELLS_PER_TURN s'applique
+      // SEULEMENT aux sorts qui ciblent une LANE (offensive / debuff / buff
+      // creature). Les sorts "hero/self" (Second Wind heal, Sangsue heal,
+      // etc.) ne touchent pas la lane d'attaque → exempt du cap. Permet le
+      // combo Anchor lane + Second Wind hero le même tour. Cap utility
+      // séparé : max 1 par tour pour éviter le spam Second Wind+Sangsue.
+      const laneCount = cur.spells.filter((s) => s.kind === "lane").length;
+      const utilityCount = cur.spells.filter((s) => s.kind !== "lane").length;
+      if (spell.kind === "lane" && laneCount >= MAX_SPELLS_PER_TURN) return cur;
+      if (spell.kind !== "lane" && utilityCount >= 1) return cur;
       const duplicate = cur.spells.some((s) => {
         if (s.id !== spell.id) return false;
         if (s.kind !== spell.kind) return false;

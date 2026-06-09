@@ -145,6 +145,16 @@ T2 a constellation ⭐ 3/3 → FINISHER UNLOCKED
 
 ## 🆕 Feedback Alex 2026-06-09 (post-Lot D build)
 
+### Round 3 Alex feedback 2026-06-09 — 4 points ressenti ✅
+- **Layout opp strip dans top header** (Alex flag #1) : ArenaHeroStrip opp sortie du wrapper p-3 board, placée en haut HORS du pad (px-3 pt-1 pb-0.5). Lanes opp gagnent l'espace, centre plus respirable pour chips queue.
+- **MAX_SPELLS exemption sorts hero/self** (Alex flag #2) : Anchor + Second Wind même tour OK maintenant. Cap "lane-target" = 2, cap "self/hero" = 1, total max 3 sorts/tour.
+- **Heal popup vert "+N"** (Alex flag #3) : ArenaHeroStrip ajoute popup symétrique au damage pour heal HP. Plus de "vie qui monte mystère".
+- **Banner Supernova lane explicite** (Alex flag #4) : log "SUPERNOVA L<n> → 6 dmg creature opp" pour comprendre quand le sort cible une lane (creature) vs le hero.
+
+### NOTE TERMINOLOGIE BUT D'OR
+- Le "but d'or" CURRENT (résolution complète des 3 lanes même si match-end interim) reste actif — important pour permettre les égalités.
+- Le **VRAI BUT D'OR** = mort subite RPSLS à 1 manche aveugle quand vraiment égalité absolue (HP+ATK+board identiques) → **À implémenter Lot H** (mécanique tie-break ultime).
+
 ### Round 2 Alex feedback 2026-06-09 post-Lot D MVP ✅
 - **Aegis + Anchor mutual exclusion par lane** (option A) : interdit le combo défense physique+magique sur la même lane le même tour. Le 2e fizzle. Implémenté dans ArenaGame.addSpell.
 - **Aegis LOCK badge** : carte grayscale + chip "🔒 LOCK" si aegisCastThisMatch. Implémenté dans ArenaPlanPhase hand strip.

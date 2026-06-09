@@ -52,15 +52,24 @@ export function ArenaHeroStrip({
   const ringColor = side === "you" ? "ring-emerald-400/70" : "ring-rose-400/70";
   const hpPct = Math.max(0, Math.min(100, (hero.hp / hero.maxHp) * 100));
   const lowHp = hero.hp <= 5;
-  // Track previous HP so we can spawn a floating damage popup over the
-  // portrait when the hero just took damage.
+  // Track previous HP pour spawn popup damage/heal au-dessus du portrait.
+  // Alex feedback 2026-06-09 point #3 : ajout popup vert "+N" sur HEAL,
+  // sinon le joueur voit la HP monter sans feedback explicite (Second Wind,
+  // Sangsue, etc.) → confusion "vie qui monte/descend mystère".
   const prevHpRef = useRef(hero.hp);
   const [dmgPop, setDmgPop] = useState<{ n: number; key: number } | null>(null);
+  const [healPop, setHealPop] = useState<{ n: number; key: number } | null>(null);
   useEffect(() => {
     const prev = prevHpRef.current;
     if (hero.hp < prev) {
       setDmgPop({ n: prev - hero.hp, key: Date.now() });
       const id = window.setTimeout(() => setDmgPop(null), 1100);
+      prevHpRef.current = hero.hp;
+      return () => window.clearTimeout(id);
+    }
+    if (hero.hp > prev) {
+      setHealPop({ n: hero.hp - prev, key: Date.now() });
+      const id = window.setTimeout(() => setHealPop(null), 1100);
       prevHpRef.current = hero.hp;
       return () => window.clearTimeout(id);
     }
@@ -87,6 +96,19 @@ export function ArenaHeroStrip({
               style={{ textShadow: "0 2px 8px rgba(244,63,94,0.85), 0 0 2px black" }}
             >
               −{dmgPop.n}
+            </motion.div>
+          )}
+          {healPop && (
+            <motion.div
+              key={"heal-" + healPop.key}
+              initial={{ opacity: 0, y: 0, scale: 0.7 }}
+              animate={{ opacity: 1, y: -32, scale: 1.2 }}
+              exit={{ opacity: 0, y: -48 }}
+              transition={{ duration: 1, ease: "easeOut" }}
+              className="absolute top-0 left-0 right-0 flex items-center justify-center pointer-events-none text-2xl font-black text-emerald-300"
+              style={{ textShadow: "0 2px 8px rgba(52,211,153,0.85), 0 0 2px black" }}
+            >
+              +{healPop.n}
             </motion.div>
           )}
         </AnimatePresence>
