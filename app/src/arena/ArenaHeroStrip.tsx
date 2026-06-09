@@ -17,6 +17,7 @@ import { CardImage } from "../ranked/CardImage";
 import { useT } from "../i18n";
 import type { CardId } from "../ranked/rankedTypes";
 import type { HeroState } from "./arenaTypes";
+import { ArenaConstellationBar } from "./ArenaConstellationBar";
 
 export interface ArenaHeroStripProps {
   hero: HeroState;
@@ -186,6 +187,16 @@ export function ArenaHeroStrip({
           <span className="ml-auto font-bold text-ink-muted">🂠 {hero.hand.length}</span>
           {side === "you" && <span className="font-bold text-themed">T{turn}</span>}
         </div>
+        {/* Lot C — Constellation 3⭐. Affichée seulement si le hero a une
+         *  Affinité ; sinon le composant retourne null. */}
+        {hero.affinity && (
+          <ArenaConstellationBar
+            count={hero.constellationCount ?? 0}
+            affinity={hero.affinity}
+            side={side}
+            finisherUnlocked={hero.finisherUnlocked}
+          />
+        )}
         {/* Augur peek — when this side is the OPP (i.e. the player cast
          *  Augur and is spying on opp's hand), show the actual mini-cards
          *  OVERLAYED in absolute position so the strip's measured height

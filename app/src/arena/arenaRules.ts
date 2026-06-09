@@ -26,6 +26,7 @@ import {
   CREATURE_STATS,
   HERO_MAX_HP,
   MANA_CAP,
+  MAX_SPELLS_PER_TURN,
   STARTING_HAND_SIZE,
   moveCountersMove,
   type ArenaMatchResult,
@@ -70,6 +71,7 @@ export function makeHero(deckIds: CardId[], affinity?: Move): HeroState {
     discard: [],
     divineShield: false,
     affinity,
+    constellationCount: 0,
   };
 }
 
@@ -318,9 +320,26 @@ export function applySpellPhase(board: BoardState, intent: TurnIntent, side: Sid
  *  (documented bias — alternative is random which breaks reproducibility).
  *  Same priority WITHIN a side : original tap order (intent.spells order). */
 export function applyAllSpells(board: BoardState, intentA: TurnIntent, intentB: TurnIntent): BoardState {
+  // Alex flag 2026-06-09 : "3 sorts cast T6 alors que cap=2" — le check UI
+  // (ArenaGame.addSpell) bloquait normalement mais une voie de bypass
+  // restait ouverte (drag-drop ? double tap rapide ?). Filet de sécurité
+  // côté engine : truncate à MAX_SPELLS_PER_TURN AVANT traitement, peu
+  // importe ce que l'UI a laissé passer.
+  const safeIntentA = intentA.spells.length > MAX_SPELLS_PER_TURN
+    ? { ...intentA, spells: intentA.spells.slice(0, MAX_SPELLS_PER_TURN) }
+    : intentA;
+  const safeIntentB = intentB.spells.length > MAX_SPELLS_PER_TURN
+    ? { ...intentB, spells: intentB.spells.slice(0, MAX_SPELLS_PER_TURN) }
+    : intentB;
+  if (safeIntentA !== intentA) {
+    alog("spell", `BYPASS BLOCKED a — intent had ${intentA.spells.length} spells, truncated to ${MAX_SPELLS_PER_TURN}`);
+  }
+  if (safeIntentB !== intentB) {
+    alog("spell", `BYPASS BLOCKED b — intent had ${intentB.spells.length} spells, truncated to ${MAX_SPELLS_PER_TURN}`);
+  }
   const combined: Array<{ spell: PlayedSpell; side: Side; idx: number }> = [
-    ...intentA.spells.map((spell, idx) => ({ spell, side: "a" as Side, idx })),
-    ...intentB.spells.map((spell, idx) => ({ spell, side: "b" as Side, idx })),
+    ...safeIntentA.spells.map((spell, idx) => ({ spell, side: "a" as Side, idx })),
+    ...safeIntentB.spells.map((spell, idx) => ({ spell, side: "b" as Side, idx })),
   ];
   combined.sort((x, y) => {
     const pdiff = spellPriority(x.spell.id) - spellPriority(y.spell.id);
@@ -368,10 +387,25 @@ export function applySummons(board: BoardState, intent: TurnIntent, side: Side):
     } else {
       alog("summon", `${side} pose ${summon.move} L${summon.lane} affinity=${hero.affinity ?? "∅"}`);
     }
+    // Lot C — Constellation 3⭐ : incrémenter le compteur si le symbole posé
+    // correspond à l'affinité du hero. Capé visuellement à 3 mais on garde
+    // la vraie valeur pour le futur (Lot D Finisher déclenché à 3, scaling
+    // au-delà possible si on veut un finisher rechargeable).
+    const isAffinityMatch = hero.affinity !== undefined && summon.move === hero.affinity;
+    const nextCount = isAffinityMatch ? hero.constellationCount + 1 : hero.constellationCount;
+    const unlocked = nextCount >= 3 && !hero.finisherUnlocked;
+    if (isAffinityMatch) {
+      alog("summon", `${side} constellation ⭐ ${nextCount}/3 ${unlocked ? "→ FINISHER UNLOCKED" : ""}`);
+    }
     b = {
       ...b,
       lanes,
-      [side]: { ...hero, mana: hero.mana - 1 },
+      [side]: {
+        ...hero,
+        mana: hero.mana - 1,
+        constellationCount: nextCount,
+        finisherUnlocked: hero.finisherUnlocked || unlocked,
+      },
     } as BoardState;
   }
   return b;
