@@ -45,7 +45,7 @@ import {
   type PlannedSummon,
   type TurnIntent,
 } from "./arenaTypes";
-import { CPU_ARENA_DECK, buildPlayerDeck, removeSpentCards } from "./arenaDecks";
+import { buildCpuDeckMirroring, buildPlayerDeck, removeSpentCards } from "./arenaDecks";
 import { runResolverFlow, type ResolveStep } from "./arenaResolverFlow";
 
 const MATCH_FOUND_SPLASH_MS = 1_800;
@@ -87,7 +87,7 @@ export function ArenaGame({
   }
 
   const [board, setBoard] = useState<BoardState>(() =>
-    makeInitialBoard(playerDeck.current, CPU_ARENA_DECK, playerAffinity.current, undefined),
+    makeInitialBoard(playerDeck.current, buildCpuDeckMirroring(playerDeck.current), playerAffinity.current, undefined),
   );
   const [intent, setIntent] = useState<TurnIntent>({ spells: [], summons: [] });
   const [matchSplash, setMatchSplash] = useState(true);
@@ -323,7 +323,7 @@ export function ArenaGame({
           // handler, fall back to a local soft-reset.
           if (onRematch) { onRematch(); return; }
           matchEndedRef.current = false;
-          setBoard(makeInitialBoard(playerDeck.current, CPU_ARENA_DECK, playerAffinity.current, undefined));
+          setBoard(makeInitialBoard(playerDeck.current, buildCpuDeckMirroring(playerDeck.current), playerAffinity.current, undefined));
           setIntent({ spells: [], summons: [] });
           setOppPreview(null);
           setPlayerPreview(null);
