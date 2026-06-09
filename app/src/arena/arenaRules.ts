@@ -401,6 +401,11 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
   const lane = board.lanes[laneIdx];
   const ca = lane.a;
   const cb = lane.b;
+  // ENTRY log : confirme que resolveLaneCombat est bien appelée pour cette
+  // lane avec quelles créatures. Permet de diagnostiquer "combat T0 L0 n'a
+  // pas eu lieu" — si on voit pas cet entry log alors que post-summons
+  // montre 2 créatures, c'est que resolveLaneCombatAt n'est pas appelée.
+  alog("combat", `L${laneIdx} ENTER ca=${ca?.move ?? "∅"} cb=${cb?.move ?? "∅"}`);
 
   if (ca && cb) {
     const counterAB = moveCountersMove(ca.move, cb.move);
