@@ -49,25 +49,35 @@ export function buildPlayerDeck(saved: CardId[] | undefined): CardId[] {
     // Tempo / draw / control
     "surge", "curse", "mirror", "tide",
   ];
-  // Alex feedback 2026-06-09 : "à court de jeu/fun" → bumped deck size
-  // 8 → 12 pour garantir plus de matière en pioche. Avec STARTING_HAND_SIZE=5
-  // et pioche 2/tour, le deck est consommé sur ~6-7 tours puis on reshuffle
-  // le discard, ce qui donne 12-14 tours d'activité avant reshuffle.
+  // Alex feedback 2026-06-09 : "Précision en boucle infinie" — cause = le
+  // deck contenait plusieurs copies de la même carte (saved + FILLER non
+  // dédupliqués). Avec MAX_COPIES = 2, une carte ne peut être tirée que
+  // 2 fois par run (avec reshuffle après discard), pas en boucle infinie.
   const DECK_SIZE = 12;
+  const MAX_COPIES = 2;
+  const counts = new Map<CardId, number>();
+  const out: CardId[] = [];
+  const tryPush = (c: CardId): void => {
+    if (out.length >= DECK_SIZE) return;
+    const cur = counts.get(c) ?? 0;
+    if (cur >= MAX_COPIES) return;
+    out.push(c);
+    counts.set(c, cur + 1);
+  };
+  // Pass 1 : the saved Ranked deck (1 copy each at most).
   const base = (saved ?? []).filter(arenaSupported);
-  // Force-include direct damage so the player can push lethal even if
-  // all lanes have an opp creature blocking the path.
-  const enforced = base.slice();
-  if (!enforced.includes("heist") && enforced.length < DECK_SIZE) enforced.push("heist");
-  if (!enforced.includes("supernova") && enforced.length < DECK_SIZE) enforced.push("supernova");
-  // Top up with filler — duplicates allowed for variety.
-  const out = enforced.slice();
+  for (const c of base) tryPush(c);
+  // Force-include direct damage so the player can push lethal even when
+  // all lanes are creature-blocked.
+  tryPush("heist");
+  tryPush("supernova");
+  // Pass 2 : top up with FILLER (1 copy each).
+  for (const f of FILLER) tryPush(f);
+  // Pass 3 : if still under size, allow 2nd copies of FILLER.
   for (const f of FILLER) {
     if (out.length >= DECK_SIZE) break;
-    out.push(f);
+    tryPush(f);
   }
-  // If FILLER ran dry (shouldn't), pad with first card to reach size.
-  while (out.length < DECK_SIZE && out.length > 0) out.push(out[0]);
   return out;
 }
 
