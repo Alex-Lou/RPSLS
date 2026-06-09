@@ -14,6 +14,7 @@ import { DeckManager } from "../ranked/DeckManager";
 import { MatchPrepScreen, type Arena } from "../ranked/MatchPrepScreen";
 import { ArenaPadProvider } from "../ranked/arena";
 import { ArenaPage } from "../arena/ArenaPage";
+import { ArenaLobby } from "../arena/ArenaLobby";
 import { useArenaOverride } from "../ranked/arenaOverride";
 import { oppPersona } from "../ranked/personaSeed";
 import { applyTheme } from "../theme/theme";
@@ -37,7 +38,8 @@ type View =
   | { kind: "classe_lobby" }
   | { kind: "classe_bracket" }
   | { kind: "classe_match"; oppName: string; oppAvatar: string }
-  // Constellation Pro — mini-HS-like mode. See app/src/arena/ + docs.
+  // Constellation Pro — solo lobby (deck + rules + entry points) then match.
+  | { kind: "arena_lobby" }
   | { kind: "arena_pro" };
 
 export function PlayPage({
@@ -123,9 +125,18 @@ export function PlayPage({
             onGoConstellation={(winTo) => setView({ kind: "lanes_cpu", winTo })}
             onGoConstellationMenu={() => setView({ kind: "constellation_prep" })}
             onGoRanked={() => setView({ kind: "ranked_lobby" })}
-            onGoArenaPro={() => setView({ kind: "arena_pro" })}
+            onGoArenaPro={() => setView({ kind: "arena_lobby" })}
             onGoSandbox={() => setView({ kind: "sandbox" })}
             onGoClasse={() => setView({ kind: "classe_lobby" })}
+          />
+        )}
+        {view.kind === "arena_lobby" && (
+          <ArenaLobby
+            key="arena-lobby"
+            onTraining={() => setView({ kind: "arena_pro" })}
+            onManageDeck={() => setView({ kind: "ranked_deck" })}
+            onGoShop={() => setView({ kind: "ranked_lobby" })}
+            onBack={() => setView({ kind: "select" })}
           />
         )}
         {view.kind === "arena_pro" && (
@@ -136,7 +147,7 @@ export function PlayPage({
             exit={{ opacity: 0, y: -12 }}
             className="flex flex-col flex-1 min-h-0"
           >
-            <ArenaPage onBack={() => setView({ kind: "select" })} />
+            <ArenaPage onBack={() => setView({ kind: "arena_lobby" })} />
           </motion.div>
         )}
         {view.kind === "constellation_prep" && (
