@@ -348,10 +348,10 @@ export function ArenaPlanPhase({
        *  spells; non-lane cards just snap back). dragSnapToOrigin returns
        *  the card to its slot after release. */}
       {/* Hand strip — FIXED HEIGHT container so the pad doesn't reflow when
-       *  cards leave/enter the hand (Alex flag #3 : l'interface ne doit PAS
-       *  bouger). Empty-hand fallback shows a "porte-cartes" placeholder
-       *  inside the same h-[82px] box. */}
-      <div className="h-[82px] flex items-end justify-center">
+       *  cards leave/enter the hand. relative + z-30 pour s'assurer que les
+       *  cartes apparaissent DEVANT le board (Alex flag : "afficher en
+       *  éventail mais DEVANT, pas DERRIÈRE!"). */}
+      <div className="h-[82px] flex items-end justify-center relative z-30">
       {me.hand.length > 0 ? (
         <div className="flex items-end justify-center gap-1 px-1 overflow-x-auto w-full">
           {me.hand.map((id, i) => {
