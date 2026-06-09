@@ -30,6 +30,7 @@ import {
 } from "../../types";
 import { type DailyChallenge } from "../../engine/daily";
 import { eclatsReward } from "../../engine/economy";
+import { streakBonusXp, streakXpMultiplier } from "../../match/streak";
 import { useT } from "../../i18n";
 import {
   CinematicMatchEnd,
@@ -290,15 +291,11 @@ export function Game({
     const lpDelta =
       outcome === "win" ? r.lpWin : outcome === "loss" ? r.lpLoss : r.lpDraw;
 
-    // Streak multiplier — applied only on wins (don't reward losing streaks)
-    const peakStreak = streaks.bestA;
-    const streakMult =
-      outcome === "win" && peakStreak >= 5 ? 2.0 :
-      outcome === "win" && peakStreak >= 3 ? 1.5 :
-      outcome === "win" && peakStreak >= 2 ? 1.2 : 1.0;
-    // Daily challenge bonus on win
+    // Daily challenge bonus on win. The win-streak multiplier is NOT applied
+    // here: the store rolls the streak in nextStreak() and adds streakBonusXp
+    // on top of the xpDelta we send. Re-applying it here would double-count.
     const dailyMult = outcome === "win" && isDailyActive && daily ? (1 + daily.xpBonus) : 1.0;
-    const xpDelta = Math.round(baseXp * streakMult * dailyMult);
+    const xpDelta = Math.round(baseXp * dailyMult);
 
     // Mark daily as completed only on win
     if (outcome === "win" && isDailyActive && daily) {
@@ -1333,15 +1330,16 @@ function EndPanel({
   const playerWon = s === "a_won";
   const baseXp = playerWon ? r.xpWin : r.xpLoss;
   const lpDelta = playerWon ? r.lpWin : r.lpLoss;
-  // Match streak multiplier with the one applied in the store
-  const peakStreak = streaks.bestA;
-  const streakMult =
-    playerWon && peakStreak >= 5 ? 2.0 :
-    playerWon && peakStreak >= 3 ? 1.5 :
-    playerWon && peakStreak >= 2 ? 1.2 : 1.0;
+  // Streak bonus is owned by the store (recordMatch → streakBonusXp). Mirror
+  // the same math here so the displayed total matches what was credited.
+  // The store rolls the streak via nextStreak() then feeds it to
+  // streakBonusXp(); after recordMatch winStreak holds the post-roll value.
+  const currentStreak = useStore((s2) => s2.player.winStreak ?? 0);
+  const streakMult = playerWon ? streakXpMultiplier(currentStreak) : 1.0;
   const dailyMult = playerWon && isDaily ? 1 + dailyBonus : 1.0;
-  const xpMultiplier = streakMult * dailyMult;
-  const xpDelta = Math.round(baseXp * xpMultiplier);
+  const xpAfterDaily = Math.round(baseXp * dailyMult);
+  const streakBonus = playerWon ? streakBonusXp(xpAfterDaily, currentStreak) : 0;
+  const xpDelta = xpAfterDaily + streakBonus;
   const xpBonus = xpDelta - baseXp;
 
   // Map status to outcome from the player's perspective (player is always A).
