@@ -347,8 +347,13 @@ export function ArenaPlanPhase({
        *  one-gesture commit to a lane (only meaningful for lane-targeted
        *  spells; non-lane cards just snap back). dragSnapToOrigin returns
        *  the card to its slot after release. */}
+      {/* Hand strip — FIXED HEIGHT container so the pad doesn't reflow when
+       *  cards leave/enter the hand (Alex flag #3 : l'interface ne doit PAS
+       *  bouger). Empty-hand fallback shows a "porte-cartes" placeholder
+       *  inside the same h-[82px] box. */}
+      <div className="h-[82px] flex items-end justify-center">
       {me.hand.length > 0 ? (
-        <div className="flex items-end justify-center gap-1 px-1 overflow-x-auto">
+        <div className="flex items-end justify-center gap-1 px-1 overflow-x-auto w-full">
           {me.hand.map((id, i) => {
             const card = CARDS[id];
             const supported = arenaSupported(id);
@@ -439,10 +444,16 @@ export function ArenaPlanPhase({
           })}
         </div>
       ) : (
-        <div className="text-center text-[10px] text-ink-faint italic">
-          Main vide — fin de tour pour piocher.
+        <div className="flex flex-col items-center gap-1.5 opacity-65">
+          <div className="w-[44px] h-[60px] sm:w-[48px] sm:h-[66px] rounded-lg border-2 border-dashed border-hairline bg-black/15 flex items-center justify-center text-2xl">
+            🎴
+          </div>
+          <span className="text-[10px] text-ink-faint italic">
+            Main vide — fin de tour pour piocher
+          </span>
         </div>
       )}
+      </div>
 
       {/* Lock button — HTML button (stable on device, matches Ranked pattern).
        *  Wrapped in a relative div with an ABSOLUTE blurred glow underneath

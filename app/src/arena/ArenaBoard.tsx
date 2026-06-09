@@ -293,6 +293,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
           stickers={oppRowStickers}
           deflectingRockLane={tauntBlock?.defenderSide === oppSide ? tauntBlock.rockLane : null}
           deflectKey={tauntBlock?.defenderSide === oppSide ? tauntBlock.key : null}
+          summoningMove={targeting?.kind === "summon"}
         />
 
         {/* CENTER STATUS ZONE — single bar that owns the phase chip + the
@@ -320,6 +321,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
           stickers={playerRowStickers}
           deflectingRockLane={tauntBlock?.defenderSide === playerSide ? tauntBlock.rockLane : null}
           deflectKey={tauntBlock?.defenderSide === playerSide ? tauntBlock.key : null}
+          summoningMove={targeting?.kind === "summon"}
         />
 
         {/* Player strip — HP bar flashes when an attack lands on player hero.
@@ -452,7 +454,7 @@ function IntentChips({ intent, side }: { intent: TurnIntent; side: "you" | "opp"
 function LaneRow({
   lanes, renderSide, intent, isPlayer, combatLane = null,
   validLanes = [false, false, false], targetLabel = "", onLaneTap,
-  stickers = [],
+  stickers = [], summoningMove = false,
   deflectingRockLane = null,
   deflectKey = null,
 }: {
@@ -474,6 +476,9 @@ function LaneRow({
   /** Key that changes each deflection — drives the re-mount of the pulse
    *  anim so consecutive deflects on the same rock re-fire. */
   deflectKey?: number | null;
+  /** True when the active targeting is a summon (i.e. RPSLS picker active).
+   *  Drives the "↻ Remplacer" label override on occupied lanes. */
+  summoningMove?: boolean;
 }) {
   // Pierre's Provocation (taunt) is suppressed while opp has ANY of the
   // two RPSLS counters of Rock alive — Paper (Étouffe) OR Spock (Logique
@@ -537,7 +542,11 @@ function LaneRow({
               showPlanned={!!intent}
               chargeAttack={inCombat}
               clickable={valid}
-              clickableLabel={targetLabel}
+              clickableLabel={
+                // "↻ Remplacer" si on est en mode summon ET le slot a déjà
+                // une de mes créatures (replace au lieu d'invoquer ici).
+                (summoningMove && !!c && isPlayer) ? "↻ Remplacer" : targetLabel
+              }
               onClick={valid && onLaneTap ? () => onLaneTap(lane) : undefined}
               passiveSuppressed={suppressed}
               deflectingPulse={deflectingRockLane === lane ? deflectKey ?? 0 : null}

@@ -393,11 +393,16 @@ export function isValidLaneTarget(
 ): boolean {
   if (!targeting) return false;
   const isPlayerRow = side === playerSide;
+  // For SUMMONS: any of my lanes is a valid target. If the lane is already
+  // occupied by one of my creatures, the summon REPLACES it (applySummons
+  // engine does the replace by design — old creature dies silently). Alex
+  // flag #4 : si toutes mes lanes sont pleines et plus de cartes, sans
+  // replace c'est le stalemate. Replace débloque toujours.
+  if (targeting.kind === "summon") {
+    return isPlayerRow;
+  }
   const mine = lanes[lane][playerSide];
   const opp  = lanes[lane][playerSide === "a" ? "b" : "a"];
-  if (targeting.kind === "summon") {
-    return isPlayerRow && !mine;
-  }
   if (targeting.kind === "spell" && targeting.targetKind === "lane") {
     const tgtSide = LANE_SPELL_TARGET_SIDE[targeting.id] ?? "my-creature";
     if (tgtSide === "my-creature") return isPlayerRow && !!mine;
@@ -409,9 +414,11 @@ export function isValidLaneTarget(
 }
 
 /** Human-readable label shown ON the valid slot (instead of generic "play here"). */
-export function targetLabelFor(targeting: ArenaTargeting): string {
+export function targetLabelFor(targeting: ArenaTargeting, slotHasCreature = false): string {
   if (!targeting) return "";
-  if (targeting.kind === "summon") return "✦ Invoquer ici";
+  if (targeting.kind === "summon") {
+    return slotHasCreature ? "↻ Remplacer" : "✦ Invoquer ici";
+  }
   if (targeting.kind === "spell" && targeting.targetKind === "lane") {
     const tgtSide = LANE_SPELL_TARGET_SIDE[targeting.id] ?? "my-creature";
     if (tgtSide === "my-creature") return "✦ Cible ta créature";

@@ -126,13 +126,16 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
   const mainSlots = deck.slice(0, MAIN_SLOTS) as (CardId | null)[];
   const reserveSlots = deck.slice(MAIN_SLOTS, TOTAL) as (CardId | null)[];
 
-  // Tap a card → open the detail modal (Alex flag : "j'ai toujours besoin
-  // de scroller tout en haut pour voir les détails d'une carte tout en bas"
-  // → previous in-flow panel + scrollIntoView still left bad UX on long
-  // lists. Modal portal is the right answer: always visible, no scroll).
+  // Tap a card → open detail modal AND set as selected. The modal has a
+  // "Mettre dans mon deck" button that closes the modal WHILE keeping the
+  // card selected so a follow-up slot-tap assigns it (Alex flag : modal
+  // ouvert empêchait l'assignation). X / backdrop closes WITHOUT
+  // assigning (selected resets too).
+  const [modalOpen, setModalOpen] = useState(false);
   function handleCardTap(id: CardId) {
     if (!collection.includes(id)) return;
-    setSelected(selected === id ? null : id);
+    setSelected(id);
+    setModalOpen(true);
   }
 
   function handleSlotTap(slotIdx: number) {
@@ -452,14 +455,16 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
         </motion.button>
       </div>
 
-      {/* Card detail MODAL — portal-rendered overlay, ouvert au tap d'une
-       *  carte de la collection. Plus de scroll requis. */}
+      {/* Card detail MODAL — portal overlay opened on card tap. The
+       *  "Sélectionner pour le deck" button closes the modal while
+       *  KEEPING the card selected so the next slot-tap assigns it. */}
       <CardDetailModal
-        id={selected}
+        id={modalOpen ? selected : null}
         masteryXp={(player.cardMastery ?? {})[selected ?? ""] ?? 0}
         owned={selected ? collection.includes(selected) : false}
         inDeck={selected ? usedInDeck.has(selected) : false}
-        onClose={() => setSelected(null)}
+        onClose={() => { setModalOpen(false); setSelected(null); }}
+        onPickForDeck={() => setModalOpen(false)}
         t={t}
       />
     </motion.div>
@@ -511,13 +516,19 @@ function DeckSlot({
  *  to scroll back to the top to read details. Click backdrop or X to close.
  *  Inside, CardDetailContent is reused as-is. */
 function CardDetailModal({
-  id, masteryXp, owned, inDeck, onClose, t,
+  id, masteryXp, owned, inDeck, onClose, onPickForDeck, t,
 }: {
   id: CardId | null;
   masteryXp: number;
   owned: boolean;
   inDeck: boolean;
+  /** Called by the backdrop / ✕ button : closes the modal AND clears
+   *  the selection. The card is "forgotten". */
   onClose: () => void;
+  /** Called by the "Mettre dans mon deck" button : closes the modal
+   *  but KEEPS the selection so the next slot tap assigns it. Only
+   *  available if the card is OWNED. */
+  onPickForDeck: () => void;
   t: (key: string) => string;
 }) {
   return createPortal(
@@ -548,6 +559,18 @@ function CardDetailModal({
               inDeck={inDeck}
               t={t}
             />
+            {/* "Mettre dans mon deck" CTA — only meaningful for owned cards.
+             *  Closes the modal but keeps the card selected so the next
+             *  slot-tap assigns it (Alex flag : modal cassait l'assign). */}
+            {owned && (
+              <button
+                onClick={onPickForDeck}
+                className="mt-2 w-full py-2.5 rounded-2xl bg-themed shadow-lg font-black text-white text-sm transition active:scale-[0.97]"
+                style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.08em" }}
+              >
+                {inDeck ? "↺ Réassigner cette carte" : "✓ Mettre dans mon deck"}
+              </button>
+            )}
             <button
               onClick={onClose}
               className="absolute -top-3 -right-3 w-9 h-9 rounded-full bg-zinc-900 border-2 border-hairline text-white text-lg font-bold flex items-center justify-center shadow-2xl hover:bg-zinc-800 transition"
