@@ -33,6 +33,7 @@ import {
   type HeroState,
   type LaneIndex,
   type LaneState,
+  type PlayedSpell,
   type Side,
   type TurnIntent,
 } from "./arenaTypes";
@@ -243,9 +244,8 @@ export function resolveTurn(
 ): BoardState {
   let b = board;
 
-  // ─── 1. Spell phase ───
-  b = applySpellPhase(b, intentA, "a");
-  b = applySpellPhase(b, intentB, "b");
+  // ─── 1. Spell phase ─── (fairness fix: intercalate sides by priority)
+  b = applyAllSpells(b, intentA, intentB);
 
   // ─── 2. Summon phase ───
   b = applySummons(b, intentA, "a");
@@ -268,8 +268,12 @@ export function resolveTurn(
 /** Apply one side's spells, ordered by spellPriority asc (defensive first).
  *  Each spell consumes its mana cost from the side's pool. Spells that
  *  can't be paid for at the moment they'd fire are skipped silently.
- *  Exported so the UI can sequence the resolver (spell phase → summon phase
- *  → combat) with pauses between them for readability. */
+ *
+ *  NOTE — kept for backwards compatibility / single-side callers. The
+ *  resolver should use applyAllSpells (below) which intercales the two
+ *  sides by priority for fairness. See docs/CONSTELLATION_PRO_AUDIT.md
+ *  bug #1 for the asymmetry this single-side helper would cause if used
+ *  for both sides sequentially. */
 export function applySpellPhase(board: BoardState, intent: TurnIntent, side: Side): BoardState {
   const ordered = intent.spells.slice().sort((s1, s2) => {
     return spellPriority(s1.id) - spellPriority(s2.id);
@@ -280,6 +284,39 @@ export function applySpellPhase(board: BoardState, intent: TurnIntent, side: Sid
     const hero = side === "a" ? b.a : b.b;
     if (hero.mana < card.cost) continue;
     // Spend mana up-front so the same card can't be "fizzled" twice for cost.
+    b = {
+      ...b,
+      [side]: { ...hero, mana: hero.mana - card.cost },
+    } as BoardState;
+    const ctx: ArenaSpellContext = { board: b, side, spell };
+    b = applyArenaSpell(ctx);
+  }
+  return b;
+}
+
+/** Apply BOTH sides' spells, INTERCALATED by priority — fixes the audit
+ *  bug #1 where A's offensive spells fired before B's defensive spells
+ *  could react. Same priority across sides : tie-break by side a first
+ *  (documented bias — alternative is random which breaks reproducibility).
+ *  Same priority WITHIN a side : original tap order (intent.spells order). */
+export function applyAllSpells(board: BoardState, intentA: TurnIntent, intentB: TurnIntent): BoardState {
+  const combined: Array<{ spell: PlayedSpell; side: Side; idx: number }> = [
+    ...intentA.spells.map((spell, idx) => ({ spell, side: "a" as Side, idx })),
+    ...intentB.spells.map((spell, idx) => ({ spell, side: "b" as Side, idx })),
+  ];
+  combined.sort((x, y) => {
+    const pdiff = spellPriority(x.spell.id) - spellPriority(y.spell.id);
+    if (pdiff !== 0) return pdiff;
+    // Same priority — break by side (a before b), then by original order
+    // within the side. Keeps the resolution reproducible and predictable.
+    if (x.side !== y.side) return x.side === "a" ? -1 : 1;
+    return x.idx - y.idx;
+  });
+  let b = board;
+  for (const { spell, side } of combined) {
+    const card = CARDS[spell.id as CardId];
+    const hero = side === "a" ? b.a : b.b;
+    if (hero.mana < card.cost) continue;
     b = {
       ...b,
       [side]: { ...hero, mana: hero.mana - card.cost },

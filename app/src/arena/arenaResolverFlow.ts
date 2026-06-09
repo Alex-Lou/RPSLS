@@ -10,7 +10,7 @@
  */
 
 import {
-  applySpellPhase,
+  applyAllSpells,
   applySummons,
   endOfTurnCleanup,
   resolveLaneCombatAt,
@@ -75,11 +75,10 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
   setPlayerPreview(playerIntent);
   setResolveStep("reveal-opp");
 
-  // ─── Step 1: SPELLS ───
+  // ─── Step 1: SPELLS ─── (fairness fix #1: intercalate sides by priority)
   window.setTimeout(() => {
     let b = startBoard;
-    b = applySpellPhase(b, playerIntent, "a");
-    b = applySpellPhase(b, cpuIntent, "b");
+    b = applyAllSpells(b, playerIntent, cpuIntent);
     setBoard(b);
     setResolveStep("spells");
 
