@@ -100,13 +100,16 @@ export function ArenaMatchSplash({ playerName, playerAvatar }: ArenaMatchSplashP
         Invoque, lance des sorts, joue intelligent.
       </motion.div>
 
-      {/* "GO!" beat at the end — fades in fast as the match is about to start */}
+      {/* "GO!" beat at the end — Alex feedback 2026-06-09 point #7 : durée
+       *  étendue (0.45s → 1.2s) + scale plus dramatique pour faire durer
+       *  le plaisir du suspense. Le SPLASH_MS dans ArenaGame est bumpé en
+       *  conséquence (1800 → 2600ms). */}
       <motion.div
         initial={{ opacity: 0, scale: 0.4 }}
-        animate={{ opacity: [0, 1, 1, 0], scale: [0.4, 1.3, 1.05, 1] }}
-        transition={{ delay: 1.35, duration: 0.45, ease: "easeOut" }}
-        className="absolute bottom-12 left-0 right-0 text-center text-4xl font-black tracking-[0.2em] text-amber-300"
-        style={{ filter: "drop-shadow(0 0 18px rgba(252,211,77,0.85))" }}
+        animate={{ opacity: [0, 1, 1, 1, 0], scale: [0.4, 1.5, 1.15, 1.08, 1] }}
+        transition={{ delay: 1.35, duration: 1.2, ease: "easeOut", times: [0, 0.18, 0.4, 0.7, 1] }}
+        className="absolute bottom-12 left-0 right-0 text-center text-5xl font-black tracking-[0.25em] text-amber-300"
+        style={{ filter: "drop-shadow(0 0 22px rgba(252,211,77,0.95))" }}
       >
         GO !
       </motion.div>

@@ -49,7 +49,11 @@ import {
 import { buildCpuDeckMirroring, buildPlayerDeck, removeSpentCards } from "./arenaDecks";
 import { runResolverFlow, type ResolveStep } from "./arenaResolverFlow";
 
-const MATCH_FOUND_SPLASH_MS = 1_800;
+// Alex feedback 2026-06-09 point #7 : décompte+GO trop rapide. Bumpé de
+// 1800 → 2600ms pour laisser le "GO!" durer un peu et faire monter le
+// suspense (anim splash interne dure ~1.35s + 0.45s = ~1.8s, on garde
+// 800ms de plus sur "GO!" final).
+const MATCH_FOUND_SPLASH_MS = 2_600;
 
 export function ArenaGame({
   onQuit, onRematch,
@@ -238,6 +242,16 @@ export function ArenaGame({
       const utilityCount = cur.spells.filter((s) => s.kind !== "lane").length;
       if (spell.kind === "lane" && laneCount >= MAX_SPELLS_PER_TURN) return cur;
       if (spell.kind !== "lane" && utilityCount >= 1) return cur;
+      // Alex feedback 2026-06-09 (round 4) : 1 carte en main = 1 cast max.
+      // Avant le check duplicate refusait seulement (même id + même lane),
+      // donc une seule copie en main pouvait être cast 2× sur 2 lanes
+      // différentes (effet appliqué 2× mais 1 seule copie consommée par
+      // removeSpentCards) — bug double-effect. Fix : compter les usages
+      // de spell.id dans cur.spells et refuser si dépasse le nombre de
+      // copies en main.
+      const usageCount = cur.spells.filter((s) => s.id === spell.id).length;
+      const handCount = board.a.hand.filter((id) => id === spell.id).length;
+      if (usageCount >= handCount) return cur;
       const duplicate = cur.spells.some((s) => {
         if (s.id !== spell.id) return false;
         if (s.kind !== spell.kind) return false;

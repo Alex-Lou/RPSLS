@@ -233,6 +233,9 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
           }
           setBoard(b);
           if ((aDead || bDead) && onMatchEnd) {
+            // Alex feedback 2026-06-09 point #6 : laisser respirer l'UI 1.6s
+            // avant la transition match-end screen (était 200ms = transition
+            // brutale). Donne le temps de voir le dernier état du board.
             window.setTimeout(() => {
               // Convention onMatchEnd(playerWon) : true = player win.
               // Égalité (aDead && bDead) → null. Pour MVP on traite comme
@@ -240,7 +243,7 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
               // gérera l'affichage du label "Égalité".
               const playerWon = bDead && !aDead;
               onMatchEnd(playerWon);
-            }, 200);
+            }, 1600);
           }
         }, TOTAL_COMBAT_MS);
 
