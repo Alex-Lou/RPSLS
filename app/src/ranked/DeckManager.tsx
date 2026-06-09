@@ -7,7 +7,8 @@
  * collection. Locked cards stay greyed with a hint.
  */
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
 import { ALL_CARD_IDS, CARDS, isPassiveCard, RARITY_COLOR, RARITY_ORDER } from "./cards";
@@ -125,21 +126,13 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
   const mainSlots = deck.slice(0, MAIN_SLOTS) as (CardId | null)[];
   const reserveSlots = deck.slice(MAIN_SLOTS, TOTAL) as (CardId | null)[];
 
-  // Ref + auto-scroll to bring the detail panel into view next to the tapped
-  // card. Without this, tapping a card deep in the collection leaves the
-  // detail panel stuck above the scroll — Alex flagged the "chiant de
-  // scroll" feedback on long lists.
-  const detailPanelRef = useRef<HTMLDivElement | null>(null);
+  // Tap a card → open the detail modal (Alex flag : "j'ai toujours besoin
+  // de scroller tout en haut pour voir les détails d'une carte tout en bas"
+  // → previous in-flow panel + scrollIntoView still left bad UX on long
+  // lists. Modal portal is the right answer: always visible, no scroll).
   function handleCardTap(id: CardId) {
     if (!collection.includes(id)) return;
-    const willSelect = selected !== id;
-    setSelected(willSelect ? id : null);
-    if (willSelect) {
-      // Defer to next frame so the panel has rendered before we scroll.
-      requestAnimationFrame(() => {
-        detailPanelRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
-      });
-    }
+    setSelected(selected === id ? null : id);
   }
 
   function handleSlotTap(slotIdx: number) {
@@ -291,21 +284,8 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        {/* Card detail panel — replaces the implicit "what does this do?" with
-            an explicit info card whenever the player selects something from
-            the collection. Auto-scrolls into view on selection so it lands
-            NEAR the tapped card instead of getting stuck at the top — Alex
-            feedback "il faut que l'aperçu apparaisse au-dessus de la ligne
-            de la carte touchée". */}
-        <div ref={detailPanelRef}>
-          <CardDetailPanel
-            id={selected}
-            masteryXp={(player.cardMastery ?? {})[selected ?? ""] ?? 0}
-            owned={selected ? collection.includes(selected) : false}
-            inDeck={selected ? usedInDeck.has(selected) : false}
-            t={t}
-          />
-        </div>
+        {/* CardDetailModal mounts via portal at the end of this component —
+            see the bottom of the JSX tree. No in-flow panel anymore. */}
 
         {/* Collection — collapsible header + sticky filter bar + curve-grouped
             cards grid. Designed to scale past 46 cards without becoming a wall
@@ -471,6 +451,17 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
           Sauvegarder le deck
         </motion.button>
       </div>
+
+      {/* Card detail MODAL — portal-rendered overlay, ouvert au tap d'une
+       *  carte de la collection. Plus de scroll requis. */}
+      <CardDetailModal
+        id={selected}
+        masteryXp={(player.cardMastery ?? {})[selected ?? ""] ?? 0}
+        owned={selected ? collection.includes(selected) : false}
+        inDeck={selected ? usedInDeck.has(selected) : false}
+        onClose={() => setSelected(null)}
+        t={t}
+      />
     </motion.div>
   );
 }
@@ -513,46 +504,62 @@ function DeckSlot({
   );
 }
 
-/* ────────────── Card detail panel ────────────── */
+/* ────────────── Card detail modal ────────────── */
 
-/** Card detail panel — surfaces the full card text when one is tapped, so the
- *  player understands what they're equipping without playing a match to find
- *  out. Sits between the deck slots and the collection grid; always rendered
- *  (placeholder when no selection) so the layout doesn't jump when picking
- *  cards in/out. */
-function CardDetailPanel({
-  id, masteryXp, owned, inDeck, t,
+/** Card detail modal — fullscreen portal overlay opened when a collection
+ *  card is tapped. Replaces the old in-flow panel that forced the player
+ *  to scroll back to the top to read details. Click backdrop or X to close.
+ *  Inside, CardDetailContent is reused as-is. */
+function CardDetailModal({
+  id, masteryXp, owned, inDeck, onClose, t,
 }: {
   id: CardId | null;
   masteryXp: number;
   owned: boolean;
   inDeck: boolean;
+  onClose: () => void;
   t: (key: string) => string;
 }) {
-  return (
-    <AnimatePresence mode="wait" initial={false}>
-      {id ? (
-        <CardDetailContent
-          key={id}
-          id={id}
-          masteryXp={masteryXp}
-          owned={owned}
-          inDeck={inDeck}
-          t={t}
-        />
-      ) : (
+  return createPortal(
+    <AnimatePresence>
+      {id && (
         <motion.div
-          key="empty"
+          key="card-detail-modal"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
-          className="rounded-xl border border-dashed border-hairline bg-black/20 px-3 py-3 text-center text-[11px] text-ink-faint"
+          transition={{ duration: 0.18 }}
+          onClick={onClose}
+          className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
         >
-          Touche une carte dans la collection pour lire son effet
+          <motion.div
+            initial={{ scale: 0.92, y: 14, opacity: 0 }}
+            animate={{ scale: 1, y: 0, opacity: 1 }}
+            exit={{ scale: 0.94, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 280, damping: 24 }}
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-md"
+          >
+            <CardDetailContent
+              key={id}
+              id={id}
+              masteryXp={masteryXp}
+              owned={owned}
+              inDeck={inDeck}
+              t={t}
+            />
+            <button
+              onClick={onClose}
+              className="absolute -top-3 -right-3 w-9 h-9 rounded-full bg-zinc-900 border-2 border-hairline text-white text-lg font-bold flex items-center justify-center shadow-2xl hover:bg-zinc-800 transition"
+              aria-label="Fermer"
+            >
+              ✕
+            </button>
+          </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 
