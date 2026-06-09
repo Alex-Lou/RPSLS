@@ -413,15 +413,9 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
     alog("combat", `L${laneIdx} BOTH-PRESENT counterAB=${counterAB} counterBA=${counterBA}`);
 
     if (counterAB && !counterBA) {
-      alog("combat", `L${laneIdx} branch=A-wins (counterAB && !counterBA)`);
-      // A counters B in RPSLS. Save order (highest priority first):
-      //  1. Esquive (B Lézard dodgeCharge) → B survives, A doesn't pursue.
-      //  2. Aegis (B divineShield) UNLESS A is Tranchant (Scissors pierce
-      //     Aegis at combat). Aegis consumes, B survives, A doesn't pursue.
-      //  3. Otherwise: B dies AND A's ATK pursues to B's hero (counter
-      //     "swing-through" 2026-06-09). Pursuit can still be deflected
-      //     by a charged Pierre on B's side (consumes 1 charge).
+      alog("combat", `L${laneIdx} branch=A-wins`);
       const winnerA = bluntOnCombat(ca);
+      alog("combat", `L${laneIdx} step=bluntDone winnerA=${winnerA.move}`);
       const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
       if (cb.dodgeCharge) {
         alog("combat", `L${laneIdx} A wins → ESQUIVE save B (dodge consumed)`);
@@ -433,17 +427,22 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
         lanes[laneIdx] = { a: winnerA, b: { ...cb, divineShield: false } };
         return { ...board, lanes };
       }
+      alog("combat", `L${laneIdx} step=noSave killing-B`);
       lanes[laneIdx] = { a: winnerA, b: null };
-      // Alex feedback D : kill bonus pour le côté attaquant (A a tué B).
       const updatedBoard = { ...board, lanes, a: { ...board.a, killBonusPending: true } };
+      alog("combat", `L${laneIdx} step=updatedBoardBuilt`);
       const deflect = findDeflector(updatedBoard, "b");
+      alog("combat", `L${laneIdx} step=deflectCheck deflect=${deflect ? `L${deflect.lane}/${deflect.side}` : "null"}`);
       if (deflect) {
         alog("combat", `L${laneIdx} A wins → B die. Poursuite hero b → DEFLECTED par Pierre L${deflect.lane}`);
         return consumeProvocation(updatedBoard, deflect);
       }
       const atkA = creatureEffectiveAtk(winnerA);
+      alog("combat", `L${laneIdx} step=atkComputed atkA=${atkA}`);
       alog("combat", `L${laneIdx} A wins → B die. Poursuite hero b atk=${atkA}`);
-      return { ...updatedBoard, b: damageHero(updatedBoard.b, atkA) };
+      const finalBoard = { ...updatedBoard, b: damageHero(updatedBoard.b, atkA) };
+      alog("combat", `L${laneIdx} step=finalBoardReturn b.hp=${finalBoard.b.hp}`);
+      return finalBoard;
     }
     if (counterBA && !counterAB) {
       alog("combat", `L${laneIdx} branch=B-wins (counterBA && !counterAB)`);
