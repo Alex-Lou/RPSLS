@@ -21,6 +21,7 @@
  * See docs/CONSTELLATION_PRO_DESIGN.md for the locked combat formulas.
  */
 
+import { alog, alogSetTurn, csnap } from "./arenaLog";
 import {
   CREATURE_STATS,
   HERO_MAX_HP,
@@ -353,11 +354,20 @@ export function applySummons(board: BoardState, intent: TurnIntent, side: Side):
   let b = board;
   for (const summon of intent.summons) {
     const hero = side === "a" ? b.a : b.b;
-    if (hero.mana < 1) break;
+    if (hero.mana < 1) {
+      alog("summon", `SKIP ${side} ${summon.move} L${summon.lane} (no mana)`);
+      break;
+    }
     const lanes = b.lanes.slice() as [LaneState, LaneState, LaneState];
     const lane = { ...lanes[summon.lane] };
+    const replaced = lane[side];
     lane[side] = makeCreature(summon.move, side, hero.affinity);
     lanes[summon.lane] = lane;
+    if (replaced) {
+      alog("summon", `${side} pose ${summon.move} L${summon.lane} (REMPLACE ${csnap(replaced)}) affinity=${hero.affinity ?? "∅"}`);
+    } else {
+      alog("summon", `${side} pose ${summon.move} L${summon.lane} affinity=${hero.affinity ?? "∅"}`);
+    }
     b = {
       ...b,
       lanes,
@@ -393,12 +403,9 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
   const cb = lane.b;
 
   if (ca && cb) {
-    // RPSLS one-shot model (Alex design lock): RPSLS counter = the LOSER dies
-    // instantly, the WINNER survives intact. Same-symbol mirror = normal ATK
-    // /HP trade (no winner from RPSLS). Cross-symbol always has a clear
-    // winner — see moveCountersMove table.
     const counterAB = moveCountersMove(ca.move, cb.move);
     const counterBA = moveCountersMove(cb.move, ca.move);
+    alog("combat", `L${laneIdx} ${csnap(ca)} vs ${csnap(cb)} | counterAB=${counterAB} counterBA=${counterBA} | cb.dodge=${cb.dodgeCharge} cb.shield=${cb.divineShield} ca.pierces=${ca.pierces}`);
 
     if (counterAB && !counterBA) {
       // A counters B in RPSLS. Save order (highest priority first):
@@ -411,36 +418,48 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
       const winnerA = bluntOnCombat(ca);
       const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
       if (cb.dodgeCharge) {
+        alog("combat", `L${laneIdx} A wins → ESQUIVE save B (dodge consumed)`);
         lanes[laneIdx] = { a: winnerA, b: { ...cb, dodgeCharge: false } };
         return { ...board, lanes };
       }
       if (cb.divineShield && !ca.pierces) {
+        alog("combat", `L${laneIdx} A wins → AEGIS save B (shield consumed)`);
         lanes[laneIdx] = { a: winnerA, b: { ...cb, divineShield: false } };
         return { ...board, lanes };
       }
       lanes[laneIdx] = { a: winnerA, b: null };
       const updatedBoard = { ...board, lanes };
       const deflect = findDeflector("b");
-      if (deflect) return consumeProvocation(updatedBoard, deflect);
+      if (deflect) {
+        alog("combat", `L${laneIdx} A wins → B die. Poursuite hero b → DEFLECTED par Pierre L${deflect.lane}`);
+        return consumeProvocation(updatedBoard, deflect);
+      }
       const atkA = creatureEffectiveAtk(winnerA);
+      alog("combat", `L${laneIdx} A wins → B die. Poursuite hero b atk=${atkA}`);
       return { ...updatedBoard, b: damageHero(updatedBoard.b, atkA) };
     }
     if (counterBA && !counterAB) {
       const winnerB = bluntOnCombat(cb);
       const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
       if (ca.dodgeCharge) {
+        alog("combat", `L${laneIdx} B wins → ESQUIVE save A (dodge consumed)`);
         lanes[laneIdx] = { a: { ...ca, dodgeCharge: false }, b: winnerB };
         return { ...board, lanes };
       }
       if (ca.divineShield && !cb.pierces) {
+        alog("combat", `L${laneIdx} B wins → AEGIS save A (shield consumed)`);
         lanes[laneIdx] = { a: { ...ca, divineShield: false }, b: winnerB };
         return { ...board, lanes };
       }
       lanes[laneIdx] = { a: null, b: winnerB };
       const updatedBoard = { ...board, lanes };
       const deflect = findDeflector("a");
-      if (deflect) return consumeProvocation(updatedBoard, deflect);
+      if (deflect) {
+        alog("combat", `L${laneIdx} B wins → A die. Poursuite hero a → DEFLECTED par Pierre L${deflect.lane}`);
+        return consumeProvocation(updatedBoard, deflect);
+      }
       const atkB = creatureEffectiveAtk(winnerB);
+      alog("combat", `L${laneIdx} B wins → A die. Poursuite hero a atk=${atkB}`);
       return { ...updatedBoard, a: damageHero(updatedBoard.a, atkB) };
     }
 
@@ -512,17 +531,25 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
   }
 
   if (ca && !cb) {
-    // A's creature would attack B's hero unopposed — check for a charged
-    // taunt-bearer on B's side that can deflect (and consume a charge).
     const deflect = findDeflector("b");
-    if (deflect) return consumeProvocation(board, deflect);
-    return { ...board, b: damageHero(board.b, creatureEffectiveAtk(ca)) };
+    if (deflect) {
+      alog("combat", `L${laneIdx} ${csnap(ca)} undefended → hero b DEFLECTED par Pierre L${deflect.lane}`);
+      return consumeProvocation(board, deflect);
+    }
+    const atk = creatureEffectiveAtk(ca);
+    alog("combat", `L${laneIdx} ${csnap(ca)} undefended → hero b atk=${atk}`);
+    return { ...board, b: damageHero(board.b, atk) };
   }
 
   if (cb && !ca) {
     const deflect = findDeflector("a");
-    if (deflect) return consumeProvocation(board, deflect);
-    return { ...board, a: damageHero(board.a, creatureEffectiveAtk(cb)) };
+    if (deflect) {
+      alog("combat", `L${laneIdx} ${csnap(cb)} undefended → hero a DEFLECTED par Pierre L${deflect.lane}`);
+      return consumeProvocation(board, deflect);
+    }
+    const atk = creatureEffectiveAtk(cb);
+    alog("combat", `L${laneIdx} ${csnap(cb)} undefended → hero a atk=${atk}`);
+    return { ...board, a: damageHero(board.a, atk) };
   }
 
   return board; // both lanes empty
@@ -543,6 +570,8 @@ export function endOfTurnCleanup(board: BoardState): BoardState {
  *  reveal state (Augur, etc.). */
 export function advanceToNextTurn(board: BoardState): BoardState {
   const nextTurn = board.turn + 1;
+  alogSetTurn(nextTurn);
+  alog("turn", `=== Tour ${nextTurn} === a.hp=${board.a.hp} b.hp=${board.b.hp}`);
   const a = refreshHero(drawCards(board.a, 1));
   const b = refreshHero(drawCards(board.b, 1));
   return {
