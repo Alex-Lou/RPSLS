@@ -347,6 +347,7 @@ export type ArenaPhase =
   | "draw"        // turn start, mana up, draw a card
   | "planning"    // both sides plan in parallel
   | "resolving"   // resolver running (spells → summons → combat)
+  | "sudden-death" // Round 10 VRAI BUT D'OR : égalité parfaite → 1 lane RPSLS aveugle
   | "match-end";  // hero hit 0 HP
 
 /* ───────────────────────── Match result ───────────────────────── */

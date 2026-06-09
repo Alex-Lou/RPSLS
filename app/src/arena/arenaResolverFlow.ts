@@ -228,11 +228,19 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
           b = endOfTurnCleanup(b);
           const aDead = b.a.hp <= 0;
           const bDead = b.b.hp <= 0;
+          if (aDead && bDead) {
+            // Round 10 VRAI BUT D'OR : égalité parfaite → phase sudden-death
+            // (Mort subite RPSLS) au lieu de match-end direct. ArenaGame
+            // détecte cette phase et affiche le component ArenaSuddenDeath.
+            alog("turn", `MATCH END — ÉGALITÉ (a.hp=${b.a.hp}, b.hp=${b.b.hp}) → 🌟 BUT D'OR / Mort subite RPSLS`);
+            b = { ...b, phase: "sudden-death" };
+            setBoard(b);
+            // Pas de onMatchEnd ici — le sudden-death component va le triggerer
+            // après résolution. Délai 1.6s pour laisser respirer la transition.
+            return;
+          }
           if (aDead || bDead) {
             b = { ...b, phase: "match-end" };
-          }
-          if (aDead && bDead) {
-            alog("turn", `MATCH END — ÉGALITÉ (a.hp=${b.a.hp}, b.hp=${b.b.hp}) → tie-break Mort subite à venir (Lot H)`);
           }
           setBoard(b);
           if ((aDead || bDead) && onMatchEnd) {
@@ -241,9 +249,6 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
             // brutale). Donne le temps de voir le dernier état du board.
             window.setTimeout(() => {
               // Convention onMatchEnd(playerWon) : true = player win.
-              // Égalité (aDead && bDead) → null. Pour MVP on traite comme
-              // "ni victoire ni défaite" (player NOT wins) — ArenaMatchEnd
-              // gérera l'affichage du label "Égalité".
               const playerWon = bDead && !aDead;
               onMatchEnd(playerWon);
             }, 1600);

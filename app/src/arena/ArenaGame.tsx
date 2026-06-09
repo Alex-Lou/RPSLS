@@ -33,6 +33,7 @@ import { ArenaDebugOverlay } from "./ArenaDebugOverlay";
 import { ArenaMatchEnd } from "./ArenaMatchEnd";
 import { ArenaMatchSplash } from "./ArenaMatchSplash";
 import { ArenaPlanPhase } from "./ArenaPlanPhase";
+import { ArenaSuddenDeath } from "./ArenaSuddenDeath";
 import { arenaLogReset } from "./arenaLog";
 import { advanceToNextTurn, makeInitialBoard } from "./arenaRules";
 import { cpuArenaDecision } from "./arenaAI";
@@ -348,6 +349,23 @@ export function ArenaGame({
 
   if (matchSplash) {
     return <ArenaMatchSplash playerName={player.nickname || "Toi"} playerAvatar={player.avatar} />;
+  }
+
+  if (board.phase === "sudden-death") {
+    // Round 10 VRAI BUT D'OR — Mort subite RPSLS. Le component gère le picker
+    // + reveal + counter check. Quand résolu, assigne 1 HP au winner et flip
+    // la phase à match-end pour que ArenaMatchEnd affiche le résultat propre.
+    return (
+      <ArenaSuddenDeath
+        onResolved={(winner) => {
+          const nextBoard: BoardState = winner === "a"
+            ? { ...board, a: { ...board.a, hp: 1 }, b: { ...board.b, hp: 0 }, phase: "match-end" }
+            : { ...board, a: { ...board.a, hp: 0 }, b: { ...board.b, hp: 1 }, phase: "match-end" };
+          setBoard(nextBoard);
+          if (winner === "a") hapticMatchWin(); else hapticMatchLoss();
+        }}
+      />
+    );
   }
 
   if (board.phase === "match-end") {

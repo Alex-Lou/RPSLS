@@ -552,10 +552,34 @@ export function advanceToNextTurn(board: BoardState): BoardState {
   // suivant. killBonusPending reset après la pioche bonus.
   const drawA = 2 + (board.a.killBonusPending ? 1 : 0);
   const drawB = 2 + (board.b.killBonusPending ? 1 : 0);
-  const a = refreshHero({ ...drawCards(board.a, drawA), killBonusPending: false });
-  const b = refreshHero({ ...drawCards(board.b, drawB), killBonusPending: false });
+  // Lot D-bis Round 10 — hooks runtime Finishers persistants :
+  // VERGER : si vergerActive, hero heal +1/tour (cumulé tant que actif)
+  // MÉTAMORPHOSE : si metamorphoseActive, tous mes Lézard refill dodgeCharges
+  // Note : LAME est traité in-combat (cf arenaCombat), pas ici.
+  let lanesAfterFinishers = board.lanes;
+  if (board.a.metamorphoseActive) {
+    lanesAfterFinishers = lanesAfterFinishers.map((l) => ({
+      ...l,
+      a: l.a && l.a.move === "lizard" ? { ...l.a, dodgeCharges: Math.max(l.a.dodgeCharges, 1) } : l.a,
+    })) as [LaneState, LaneState, LaneState];
+    alog("turn", `a MÉTAMORPHOSE → Lézard dodge refresh`);
+  }
+  if (board.b.metamorphoseActive) {
+    lanesAfterFinishers = lanesAfterFinishers.map((l) => ({
+      ...l,
+      b: l.b && l.b.move === "lizard" ? { ...l.b, dodgeCharges: Math.max(l.b.dodgeCharges, 1) } : l.b,
+    })) as [LaneState, LaneState, LaneState];
+    alog("turn", `b MÉTAMORPHOSE → Lézard dodge refresh`);
+  }
+  const heroAVerger = board.a.vergerActive ? { ...board.a, hp: Math.min(board.a.maxHp, board.a.hp + 1) } : board.a;
+  const heroBVerger = board.b.vergerActive ? { ...board.b, hp: Math.min(board.b.maxHp, board.b.hp + 1) } : board.b;
+  if (board.a.vergerActive) alog("turn", `a VERGER → +1 HP (${board.a.hp} → ${heroAVerger.hp})`);
+  if (board.b.vergerActive) alog("turn", `b VERGER → +1 HP (${board.b.hp} → ${heroBVerger.hp})`);
+  const a = refreshHero({ ...drawCards(heroAVerger, drawA), killBonusPending: false });
+  const b = refreshHero({ ...drawCards(heroBVerger, drawB), killBonusPending: false });
   return {
     ...board,
+    lanes: lanesAfterFinishers,
     turn: nextTurn,
     phase: "planning",
     a, b,

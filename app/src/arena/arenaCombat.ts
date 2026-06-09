@@ -122,16 +122,21 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
       const winnerA = bluntOnCombat(ca);
       alog("combat", `L${laneIdx} step=bluntDone winnerA=${winnerA.move}`);
       const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
-      if (cb.dodgeCharges > 0) {
+      // Lot D-bis Round 10 — LAME Finisher : si a a lameActive ET ca est
+      // scissors, pierce TOUT (Esquive + Aegis + anti-taunt) — l'ultime
+      // burst de la Voie Ciseau.
+      const aLamePierce = board.a.lameActive && ca.move === "scissors";
+      if (cb.dodgeCharges > 0 && !aLamePierce) {
         alog("combat", `L${laneIdx} A wins → ESQUIVE save B (charge ${cb.dodgeCharges} → ${cb.dodgeCharges - 1})`);
         lanes[laneIdx] = { a: winnerA, b: { ...cb, dodgeCharges: cb.dodgeCharges - 1 } };
         return { ...board, lanes };
       }
-      if (cb.divineShield && !ca.pierces) {
+      if (cb.divineShield && !ca.pierces && !aLamePierce) {
         alog("combat", `L${laneIdx} A wins → AEGIS save B (shield consumed)`);
         lanes[laneIdx] = { a: winnerA, b: { ...cb, divineShield: false } };
         return { ...board, lanes };
       }
+      if (aLamePierce) alog("combat", `L${laneIdx} A wins → LAME pierce TOUT (no save)`);
       alog("combat", `L${laneIdx} step=noSave killing-B`);
       lanes[laneIdx] = { a: winnerA, b: null };
       const updatedBoard = { ...board, lanes, a: { ...board.a, killBonusPending: true } };
@@ -153,16 +158,19 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
       alog("combat", `L${laneIdx} branch=B-wins (counterBA && !counterAB)`);
       const winnerB = bluntOnCombat(cb);
       const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
-      if (ca.dodgeCharges > 0) {
+      // Lot D-bis Round 10 — LAME Finisher pour b côté.
+      const bLamePierce = board.b.lameActive && cb.move === "scissors";
+      if (ca.dodgeCharges > 0 && !bLamePierce) {
         alog("combat", `L${laneIdx} B wins → ESQUIVE save A (charge ${ca.dodgeCharges} → ${ca.dodgeCharges - 1})`);
         lanes[laneIdx] = { a: { ...ca, dodgeCharges: ca.dodgeCharges - 1 }, b: winnerB };
         return { ...board, lanes };
       }
-      if (ca.divineShield && !cb.pierces) {
+      if (ca.divineShield && !cb.pierces && !bLamePierce) {
         alog("combat", `L${laneIdx} B wins → AEGIS save A (shield consumed)`);
         lanes[laneIdx] = { a: { ...ca, divineShield: false }, b: winnerB };
         return { ...board, lanes };
       }
+      if (bLamePierce) alog("combat", `L${laneIdx} B wins → LAME pierce TOUT (no save)`);
       lanes[laneIdx] = { a: null, b: winnerB };
       // Alex feedback D : kill bonus pour le côté attaquant (B a tué A).
       const updatedBoard = { ...board, lanes, b: { ...board.b, killBonusPending: true } };
