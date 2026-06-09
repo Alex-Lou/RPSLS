@@ -165,12 +165,29 @@ export function buildPlayerDeck(saved: CardId[] | undefined): CardId[] {
 
 /** Strip cards the side committed (spells) from their hand BEFORE the
  *  resolver runs. Summons are RPSLS moves, not cards in hand — they
- *  don't need to be removed. */
+ *  don't need to be removed.
+ *
+ *  Alex feedback 2026-06-09 round 7 : log explicite des cartes consommées
+ *  pour debug "carte ne se retire pas de la main" — chaque cast doit
+ *  consommer 1 copie. Si l'intent contient N copies du même id, removeSpent
+ *  doit consommer N copies différentes. */
 export function removeSpentCards(hand: CardId[], intent: TurnIntent): CardId[] {
   let out = hand.slice();
+  const consumed: CardId[] = [];
   for (const s of intent.spells) {
     const i = out.indexOf(s.id);
-    if (i >= 0) out = [...out.slice(0, i), ...out.slice(i + 1)];
+    if (i >= 0) {
+      out = [...out.slice(0, i), ...out.slice(i + 1)];
+      consumed.push(s.id);
+    } else {
+      // Carte absente de la main — bug rare (intent ajouté mais carte déjà
+      // partie au tour précédent ?). On loggue pour diagnostic.
+      consumed.push(`MISSING:${s.id}` as CardId);
+    }
+  }
+  if (consumed.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`[arena:hand] consumed cards=[${consumed.join(",")}] hand was=${hand.length} now=${out.length}`);
   }
   return out;
 }
