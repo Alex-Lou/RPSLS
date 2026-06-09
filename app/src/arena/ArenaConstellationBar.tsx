@@ -42,6 +42,20 @@ export function ArenaConstellationBar({
   // n'aurait aucun sens.
   if (!affinity) return null;
 
+  // Alex feedback 2026-06-09 point #2 : progression lumineuse plus claire,
+  // 1⭐ → discret, 2⭐ → moyen, 3⭐ → flash MAX. Avant 3 c'est "progression",
+  // après 3 c'est "climax" — la différence DOIT sauter aux yeux.
+  // Halo extérieur du badge scale avec filledCount :
+  const glowIntensity =
+    filledCount === 0 ? 0 :
+    filledCount === 1 ? 0.35 :
+    filledCount === 2 ? 0.65 :
+    1.0;
+  const bgOpacityPct =
+    filledCount === 0 ? 12 :
+    filledCount === 1 ? 18 :
+    filledCount === 2 ? 26 :
+    42; // 3⭐ : fond bien teinté
   return (
     <div
       className={
@@ -49,11 +63,11 @@ export function ArenaConstellationBar({
         (side === "you" ? "self-start" : "self-end")
       }
       style={{
-        background: `linear-gradient(135deg, color-mix(in oklab, ${accentColor} 12%, rgba(0,0,0,0.55)), rgba(0,0,0,0.65))`,
-        border: `1px solid color-mix(in oklab, ${accentColor} 45%, rgba(255,255,255,0.05))`,
+        background: `linear-gradient(135deg, color-mix(in oklab, ${accentColor} ${bgOpacityPct}%, rgba(0,0,0,0.55)), rgba(0,0,0,0.65))`,
+        border: `1px solid color-mix(in oklab, ${accentColor} ${45 + filledCount * 12}%, rgba(255,255,255,0.05))`,
         boxShadow: isComplete
-          ? `0 0 18px -2px ${accentColor}aa, inset 0 0 10px color-mix(in oklab, ${accentColor} 35%, transparent)`
-          : `0 1px 3px rgba(0,0,0,0.4)`,
+          ? `0 0 22px -1px ${accentColor}cc, 0 0 8px ${accentColor}88, inset 0 0 12px color-mix(in oklab, ${accentColor} 40%, transparent)`
+          : `0 0 ${4 + glowIntensity * 10}px -1px ${accentColor}${Math.round(glowIntensity * 200 + 30).toString(16).padStart(2, "0")}, 0 1px 3px rgba(0,0,0,0.4)`,
       }}
       aria-label={`Constellation ${filledCount} sur ${STAR_COUNT}`}
     >
@@ -64,6 +78,10 @@ export function ArenaConstellationBar({
       <div className="flex items-center gap-0.5">
         {Array.from({ length: STAR_COUNT }).map((_, i) => {
           const filled = i < filledCount;
+          // glow étoile : plus lumineuse plus le compteur monte (1 → 2 → 3).
+          const starGlowPx = filled
+            ? (filledCount === 1 ? 3 : filledCount === 2 ? 5 : 7)
+            : 0;
           return (
             <motion.span
               key={i}
@@ -71,24 +89,27 @@ export function ArenaConstellationBar({
               animate={
                 filled
                   ? {
-                      scale: isComplete ? [1, 1.18, 1] : 1,
+                      scale: isComplete ? [1, 1.22, 1] : (filledCount === 2 ? [1, 1.1, 1] : 1),
                       filter: isComplete
                         ? [
-                            `drop-shadow(0 0 2px ${accentColor})`,
-                            `drop-shadow(0 0 6px ${accentColor})`,
-                            `drop-shadow(0 0 2px ${accentColor})`,
+                            `drop-shadow(0 0 3px ${accentColor})`,
+                            `drop-shadow(0 0 9px ${accentColor})`,
+                            `drop-shadow(0 0 3px ${accentColor})`,
                           ]
-                        : `drop-shadow(0 0 3px ${accentColor})`,
+                        : `drop-shadow(0 0 ${starGlowPx}px ${accentColor})`,
                     }
                   : { scale: 1, filter: "none" }
               }
               transition={
                 isComplete
-                  ? { duration: 1.6, repeat: Infinity, ease: "easeInOut", delay: i * 0.18 }
+                  ? { duration: 1.4, repeat: Infinity, ease: "easeInOut", delay: i * 0.16 }
+                  : filledCount === 2
+                  ? { duration: 2.0, repeat: Infinity, ease: "easeInOut", delay: i * 0.2 }
                   : { type: "spring", stiffness: 320, damping: 20 }
               }
               className={
-                "text-[11px] leading-none " +
+                "leading-none " +
+                (isComplete ? "text-[14px] font-black" : filledCount === 2 ? "text-[12px] font-bold" : "text-[11px]") + " " +
                 (filled ? "" : "opacity-25")
               }
               style={{ color: filled ? accentColor : "#71717a" }}
@@ -101,10 +122,13 @@ export function ArenaConstellationBar({
       {finisherUnlocked && (
         <motion.span
           initial={{ opacity: 0, scale: 0.5 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ type: "spring", stiffness: 320, damping: 18 }}
-          className="text-[8px] uppercase tracking-wider font-black text-amber-200"
-          style={{ textShadow: `0 0 6px ${accentColor}` }}
+          animate={{
+            opacity: [0.9, 1, 0.9],
+            scale: [1, 1.05, 1],
+          }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+          className="text-[9px] uppercase tracking-wider font-black text-amber-200"
+          style={{ textShadow: `0 0 8px ${accentColor}, 0 0 4px #fbbf24` }}
         >
           FINISHER ✦
         </motion.span>

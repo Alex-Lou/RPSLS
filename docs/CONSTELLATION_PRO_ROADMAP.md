@@ -143,6 +143,21 @@ T2 a constellation ⭐ 3/3 → FINISHER UNLOCKED
 - `[arena:spell] T5 BYPASS BLOCKED a — intent had 3 spells, truncated to 2` (filet en action)
 - `[arena:spell] T3 a aegis FIZZLE (lock déjà actif)` (lock anti-spam fonctionne)
 
+## 🆕 Feedback Alex 2026-06-09 (post-Lot D build)
+
+### #1 Limite cartes égales en main + Double usage (réflexion design)
+- **Limit par rareté** : common max 3, rare max 2, epic 1, legendary 1
+- **Double usage** option (B) préférée : 2 copies en main = "Surcharge" effet doublé (Précision +4 ATK au lieu +2, consume les 2 copies). Force un choix : thésauriser ou cast.
+- Lot D-bis à câbler après Finishers stabilisés.
+
+### #2 Constellation Bar progression lumineuse ✅ DONE
+- 1⭐ glow léger, 2⭐ moyen (+pulse), 3⭐ flash MAX + FINISHER ✦ amber permanent
+- Implémenté dans ArenaConstellationBar.tsx (commit Lot D)
+
+### #3 Espace central pour chips queue ✅ DONE
+- Wrapper CenterStatus avec my-2 sm:my-3 → push lanes haut/bas, libère le centre
+- Implémenté dans ArenaBoard.tsx
+
 ## 🆕 Nouvelles requêtes (Alex feedback antérieur, encore à câbler)
 
 ### CPU theme + pad assortis

@@ -299,13 +299,20 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
         {/* CENTER STATUS ZONE — single bar that owns the phase chip + the
          *  current event ("Adversaire dévoile" / "Sorts" / "Combat Lane N").
          *  Replaces the previous 3-stack (phase banner + 2 reveal banners)
-         *  so the eye has ONE thing to read at the center. */}
-        <CenterStatus
-          step={resolveStep ?? null}
-          turn={board.turn}
-          oppPreview={oppPreview}
-          playerPreview={playerPreview}
-        />
+         *  so the eye has ONE thing to read at the center.
+         *
+         *  Alex feedback 2026-06-09 point #3 : libérer l'espace central pour
+         *  les chips queue qui apparaissent pendant les manches (Augur révélés,
+         *  Aegis indicators, etc.). Wrapper avec my-2 sm:my-3 = ajout d'espace
+         *  vertical au centre, pousse les rows joueur/opp vers le haut/bas. */}
+        <div className="my-2 sm:my-3 [@media(max-height:560px)]:my-1">
+          <CenterStatus
+            step={resolveStep ?? null}
+            turn={board.turn}
+            oppPreview={oppPreview}
+            playerPreview={playerPreview}
+          />
+        </div>
 
         {/* Player lane row — slots become tappable when targeting wants
          *  THIS side (summon → my empty; aegis/surge → my creature; etc.). */}
