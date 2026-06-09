@@ -72,12 +72,12 @@ export function cpuArenaDecision(
       const counterMO = moveCountersMove(mine.move, opp.move);
       let wouldDie: boolean;
       if (counterOM && !counterMO) {
-        wouldDie = !mine.divineShield && !mine.dodgeCharge;
+        wouldDie = !mine.divineShield && mine.dodgeCharges === 0;
       } else if (counterMO && !counterOM) {
         wouldDie = false;
       } else {
         const incoming = CREATURE_STATS[opp.move].atk + opp.atkBuff;
-        wouldDie = mine.hp <= incoming && !mine.divineShield && !mine.dodgeCharge;
+        wouldDie = mine.hp <= incoming && !mine.divineShield && mine.dodgeCharges === 0;
       }
       if (!wouldDie) continue;
       // Try Aegis (1m) first — divine shield absorbs ALL the incoming dmg.

@@ -179,11 +179,18 @@ export function makeCreature(move: Move, side: Side, affinity?: Move): Creature 
   //   Pierre  : provocationCharges 2 (au lieu de 1)
   //   Ciseaux : hp +1 (HP 2 au lieu de 1 — survit à un échange)
   //   Spock   : voieAtkBonus +1 (ATK perm 3 au lieu de 2)
-  //   Feuille / Lézard : à câbler dans une 2e passe (Fanaison ralentie +
-  //     Esquive 2 charges nécessitent de refactor wiltedSteps + dodgeCharge).
+  //   Feuille : wiltSkipNext true → Fanaison ralentie (wilt tous les 2 tours)
+  //   Lézard  : dodgeCharges 2 (au lieu de 1 — survit à 2 saves Esquive)
   const voieRockCharges = matchesAffinity && move === "rock" ? 2 : (move === "rock" ? 1 : 0);
   const voieScissorsHpBonus = matchesAffinity && move === "scissors" ? 1 : 0;
   const voieAtkBonus = matchesAffinity && move === "spock" ? 1 : 0;
+  // Lot B Round 8 : Lézard base 1 charge dodge, Voie Lézard 2 charges.
+  const dodgeCharges = move === "lizard" ? (matchesAffinity ? 2 : 1) : 0;
+  // Voie Feuille : flag persistent + toggle wiltSkipNext démarre à true.
+  // 1er endOfTurnReset SKIP (Feuille reste ATK 3 ce tour), 2e wilt à 1, 3e
+  // SKIP, 4e wilt à 2, 5e SKIP, etc. → Fanaison divisée par 2.
+  const voieFeuille = matchesAffinity && move === "paper";
+  const wiltSkipNext = voieFeuille;
   return {
     move,
     side,
@@ -197,10 +204,12 @@ export function makeCreature(move: Move, side: Side, affinity?: Move): Creature 
     stifles:     move === "paper",    // 🌿 Étouffe (UI badge only — actual
                                        //   check uses move === "paper" || "spock")
     pierces:     move === "scissors", // ⚔ Tranchant
-    dodgeCharge: move === "lizard",   // ✨ Esquive
+    dodgeCharges,                      // ✨ Esquive (Lézard 1 ou 2 charges)
     spellImmune: move === "spock",    // 🧬 Logique
     summonedThisTurn: true,           // Lente (Pierre 0 ATK) / Lent (Lézard 1)
-    wiltedSteps: 0,                    // Fanaison (Feuille: -1/turn)
+    wiltedSteps: 0,                    // Fanaison (Feuille: -1/turn ou -1/2 turns Voie)
+    voieFeuille,                       // Lot B Round 8 — flag Voie Feuille
+    wiltSkipNext,                      // Voie Feuille slow wilt toggle
     combatBlunted: false,              // Émoussé (Ciseaux: -1 after 1st combat)
     provocationCharges: voieRockCharges,
     voieAtkBonus,
@@ -230,12 +239,13 @@ export function creatureEffectiveAtk(c: Creature): number {
 }
 
 /** Apply damage to a creature, honoring its defenses in order:
- *   1. Esquive (Lézard 1-charge) — intrinsèque, prioritaire sur divineShield.
+ *   1. Esquive (Lézard dodgeCharges) — intrinsèque, prioritaire sur divineShield.
+ *      Consume 1 charge. Voie Lézard = 2 charges initiales.
  *   2. Divine Shield (Aegis spell) — consommé au 1er dégât.
  *  Returns the new creature, or null if it died. */
 export function damageCreature(c: Creature, dmg: number): Creature | null {
   if (dmg <= 0) return c;
-  if (c.dodgeCharge) return { ...c, dodgeCharge: false };
+  if (c.dodgeCharges > 0) return { ...c, dodgeCharges: c.dodgeCharges - 1 };
   if (c.divineShield) return { ...c, divineShield: false };
   const hp = c.hp - dmg;
   if (hp <= 0) return null;
@@ -248,12 +258,33 @@ export function damageCreature(c: Creature, dmg: number): Creature | null {
 /** A creature's "per-turn" buffs (atkBuff, anchored, riposte) reset at the
  *  END of the turn so they don't snowball forever. Persistent damage stays.
  *  Innate passives (taunt, stifles, pierces, spellImmune) and consumed
- *  resources (dodgeCharge, combatBlunted) persist across turns.
+ *  resources (dodgeCharges, combatBlunted) persist across turns.
  *  - divineShield: persists across turns until consumed by damage.
  *  - summonedThisTurn: cleared (the "Lente/Lent" malus only bites turn 1).
- *  - wiltedSteps: incremented for Paper (drives Fanaison). */
+ *  - wiltedSteps: incremented for Paper (drives Fanaison).
+ *  - wiltSkipNext: Voie Feuille toggle — skip wilt this turn et flip false. */
 export function endOfTurnReset(c: Creature): Creature {
-  const wilted = c.move === "paper" ? c.wiltedSteps + 1 : c.wiltedSteps;
+  // Lot B Round 8 — Voie Feuille slow wilt (Fanaison ÷ 2) :
+  //   voieFeuille=true + wiltSkipNext=true  → SKIP wilt ce tour, flip à false
+  //   voieFeuille=true + wiltSkipNext=false → wilt + flip à true (skip prochain)
+  //   voieFeuille=false (Feuille normale)   → wilt chaque tour, no toggle
+  let wilted = c.wiltedSteps;
+  let nextSkip = c.wiltSkipNext;
+  if (c.move === "paper") {
+    if (c.voieFeuille) {
+      if (c.wiltSkipNext) {
+        // Skip ce tour, prochain tour wilt.
+        nextSkip = false;
+      } else {
+        // Wilt ce tour, prochain tour skip.
+        wilted = c.wiltedSteps + 1;
+        nextSkip = true;
+      }
+    } else {
+      // Feuille normale (hors Voie) : wilt chaque tour.
+      wilted = c.wiltedSteps + 1;
+    }
+  }
   return {
     ...c,
     atkBuff: 0,
@@ -261,6 +292,7 @@ export function endOfTurnReset(c: Creature): Creature {
     ripostePrimed: false,
     summonedThisTurn: false,
     wiltedSteps: wilted,
+    wiltSkipNext: nextSkip,
   };
 }
 
@@ -501,7 +533,7 @@ export function advanceToNextTurn(board: BoardState): BoardState {
       const atk = creatureEffectiveAtk(c);
       const flags: string[] = [];
       if (c.divineShield) flags.push("🛡");
-      if (c.dodgeCharge) flags.push("✨");
+      if (c.dodgeCharges > 0) flags.push(c.dodgeCharges > 1 ? `✨${c.dodgeCharges}` : "✨");
       if (c.taunt && c.provocationCharges > 0) flags.push(`P${c.provocationCharges}`);
       if (c.summonedThisTurn && (c.move === "rock" || c.move === "lizard")) flags.push("L");
       if (c.move === "paper" && c.wiltedSteps > 0) flags.push(`F${c.wiltedSteps}`);

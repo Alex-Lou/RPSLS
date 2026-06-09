@@ -83,7 +83,7 @@ export function ArenaLaneSlot({
   useEffect(() => {
     const prev = prevRef.current;
     const snap = creature
-      ? { hp: creature.hp, move: creature.move, shield: creature.divineShield, dodge: creature.dodgeCharge }
+      ? { hp: creature.hp, move: creature.move, shield: creature.divineShield, dodge: creature.dodgeCharges > 0 }
       : null;
     if (creature && prev && prev.move === creature.move && creature.hp < prev.hp) {
       const dmg = prev.hp - creature.hp;
@@ -106,7 +106,7 @@ export function ArenaLaneSlot({
     // Cause probable : si dodgedHit était déjà set quand la creature change
     // (mort/replace), le chip restait visible. Ajout d'un clear explicite
     // quand la creature meurt OU change de move (sticker plus jamais stale).
-    if (creature && prev && prev.move === creature.move && prev.dodge && !creature.dodgeCharge && creature.hp === prev.hp) {
+    if (creature && prev && prev.move === creature.move && prev.dodge && creature.dodgeCharges === 0 && creature.hp === prev.hp) {
       setDodgedHit({ key: Date.now() });
       const id = window.setTimeout(() => setDodgedHit(null), 1400);
       prevRef.current = snap;
@@ -299,7 +299,7 @@ export function ArenaLaneSlot({
               ⚔
             </span>
           )}
-          {creature.dodgeCharge && (
+          {creature.dodgeCharges > 0 && (
             <span className="text-[9px] px-1 py-0.5 rounded bg-sky-400/95 text-black font-black tracking-wider shadow leading-none" title="Esquive — la prochaine blessure est ignorée">
               ✨
             </span>

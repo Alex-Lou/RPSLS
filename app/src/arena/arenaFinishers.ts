@@ -124,7 +124,7 @@ function applyMetamorphose(board: BoardState, side: Side): BoardState {
   for (let i = 0; i < 3; i++) {
     const c = b.lanes[i][side];
     if (c && c.move === "lizard") {
-      b = mutateLaneCreature(b, side, i, (cur) => ({ ...cur, dodgeCharge: true }));
+      b = mutateLaneCreature(b, side, i, (cur) => ({ ...cur, dodgeCharges: Math.max(cur.dodgeCharges, 1) }));
       count++;
     }
   }

@@ -231,11 +231,13 @@ export interface Creature {
    *  (they hit nothing instead — opp must clear my taunt-bearer first).
    *  Set inherently on Rock creatures at summon. */
   taunt: boolean;
-  /** Lézard's "Esquive" innate passive — the next damage source is ignored
-   *  and this flag drops. Different from divineShield because it's INTRINSIC
-   *  (not granted by a spell), and takes priority over divineShield when both
-   *  are present. */
-  dodgeCharge: boolean;
+  /** Lézard's "Esquive" innate passive — chaque charge ignore 1 damage source.
+   *  Lézard base : 1 charge. Voie Lézard (affinity match) : 2 charges initiales.
+   *  Métamorphose finisher : refill 1 charge fin de tour.
+   *
+   *  Round 8 refactor : était `dodgeCharge: boolean`, maintenant un compteur.
+   *  > 0 = peut esquiver (consume 1 par save). 0 = plus de save Esquive. */
+  dodgeCharges: number;
   /** Ciseaux' "Tranchant" — when this creature attacks in lane combat, the
    *  defender's divineShield is bypassed (full damage lands). Set inherently
    *  on Scissors at summon, never granted by spells. */
@@ -258,6 +260,14 @@ export interface Creature {
    *  Drives the "Fanaison" malus: Feuille loses 1 ATK per turn elapsed,
    *  floor 1 (so 3 → 2 → 1 → 1 → 1). Stays at 0 on all other moves. */
   wiltedSteps: number;
+  /** Voie Feuille (affinity match) — Round 8 : Fanaison RALENTIE. La Feuille
+   *  Voie wilt tous les 2 tours au lieu de chaque tour. Persistant — set true
+   *  au summon si makeCreature(paper, affinity=paper). */
+  voieFeuille: boolean;
+  /** Toggle pour Voie Feuille uniquement : démarre true → endOfTurnReset SKIP
+   *  ce tour et flip false → next tour wilt et flip true → next SKIP, etc.
+   *  Pour non-Voie Feuille : reste false, wilt à chaque tour normalement. */
+  wiltSkipNext: boolean;
   /** Set true on Scissors creatures AFTER their first combat exchange
    *  (whether they survive or not — kept for symmetry though only matters
    *  if they survive). Drives the "Émoussé" malus: −1 ATK permanent. */

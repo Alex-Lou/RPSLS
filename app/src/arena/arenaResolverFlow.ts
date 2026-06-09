@@ -29,7 +29,7 @@ function logBoardSnapshot(b: BoardState, tag: string): void {
     const atk = creatureEffectiveAtk(c);
     const flags: string[] = [];
     if (c.divineShield) flags.push("🛡");
-    if (c.dodgeCharge) flags.push("✨");
+    if (c.dodgeCharges > 0) flags.push(c.dodgeCharges > 1 ? `✨${c.dodgeCharges}` : "✨");
     if (c.taunt && c.provocationCharges > 0) flags.push(`P${c.provocationCharges}`);
     if (c.summonedThisTurn && (c.move === "rock" || c.move === "lizard")) flags.push("L");
     if (c.move === "paper" && c.wiltedSteps > 0) flags.push(`F${c.wiltedSteps}`);
@@ -140,8 +140,8 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
           const bothPresent = !!lane.a && !!lane.b;
           const counterAB = bothPresent && moveCountersMove(lane.a!.move, lane.b!.move);
           const counterBA = bothPresent && moveCountersMove(lane.b!.move, lane.a!.move);
-          const aFollowsThroughOnB = bothPresent && counterAB && !counterBA && !lane.b!.dodgeCharge;
-          const bFollowsThroughOnA = bothPresent && counterBA && !counterAB && !lane.a!.dodgeCharge;
+          const aFollowsThroughOnB = bothPresent && counterAB && !counterBA && lane.b!.dodgeCharges === 0;
+          const bFollowsThroughOnA = bothPresent && counterBA && !counterAB && lane.a!.dodgeCharges === 0;
           // TAUNT DEFLECTION DETECTION — keep in sync with rules.findDeflector:
           //   first ALIVE+CHARGED Pierre on defender's side, EXCEPT if
           //   attacker has Paper/Spock anti-taunt active. Returns the

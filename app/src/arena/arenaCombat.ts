@@ -43,7 +43,7 @@ function bluntOnCombat(c: Creature): Creature {
 /** Variant used by Tranchant (Scissors) attackers — bypasses divineShield.
  *  Returns null if the creature dies. */
 function damageCreaturePierce(c: Creature, dmg: number): Creature | null {
-  if (c.dodgeCharge) return { ...c, dodgeCharge: false };
+  if (c.dodgeCharges > 0) return { ...c, dodgeCharges: c.dodgeCharges - 1 };
   const newHp = c.hp - dmg;
   if (newHp <= 0) return null;
   return { ...c, hp: newHp };
@@ -122,9 +122,9 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
       const winnerA = bluntOnCombat(ca);
       alog("combat", `L${laneIdx} step=bluntDone winnerA=${winnerA.move}`);
       const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
-      if (cb.dodgeCharge) {
-        alog("combat", `L${laneIdx} A wins → ESQUIVE save B (dodge consumed)`);
-        lanes[laneIdx] = { a: winnerA, b: { ...cb, dodgeCharge: false } };
+      if (cb.dodgeCharges > 0) {
+        alog("combat", `L${laneIdx} A wins → ESQUIVE save B (charge ${cb.dodgeCharges} → ${cb.dodgeCharges - 1})`);
+        lanes[laneIdx] = { a: winnerA, b: { ...cb, dodgeCharges: cb.dodgeCharges - 1 } };
         return { ...board, lanes };
       }
       if (cb.divineShield && !ca.pierces) {
@@ -153,9 +153,9 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
       alog("combat", `L${laneIdx} branch=B-wins (counterBA && !counterAB)`);
       const winnerB = bluntOnCombat(cb);
       const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
-      if (ca.dodgeCharge) {
-        alog("combat", `L${laneIdx} B wins → ESQUIVE save A (dodge consumed)`);
-        lanes[laneIdx] = { a: { ...ca, dodgeCharge: false }, b: winnerB };
+      if (ca.dodgeCharges > 0) {
+        alog("combat", `L${laneIdx} B wins → ESQUIVE save A (charge ${ca.dodgeCharges} → ${ca.dodgeCharges - 1})`);
+        lanes[laneIdx] = { a: { ...ca, dodgeCharges: ca.dodgeCharges - 1 }, b: winnerB };
         return { ...board, lanes };
       }
       if (ca.divineShield && !cb.pierces) {
