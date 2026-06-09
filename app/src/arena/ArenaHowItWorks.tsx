@@ -64,14 +64,14 @@ export function ArenaHowItWorks({ onClose }: { onClose: () => void }) {
           <Section title="⋙ Mana" body="1 mana au tour 1, +1 chaque tour jusqu'à 10. Tes coups RPSLS coûtent 1 mana, tes sorts ont leur propre coût (1-4 mana)." />
           <Section title="🪨 Créatures qui RESTENT sur les lanes" body="Quand tu invoques un coup RPSLS, la créature PERSISTE sur sa lane d'un tour à l'autre — elle garde ses blessures, ses buffs, son shield. Elle ne disparaît QUE si ses HP tombent à 0 (animation rose qui éclate)." />
           <Section
-            title="⚔️ Combat — la règle RPSLS-FIRST avec POURSUITE"
+            title="⚔️ Combat — RPSLS-FIRST + POURSUITE + SAUVEGARDES"
             body=""
             sub={[
               "Deux créatures FACE À FACE : la règle RPSLS tranche. Le perdant MEURT INSTANT, le gagnant survit intact. Ciseau vs Pierre → Ciseau mort, Pierre intacte.",
-              "POURSUITE : le gagnant ne s'arrête pas. Son ATK CONTINUE vers le HÉROS adverse. Spock 2 ATK bat Ciseaux → Ciseau mort + 2 dégâts au héros opp. La défense Provocation Pierre (ailleurs) peut détourner cette poursuite.",
+              "POURSUITE : le gagnant ne s'arrête pas. Son ATK CONTINUE vers le HÉROS adverse. Spock 2 ATK bat Ciseau → Ciseau mort + 2 dégâts au héros opp. La défense Provocation Pierre (ailleurs) peut détourner cette poursuite.",
               "MÊME SYMBOLE des deux côtés (Pierre vs Pierre) : pas de winner RPSLS → échange ATK/HP normal (ils s'entre-tapent simultanément, pas de poursuite).",
               "UNE SEULE créature sur la lane (lane opp vide) : elle frappe directement le HÉROS opp pour son ATK… SAUF si la nature passive de l'opp annule (voir ↓).",
-              "ESQUIVE du Lézard ABSORBE la poursuite : si Spock attaque un Lézard, le Lézard esquive (charge consommée) ET Spock n'atteint pas le héros — Esquive sauve les 2.",
+              "SAUVEGARDES (ordre priorité) : 1) ESQUIVE Lézard (charge consommée) annule mort + poursuite. 2) AEGIS Bouclier (sort) annule mort + poursuite — SAUF si l'attaquant est Ciseau (Tranchant perce Aegis et tue quand même). 3) Sinon : mort + poursuite normale.",
             ]}
           />
           {/* THE BIG ONE — single source of truth on les 5 passifs RPSLS.

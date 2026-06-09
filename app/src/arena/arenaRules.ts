@@ -347,18 +347,21 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
     const counterBA = moveCountersMove(cb.move, ca.move);
 
     if (counterAB && !counterBA) {
-      // A counters B in RPSLS. Two outcomes:
-      //  • Esquive on B consumes its dodge charge → B survives, A doesn't
-      //    pursue (the dodge "wasted A's swing").
-      //  • Otherwise: B dies instantly AND A's ATK pursues to B's hero
-      //    (Alex 2026-06-09 design lock: the winner finishes the swing on
-      //    the opponent hero — anything that beats X in RPSLS keeps swinging
-      //    onto the hero behind). A's hero attack can still be deflected by
-      //    a charged Pierre on B's side (consumes 1 charge).
+      // A counters B in RPSLS. Save order (highest priority first):
+      //  1. Esquive (B Lézard dodgeCharge) → B survives, A doesn't pursue.
+      //  2. Aegis (B divineShield) UNLESS A is Tranchant (Scissors pierce
+      //     Aegis at combat). Aegis consumes, B survives, A doesn't pursue.
+      //  3. Otherwise: B dies AND A's ATK pursues to B's hero (counter
+      //     "swing-through" 2026-06-09). Pursuit can still be deflected
+      //     by a charged Pierre on B's side (consumes 1 charge).
       const winnerA = bluntOnCombat(ca);
       const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
       if (cb.dodgeCharge) {
         lanes[laneIdx] = { a: winnerA, b: { ...cb, dodgeCharge: false } };
+        return { ...board, lanes };
+      }
+      if (cb.divineShield && !ca.pierces) {
+        lanes[laneIdx] = { a: winnerA, b: { ...cb, divineShield: false } };
         return { ...board, lanes };
       }
       lanes[laneIdx] = { a: winnerA, b: null };
@@ -373,6 +376,10 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
       const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
       if (ca.dodgeCharge) {
         lanes[laneIdx] = { a: { ...ca, dodgeCharge: false }, b: winnerB };
+        return { ...board, lanes };
+      }
+      if (ca.divineShield && !cb.pierces) {
+        lanes[laneIdx] = { a: { ...ca, divineShield: false }, b: winnerB };
         return { ...board, lanes };
       }
       lanes[laneIdx] = { a: null, b: winnerB };
