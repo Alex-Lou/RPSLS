@@ -403,7 +403,7 @@ export function ArenaLaneSlot({
   if (plannedSummon && showPlanned) {
     const pal = MOVE_PALETTE[plannedSummon.move];
     const rim = moveRim(pal.hex);
-    return (
+    const plannedContent = (
       <motion.div
         initial={{ opacity: 0, scale: 0.7 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -414,9 +414,6 @@ export function ArenaLaneSlot({
           boxShadow: `0 0 10px -3px ${moveGlow(pal.hex)}80`,
         }}
       >
-        {/* "EN ATTENTE" → 3 dots animés (loading) — plus écolo visuellement
-         *  qu'un texte qui crie. Position top-right, ne chevauche jamais le
-         *  nom du move au centre. */}
         <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded bg-black/55 backdrop-blur-sm flex items-center gap-0.5" aria-label="en attente">
           {[0, 1, 2].map((i) => (
             <motion.span
@@ -438,6 +435,25 @@ export function ArenaLaneSlot({
         </div>
       </motion.div>
     );
+    // Alex feedback 2026-06-09 : "remplacement ne marche pas" — quand on a
+    // déjà planifié un symbole sur la lane, le slot était figé sans
+    // clickable. Maintenant on wrap dans un button avec label "↻ Remplacer
+    // (planifié)" pour permettre de changer d'avis avant le lock.
+    if (clickable) {
+      return (
+        <button
+          onClick={onClick}
+          className="w-full focus:outline-none relative"
+          aria-label={clickableLabel}
+        >
+          {plannedContent}
+          <span className="absolute bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-amber-400/95 text-black text-[9px] uppercase tracking-wider font-black shadow-lg whitespace-nowrap z-30">
+            {clickableLabel}
+          </span>
+        </button>
+      );
+    }
+    return plannedContent;
   }
 
   // Empty slot — but wrapped as a BUTTON when clickable, with pulsing amber
