@@ -280,7 +280,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
         />
       </div>
 
-      <div className="relative px-4 pb-4 sm:px-5 sm:pb-5 flex flex-col gap-5 sm:gap-6 [@media(max-height:560px)]:px-2 [@media(max-height:560px)]:pb-2 [@media(max-height:560px)]:gap-2.5">
+      <div className="relative px-5 pb-5 sm:px-6 sm:pb-6 flex flex-col gap-6 sm:gap-7 min-h-[420px] sm:min-h-[480px] [@media(max-height:560px)]:px-2 [@media(max-height:560px)]:pb-2 [@media(max-height:560px)]:gap-2.5 [@media(max-height:560px)]:min-h-0">
         {/* Opponent lane row — ghost previews of opp summons during reveal.
          *  Slots become tappable when a spell targets OPP creatures (Curse,
          *  Sangsue, Trou Noir). */}
@@ -499,7 +499,7 @@ function LaneRow({
     return !!c && (c.move === "paper" || c.move === "spock");
   });
   return (
-    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+    <div className="grid grid-cols-3 gap-2.5 sm:gap-3.5">
       {[0, 1, 2].map((i) => {
         const lane = i as LaneIndex;
         const c = lanes[lane][renderSide];
