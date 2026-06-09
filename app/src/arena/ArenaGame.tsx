@@ -37,6 +37,7 @@ import { advanceToNextTurn, makeInitialBoard } from "./arenaRules";
 import { cpuArenaDecision } from "./arenaAI";
 import {
   HERO_MAX_HP,
+  MAX_SPELLS_PER_TURN,
   type ArenaTargeting,
   type BoardState,
   type LaneIndex,
@@ -216,11 +217,13 @@ export function ArenaGame({
   /* ──────────── Intent builders ──────────── */
 
   function addSpell(spell: PlayedSpell) {
-    // Reserve mana checks happen at lock — here we only enforce that the
-    // intent doesn't already contain the same spell instance (the UI may
-    // call this twice on a rapid tap).
+    // Alex feedback F : limite MAX_SPELLS_PER_TURN sorts par tour pour
+    // éviter les tours dump-tout. Si déjà au max, fizzle (haptic neutral).
     hapticTap();
-    setIntent((cur) => ({ ...cur, spells: [...cur.spells, spell] }));
+    setIntent((cur) => {
+      if (cur.spells.length >= MAX_SPELLS_PER_TURN) return cur;
+      return { ...cur, spells: [...cur.spells, spell] };
+    });
   }
 
   function removeSpell(idx: number) {

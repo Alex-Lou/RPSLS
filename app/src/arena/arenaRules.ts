@@ -427,7 +427,8 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
         return { ...board, lanes };
       }
       lanes[laneIdx] = { a: winnerA, b: null };
-      const updatedBoard = { ...board, lanes };
+      // Alex feedback D : kill bonus pour le côté attaquant (A a tué B).
+      const updatedBoard = { ...board, lanes, a: { ...board.a, killBonusPending: true } };
       const deflect = findDeflector(updatedBoard, "b");
       if (deflect) {
         alog("combat", `L${laneIdx} A wins → B die. Poursuite hero b → DEFLECTED par Pierre L${deflect.lane}`);
@@ -451,7 +452,8 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
         return { ...board, lanes };
       }
       lanes[laneIdx] = { a: null, b: winnerB };
-      const updatedBoard = { ...board, lanes };
+      // Alex feedback D : kill bonus pour le côté attaquant (B a tué A).
+      const updatedBoard = { ...board, lanes, b: { ...board.b, killBonusPending: true } };
       const deflect = findDeflector(updatedBoard, "a");
       if (deflect) {
         alog("combat", `L${laneIdx} B wins → A die. Poursuite hero a → DEFLECTED par Pierre L${deflect.lane}`);
@@ -488,7 +490,12 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
     }
     const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
     lanes[laneIdx] = { a: newA, b: newB };
-    return { ...board, lanes };
+    // Alex feedback D : mirror trade kill bonus — chaque side qui a tué
+    // récupère un bonus. Si A killed B → A gets bonus. Si both died → both
+    // bonus (mutual destruction = double récompense, agressivité OK).
+    const heroA = !newB ? { ...board.a, killBonusPending: true } : board.a;
+    const heroB = !newA ? { ...board.b, killBonusPending: true } : board.b;
+    return { ...board, lanes, a: heroA, b: heroB };
   }
 
   // TAUNT (Provocation): if the would-be-attacked side has a CHARGED
@@ -575,12 +582,13 @@ export function advanceToNextTurn(board: BoardState): BoardState {
   const nextTurn = board.turn + 1;
   alogSetTurn(nextTurn);
   alog("turn", `=== Tour ${nextTurn} === a.hp=${board.a.hp} b.hp=${board.b.hp}`);
-  // Alex feedback 2026-06-09 : "fin de tour pioche rien du tout, on se
-  // retrouve vite à court de jeu" → pioche 2 cartes au lieu de 1 pour
-  // garder de la matière à jouer plus longtemps. 2 cartes + main initiale
-  // de 5 + deck taille 12 = ~24 tours avant reshuffle complet.
-  const a = refreshHero(drawCards(board.a, 2));
-  const b = refreshHero(drawCards(board.b, 2));
+  // Alex feedback 2026-06-09 D : "récompenser l'agression" → si tu as
+  // tué une créature opp ce tour, tu pioches +1 carte bonus au tour
+  // suivant. killBonusPending reset après la pioche bonus.
+  const drawA = 2 + (board.a.killBonusPending ? 1 : 0);
+  const drawB = 2 + (board.b.killBonusPending ? 1 : 0);
+  const a = refreshHero({ ...drawCards(board.a, drawA), killBonusPending: false });
+  const b = refreshHero({ ...drawCards(board.b, drawB), killBonusPending: false });
   return {
     ...board,
     turn: nextTurn,

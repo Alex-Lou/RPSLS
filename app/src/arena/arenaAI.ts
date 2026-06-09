@@ -24,7 +24,7 @@
  */
 
 import { CARDS } from "../ranked/cards";
-import { CREATURE_STATS, moveCountersMove } from "./arenaTypes";
+import { CREATURE_STATS, MAX_SPELLS_PER_TURN, moveCountersMove } from "./arenaTypes";
 import type {
   BoardState,
   PlayedSpell,
@@ -219,6 +219,12 @@ export function cpuArenaDecision(
   // Final priority sort — caller (resolver) will re-sort, but doing it here
   // keeps the intent legible if anyone inspects it for tests.
   intent.spells.sort((s1, s2) => spellPriority(s1.id) - spellPriority(s2.id));
+  // Alex feedback F : symétrie joueur — CPU aussi gated à MAX_SPELLS_PER_TURN.
+  // Truncate à la fin pour garder les sorts les plus prioritaires (haut de
+  // la liste après le tri). Sinon CPU avait avantage avec spam illimité.
+  if (intent.spells.length > MAX_SPELLS_PER_TURN) {
+    intent.spells.length = MAX_SPELLS_PER_TURN;
+  }
 
   return intent;
 }

@@ -18,11 +18,17 @@ import type { CardId } from "../ranked/rankedTypes";
 /* ───────────────────────── Hero ───────────────────────── */
 
 export const HERO_MAX_HP = 20;
-export const MANA_CAP = 10;
+// Alex feedback 2026-06-09 G : "repenser le fun, parties s'épuisent vite"
+// → MANA_CAP 10→8 pour rendre les ressources plus précieuses, le tempo
+// du match plus serré (max ATK lift à T8 au lieu de T10).
+export const MANA_CAP = 8;
 export const LANE_COUNT = 3;
-// Alex feedback 2026-06-09 : "à court de jeu" → bump.
 export const HAND_CAP = 10;
 export const STARTING_HAND_SIZE = 5;
+// Alex feedback 2026-06-09 F : "controler usage et nombre de cartes par
+// main/manche" → max 2 sorts intent par tour. Empêche les tours dump-tout
+// quand on a beaucoup de mana, force à étaler les plays.
+export const MAX_SPELLS_PER_TURN = 2;
 /** Soft cap on turns — if neither hero is dead by then, the lower-HP loses
  *  (sudden-death fail-safe so an over-defensive match still ends). */
 export const TURN_HARD_CAP = 30;
@@ -32,11 +38,17 @@ export type Side = "a" | "b";
 export interface HeroState {
   hp: number;
   maxHp: number;
-  /** Constellation Pro v2 — the Voie (RPSLS affinity) chosen by this hero
-   *  before the match. Creatures of this exact move get a passive bonus
-   *  at summon time (provocationCharges, hp, voieAtkBonus). null = no
-   *  affinity picked (fallback to defaults, no bonus). */
   affinity?: import("../engine/game").Move;
+  /** Alex feedback A 2026-06-09 : "Aegis 1 cast par hero par match" pour
+   *  casser les stalemates où l'opp re-cast Aegis sur la même créature à
+   *  chaque tour. Set à true à la première cast d'Aegis (lane ou self) ;
+   *  applyAegis fizzle silencieusement si déjà true. Reset au match start. */
+  aegisCastThisMatch?: boolean;
+  /** Alex feedback D 2026-06-09 : "récompenser l'agression" → si ce hero
+   *  a tué une créature opp ce tour, il pioche +1 carte bonus au prochain
+   *  tour. Set à true dans resolveLaneCombat quand une mort est causée,
+   *  reset à false au début du tour suivant après la pioche bonus. */
+  killBonusPending?: boolean;
   /** Mana available THIS turn. Refreshes to maxMana at the start of each turn. */
   mana: number;
   /** Mana ceiling — increments by 1 every turn up to MANA_CAP. */

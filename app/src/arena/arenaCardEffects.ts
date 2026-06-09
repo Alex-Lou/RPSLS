@@ -163,19 +163,27 @@ function isDetached(c: Creature | null | undefined): boolean {
  *  BONUS on a Pierre target: ALSO refills its Provocation charge to 1 — Aegis
  *  becomes the dedicated "rebuild the tank" tool when its charge is spent. */
 function applyAegis(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
+  // Alex feedback A 2026-06-09 : Aegis Pro = 1 cast par hero par match.
+  // Casse les stalemates où l'opp re-cast Aegis chaque tour → Pierre /
+  // Lézard invincibles. 2e cast fizzle silencieusement.
+  const heroBefore = side === "a" ? board.a : board.b;
+  if (heroBefore.aegisCastThisMatch) return board;
+  let updated: BoardState;
   if (spell.kind === "lane") {
     const c = getMyCreatureOnLane(board, side, spell.lane);
     if (!c || isDetached(c)) return board;
     const refilled = c.move === "rock"
       ? { ...c, divineShield: true, provocationCharges: Math.max(c.provocationCharges, 1) }
       : { ...c, divineShield: true };
-    return withMyCreatureOnLane(board, side, spell.lane, refilled);
+    updated = withMyCreatureOnLane(board, side, spell.lane, refilled);
+  } else if (spell.kind === "self") {
+    updated = withSideHero(board, side, { ...heroBefore, divineShield: true });
+  } else {
+    return board;
   }
-  if (spell.kind === "self") {
-    const hero = side === "a" ? board.a : board.b;
-    return withSideHero(board, side, { ...hero, divineShield: true });
-  }
-  return board;
+  // Lock further casts on this hero.
+  const heroAfter = side === "a" ? updated.a : updated.b;
+  return withSideHero(updated, side, { ...heroAfter, aegisCastThisMatch: true });
 }
 
 /** Anchor — my creature on that lane is IMMUNE to enemy spells this turn.
