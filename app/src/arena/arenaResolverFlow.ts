@@ -177,11 +177,18 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
           }, LANE_CHARGE_MS * 0.55);
           window.setTimeout(() => {
             const prevB = b;
-            b = resolveLaneCombatAt(b, laneIdx);
-            // Sanity log : confirme que resolveLaneCombatAt a bien renvoyé
-            // un board updated (Alex flag L1 paper>rock counter qui ne tue
-            // pas la Pierre opp). Si POST-RESOLVE dit "same-ref" alors la
-            // fonction n'a pas muté le state. Si "null" → return undefined.
+            // Wrap resolveLaneCombatAt in try-catch. Si le combat throw
+            // silencieusement (ce qu'on suspecte pour le bug L2 rock vs
+            // scissors qui stop à step=updatedBoardBuilt), on l'attrape et
+            // on log l'erreur AU LIEU de laisser l'exception unwind le
+            // setTimeout (qui sinon empêchait le kill d'être appliqué).
+            try {
+              b = resolveLaneCombatAt(b, laneIdx);
+            } catch (e) {
+              const msg = e instanceof Error ? `${e.message}\n${e.stack ?? ""}` : String(e);
+              alog("combat", `L${laneIdx} EXCEPTION: ${msg}`);
+              b = prevB;
+            }
             if (!b) {
               alog("combat", `L${laneIdx} POST-RESOLVE BUG : board=null !`);
               b = prevB;
