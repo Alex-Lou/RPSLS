@@ -23,7 +23,11 @@ export const HERO_MAX_HP = 20;
 // du match plus serré (max ATK lift à T8 au lieu de T10).
 export const MANA_CAP = 8;
 export const LANE_COUNT = 3;
-export const HAND_CAP = 10;
+// Alex feedback 2026-06-09 : "trop de cartes dans la main, slide pas dispo"
+// → HAND_CAP 10 → 7 pour réduire la surcharge visuelle. Le hand strip
+// gère le slide horizontal natif (overflow-x-auto + touch-action: pan-x)
+// donc 7 cartes max est confortable sans débordement.
+export const HAND_CAP = 7;
 export const STARTING_HAND_SIZE = 5;
 // Alex feedback 2026-06-09 F : "controler usage et nombre de cartes par
 // main/manche" → max 2 sorts intent par tour. Empêche les tours dump-tout

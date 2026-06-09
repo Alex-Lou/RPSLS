@@ -219,9 +219,19 @@ export function ArenaGame({
   function addSpell(spell: PlayedSpell) {
     // Alex feedback F : limite MAX_SPELLS_PER_TURN sorts par tour pour
     // éviter les tours dump-tout. Si déjà au max, fizzle (haptic neutral).
+    // Alex feedback : "pas permettre l'usage de la même carte deux fois
+    // sur le même lane" → reject si même id ET même lane déjà dans intent.
+    // Pour spells non-lane (self / hero / global), simple check sur id.
     hapticTap();
     setIntent((cur) => {
       if (cur.spells.length >= MAX_SPELLS_PER_TURN) return cur;
+      const duplicate = cur.spells.some((s) => {
+        if (s.id !== spell.id) return false;
+        if (s.kind !== spell.kind) return false;
+        if (s.kind === "lane" && spell.kind === "lane") return s.lane === spell.lane;
+        return true; // same id + same non-lane target → dup
+      });
+      if (duplicate) return cur;
       return { ...cur, spells: [...cur.spells, spell] };
     });
   }

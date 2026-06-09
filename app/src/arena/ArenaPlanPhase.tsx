@@ -353,7 +353,16 @@ export function ArenaPlanPhase({
        *  éventail mais DEVANT, pas DERRIÈRE!"). */}
       <div className="h-[82px] flex items-end justify-center relative z-30">
       {me.hand.length > 0 ? (
-        <div className="flex items-end justify-center gap-1 px-1 overflow-x-auto w-full">
+        // Alex feedback : "pas dispo le slide" → ajout de touchAction
+        // pan-x au wrapper pour permettre le scroll horizontal natif sans
+        // que le drag-card intercepte le swipe horizontal.
+        // justify-start au lieu de center pour que le scroll soit utile
+        // (si center et qu'il manque de place, les cards des extrémités
+        // sont coupées sans pouvoir scroller).
+        <div
+          className="flex items-end justify-start gap-1 px-1 overflow-x-auto w-full"
+          style={{ touchAction: "pan-x", scrollbarWidth: "thin" }}
+        >
           {me.hand.map((id, i) => {
             const card = CARDS[id];
             const supported = arenaSupported(id);
