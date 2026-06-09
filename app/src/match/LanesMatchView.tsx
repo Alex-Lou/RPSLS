@@ -102,6 +102,10 @@ export interface LanesMatchViewProps {
   /** Show the pick countdown. Online (vs real players) keeps it; solo vs CPU
    *  passes false so there's no time pressure and no move played for you. */
   showTimer?: boolean;
+  /** Competitive context (online) → mid-match quit triggers the escalating
+   *  rankLp abandon penalty. Casual (solo vs CPU) passes false so a local
+   *  forfeit doesn't move the ladder. Default true (rétro-compat online). */
+  competitive?: boolean;
 }
 
 /* ──────────── Main view ──────────── */
@@ -117,6 +121,7 @@ export function LanesMatchView({
   onLeave,
   onRematch,
   showTimer = true,
+  competitive = true,
 }: LanesMatchViewProps & { onRematch?: () => void }) {
   const t = useT();
   const recordAbandon = useStore((s) => s.recordAbandon);
@@ -294,13 +299,14 @@ export function LanesMatchView({
       <AnimatePresence>
         {quitConfirmOpen && (
           <QuitConfirmModal
-            competitive
+            competitive={competitive}
             onCancel={() => setQuitConfirmOpen(false)}
             onConfirm={() => {
               setQuitConfirmOpen(false);
-              // Online lanes = competitive → register the abandon so repeat
+              // Competitive (online) → register the abandon so repeat
               // quitters take the escalating LP penalty before we leave.
-              recordAbandon();
+              // Casual local vs CPU skips it: no ladder to penalise.
+              if (competitive) recordAbandon();
               onLeave();
             }}
           />
