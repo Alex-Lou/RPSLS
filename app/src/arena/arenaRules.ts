@@ -118,22 +118,51 @@ export function healHero(hero: HeroState, amount: number): HeroState {
   return { ...hero, hp: Math.min(hero.maxHp, hero.hp + amount) };
 }
 
+/** Alex feedback 2026-06-09 Round 7 — limites de copies par rareté en main :
+ *  common 3, rare 2, epic 1, legendary 1. Empêche le spam d'une seule carte
+ *  puissante. Plus la carte est rare, plus son cap en main est restrictif. */
+const HAND_RARITY_CAP: Record<string, number> = {
+  common: 3,
+  rare: 2,
+  epic: 1,
+  legendary: 1,
+};
+
 /** Pull `n` cards from the deck → hand (reshuffles discard into deck if the
  *  deck runs dry mid-draw). Returns the new HeroState. Cap at HAND_CAP — extra
- *  cards are "burned" (lost to the void — classic overdraw rule). */
+ *  cards sont "burned" (lost to the void — classic overdraw rule).
+ *
+ *  Alex feedback Round 7 : si une pioche violerait le cap rareté en main
+ *  (3 commons / 2 rares / 1 epic / 1 leg), retry une autre carte (option A
+ *  "replace") jusqu'à 3 tentatives par slot avant burn. Préserve la curve
+ *  CCG : le joueur garde un mix de raretés équilibré. */
 export function drawCards(hero: HeroState, n: number): HeroState {
   let { hand, deck, discard } = hero;
   hand = hand.slice();
   deck = deck.slice();
   discard = discard.slice();
   for (let i = 0; i < n; i++) {
-    if (deck.length === 0) {
-      if (discard.length === 0) break;
-      deck = shuffle(discard);
-      discard = [];
+    // 3 tentatives par slot pour respecter le cap rareté (option A replace).
+    let drawn: CardId | null = null;
+    for (let attempt = 0; attempt < 3 && drawn === null; attempt++) {
+      if (deck.length === 0) {
+        if (discard.length === 0) break;
+        deck = shuffle(discard);
+        discard = [];
+      }
+      const card = deck.shift()!;
+      const rarity = CARDS[card]?.rarity;
+      const cap = rarity ? HAND_RARITY_CAP[rarity] : 99;
+      const inHand = hand.filter((id) => id === card).length;
+      if (inHand >= cap) {
+        // Replace : retire cette carte au discard et retry une autre du deck.
+        discard.push(card);
+        continue;
+      }
+      drawn = card;
     }
-    const card = deck.shift()!;
-    if (hand.length < 8) hand.push(card);
+    if (drawn === null) break; // 3 retries fail ou deck vide
+    if (hand.length < 8) hand.push(drawn);
     // else: burn (overdraw — design choice to discourage over-stuffing the hand)
   }
   return { ...hero, hand, deck, discard };
