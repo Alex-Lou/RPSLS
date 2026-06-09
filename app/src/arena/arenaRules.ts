@@ -405,7 +405,6 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
   if (ca && cb) {
     const counterAB = moveCountersMove(ca.move, cb.move);
     const counterBA = moveCountersMove(cb.move, ca.move);
-    alog("combat", `L${laneIdx} ${csnap(ca)} vs ${csnap(cb)} | counterAB=${counterAB} counterBA=${counterBA} | cb.dodge=${cb.dodgeCharge} cb.shield=${cb.divineShield} ca.pierces=${ca.pierces}`);
 
     if (counterAB && !counterBA) {
       // A counters B in RPSLS. Save order (highest priority first):

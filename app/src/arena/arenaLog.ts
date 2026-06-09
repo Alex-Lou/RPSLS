@@ -1,47 +1,80 @@
 /**
- * arenaLog — lightweight structured logger for Constellation Pro.
+ * arenaLog — in-memory structured log buffer for Constellation Pro.
  *
- * Designed to be readable in `adb logcat | grep arena` so Alex (and I) can
- * follow EXACTLY what happens turn-by-turn in a match without bumping into
- * UI guesses. Each line is one logical event, prefixed by `[arena:<cat>]`
- * so categories can be filtered (e.g. `grep arena:combat`).
+ * Replaces the previous `console.log → adb logcat` flow which lost lines
+ * under load (Alex feedback "logs perdus, suivi en retard"). Now :
+ *  - logs are pushed into a bounded in-memory ring buffer
+ *  - subscribers (React components) are notified on every push
+ *  - a debug overlay inside the app reads the buffer live, no Android
+ *    logcat in the loop → zero drops, zero latency
+ *  - console.log is STILL called as a fallback so `adb logcat` works too
+ *    when needed, but the in-app panel is the canonical source.
  *
- * Toggle ARENA_LOG_ENABLED off before merge / release if logs become noisy.
- * Kept on during the v2 development cycle for diagnosis.
+ * Each entry is ONE LOGICAL EVENT (a verdict, not a play-by-play dump),
+ * so the panel stays readable across a long match.
  */
 
-/** Flip to false to silence ALL arena logs at once. */
 const ARENA_LOG_ENABLED = true;
+const MAX_BUFFER = 250;
 
-/** Short turn marker so the player can correlate the log against the
- *  on-screen turn counter. Updated from arenaRules.advanceToNextTurn. */
+export interface ArenaLogEntry {
+  ts: number;
+  turn: number;
+  category: string;
+  msg: string;
+}
+
+const buffer: ArenaLogEntry[] = [];
+const listeners = new Set<() => void>();
 let currentTurn = 0;
 
 export function alogSetTurn(turn: number): void {
   currentTurn = turn;
 }
 
-/** Generic log — `category` filters via `grep arena:<category>`. Args are
- *  joined with spaces, primitives stringified, objects JSON-stringified.
- *  Output is one line per call. */
+/** Push a single event into the buffer + notify subscribers. */
 export function alog(category: string, ...args: unknown[]): void {
   if (!ARENA_LOG_ENABLED) return;
   const parts = args.map((a) => {
     if (a === null || a === undefined) return String(a);
     if (typeof a === "string" || typeof a === "number" || typeof a === "boolean") return String(a);
-    try { return JSON.stringify(a); } catch { return "[unstringifiable]"; }
+    try { return JSON.stringify(a); } catch { return "[?]"; }
   });
+  const msg = parts.join(" ");
+  const entry: ArenaLogEntry = { ts: Date.now(), turn: currentTurn, category, msg };
+  buffer.push(entry);
+  if (buffer.length > MAX_BUFFER) buffer.shift();
+  // Notify subscribers — copy the set to a list so a subscriber that
+  // unsubscribes during notify doesn't mutate the iteration.
+  for (const cb of Array.from(listeners)) cb();
+  // Fallback: also send to console so `adb logcat | grep arena` still
+  // works for offline diagnosis when needed.
   // eslint-disable-next-line no-console
-  console.log(`[arena:${category}] T${currentTurn} ${parts.join(" ")}`);
+  console.log(`[arena:${category}] T${currentTurn} ${msg}`);
 }
 
-/** Compact creature snapshot for log lines : "rock(a)1/3" / "scissors(b)4/1". */
+/** Snapshot of the current buffer — returned as a NEW array so callers
+ *  can freely sort / slice without mutating the buffer. */
+export function arenaLogSnapshot(): ArenaLogEntry[] {
+  return buffer.slice();
+}
+
+/** Subscribe to log mutations — used by useSyncExternalStore or
+ *  the legacy useEffect+listener pattern in ArenaDebugOverlay. */
+export function arenaLogSubscribe(cb: () => void): () => void {
+  listeners.add(cb);
+  return () => { listeners.delete(cb); };
+}
+
+/** Wipe the buffer (called at match start so each match has a clean log). */
+export function arenaLogReset(): void {
+  buffer.length = 0;
+  currentTurn = 0;
+  for (const cb of Array.from(listeners)) cb();
+}
+
+/** Compact creature snapshot : "rock(a)3HP". */
 export function csnap(c: { move: string; side: string; hp: number } | null | undefined): string {
   if (!c) return "∅";
   return `${c.move}(${c.side})${c.hp}HP`;
-}
-
-/** Compact lane snapshot for log lines : "L0:rock(a)1/3 vs scissors(b)4/1". */
-export function lsnap(laneIdx: number, lane: { a: { move: string; side: string; hp: number } | null; b: { move: string; side: string; hp: number } | null }): string {
-  return `L${laneIdx}:${csnap(lane.a)}vs${csnap(lane.b)}`;
 }

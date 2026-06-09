@@ -28,9 +28,11 @@ import {
   type MatchBackHandle,
 } from "../match/sharedMatchUI";
 import { ArenaBoard } from "./ArenaBoard";
+import { ArenaDebugOverlay } from "./ArenaDebugOverlay";
 import { ArenaMatchEnd } from "./ArenaMatchEnd";
 import { ArenaMatchSplash } from "./ArenaMatchSplash";
 import { ArenaPlanPhase } from "./ArenaPlanPhase";
+import { arenaLogReset } from "./arenaLog";
 import { advanceToNextTurn, makeInitialBoard } from "./arenaRules";
 import { cpuArenaDecision } from "./arenaAI";
 import {
@@ -74,6 +76,14 @@ export function ArenaGame({
   // adaptive). Player affinity locked at match start, change in lobby pour
   // le prochain match.
   const playerAffinity = useRef(player.arenaAffinity);
+
+  // Wipe the log buffer at match start so each match has a clean diagnostic
+  // history (Alex flag : "tu pers tout finalement"). Called once at mount.
+  const logResetRef = useRef(false);
+  if (!logResetRef.current) {
+    arenaLogReset();
+    logResetRef.current = true;
+  }
 
   const [board, setBoard] = useState<BoardState>(() =>
     makeInitialBoard(playerDeck.current, CPU_ARENA_DECK, playerAffinity.current, undefined),
@@ -365,6 +375,10 @@ export function ArenaGame({
         onRemoveSummon={removeSummon}
         onLock={handleLockTurn}
       />
+      {/* Debug log overlay — floating 🐛 button + bottom-sheet panel
+       *  that shows live arena events. Replaces adb logcat (which
+       *  dropped lines under load) with an in-app live feed. */}
+      <ArenaDebugOverlay />
     </div>
   );
 }
