@@ -410,8 +410,10 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
   if (ca && cb) {
     const counterAB = moveCountersMove(ca.move, cb.move);
     const counterBA = moveCountersMove(cb.move, ca.move);
+    alog("combat", `L${laneIdx} BOTH-PRESENT counterAB=${counterAB} counterBA=${counterBA}`);
 
     if (counterAB && !counterBA) {
+      alog("combat", `L${laneIdx} branch=A-wins (counterAB && !counterBA)`);
       // A counters B in RPSLS. Save order (highest priority first):
       //  1. Esquive (B Lézard dodgeCharge) → B survives, A doesn't pursue.
       //  2. Aegis (B divineShield) UNLESS A is Tranchant (Scissors pierce
@@ -444,6 +446,7 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
       return { ...updatedBoard, b: damageHero(updatedBoard.b, atkA) };
     }
     if (counterBA && !counterAB) {
+      alog("combat", `L${laneIdx} branch=B-wins (counterBA && !counterAB)`);
       const winnerB = bluntOnCombat(cb);
       const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
       if (ca.dodgeCharge) {
