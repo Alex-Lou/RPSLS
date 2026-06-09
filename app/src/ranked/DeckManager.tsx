@@ -252,7 +252,7 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
       </div>
 
       {/* Scroll region — only this middle band scrolls. */}
-      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 pr-1">
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 px-1">
         {/* Main hand */}
         <div>
           <h2 className="text-[10px] uppercase tracking-[0.25em] font-bold text-emerald-400 mb-2">
@@ -487,7 +487,7 @@ function DeckSlot({
   return (
     <button
       onClick={onClick}
-      className="relative aspect-[3/4] rounded-xl overflow-hidden ring-1 ring-white/20 bg-surface-raised"
+      className="relative aspect-[3/4] rounded-xl overflow-hidden ring-1 ring-inset ring-white/20 bg-surface-raised"
     >
       <CardImage id={cardId} glyphSize="text-2xl" />
       <div className="absolute bottom-0 left-0 right-0 bg-black/70 py-0.5 z-10">
