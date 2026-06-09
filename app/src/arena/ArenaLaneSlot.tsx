@@ -206,32 +206,54 @@ export function ArenaLaneSlot({
         >
           {creature.move}
         </span>
-        {/* ATK and HP corner badges. ATK badge is RED + ↓ when a malus
-         *  (Lente, Fanaison, Émoussé, Curse atkBuff<0) reduces the value
-         *  below base+buff — Alex's "-1 sur la Pierre" was this state. */}
-        <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between px-1 pb-0.5">
-          <span
-            className={
-              "inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[10px] font-black leading-none tabular-nums shadow " +
-              (atkReduced
-                ? "bg-rose-600/90 text-rose-50"
-                : "bg-amber-500/85 text-amber-50")
-            }
-            title={atkReduced ? "ATK réduite par un malus actif" : undefined}
-          >
-            ⚔ {atk}
-            {atkReduced && <span className="text-[8px] opacity-95">↓</span>}
-            {!atkReduced && creature.atkBuff > 0 && <span className="text-[7px] opacity-90">+{creature.atkBuff}</span>}
-          </span>
-          <motion.span
-            key={creature.hp}
-            initial={{ scale: 1.3, color: "#fda4af" }}
-            animate={{ scale: 1, color: lowHp ? "#fb7185" : "#fee2e2" }}
-            transition={{ duration: 0.3 }}
-            className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-rose-600/85 text-[10px] font-black leading-none tabular-nums shadow"
-          >
-            ❤ {creature.hp}/{stats.hp}
-          </motion.span>
+        {/* ATK and HP corner badges + a MINI HP BAR at the very bottom edge
+         *  of the slot that animates fill width on damage/heal — Alex
+         *  feedback : "je vois pas les pv de chaque move descendre",
+         *  the chip alone wasn't read as a status indicator. */}
+        <div className="absolute bottom-0 left-0 right-0 flex flex-col gap-0">
+          {/* HP bar — sits above the badges. Fills + colour changes by
+           *  threshold (green > 50%, amber > 25%, rose otherwise). The
+           *  width animates so a hit is OBVIOUS, not just a number flip. */}
+          <div className="mx-1 mb-0.5 h-1.5 rounded-full bg-black/65 overflow-hidden ring-1 ring-black/40 shadow-inner">
+            <motion.div
+              className={
+                "h-full rounded-full " +
+                (creature.hp / stats.hp > 0.5
+                  ? "bg-gradient-to-r from-emerald-500 to-emerald-300"
+                  : creature.hp / stats.hp > 0.25
+                  ? "bg-gradient-to-r from-amber-500 to-amber-300"
+                  : "bg-gradient-to-r from-rose-600 to-rose-400")
+              }
+              initial={false}
+              animate={{ width: `${Math.max(0, Math.min(100, (creature.hp / stats.hp) * 100))}%` }}
+              transition={{ type: "spring", stiffness: 220, damping: 24 }}
+            />
+          </div>
+          {/* Bottom row : ATK left + HP chip right. */}
+          <div className="flex items-end justify-between px-1 pb-0.5">
+            <span
+              className={
+                "inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[10px] font-black leading-none tabular-nums shadow " +
+                (atkReduced
+                  ? "bg-rose-600/90 text-rose-50"
+                  : "bg-amber-500/85 text-amber-50")
+              }
+              title={atkReduced ? "ATK réduite par un malus actif" : undefined}
+            >
+              ⚔ {atk}
+              {atkReduced && <span className="text-[8px] opacity-95">↓</span>}
+              {!atkReduced && creature.atkBuff > 0 && <span className="text-[7px] opacity-90">+{creature.atkBuff}</span>}
+            </span>
+            <motion.span
+              key={creature.hp}
+              initial={{ scale: 1.3, color: "#fda4af" }}
+              animate={{ scale: 1, color: lowHp ? "#fb7185" : "#fee2e2" }}
+              transition={{ duration: 0.3 }}
+              className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-rose-600/85 text-[10px] font-black leading-none tabular-nums shadow"
+            >
+              ❤ {creature.hp}/{stats.hp}
+            </motion.span>
+          </div>
         </div>
         {/* INNATE PASSIVE BADGE top-right — one per move, RPSLS identity.
          *  Pierre's Provocation can be suppressed by opp Étouffe (Feuille)
