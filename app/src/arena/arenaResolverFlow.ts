@@ -201,10 +201,10 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
               alog("combat", `L${laneIdx} POST-RESOLVE same-ref (pas de mutation)`);
             }
             setBoard(b);
-            if (b.a.hp <= 0 || b.b.hp <= 0) {
-              setCombatLane(null);
-              return;
-            }
+            // Alex feedback 2026-06-09 point #5 "but d'or" : NE PLUS early-exit
+            // sur match-end interim. On résout les 3 lanes complètes pour
+            // permettre l'égalité (a≤0 ET b≤0). Le verdict final est calculé
+            // après les 3 lanes (cf endOfTurnCleanup + draw check ci-dessous).
             if (laneIdx < 2) {
               window.setTimeout(() => {
                 setCombatLane(null);
@@ -217,17 +217,27 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
         };
         runLane(0);
 
-        // After all 3 lanes — cleanup + HP check.
+        // After all 3 lanes — cleanup + HP check + draw detection.
         const TOTAL_COMBAT_MS = LANE_CHARGE_MS * 3 + LANE_PAUSE_MS * 2 + 200;
         window.setTimeout(() => {
           b = endOfTurnCleanup(b);
-          if (b.a.hp <= 0 || b.b.hp <= 0) {
+          const aDead = b.a.hp <= 0;
+          const bDead = b.b.hp <= 0;
+          if (aDead || bDead) {
             b = { ...b, phase: "match-end" };
           }
+          if (aDead && bDead) {
+            alog("turn", `MATCH END — ÉGALITÉ (a.hp=${b.a.hp}, b.hp=${b.b.hp}) → tie-break Mort subite à venir (Lot H)`);
+          }
           setBoard(b);
-          if ((b.a.hp <= 0 || b.b.hp <= 0) && onMatchEnd) {
+          if ((aDead || bDead) && onMatchEnd) {
             window.setTimeout(() => {
-              onMatchEnd(b.b.hp <= 0 && b.a.hp > 0);
+              // Convention onMatchEnd(playerWon) : true = player win.
+              // Égalité (aDead && bDead) → null. Pour MVP on traite comme
+              // "ni victoire ni défaite" (player NOT wins) — ArenaMatchEnd
+              // gérera l'affichage du label "Égalité".
+              const playerWon = bDead && !aDead;
+              onMatchEnd(playerWon);
             }, 200);
           }
         }, TOTAL_COMBAT_MS);

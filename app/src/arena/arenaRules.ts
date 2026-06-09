@@ -390,15 +390,14 @@ export function applySummons(board: BoardState, intent: TurnIntent, side: Side):
     } else {
       alog("summon", `${side} pose ${summon.move} L${summon.lane} affinity=${hero.affinity ?? "∅"}`);
     }
-    // Lot C — Constellation 3⭐ : incrémenter le compteur si le symbole posé
-    // correspond à l'affinité du hero. Capé visuellement à 3 mais on garde
-    // la vraie valeur pour le futur (Lot D Finisher déclenché à 3, scaling
-    // au-delà possible si on veut un finisher rechargeable).
-    const isAffinityMatch = hero.affinity !== undefined && summon.move === hero.affinity;
-    const nextCount = isAffinityMatch ? hero.constellationCount + 1 : hero.constellationCount;
-    const unlocked = nextCount >= 3 && !hero.finisherUnlocked;
-    if (isAffinityMatch) {
-      alog("summon", `${side} constellation ⭐ ${nextCount}/3 ${unlocked ? "→ FINISHER UNLOCKED" : ""}`);
+    // Lot C — Constellation 3⭐ : Alex feedback 2026-06-09 — passage en mode
+    // SIMULTANÉ (vs cumulé). Le compteur compte les Voie-créatures VIVANTES
+    // sur le board, pas les poses cumulées. Force le joueur à garder ses 3
+    // Voies en vie pour atteindre 3⭐.
+    const aliveVoieCount = countAliveAffinity(lanes, side, hero.affinity);
+    const unlocked = aliveVoieCount >= 3 && !hero.finisherUnlocked;
+    if (hero.affinity && summon.move === hero.affinity) {
+      alog("summon", `${side} constellation ⭐ ${aliveVoieCount}/3 ${unlocked ? "→ FINISHER UNLOCKED" : ""}`);
     }
     // Lot D — Injection automatique de la carte Finisher dans la main au
     // moment où on passe 3⭐ pour la 1ère fois. Choix selon l'Affinité.
@@ -415,12 +414,30 @@ export function applySummons(board: BoardState, intent: TurnIntent, side: Side):
         ...hero,
         mana: hero.mana - 1,
         hand: nextHand,
-        constellationCount: nextCount,
+        constellationCount: aliveVoieCount,
         finisherUnlocked: hero.finisherUnlocked || unlocked,
       },
     } as BoardState;
   }
   return b;
+}
+
+/** Lot C v2 — Count les créatures de `side` qui correspondent à son Affinité
+ *  ET sont vivantes. Utilisé pour la Constellation 3⭐ SIMULTANÉE (Alex
+ *  feedback 2026-06-09) : il faut maintenir 3 Voies en vie en même temps
+ *  pour débloquer le Finisher, pas juste poser 3× cumulés. */
+export function countAliveAffinity(
+  lanes: readonly LaneState[],
+  side: Side,
+  affinity: Move | undefined,
+): number {
+  if (!affinity) return 0;
+  let count = 0;
+  for (const lane of lanes) {
+    const c = lane[side];
+    if (c && c.move === affinity) count++;
+  }
+  return count;
 }
 
 /** Run combat on a SINGLE lane — exported so the UI can sequence the

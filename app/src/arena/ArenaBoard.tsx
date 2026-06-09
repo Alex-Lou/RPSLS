@@ -273,7 +273,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
          *  Augur revealed on opp = my augurRevealedB (I cast augur on side b),
          *  i.e. board.augurRevealedB if I'm side a, else board.augurRevealedA. */}
         <ArenaHeroStrip
-          hero={opp} side="opp" turn={board.turn} name="CPU" avatar={undefined}
+          hero={opp} board={board} side="opp" turn={board.turn} name="CPU" avatar={undefined}
           incomingAttackKey={heroHit?.side === "opp" ? heroHit.key : null}
           augurRevealed={playerSide === "a" ? board.augurRevealedB : board.augurRevealedA}
         />
@@ -301,11 +301,10 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
          *  Replaces the previous 3-stack (phase banner + 2 reveal banners)
          *  so the eye has ONE thing to read at the center.
          *
-         *  Alex feedback 2026-06-09 point #3 : libérer l'espace central pour
-         *  les chips queue qui apparaissent pendant les manches (Augur révélés,
-         *  Aegis indicators, etc.). Wrapper avec my-2 sm:my-3 = ajout d'espace
-         *  vertical au centre, pousse les rows joueur/opp vers le haut/bas. */}
-        <div className="my-2 sm:my-3 [@media(max-height:560px)]:my-1">
+         *  Alex feedback 2026-06-09 point #2 : pad trop serré, agrandir le
+         *  board. Réduit le my-* du wrapper (was my-2 sm:my-3) pour rendre
+         *  le pad plus dense et combler l'espace vide vers la main strip. */}
+        <div className="my-0.5 sm:my-1 [@media(max-height:560px)]:my-0">
           <CenterStatus
             step={resolveStep ?? null}
             turn={board.turn}
@@ -334,7 +333,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
         {/* Player strip — HP bar flashes when an attack lands on player hero.
          *  Augur cast on me = opp's augurRevealed on my side. */}
         <ArenaHeroStrip
-          hero={me} side="you" turn={board.turn} name={playerName} avatar={playerAvatar}
+          hero={me} board={board} side="you" turn={board.turn} name={playerName} avatar={playerAvatar}
           incomingAttackKey={heroHit?.side === "you" ? heroHit.key : null}
           augurRevealed={playerSide === "a" ? board.augurRevealedA : board.augurRevealedB}
         />

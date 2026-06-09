@@ -236,6 +236,18 @@ export function ArenaGame({
         return true; // same id + same non-lane target → dup
       });
       if (duplicate) return cur;
+      // Alex feedback 2026-06-09 (option A) : Aegis ET Anchor sur la MÊME
+      // lane le même tour = mutual exclusion. Force un choix entre défense
+      // physique (Aegis) et défense magique (Anchor). Le 2e fizzle.
+      if ((spell.id === "aegis" || spell.id === "anchor") && spell.kind === "lane") {
+        const conflict = cur.spells.some((s) => {
+          if (s.kind !== "lane" || spell.kind !== "lane") return false;
+          if (s.lane !== spell.lane) return false;
+          const otherId = spell.id === "aegis" ? "anchor" : "aegis";
+          return s.id === otherId;
+        });
+        if (conflict) return cur;
+      }
       return { ...cur, spells: [...cur.spells, spell] };
     });
   }

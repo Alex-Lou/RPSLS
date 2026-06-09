@@ -145,6 +145,14 @@ T2 a constellation ⭐ 3/3 → FINISHER UNLOCKED
 
 ## 🆕 Feedback Alex 2026-06-09 (post-Lot D build)
 
+### Round 2 Alex feedback 2026-06-09 post-Lot D MVP ✅
+- **Aegis + Anchor mutual exclusion par lane** (option A) : interdit le combo défense physique+magique sur la même lane le même tour. Le 2e fizzle. Implémenté dans ArenaGame.addSpell.
+- **Aegis LOCK badge** : carte grayscale + chip "🔒 LOCK" si aegisCastThisMatch. Implémenté dans ArenaPlanPhase hand strip.
+- **Constellation simultanée** (passe de cumulé → 3 vivantes en même temps). countAliveAffinity helper, ArenaHeroStrip recompute live depuis board.lanes. UI reflète morts immédiatement.
+- **But d'or / égalité MVP** : combat 3 lanes joue toujours en entier (plus de early-exit interim). Si a≤0 ET b≤0 → DRAW (log + onMatchEnd(false) MVP, tie-break Mort subite Lot H).
+- **Pad agrandi** : my-0.5/sm:my-1 au lieu de my-2/sm:my-3, comble l'espace vide.
+- **Bouton logs repositionné** : top-right au lieu de bottom-right, libère les boutons système Android.
+
 ### #1 Limite cartes égales en main + Double usage (réflexion design)
 - **Limit par rareté** : common max 3, rare max 2, epic 1, legendary 1
 - **Double usage** option (B) préférée : 2 copies en main = "Surcharge" effet doublé (Précision +4 ATK au lieu +2, consume les 2 copies). Force un choix : thésauriser ou cast.

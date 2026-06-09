@@ -16,11 +16,16 @@ import { CARDS } from "../ranked/cards";
 import { CardImage } from "../ranked/CardImage";
 import { useT } from "../i18n";
 import type { CardId } from "../ranked/rankedTypes";
-import type { HeroState } from "./arenaTypes";
+import type { BoardState, HeroState } from "./arenaTypes";
 import { ArenaConstellationBar } from "./ArenaConstellationBar";
+import { countAliveAffinity } from "./arenaRules";
 
 export interface ArenaHeroStripProps {
   hero: HeroState;
+  /** Board complet — utilisé pour computer live le count Constellation
+   *  (Lot C v2 simultanée) plutôt que de lire hero.constellationCount qui
+   *  pourrait être stale après combat. Optionnel (fallback sur le count). */
+  board?: BoardState;
   side: "you" | "opp";
   turn: number;
   /** Display name shown next to the portrait — player nickname for "you",
@@ -40,7 +45,7 @@ export interface ArenaHeroStripProps {
 }
 
 export function ArenaHeroStrip({
-  hero, side, turn, name, avatar, incomingAttackKey, augurRevealed,
+  hero, board, side, turn, name, avatar, incomingAttackKey, augurRevealed,
 }: ArenaHeroStripProps) {
   const t = useT();
   const accent = side === "you" ? "text-emerald-300" : "text-rose-300";
@@ -187,11 +192,13 @@ export function ArenaHeroStrip({
           <span className="ml-auto font-bold text-ink-muted">🂠 {hero.hand.length}</span>
           {side === "you" && <span className="font-bold text-themed">T{turn}</span>}
         </div>
-        {/* Lot C — Constellation 3⭐. Affichée seulement si le hero a une
-         *  Affinité ; sinon le composant retourne null. */}
+        {/* Lot C v2 — Constellation 3⭐ SIMULTANÉE (Alex feedback 2026-06-09).
+         *  Count live recomputed depuis board.lanes pour refléter immédiatement
+         *  les morts au combat. Si board pas dispo (cas edge), fallback sur le
+         *  count stocké. */}
         {hero.affinity && (
           <ArenaConstellationBar
-            count={hero.constellationCount ?? 0}
+            count={board ? countAliveAffinity(board.lanes, side === "you" ? "a" : "b", hero.affinity) : (hero.constellationCount ?? 0)}
             affinity={hero.affinity}
             side={side}
             finisherUnlocked={hero.finisherUnlocked}
