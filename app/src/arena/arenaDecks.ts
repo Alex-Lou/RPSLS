@@ -16,9 +16,17 @@
  */
 
 import { arenaSupported } from "./arenaCardEffects";
+import { isFinisherCard } from "./arenaFinishers";
 import { CARDS } from "../ranked/cards";
 import type { TurnIntent } from "./arenaTypes";
 import type { CardId } from "../ranked/rankedTypes";
+
+/** True si la carte peut être placée dans un deck (player ou CPU).
+ *  Les Finishers Constellation Pro sont injectés UNIQUEMENT à 3⭐ via
+ *  arenaRules.applySummons — pas drawables, pas draftables. */
+export function isDeckable(id: CardId): boolean {
+  return arenaSupported(id) && !isFinisherCard(id);
+}
 
 /** CPU's curated Arena deck — fallback static deck if buildCpuDeckMirroring
  *  ne reçoit pas de playerDeck. Sinon utilisé via la version dynamique
@@ -51,7 +59,7 @@ export function buildCpuDeckMirroring(playerDeck: CardId[]): CardId[] {
   // Pool de cartes Arena-supported par rareté.
   const pools: Record<string, CardId[]> = { common: [], rare: [], epic: [], legendary: [] };
   for (const id of Object.keys(CARDS) as CardId[]) {
-    if (!arenaSupported(id)) continue;
+    if (!isDeckable(id)) continue;
     const card = CARDS[id];
     pools[card.rarity].push(id);
   }
@@ -139,7 +147,7 @@ export function buildPlayerDeck(saved: CardId[] | undefined): CardId[] {
     counts.set(c, cur + 1);
   };
   // Pass 1 : the saved Ranked deck (1 copy each at most).
-  const base = (saved ?? []).filter(arenaSupported);
+  const base = (saved ?? []).filter(isDeckable);
   for (const c of base) tryPush(c);
   // Force-include direct damage so the player can push lethal even when
   // all lanes are creature-blocked.
