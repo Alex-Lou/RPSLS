@@ -7,7 +7,7 @@
  * collection. Locked cards stay greyed with a hint.
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
 import { ALL_CARD_IDS, CARDS, isPassiveCard, RARITY_COLOR, RARITY_ORDER } from "./cards";
@@ -125,9 +125,21 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
   const mainSlots = deck.slice(0, MAIN_SLOTS) as (CardId | null)[];
   const reserveSlots = deck.slice(MAIN_SLOTS, TOTAL) as (CardId | null)[];
 
+  // Ref + auto-scroll to bring the detail panel into view next to the tapped
+  // card. Without this, tapping a card deep in the collection leaves the
+  // detail panel stuck above the scroll — Alex flagged the "chiant de
+  // scroll" feedback on long lists.
+  const detailPanelRef = useRef<HTMLDivElement | null>(null);
   function handleCardTap(id: CardId) {
     if (!collection.includes(id)) return;
-    setSelected(selected === id ? null : id);
+    const willSelect = selected !== id;
+    setSelected(willSelect ? id : null);
+    if (willSelect) {
+      // Defer to next frame so the panel has rendered before we scroll.
+      requestAnimationFrame(() => {
+        detailPanelRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+      });
+    }
   }
 
   function handleSlotTap(slotIdx: number) {
@@ -281,15 +293,19 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
 
         {/* Card detail panel — replaces the implicit "what does this do?" with
             an explicit info card whenever the player selects something from
-            the collection. Always-rendered slot avoids a layout jump on
-            select/deselect; a placeholder fills it otherwise. */}
-        <CardDetailPanel
-          id={selected}
-          masteryXp={(player.cardMastery ?? {})[selected ?? ""] ?? 0}
-          owned={selected ? collection.includes(selected) : false}
-          inDeck={selected ? usedInDeck.has(selected) : false}
-          t={t}
-        />
+            the collection. Auto-scrolls into view on selection so it lands
+            NEAR the tapped card instead of getting stuck at the top — Alex
+            feedback "il faut que l'aperçu apparaisse au-dessus de la ligne
+            de la carte touchée". */}
+        <div ref={detailPanelRef}>
+          <CardDetailPanel
+            id={selected}
+            masteryXp={(player.cardMastery ?? {})[selected ?? ""] ?? 0}
+            owned={selected ? collection.includes(selected) : false}
+            inDeck={selected ? usedInDeck.has(selected) : false}
+            t={t}
+          />
+        </div>
 
         {/* Collection — collapsible header + sticky filter bar + curve-grouped
             cards grid. Designed to scale past 46 cards without becoming a wall
@@ -762,12 +778,12 @@ function CardCell({
       className={
         "relative rounded-xl overflow-hidden aspect-[3/4] flex flex-col items-center justify-center transition " +
         (isSelected
-          ? "ring-2 ring-white shadow-lg shadow-white/30 scale-105"
+          ? "ring-2 ring-inset ring-white shadow-lg shadow-white/30 scale-105"
           : inDeck
-          ? "ring-2 ring-emerald-400/50 opacity-70"
+          ? "ring-2 ring-inset ring-emerald-400/50 opacity-70"
           : unlocked
-          ? "ring-1 ring-white/20"
-          : "ring-1 ring-white/5 grayscale opacity-30")
+          ? "ring-1 ring-inset ring-white/20"
+          : "ring-1 ring-inset ring-white/5 grayscale opacity-30")
       }
     >
       <CardImage id={id} glyphSize="text-xl" />

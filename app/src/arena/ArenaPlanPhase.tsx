@@ -310,21 +310,34 @@ export function ArenaPlanPhase({
               }}
               disabled={cannotAfford || disabled}
               className={
-                "relative h-12 sm:h-14 rounded-lg flex items-center justify-center active:scale-92 select-none " +
+                "relative h-12 sm:h-14 rounded-lg flex items-center justify-center active:scale-92 select-none overflow-hidden " +
                 (cannotAfford ? "opacity-30 grayscale " : "") +
                 (isTargeting ? "scale-105 " : "")
               }
               style={{
                 touchAction: "none",
-                background: "linear-gradient(160deg, rgba(20,22,32,0.92) 0%, rgba(10,12,20,0.92) 100%)",
-                border: `2px solid ${isTargeting ? "rgba(252, 211, 77, 0.9)" : rim}`,
+                background: `linear-gradient(160deg, color-mix(in oklab, ${pal.hex} 24%, rgba(20,22,32,0.95)) 0%, color-mix(in oklab, ${pal.hex} 8%, rgba(10,12,20,0.95)) 100%)`,
+                border: `2px solid ${isTargeting ? "rgba(252, 211, 77, 0.95)" : rim}`,
                 boxShadow: isTargeting
-                  ? "0 0 14px -2px rgba(252, 211, 77, 0.7), inset 0 1px 0 rgba(255,255,255,0.08)"
-                  : `0 0 8px -2px ${glow}, inset 0 1px 0 rgba(255,255,255,0.08)`,
+                  ? `0 0 18px -2px rgba(252, 211, 77, 0.85), inset 0 0 14px ${glow}, inset 0 1px 0 rgba(255,255,255,0.12)`
+                  : `0 0 14px -3px ${glow}, inset 0 0 10px color-mix(in oklab, ${pal.hex} 28%, transparent), inset 0 1px 0 rgba(255,255,255,0.14)`,
               }}
             >
-              <MoveGlyph move={mv} className="w-8 h-8 sm:w-9 sm:h-9" />
-              <span className="absolute top-0.5 right-0.5 w-1 h-1 rounded-full bg-sky-300" />
+              {/* Subtle pulse ring — slow breathe in idle, hidden when targeting (overlap with the strong amber ring). */}
+              {!isTargeting && !cannotAfford && (
+                <motion.span
+                  aria-hidden
+                  animate={{ opacity: [0.45, 0.85, 0.45], scale: [1, 1.04, 1] }}
+                  transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+                  className="absolute inset-[2px] rounded-md pointer-events-none"
+                  style={{ boxShadow: `inset 0 0 8px ${glow}` }}
+                />
+              )}
+              <MoveGlyph move={mv} className="relative z-10 w-8 h-8 sm:w-9 sm:h-9 drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)]" />
+              <span
+                className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full"
+                style={{ background: pal.hex, boxShadow: `0 0 5px ${pal.hex}` }}
+              />
             </motion.button>
           );
         })}

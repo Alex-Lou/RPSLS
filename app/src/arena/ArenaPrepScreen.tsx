@@ -48,9 +48,13 @@ export interface ArenaPrepResult {
   cpuName: string;
 }
 
-export function ArenaPrepScreen({ onConfirm, onCancel }: {
+export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
   onConfirm: (result: ArenaPrepResult) => void;
   onCancel: () => void;
+  /** Default true (entraînement vs CPU). False = tournament / online — the
+   *  "?" rules button is hidden because the other player won't wait while
+   *  this one reads. Alex feedback 2026-06-09. */
+  isTraining?: boolean;
 }) {
   const player = useStore((s) => s.player);
   const playerName = player.nickname || "Toi";
@@ -147,16 +151,20 @@ export function ArenaPrepScreen({ onConfirm, onCancel }: {
         )}
       </AnimatePresence>
 
-      {/* Action row — "?" + COMMENCER + ANNULER */}
+      {/* Action row — "?" (training only) + COMMENCER + ANNULER. In a real
+       *  tournament / online match the rules button is hidden so the other
+       *  player isn't kept waiting while this one reads. */}
       <div className="flex items-center justify-center gap-2 mt-2">
-        <button
-          onClick={() => { hapticTap(); setHowOpen(true); }}
-          className="w-11 h-11 rounded-full bg-zinc-900 border border-emerald-700/50 text-emerald-300 text-base font-black active:scale-95 shadow-md"
-          aria-label="Comment ça marche"
-          title="Comment ça marche"
-        >
-          ?
-        </button>
+        {isTraining && (
+          <button
+            onClick={() => { hapticTap(); setHowOpen(true); }}
+            className="w-11 h-11 rounded-full bg-zinc-900 border border-emerald-700/50 text-emerald-300 text-base font-black active:scale-95 shadow-md"
+            aria-label="Comment ça marche"
+            title="Comment ça marche"
+          >
+            ?
+          </button>
+        )}
         <button
           onClick={confirm}
           disabled={phase !== "landed"}
@@ -183,7 +191,10 @@ export function ArenaPrepScreen({ onConfirm, onCancel }: {
       </div>
 
       <p className="text-center text-[10px] text-zinc-500 max-w-sm">
-        La pièce décide quel thème + pad habille le board pour ce match. Tape <span className="text-emerald-300 font-black">?</span> pour lire les règles avant de te lancer.
+        La pièce décide quel thème + pad habille le board pour ce match.
+        {isTraining && (
+          <> Tape <span className="text-emerald-300 font-black">?</span> pour lire les règles avant de te lancer.</>
+        )}
       </p>
 
       <AnimatePresence>
