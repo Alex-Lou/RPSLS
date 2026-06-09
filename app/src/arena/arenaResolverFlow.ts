@@ -12,10 +12,34 @@
 import {
   applyAllSpells,
   applySummons,
+  creatureEffectiveAtk,
   endOfTurnCleanup,
   resolveLaneCombatAt,
 } from "./arenaRules";
-import { moveCountersMove, type BoardState, type LaneIndex, type TurnIntent } from "./arenaTypes";
+import { CREATURE_STATS, moveCountersMove, type BoardState, type LaneIndex, type TurnIntent } from "./arenaTypes";
+import { alog } from "./arenaLog";
+
+/** Snapshot helper — log compact d'une lane avec flags. Réutilise le même
+ *  format que advanceToNextTurn pour cohérence à travers le pipeline. */
+function logBoardSnapshot(b: BoardState, tag: string): void {
+  alog("state", `--- ${tag} --- a.hp=${b.a.hp} b.hp=${b.b.hp}`);
+  const fmt = (c: BoardState["lanes"][number]["a"]): string => {
+    if (!c) return "∅";
+    const stats = CREATURE_STATS[c.move];
+    const atk = creatureEffectiveAtk(c);
+    const flags: string[] = [];
+    if (c.divineShield) flags.push("🛡");
+    if (c.dodgeCharge) flags.push("✨");
+    if (c.taunt && c.provocationCharges > 0) flags.push(`P${c.provocationCharges}`);
+    if (c.summonedThisTurn && (c.move === "rock" || c.move === "lizard")) flags.push("L");
+    if (c.move === "paper" && c.wiltedSteps > 0) flags.push(`F${c.wiltedSteps}`);
+    if (c.combatBlunted) flags.push("É");
+    return `${c.move}(${c.hp}/${stats.hp},⚔${atk}${flags.length ? "," + flags.join("") : ""})`;
+  };
+  for (let i = 0; i < 3; i++) {
+    alog("state", `${tag} L${i} a:${fmt(b.lanes[i].a)} b:${fmt(b.lanes[i].b)}`);
+  }
+}
 
 /** Resolver step labels — kept in sync with ArenaBoard's banner switch. */
 export type ResolveStep =
@@ -81,6 +105,10 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
     b = applyAllSpells(b, playerIntent, cpuIntent);
     setBoard(b);
     setResolveStep("spells");
+    // Snapshot post-spells pour traçage (Alex flag : "je peux pas
+    // surveiller assez, faut les logs côté toi"). Voir aussi l'arenaLog
+    // qui consomme ce log via la catégorie state.
+    logBoardSnapshot(b, "post-spells");
 
     // ─── Step 2: SUMMONS ───
     window.setTimeout(() => {
@@ -90,6 +118,7 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
       setOppPreview(null);
       setPlayerPreview(null);
       setResolveStep("summons");
+      logBoardSnapshot(b, "post-summons");
 
       // ─── Step 3: COMBAT — lane by lane ───
       window.setTimeout(() => {
