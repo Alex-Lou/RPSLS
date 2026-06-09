@@ -102,11 +102,21 @@ export function ArenaLaneSlot({
     // DODGE ESQUIVÉ — prev had dodge, now doesn't, HP unchanged. Alex
     // feedback : "animations pour les effets de type esquive du lézard
     // au premier tour" — manquait avant.
+    // Alex feedback 2026-06-09 round 5 (#5) : Esquive chip stuck sur L2.
+    // Cause probable : si dodgedHit était déjà set quand la creature change
+    // (mort/replace), le chip restait visible. Ajout d'un clear explicite
+    // quand la creature meurt OU change de move (sticker plus jamais stale).
     if (creature && prev && prev.move === creature.move && prev.dodge && !creature.dodgeCharge && creature.hp === prev.hp) {
       setDodgedHit({ key: Date.now() });
       const id = window.setTimeout(() => setDodgedHit(null), 1400);
       prevRef.current = snap;
       return () => window.clearTimeout(id);
+    }
+    // Guard #5 — si la creature disparaît OU change d'identité (move), on
+    // force le clear des chips save pour éviter qu'ils restent stuck.
+    if (!creature || (prev && creature.move !== prev.move)) {
+      setDodgedHit(null);
+      setShieldBlocked(null);
     }
     // Death transition.
     if (!creature && prev && prev.move !== null) {
