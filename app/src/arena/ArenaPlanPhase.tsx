@@ -444,35 +444,49 @@ export function ArenaPlanPhase({
         </div>
       )}
 
-      {/* Lock button — straight HTML button (matches the Ranked lock button
-       *  pattern that's stable on device). No motion.button + drag combo
-       *  that was intercepting taps. Defensive targeting reset stays — if
-       *  a stuck targeting state existed, the tap clears it before locking. */}
-      <button
-        type="button"
-        onClick={() => {
-          if (targeting) setTargeting(null);
-          if (canLock) {
-            hapticTap();
-            onLock();
+      {/* Lock button — HTML button (stable on device, matches Ranked pattern).
+       *  Wrapped in a relative div with an ABSOLUTE blurred glow underneath
+       *  that pulses when canLock to indicate "tape ici" (Alex feedback #1).
+       *  The button itself stays rigid + cliquable — only the glow animates. */}
+      <div className="relative shrink-0 self-center mt-2">
+        {canLock && (
+          <motion.div
+            aria-hidden
+            animate={{ opacity: [0.35, 0.85, 0.35], scale: [0.96, 1.06, 0.96] }}
+            transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute inset-0 rounded-2xl pointer-events-none"
+            style={{
+              background: "linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))",
+              filter: "blur(14px)",
+            }}
+          />
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            if (targeting) setTargeting(null);
+            if (canLock) {
+              hapticTap();
+              onLock();
+            }
+          }}
+          disabled={!canLock}
+          className={
+            "relative px-7 py-2.5 rounded-2xl font-black text-white text-sm transition active:scale-[0.97] " +
+            (canLock
+              ? "shadow-lg ring-2 ring-amber-300/40"
+              : "bg-hairline text-ink-faint cursor-not-allowed")
           }
-        }}
-        disabled={!canLock}
-        className={
-          "shrink-0 self-center mt-2 px-7 py-2.5 rounded-2xl font-black text-white text-sm transition active:scale-[0.97] " +
-          (canLock
-            ? "shadow-lg ring-2 ring-amber-300/40"
-            : "bg-hairline text-ink-faint cursor-not-allowed")
-        }
-        style={canLock ? {
-          background: "linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))",
-          fontFamily: "var(--font-headline)",
-          letterSpacing: "0.1em",
-          touchAction: "manipulation",
-        } : { touchAction: "manipulation" }}
-      >
-        ✓ FIN DE TOUR
-      </button>
+          style={canLock ? {
+            background: "linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))",
+            fontFamily: "var(--font-headline)",
+            letterSpacing: "0.1em",
+            touchAction: "manipulation",
+          } : { touchAction: "manipulation" }}
+        >
+          ✓ FIN DE TOUR
+        </button>
+      </div>
     </div>
   );
 }

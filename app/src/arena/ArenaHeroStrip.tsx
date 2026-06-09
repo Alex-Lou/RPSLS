@@ -61,7 +61,7 @@ export function ArenaHeroStrip({
     prevHpRef.current = hero.hp;
   }, [hero.hp]);
   return (
-    <div className="flex items-center gap-2 px-1">
+    <div className="relative flex items-center gap-2 px-1">
       {/* Portrait — avatar + name in a circle so each side has a face.
        *  Floating damage popup pops out of the portrait on HP loss. */}
       <div className="flex flex-col items-center shrink-0 w-16 relative">
@@ -186,20 +186,22 @@ export function ArenaHeroStrip({
           <span className="ml-auto font-bold text-ink-muted">🂠 {hero.hand.length}</span>
           {side === "you" && <span className="font-bold text-themed">T{turn}</span>}
         </div>
-        {/* Augur peek — when the OPPOSING player cast Augur, this side's
-         *  hand is revealed to them. The chips render on this strip so it
-         *  reads as "look — I'm spying on these cards". Bigger + glow so
-         *  the player actually NOTICES the reveal (Alex flagged that the
-         *  chips were invisible at 9px). Auto-clears next turn via
-         *  advanceToNextTurn. */}
-        {augurRevealed && augurRevealed.length > 0 && (
+        {/* Augur peek — when this side is the OPP (i.e. the player cast
+         *  Augur and is spying on opp's hand), show the actual mini-cards
+         *  OVERLAYED in absolute position so the strip's measured height
+         *  stays stable (Alex flag #8 pad instable). When this side is
+         *  the PLAYER (opp cast Augur on me — I'm being peeked at), do
+         *  NOT show the mini-cards (Alex flag #7 : "Augure de l'opp doit
+         *  PAS bouleverser mon hud") — a small chip indicator near the
+         *  portrait suffices to warn that opp is reading my hand. */}
+        {augurRevealed && augurRevealed.length > 0 && side === "opp" && (
           <motion.div
             key={"augur-" + augurRevealed.join("|")}
             initial={{ opacity: 0, y: -6, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ type: "spring", stiffness: 280, damping: 22 }}
-            className="flex items-center gap-1.5 mt-1 px-2 py-1 rounded-lg bg-amber-500/12 border border-amber-400/55"
-            style={{ boxShadow: "0 0 14px -2px rgba(252,211,77,0.55), inset 0 1px 0 rgba(252,211,77,0.2)" }}
+            className="absolute left-2 right-2 -bottom-2 flex items-center gap-1.5 px-2 py-1 rounded-lg bg-amber-500/15 border border-amber-400/65 z-30 pointer-events-none"
+            style={{ boxShadow: "0 0 14px -2px rgba(252,211,77,0.6), inset 0 1px 0 rgba(252,211,77,0.22)" }}
           >
             <motion.span
               animate={{ opacity: [0.85, 1, 0.85] }}
@@ -222,8 +224,6 @@ export function ArenaHeroStrip({
                     title={t(card.nameKey) + " — " + t(card.descKey)}
                   >
                     <CardImage id={id} glyphSize="text-base" />
-                    {/* Cost pip top-left so the player gauges mana risk at
-                     *  a glance instead of guessing from the glyph alone. */}
                     <div className="absolute top-0.5 left-0.5 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-black/80 text-sky-200 text-[8px] font-black tabular-nums">
                       {card.cost}
                     </div>
@@ -231,6 +231,20 @@ export function ArenaHeroStrip({
                 );
               })}
             </div>
+          </motion.div>
+        )}
+        {/* Indicator chip — when MY hand has been peeked at by opp Augur,
+         *  show a discrete pulsing 👁 chip next to the portrait so I know
+         *  without my strip getting reshuffled. */}
+        {augurRevealed && augurRevealed.length > 0 && side === "you" && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.6 }}
+            animate={{ opacity: [0.7, 1, 0.7], scale: 1 }}
+            transition={{ opacity: { duration: 1.4, repeat: Infinity, ease: "easeInOut" }, scale: { type: "spring", stiffness: 320, damping: 22 } }}
+            className="absolute top-1 right-1 z-20 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/30 border border-amber-300/70 text-amber-100 text-[9px] font-black uppercase tracking-wider shadow"
+            title="Opp regarde ta main (Augur)"
+          >
+            👁 Lue
           </motion.div>
         )}
       </div>
