@@ -65,6 +65,23 @@ export interface HeroState {
    *  d'unlock à chaque tour une fois passé 3 ⭐. Set à true au moment où
    *  constellationCount atteint 3 pour la 1ère fois. */
   finisherUnlocked?: boolean;
+  /** Lot D — Finisher déjà cast ce match (1× par match max). La carte
+   *  Finisher est injectée dans la main à 3⭐ ; après usage elle est
+   *  consommée et ne peut pas être ré-injectée. */
+  finisherUsed?: boolean;
+  /** Lot D — flag VERGER ÉTERNEL : Fanaison off + heal hero +1/tour persistent
+   *  jusqu'à la fin du match. Vérifié dans endOfTurnReset + creatureEffectiveAtk. */
+  vergerActive?: boolean;
+  /** Lot D — flag LAME COSMIQUE : Tranchant pierce TOUT (Aegis, Provoc,
+   *  anti-taunt) pour toutes mes créatures Tranchant. Vérifié dans
+   *  resolveLaneCombat (save check) et findDeflector (skip). */
+  lameActive?: boolean;
+  /** Lot D — flag MÉTAMORPHOSE : Esquive infinie pour mes Lézard (dodge
+   *  refresh à chaque endOfTurnReset). */
+  metamorphoseActive?: boolean;
+  /** Lot D — flag CALCUL QUANTIQUE : tous mes sorts coûtent −1m (min 0).
+   *  Vérifié dans applyAllSpells.cost. */
+  calculActive?: boolean;
   /** Mana available THIS turn. Refreshes to maxMana at the start of each turn. */
   mana: number;
   /** Mana ceiling — increments by 1 every turn up to MANA_CAP. */

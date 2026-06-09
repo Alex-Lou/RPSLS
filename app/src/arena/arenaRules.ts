@@ -22,6 +22,7 @@
  */
 
 import { alog, alogSetTurn, csnap } from "./arenaLog";
+import { AFFINITY_TO_FINISHER } from "./arenaFinishers";
 import {
   CREATURE_STATS,
   HERO_MAX_HP,
@@ -353,10 +354,12 @@ export function applyAllSpells(board: BoardState, intentA: TurnIntent, intentB: 
   for (const { spell, side } of combined) {
     const card = CARDS[spell.id as CardId];
     const hero = side === "a" ? b.a : b.b;
-    if (hero.mana < card.cost) continue;
+    // Lot D — CALCUL QUANTIQUE : tous mes sorts coûtent −1m (min 0).
+    const effectiveCost = hero.calculActive ? Math.max(0, card.cost - 1) : card.cost;
+    if (hero.mana < effectiveCost) continue;
     b = {
       ...b,
-      [side]: { ...hero, mana: hero.mana - card.cost },
+      [side]: { ...hero, mana: hero.mana - effectiveCost },
     } as BoardState;
     const ctx: ArenaSpellContext = { board: b, side, spell };
     b = applyArenaSpell(ctx);
@@ -397,12 +400,21 @@ export function applySummons(board: BoardState, intent: TurnIntent, side: Side):
     if (isAffinityMatch) {
       alog("summon", `${side} constellation ⭐ ${nextCount}/3 ${unlocked ? "→ FINISHER UNLOCKED" : ""}`);
     }
+    // Lot D — Injection automatique de la carte Finisher dans la main au
+    // moment où on passe 3⭐ pour la 1ère fois. Choix selon l'Affinité.
+    let nextHand = hero.hand;
+    if (unlocked && hero.affinity) {
+      const finisherId = AFFINITY_TO_FINISHER[hero.affinity];
+      nextHand = [...hero.hand, finisherId];
+      alog("summon", `${side} → carte Finisher [${finisherId}] injectée en main`);
+    }
     b = {
       ...b,
       lanes,
       [side]: {
         ...hero,
         mana: hero.mana - 1,
+        hand: nextHand,
         constellationCount: nextCount,
         finisherUnlocked: hero.finisherUnlocked || unlocked,
       },

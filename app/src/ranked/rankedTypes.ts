@@ -25,7 +25,10 @@ export type CardId =
   | "echo-temporel" | "ancre-temporelle"                                  //   ↑
   | "metamorphose" | "gaia" | "marchand-ames" | "telepathie"              // epics (3 mana)
   | "paradoxe" | "benediction"                                            //   ↑
-  | "schrodinger" | "juge" | "genese";                                    // legendary (4 mana)
+  | "schrodinger" | "juge" | "genese"                                     // legendary (4 mana)
+  // ── Constellation Pro Finishers (Lot D) — Pro-only, 1× par match, unlocked à 3⭐ ──
+  | "finisher-forteresse" | "finisher-verger" | "finisher-lame"
+  | "finisher-metamorphose" | "finisher-calcul";                          // legendary (4 mana)
 
 export type CardRarity = "common" | "rare" | "epic" | "legendary";
 
