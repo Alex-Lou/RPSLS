@@ -428,7 +428,7 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
       }
       lanes[laneIdx] = { a: winnerA, b: null };
       const updatedBoard = { ...board, lanes };
-      const deflect = findDeflector("b");
+      const deflect = findDeflector(updatedBoard, "b");
       if (deflect) {
         alog("combat", `L${laneIdx} A wins → B die. Poursuite hero b → DEFLECTED par Pierre L${deflect.lane}`);
         return consumeProvocation(updatedBoard, deflect);
@@ -452,7 +452,7 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
       }
       lanes[laneIdx] = { a: null, b: winnerB };
       const updatedBoard = { ...board, lanes };
-      const deflect = findDeflector("a");
+      const deflect = findDeflector(updatedBoard, "a");
       if (deflect) {
         alog("combat", `L${laneIdx} B wins → A die. Poursuite hero a → DEFLECTED par Pierre L${deflect.lane}`);
         return consumeProvocation(updatedBoard, deflect);
@@ -496,21 +496,25 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
   // deflected onto that creature AND it consumes 1 provocationCharge.
   // EXCEPT if the ATTACKER's side has a Paper (Étouffe) or Spock (Logique)
   // alive — RPSLS-coherent anti-taunt suppression.
-  const hasAntiTaunt = (side: Side): boolean =>
-    board.lanes.some((l) => {
+  //
+  // 🔴 BUG FIX 2026-06-09 : findDeflector + hasAntiTaunt prennent maintenant
+  // le board ACTUEL en paramètre (au lieu de lire le closure outer `board`).
+  // Avant, après mort d'une créature en combat, le code lisait toujours le
+  // board ORIGINAL → trouvait la créature qui venait de mourir comme
+  // déflecteur valide → consumeProvocation no-op (rock=null) → hero ne
+  // prenait pas son dégât (silent fail). Cause directe du "Pierre vs Paper
+  // → aucun mort, aucun dégât" qu'Alex a flagué.
+  const hasAntiTaunt = (b: BoardState, side: Side): boolean =>
+    b.lanes.some((l) => {
       const c = side === "a" ? l.a : l.b;
       return !!c && (c.move === "paper" || c.move === "spock");
     });
-  /** Returns the {lane, side} of the first ALIVE+CHARGED Pierre on
-   *  defenderSide that should absorb an undefended-lane attack — or null
-   *  if none qualifies (no rock, no charges left, or attacker has the
-   *  anti-taunt suppression). */
-  function findDeflector(defenderSide: Side): { lane: LaneIndex; side: Side } | null {
+  function findDeflector(b: BoardState, defenderSide: Side): { lane: LaneIndex; side: Side } | null {
     const attackerSide: Side = defenderSide === "a" ? "b" : "a";
-    if (hasAntiTaunt(attackerSide)) return null;
+    if (hasAntiTaunt(b, attackerSide)) return null;
     for (let i = 0; i < 3; i++) {
       const lane = i as LaneIndex;
-      const c = defenderSide === "a" ? board.lanes[lane].a : board.lanes[lane].b;
+      const c = defenderSide === "a" ? b.lanes[lane].a : b.lanes[lane].b;
       if (c && c.taunt && c.provocationCharges > 0) {
         return { lane, side: defenderSide };
       }
@@ -530,7 +534,7 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
   }
 
   if (ca && !cb) {
-    const deflect = findDeflector("b");
+    const deflect = findDeflector(board, "b");
     if (deflect) {
       alog("combat", `L${laneIdx} ${csnap(ca)} undefended → hero b DEFLECTED par Pierre L${deflect.lane}`);
       return consumeProvocation(board, deflect);
@@ -541,7 +545,7 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
   }
 
   if (cb && !ca) {
-    const deflect = findDeflector("a");
+    const deflect = findDeflector(board, "a");
     if (deflect) {
       alog("combat", `L${laneIdx} ${csnap(cb)} undefended → hero a DEFLECTED par Pierre L${deflect.lane}`);
       return consumeProvocation(board, deflect);
