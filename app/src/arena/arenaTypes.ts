@@ -31,6 +31,11 @@ export type Side = "a" | "b";
 export interface HeroState {
   hp: number;
   maxHp: number;
+  /** Constellation Pro v2 — the Voie (RPSLS affinity) chosen by this hero
+   *  before the match. Creatures of this exact move get a passive bonus
+   *  at summon time (provocationCharges, hp, voieAtkBonus). null = no
+   *  affinity picked (fallback to defaults, no bonus). */
+  affinity?: import("../engine/game").Move;
   /** Mana available THIS turn. Refreshes to maxMana at the start of each turn. */
   mana: number;
   /** Mana ceiling — increments by 1 every turn up to MANA_CAP. */
@@ -216,10 +221,18 @@ export interface Creature {
    *  redirecting attacks (badge + halo hide). Aegis (spell) cast on a Pierre
    *  refills +1 charge. Always 0 on non-Rock moves.
    *
+   *  Voie de la Pierre (affinity match) : 2 charges initiales au lieu d'1.
+   *
    *  Why a charge instead of permanent: Alex flagged that a board with
    *  several Pierres becomes a permanent stalemate. The charge forces a
    *  rotation: tank → recharge → tank, instead of spam → never lose. */
   provocationCharges: number;
+  /** Constellation Pro v2 — permanent ATK bonus granted by the Voie
+   *  (affinity). Applied at summon if creature.move === hero.affinity.
+   *  Persists across turns (NOT reset by endOfTurnReset, unlike atkBuff).
+   *  Today : Voie de Spock = +1 ATK perm. Other Voies use other flags
+   *  (rock provocationCharges, scissors hp+1). */
+  voieAtkBonus: number;
 }
 
 export type LaneIndex = 0 | 1 | 2;

@@ -50,8 +50,9 @@ import type { Move } from "../engine/game";
 
 /** Build a fresh hero from a deck (shuffled at match start). The deck is
  *  the 8 cards equipped in the player's saved deck; passives equipped in
- *  Ranked are IGNORED in Arena — they don't exist as concept here. */
-export function makeHero(deckIds: CardId[]): HeroState {
+ *  Ranked are IGNORED in Arena — they don't exist as concept here.
+ *  `affinity` is the Constellation Pro v2 Voie picked by this player. */
+export function makeHero(deckIds: CardId[], affinity?: Move): HeroState {
   const cleaned = deckIds.filter(
     (id): id is CardId => Object.prototype.hasOwnProperty.call(CARDS, id),
   );
@@ -67,13 +68,19 @@ export function makeHero(deckIds: CardId[]): HeroState {
     deck: remaining,
     discard: [],
     divineShield: false,
+    affinity,
   };
 }
 
-export function makeInitialBoard(deckA: CardId[], deckB: CardId[]): BoardState {
+export function makeInitialBoard(
+  deckA: CardId[],
+  deckB: CardId[],
+  affinityA?: Move,
+  affinityB?: Move,
+): BoardState {
   return {
-    a: makeHero(deckA),
-    b: makeHero(deckB),
+    a: makeHero(deckA, affinityA),
+    b: makeHero(deckB, affinityB),
     lanes: [makeEmptyLane(), makeEmptyLane(), makeEmptyLane()],
     turn: 1,
     phase: "planning",
@@ -131,11 +138,24 @@ export function drawCards(hero: HeroState, n: number): HeroState {
 
 /* ───────────────────────── Creature helpers ───────────────────────── */
 
-export function makeCreature(move: Move, side: Side): Creature {
+export function makeCreature(move: Move, side: Side, affinity?: Move): Creature {
+  const stats = CREATURE_STATS[move];
+  const matchesAffinity = affinity !== undefined && affinity === move;
+  // Voie bonuses (Constellation Pro v2 Couche 1) — applied at summon if the
+  // creature's move matches the hero's affinity. See ArenaLobby's VOIE_BONUS
+  // for the user-facing description.
+  //   Pierre  : provocationCharges 2 (au lieu de 1)
+  //   Ciseaux : hp +1 (HP 2 au lieu de 1 — survit à un échange)
+  //   Spock   : voieAtkBonus +1 (ATK perm 3 au lieu de 2)
+  //   Feuille / Lézard : à câbler dans une 2e passe (Fanaison ralentie +
+  //     Esquive 2 charges nécessitent de refactor wiltedSteps + dodgeCharge).
+  const voieRockCharges = matchesAffinity && move === "rock" ? 2 : (move === "rock" ? 1 : 0);
+  const voieScissorsHpBonus = matchesAffinity && move === "scissors" ? 1 : 0;
+  const voieAtkBonus = matchesAffinity && move === "spock" ? 1 : 0;
   return {
     move,
     side,
-    hp: CREATURE_STATS[move].hp,
+    hp: stats.hp + voieScissorsHpBonus,
     atkBuff: 0,
     divineShield: false,
     anchored: false,
@@ -147,31 +167,28 @@ export function makeCreature(move: Move, side: Side): Creature {
     pierces:     move === "scissors", // ⚔ Tranchant
     dodgeCharge: move === "lizard",   // ✨ Esquive
     spellImmune: move === "spock",    // 🧬 Logique
-    // Malus tracking — set at summon, drives the per-symbol drawback in
-    // creatureEffectiveAtk + endOfTurnReset.
     summonedThisTurn: true,           // Lente (Pierre 0 ATK) / Lent (Lézard 1)
     wiltedSteps: 0,                    // Fanaison (Feuille: -1/turn)
     combatBlunted: false,              // Émoussé (Ciseaux: -1 after 1st combat)
-    // Provocation is charge-limited (1 at summon for Pierre, refillable by
-    // Aegis). 0 on every other symbol — they don't have Provocation anyway.
-    provocationCharges: move === "rock" ? 1 : 0,
+    provocationCharges: voieRockCharges,
+    voieAtkBonus,
   };
 }
 
 export function creatureEffectiveAtk(c: Creature): number {
-  const base = CREATURE_STATS[c.move].atk + c.atkBuff;
+  const base = CREATURE_STATS[c.move].atk + c.atkBuff + c.voieAtkBonus;
   // ── Lente / Lent : the turn a Pierre or Lézard is summoned, its ATK is
   //    suppressed (Pierre → 0, Lézard → 1). All other moves attack normally
   //    the turn they land. Buff stacking still applies (a Surge on Pierre
   //    the turn it's summoned still goes through).
   if (c.summonedThisTurn) {
-    if (c.move === "rock")   return Math.max(0, 0 + c.atkBuff);
-    if (c.move === "lizard") return Math.max(0, 1 + c.atkBuff);
+    if (c.move === "rock")   return Math.max(0, 0 + c.atkBuff + c.voieAtkBonus);
+    if (c.move === "lizard") return Math.max(0, 1 + c.atkBuff + c.voieAtkBonus);
   }
   // ── Fanaison : Feuille loses 1 ATK per turn elapsed since summon, floor 1.
   //    So a freshly summoned Paper is 3, next turn 2, then 1, then stays 1.
   if (c.move === "paper" && c.wiltedSteps > 0) {
-    return Math.max(1, CREATURE_STATS.paper.atk - c.wiltedSteps + c.atkBuff);
+    return Math.max(1, CREATURE_STATS.paper.atk - c.wiltedSteps + c.atkBuff + c.voieAtkBonus);
   }
   // ── Émoussé : Ciseaux loses 1 ATK permanently after its first combat.
   if (c.combatBlunted) {
@@ -330,8 +347,8 @@ export function applyAllSpells(board: BoardState, intentA: TurnIntent, intentB: 
 /** Drop new creatures from the side's summons onto their chosen lanes. If
  *  the side already has a creature on a lane, the new one REPLACES (the old
  *  dies silently — design choice so summons can't be wasted but also can't
- *  stack). Costs 1 mana per summon; skipped if mana runs out.
- *  Exported for UI sequencing — see applySpellPhase. */
+ *  stack). Costs 1 mana per summon; skipped if mana runs out. Uses the
+ *  hero's `affinity` to apply the Voie bonus at makeCreature time. */
 export function applySummons(board: BoardState, intent: TurnIntent, side: Side): BoardState {
   let b = board;
   for (const summon of intent.summons) {
@@ -339,7 +356,7 @@ export function applySummons(board: BoardState, intent: TurnIntent, side: Side):
     if (hero.mana < 1) break;
     const lanes = b.lanes.slice() as [LaneState, LaneState, LaneState];
     const lane = { ...lanes[summon.lane] };
-    lane[side] = makeCreature(summon.move, side);
+    lane[side] = makeCreature(summon.move, side, hero.affinity);
     lanes[summon.lane] = lane;
     b = {
       ...b,

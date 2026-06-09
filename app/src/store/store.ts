@@ -113,6 +113,8 @@ interface AppState {
    *  appropriate field of player.arenaStats. The sync subscriber pushes
    *  the change to the cloud via the existing playerSync pipeline. */
   recordArenaMatch: (outcome: "win" | "loss" | "draw") => void;
+  /** Set the player's chosen Voie / affinity (Constellation Pro v2). */
+  setArenaAffinity: (affinity: Move) => void;
   /** Spend {@link PACK_COST} éclats to open a pack of 3 cards. Duplicates
    *  are auto-converted to poussière. Returns the result, or `null` when
    *  the player cannot afford the pack. */
@@ -366,6 +368,9 @@ export const useStore = create<AppState>()(
       }),
       setRankedDeck: (deck) => set((s) => ({
         player: { ...s.player, rankedDeck: deck },
+      })),
+      setArenaAffinity: (affinity) => set((s) => ({
+        player: { ...s.player, arenaAffinity: affinity },
       })),
 
       openPack: () => {

@@ -69,9 +69,14 @@ export function ArenaGame({
       (id): id is CardId => Object.prototype.hasOwnProperty.call(CARDS, id),
     ),
   ));
+  // Constellation Pro v2 Couche 1 — Affinité du joueur passée au moteur.
+  // Le CPU n'a pas (encore) d'affinité fixe — Lot ulterieur (random ou
+  // adaptive). Player affinity locked at match start, change in lobby pour
+  // le prochain match.
+  const playerAffinity = useRef(player.arenaAffinity);
 
   const [board, setBoard] = useState<BoardState>(() =>
-    makeInitialBoard(playerDeck.current, CPU_ARENA_DECK),
+    makeInitialBoard(playerDeck.current, CPU_ARENA_DECK, playerAffinity.current, undefined),
   );
   const [intent, setIntent] = useState<TurnIntent>({ spells: [], summons: [] });
   const [matchSplash, setMatchSplash] = useState(true);
@@ -295,7 +300,7 @@ export function ArenaGame({
           // handler, fall back to a local soft-reset.
           if (onRematch) { onRematch(); return; }
           matchEndedRef.current = false;
-          setBoard(makeInitialBoard(playerDeck.current, CPU_ARENA_DECK));
+          setBoard(makeInitialBoard(playerDeck.current, CPU_ARENA_DECK, playerAffinity.current, undefined));
           setIntent({ spells: [], summons: [] });
           setOppPreview(null);
           setPlayerPreview(null);

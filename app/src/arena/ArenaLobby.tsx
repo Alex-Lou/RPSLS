@@ -21,7 +21,26 @@ import { levelFromXp } from "../engine/leveling";
 import { FloatingMatchBackButton } from "../match/sharedMatchUI";
 import { CurrencyBadges } from "../ranked/CurrencyBadges";
 import { avatarImgStyle } from "../theme/avatar";
+import { MoveGlyph, MOVE_PALETTE, moveRim } from "../icons";
+import type { Move } from "../engine/game";
+import { CREATURE_PASSIVES, CREATURE_STATS } from "./arenaTypes";
 import { ArenaHowItWorks } from "./ArenaHowItWorks";
+
+const VOIES: Move[] = ["rock", "paper", "scissors", "lizard", "spock"];
+const VOIE_BONUS: Record<Move, string> = {
+  rock:     "Provocation 2 charges (au lieu de 1)",
+  paper:    "Fanaison ralentie (−1 ATK tous les 2 tours)",
+  scissors: "+1 HP (HP 2 au lieu de 1) — survit à un échange",
+  lizard:   "Esquive 2 charges (au lieu de 1)",
+  spock:    "+1 ATK (ATK 3 au lieu de 2)",
+};
+const VOIE_LABEL: Record<Move, string> = {
+  rock: "Voie de la Pierre",
+  paper: "Voie de la Feuille",
+  scissors: "Voie des Ciseaux",
+  lizard: "Voie du Lézard",
+  spock: "Voie de Spock",
+};
 
 export function ArenaLobby({
   onTraining,
@@ -39,6 +58,8 @@ export function ArenaLobby({
   onBack?: () => void;
 }) {
   const player = useStore((s) => s.player);
+  const setArenaAffinity = useStore((s) => s.setArenaAffinity);
+  const affinity: Move = player.arenaAffinity ?? "rock";
   const stats = player.arenaStats ?? { wins: 0, losses: 0, draws: 0 };
   const total = stats.wins + stats.losses + stats.draws;
   const winrate = stats.wins + stats.losses > 0
@@ -112,6 +133,68 @@ export function ArenaLobby({
         <div className="flex items-center justify-center pt-1">
           <CurrencyBadges size="full" onClick={onGoShop} />
         </div>
+      </div>
+
+      {/* Affinité (Voie) — picker des 5 symboles RPSLS. Constellation Pro
+       *  v2 Couche 1 : le symbole choisi donne un bonus passif aux créatures
+       *  de ce type ET avance la constellation 3 étoiles vers le Finisher. */}
+      <div
+        className="bg-surface rounded-2xl px-4 py-3 flex flex-col gap-2"
+        style={{ border: "1px solid color-mix(in oklab, var(--theme-primary) 35%, transparent)" }}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-fuchsia-200">
+              ✦ Ma Voie RPSLS
+            </div>
+            <div className="text-[13px] font-extrabold mt-0.5 text-zinc-100">
+              {VOIE_LABEL[affinity]}
+            </div>
+          </div>
+          <div className="text-[9px] uppercase tracking-wider text-ink-faint">
+            ⚔ {CREATURE_STATS[affinity].atk} · ❤ {CREATURE_STATS[affinity].hp}
+          </div>
+        </div>
+        <div className="grid grid-cols-5 gap-1.5">
+          {VOIES.map((m) => {
+            const pal = MOVE_PALETTE[m];
+            const isActive = affinity === m;
+            return (
+              <button
+                key={m}
+                onClick={() => setArenaAffinity(m)}
+                className={
+                  "relative h-12 rounded-lg flex items-center justify-center transition active:scale-95 " +
+                  (isActive ? "scale-110 z-10" : "opacity-65")
+                }
+                style={{
+                  background: isActive
+                    ? `linear-gradient(160deg, color-mix(in oklab, ${pal.hex} 36%, rgba(20,22,32,0.95)) 0%, color-mix(in oklab, ${pal.hex} 15%, rgba(10,12,20,0.95)) 100%)`
+                    : "linear-gradient(160deg, rgba(20,22,32,0.92) 0%, rgba(10,12,20,0.92) 100%)",
+                  border: `2px solid ${isActive ? "rgba(252, 211, 77, 0.9)" : moveRim(pal.hex)}`,
+                  boxShadow: isActive
+                    ? `0 0 18px -2px rgba(252, 211, 77, 0.7), inset 0 0 12px color-mix(in oklab, ${pal.hex} 40%, transparent)`
+                    : "inset 0 1px 0 rgba(255,255,255,0.08)",
+                }}
+              >
+                <MoveGlyph move={m} className="w-7 h-7 drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)]" />
+              </button>
+            );
+          })}
+        </div>
+        <div className="rounded-lg bg-fuchsia-950/40 border border-fuchsia-700/30 px-2.5 py-2">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-[14px]">{CREATURE_PASSIVES[affinity].glyph}</span>
+            <span className="text-[12px] font-black text-fuchsia-100">{CREATURE_PASSIVES[affinity].name}</span>
+            <span className="text-[10px] uppercase tracking-wider text-fuchsia-300 ml-auto">Bonus Voie</span>
+          </div>
+          <p className="text-[11.5px] leading-snug text-fuchsia-100/90 mt-0.5">
+            {VOIE_BONUS[affinity]}
+          </p>
+        </div>
+        <p className="text-[10px] text-ink-faint leading-snug italic">
+          Ta Voie te donne un bonus passif sur tes créatures de ce symbole. Constellation 3 ⭐ à allumer en cours de partie débloque ton FINISHER (Lot C/D à venir).
+        </p>
       </div>
 
       {/* Deck manager */}

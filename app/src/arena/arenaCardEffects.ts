@@ -265,7 +265,9 @@ function applyMirror(board: BoardState, side: Side, spell: PlayedSpell): BoardSt
   const opp = getOppCreatureOnLane(board, side, spell.lane);
   const mine = getMyCreatureOnLane(board, side, spell.lane);
   if (!opp || mine) return board;
-  return withMyCreatureOnLane(board, side, spell.lane, makeCreature(opp.move, side));
+  // Pass my affinity so the copy gets the Voie bonus if applicable.
+  const myAffinity = (side === "a" ? board.a : board.b).affinity;
+  return withMyCreatureOnLane(board, side, spell.lane, makeCreature(opp.move, side, myAffinity));
 }
 
 /** Heist — 3 damage to the opp HERO + draw 1 card. */
