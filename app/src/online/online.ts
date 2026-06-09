@@ -64,6 +64,11 @@ export interface PlayerProgress {
   classeWins?: number;
   classeLosses?: number;
   classeDraws?: number;
+  /** Constellation Pro (mini-CCG arena) record — optional for
+   *  back-compat with older server builds that don't know about Arena yet. */
+  arenaWins?: number;
+  arenaLosses?: number;
+  arenaDraws?: number;
   updatedAt: number;
   // Cosmetic preferences (small) — synced so a reinstall restores the chosen
   // look. Optional for back-compat with older saves that lack them.

@@ -24,12 +24,12 @@ import {
 // "online" + "constellation" are UI-only home cards. Constellation routes to
 // a local vs-CPU 3-lanes match; the real GameMode union covers CPU/hotseat
 // recorded matches.
-type ModeCardId = GameMode | "online" | "constellation" | "ranked_constellation";
+type ModeCardId = GameMode | "online" | "constellation" | "ranked_constellation" | "arena_pro";
 
 // Order: Training, Online (live), Constellation (vs CPU),
 // Constellation Ranked (cards+mana), Ranked. (Détendu + Hot-seat removed.)
 const ALL_CARDS: ModeCardId[] = [
-  "training", "online", "constellation", "ranked_constellation", "ranked",
+  "training", "online", "constellation", "ranked_constellation", "arena_pro", "ranked",
 ];
 
 // Hand-drawn icons that replace the emoji on each mode tile. Lives in
@@ -42,6 +42,7 @@ const MODE_ICONS: Record<ModeCardId, string> = {
   online:               "/MenuIcons/en-ligne.png",
   constellation:        "/MenuIcons/constellation.png",
   ranked_constellation: "/MenuIcons/constellation.png", // Phase A: reuse art with a distinct tint.
+  arena_pro:            "/MenuIcons/constellation.png", // Reuse for MVP; bespoke art in Phase 2.
 };
 
 /** Per-mode accent for the two tiles that otherwise fell through to the plain
@@ -99,6 +100,7 @@ export function ModeSelect({
   onGoConstellation,
   onGoConstellationMenu,
   onGoRanked,
+  onGoArenaPro,
   onGoSandbox,
   onGoClasse,
 }: {
@@ -107,6 +109,7 @@ export function ModeSelect({
   onGoConstellation?: (winTo: number) => void;
   onGoConstellationMenu?: () => void;
   onGoRanked?: () => void;
+  onGoArenaPro?: () => void;
   onGoSandbox?: () => void;
   onGoClasse?: () => void;
 }) {
@@ -252,6 +255,39 @@ export function ModeSelect({
                   </div>
                   <p className="text-[10px] sm:text-xs text-ink-muted mt-0.5 line-clamp-2">
                     {t("mode.ranked_constellation.tag")}
+                  </p>
+                </div>
+              </motion.button>
+            );
+          }
+          if (m === "arena_pro") {
+            return (
+              <motion.button
+                key="arena_pro"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05 * i, duration: 0.25 }}
+                whileHover={{ y: -3 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => onGoArenaPro?.()}
+                disabled={!onGoArenaPro}
+                className={
+                  "text-left p-2.5 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1.5 relative overflow-hidden min-h-[124px] " +
+                  TILE_BASE + " border-fuchsia-400/40 from-fuchsia-500/22 via-violet-500/14 to-indigo-500/22 " +
+                  "hover:from-fuchsia-500/32 hover:via-violet-500/26 hover:to-indigo-500/32 hover:border-fuchsia-400/70 " +
+                  "shadow-lg shadow-fuchsia-500/10"
+                }
+              >
+                <ModeIcon mode="arena_pro" />
+                <div className="min-w-0 w-full">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold text-sm sm:text-base">{t("mode.arena_pro")}</span>
+                    <span className="text-[9px] uppercase tracking-wider text-fuchsia-200 bg-fuchsia-500/30 px-1 rounded-full">
+                      BETA
+                    </span>
+                  </div>
+                  <p className="text-[10px] sm:text-xs text-ink-muted mt-0.5 line-clamp-2">
+                    {t("mode.arena_pro.tag")}
                   </p>
                 </div>
               </motion.button>

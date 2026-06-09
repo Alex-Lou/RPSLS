@@ -8,6 +8,7 @@
  */
 
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
 import { ALL_CARD_IDS, CARDS, isPassiveCard, RARITY_COLOR, RARITY_ORDER } from "./cards";
@@ -125,9 +126,16 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
   const mainSlots = deck.slice(0, MAIN_SLOTS) as (CardId | null)[];
   const reserveSlots = deck.slice(MAIN_SLOTS, TOTAL) as (CardId | null)[];
 
+  // Tap a card → open detail modal AND set as selected. The modal has a
+  // "Mettre dans mon deck" button that closes the modal WHILE keeping the
+  // card selected so a follow-up slot-tap assigns it (Alex flag : modal
+  // ouvert empêchait l'assignation). X / backdrop closes WITHOUT
+  // assigning (selected resets too).
+  const [modalOpen, setModalOpen] = useState(false);
   function handleCardTap(id: CardId) {
     if (!collection.includes(id)) return;
-    setSelected(selected === id ? null : id);
+    setSelected(id);
+    setModalOpen(true);
   }
 
   function handleSlotTap(slotIdx: number) {
@@ -252,7 +260,7 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
       </div>
 
       {/* Scroll region — only this middle band scrolls. */}
-      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 pr-1">
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 px-1">
         {/* Main hand */}
         <div>
           <h2 className="text-[10px] uppercase tracking-[0.25em] font-bold text-emerald-400 mb-2">
@@ -279,17 +287,8 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        {/* Card detail panel — replaces the implicit "what does this do?" with
-            an explicit info card whenever the player selects something from
-            the collection. Always-rendered slot avoids a layout jump on
-            select/deselect; a placeholder fills it otherwise. */}
-        <CardDetailPanel
-          id={selected}
-          masteryXp={(player.cardMastery ?? {})[selected ?? ""] ?? 0}
-          owned={selected ? collection.includes(selected) : false}
-          inDeck={selected ? usedInDeck.has(selected) : false}
-          t={t}
-        />
+        {/* CardDetailModal mounts via portal at the end of this component —
+            see the bottom of the JSX tree. No in-flow panel anymore. */}
 
         {/* Collection — collapsible header + sticky filter bar + curve-grouped
             cards grid. Designed to scale past 46 cards without becoming a wall
@@ -455,6 +454,19 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
           Sauvegarder le deck
         </motion.button>
       </div>
+
+      {/* Card detail MODAL — portal overlay opened on card tap. The
+       *  "Sélectionner pour le deck" button closes the modal while
+       *  KEEPING the card selected so the next slot-tap assigns it. */}
+      <CardDetailModal
+        id={modalOpen ? selected : null}
+        masteryXp={(player.cardMastery ?? {})[selected ?? ""] ?? 0}
+        owned={selected ? collection.includes(selected) : false}
+        inDeck={selected ? usedInDeck.has(selected) : false}
+        onClose={() => { setModalOpen(false); setSelected(null); }}
+        onPickForDeck={() => setModalOpen(false)}
+        t={t}
+      />
     </motion.div>
   );
 }
@@ -487,7 +499,7 @@ function DeckSlot({
   return (
     <button
       onClick={onClick}
-      className="relative aspect-[3/4] rounded-xl overflow-hidden ring-1 ring-white/20 bg-surface-raised"
+      className="relative aspect-[3/4] rounded-xl overflow-hidden ring-1 ring-inset ring-white/20 bg-surface-raised"
     >
       <CardImage id={cardId} glyphSize="text-2xl" />
       <div className="absolute bottom-0 left-0 right-0 bg-black/70 py-0.5 z-10">
@@ -497,46 +509,80 @@ function DeckSlot({
   );
 }
 
-/* ────────────── Card detail panel ────────────── */
+/* ────────────── Card detail modal ────────────── */
 
-/** Card detail panel — surfaces the full card text when one is tapped, so the
- *  player understands what they're equipping without playing a match to find
- *  out. Sits between the deck slots and the collection grid; always rendered
- *  (placeholder when no selection) so the layout doesn't jump when picking
- *  cards in/out. */
-function CardDetailPanel({
-  id, masteryXp, owned, inDeck, t,
+/** Card detail modal — fullscreen portal overlay opened when a collection
+ *  card is tapped. Replaces the old in-flow panel that forced the player
+ *  to scroll back to the top to read details. Click backdrop or X to close.
+ *  Inside, CardDetailContent is reused as-is. */
+function CardDetailModal({
+  id, masteryXp, owned, inDeck, onClose, onPickForDeck, t,
 }: {
   id: CardId | null;
   masteryXp: number;
   owned: boolean;
   inDeck: boolean;
+  /** Called by the backdrop / ✕ button : closes the modal AND clears
+   *  the selection. The card is "forgotten". */
+  onClose: () => void;
+  /** Called by the "Mettre dans mon deck" button : closes the modal
+   *  but KEEPS the selection so the next slot tap assigns it. Only
+   *  available if the card is OWNED. */
+  onPickForDeck: () => void;
   t: (key: string) => string;
 }) {
-  return (
-    <AnimatePresence mode="wait" initial={false}>
-      {id ? (
-        <CardDetailContent
-          key={id}
-          id={id}
-          masteryXp={masteryXp}
-          owned={owned}
-          inDeck={inDeck}
-          t={t}
-        />
-      ) : (
+  return createPortal(
+    <AnimatePresence>
+      {id && (
         <motion.div
-          key="empty"
+          key="card-detail-modal"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
-          className="rounded-xl border border-dashed border-hairline bg-black/20 px-3 py-3 text-center text-[11px] text-ink-faint"
+          transition={{ duration: 0.18 }}
+          onClick={onClose}
+          className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
         >
-          Touche une carte dans la collection pour lire son effet
+          <motion.div
+            initial={{ scale: 0.92, y: 14, opacity: 0 }}
+            animate={{ scale: 1, y: 0, opacity: 1 }}
+            exit={{ scale: 0.94, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 280, damping: 24 }}
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-md"
+          >
+            <CardDetailContent
+              key={id}
+              id={id}
+              masteryXp={masteryXp}
+              owned={owned}
+              inDeck={inDeck}
+              t={t}
+            />
+            {/* "Mettre dans mon deck" CTA — only meaningful for owned cards.
+             *  Closes the modal but keeps the card selected so the next
+             *  slot-tap assigns it (Alex flag : modal cassait l'assign). */}
+            {owned && (
+              <button
+                onClick={onPickForDeck}
+                className="mt-2 w-full py-2.5 rounded-2xl bg-themed shadow-lg font-black text-white text-sm transition active:scale-[0.97]"
+                style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.08em" }}
+              >
+                {inDeck ? "↺ Réassigner cette carte" : "✓ Mettre dans mon deck"}
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="absolute -top-3 -right-3 w-9 h-9 rounded-full bg-zinc-900 border-2 border-hairline text-white text-lg font-bold flex items-center justify-center shadow-2xl hover:bg-zinc-800 transition"
+              aria-label="Fermer"
+            >
+              ✕
+            </button>
+          </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 
@@ -762,12 +808,12 @@ function CardCell({
       className={
         "relative rounded-xl overflow-hidden aspect-[3/4] flex flex-col items-center justify-center transition " +
         (isSelected
-          ? "ring-2 ring-white shadow-lg shadow-white/30 scale-105"
+          ? "ring-2 ring-inset ring-white shadow-lg shadow-white/30 scale-105"
           : inDeck
-          ? "ring-2 ring-emerald-400/50 opacity-70"
+          ? "ring-2 ring-inset ring-emerald-400/50 opacity-70"
           : unlocked
-          ? "ring-1 ring-white/20"
-          : "ring-1 ring-white/5 grayscale opacity-30")
+          ? "ring-1 ring-inset ring-white/20"
+          : "ring-1 ring-inset ring-white/5 grayscale opacity-30")
       }
     >
       <CardImage id={id} glyphSize="text-xl" />

@@ -109,6 +109,12 @@ interface AppState {
   /** Ranked card collection */
   unlockCard: (id: string) => void;
   setRankedDeck: (deck: string[]) => void;
+  /** Record a finished Constellation Pro (arena) match — increments the
+   *  appropriate field of player.arenaStats. The sync subscriber pushes
+   *  the change to the cloud via the existing playerSync pipeline. */
+  recordArenaMatch: (outcome: "win" | "loss" | "draw") => void;
+  /** Set the player's chosen Voie / affinity (Constellation Pro v2). */
+  setArenaAffinity: (affinity: Move) => void;
   /** Spend {@link PACK_COST} éclats to open a pack of 3 cards. Duplicates
    *  are auto-converted to poussière. Returns the result, or `null` when
    *  the player cannot afford the pack. */
@@ -340,8 +346,31 @@ export const useStore = create<AppState>()(
         if (col.includes(id)) return s;
         return { player: { ...s.player, cardCollection: [...col, id] } };
       }),
+      recordArenaMatch: (outcome) => set((s) => {
+        const cur = s.player.arenaStats ?? { wins: 0, losses: 0, draws: 0 };
+        const next = {
+          wins:   cur.wins + (outcome === "win" ? 1 : 0),
+          losses: cur.losses + (outcome === "loss" ? 1 : 0),
+          draws:  cur.draws + (outcome === "draw" ? 1 : 0),
+        };
+        // Éclats reward — mirrors the existing eclatsReward(mode, outcome)
+        // scale for casual modes. Constellation Pro is higher-effort (longer
+        // matches, deeper strategy) so it pays slightly above Constellation
+        // Ranked: win 20, draw 10, loss 5.
+        const reward = outcome === "win" ? 20 : outcome === "draw" ? 10 : 5;
+        return {
+          player: {
+            ...s.player,
+            arenaStats: next,
+            eclats: (s.player.eclats ?? 0) + reward,
+          },
+        };
+      }),
       setRankedDeck: (deck) => set((s) => ({
         player: { ...s.player, rankedDeck: deck },
+      })),
+      setArenaAffinity: (affinity) => set((s) => ({
+        player: { ...s.player, arenaAffinity: affinity },
       })),
 
       openPack: () => {

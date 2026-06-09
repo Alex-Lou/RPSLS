@@ -1604,27 +1604,62 @@ function SuddenDeathOverlay({
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ duration: 0.18 }}
-      className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md px-4"
+      transition={{ duration: 0.22 }}
+      className="fixed inset-0 z-40 flex flex-col items-center justify-center backdrop-blur-md px-4 overflow-hidden"
     >
+      {/* Dramatic backdrop: throbbing red/gold radial that signals high
+       *  stakes. The blackout layer fades in over it so the rest of the UI
+       *  reads "frozen" but the duel arena reads "alive". */}
+      <motion.div
+        aria-hidden
+        className="absolute inset-0 pointer-events-none"
+        animate={{
+          background: [
+            "radial-gradient(60% 50% at 50% 50%, rgba(244,63,94,0.55) 0%, rgba(0,0,0,0.92) 70%)",
+            "radial-gradient(72% 60% at 50% 50%, rgba(251,191,36,0.55) 0%, rgba(0,0,0,0.92) 70%)",
+            "radial-gradient(60% 50% at 50% 50%, rgba(244,63,94,0.55) 0%, rgba(0,0,0,0.92) 70%)",
+          ],
+        }}
+        transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+      />
+      {/* Lightning spark layer — 6 thin rays converging from the edges,
+       *  each rotating + fading on its own period. Pure decoration; pointer-
+       *  events-none so it never blocks the picker below. */}
+      <div className="absolute inset-0 pointer-events-none" aria-hidden>
+        {[0, 60, 120, 180, 240, 300].map((deg, i) => (
+          <motion.div
+            key={deg}
+            className="absolute top-1/2 left-1/2 origin-left"
+            style={{
+              width: "55vw", height: 2,
+              background: "linear-gradient(90deg, rgba(252,211,77,0.0) 0%, rgba(252,211,77,0.85) 60%, rgba(244,63,94,0.95) 100%)",
+              transform: `rotate(${deg}deg)`,
+              filter: "blur(0.5px)",
+            }}
+            animate={{ opacity: [0, 0.9, 0], scaleX: [0.2, 1.05, 0.2] }}
+            transition={{ duration: 1.8, repeat: Infinity, delay: i * 0.15, ease: "easeOut" }}
+          />
+        ))}
+      </div>
+      {/* Title — bigger, with a continuous wobble to signal "live event". */}
       <motion.div
         initial={{ scale: 0.4, opacity: 0, rotate: -6 }}
         animate={{
-          scale: [0.4, 1.18, 1],
+          scale: [0.4, 1.25, 1, 1.04, 1],
           opacity: 1,
-          rotate: [-6, 4, 0],
+          rotate: [-6, 5, 0, -2, 0],
         }}
-        transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-        className="text-3xl sm:text-5xl font-black tracking-[0.12em] mb-1.5 text-center bg-gradient-to-br from-amber-300 via-rose-400 to-fuchsia-400 bg-clip-text text-transparent"
-        style={{ filter: "drop-shadow(0 2px 16px rgba(244,63,94,0.55))" }}
+        transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+        className="relative text-4xl sm:text-6xl font-black tracking-[0.14em] mb-1.5 text-center bg-gradient-to-br from-amber-300 via-rose-400 to-fuchsia-400 bg-clip-text text-transparent"
+        style={{ filter: "drop-shadow(0 2px 22px rgba(244,63,94,0.75))" }}
       >
-        MORT SUBITE
+        ⚡ MORT SUBITE ⚡
       </motion.div>
       <motion.div
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.35, duration: 0.25 }}
-        className="text-xs sm:text-sm text-ink-muted mb-6 max-w-xs text-center"
+        transition={{ delay: 0.45, duration: 0.3 }}
+        className="relative text-xs sm:text-sm text-amber-200/90 mb-6 max-w-xs text-center font-bold tracking-wider"
       >
         Match point des deux côtés — un seul coup décide tout.
       </motion.div>
@@ -1632,8 +1667,8 @@ function SuddenDeathOverlay({
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5, duration: 0.25 }}
-          className="grid grid-cols-5 gap-2 w-full max-w-md"
+          transition={{ delay: 0.65, duration: 0.3 }}
+          className="relative grid grid-cols-5 gap-2 w-full max-w-md"
         >
           {RANKED_MOVES.map((mv, i) => {
             const pal = MOVE_PALETTE[mv];

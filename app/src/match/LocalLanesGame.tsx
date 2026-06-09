@@ -83,6 +83,10 @@ export function LocalLanesGame({
   const roundNoRef = useRef(0);
   // Timer ID for the "auto-loss on timeout" deadline.
   const deadlineTimerRef = useRef<number | null>(null);
+  // Guards recordMatch against double-fire: flipped on natural end OR forfeit,
+  // and consulted by handleForfeit so backing out of the end screen doesn't
+  // log a second (phantom) match.
+  const recordedRef = useRef(false);
 
   // Kick off: splash → first round.
   useEffect(() => {
@@ -205,6 +209,7 @@ export function LocalLanesGame({
         timestamp: Date.now(),
         forfeit: false,
       });
+      recordedRef.current = true;
       window.setTimeout(() => {
         if (youWon) hapticMatchWin(); else hapticMatchLoss();
         setEnd({
@@ -237,6 +242,7 @@ export function LocalLanesGame({
     playerHistoryRef.current = [];
     battleRef.current = makeLocalBattle();
     roundNoRef.current = 0;
+    recordedRef.current = false;
     if (deadlineTimerRef.current) {
       window.clearTimeout(deadlineTimerRef.current);
       deadlineTimerRef.current = null;
@@ -244,6 +250,33 @@ export function LocalLanesGame({
     hapticMatchStart();
     // Give the match-found splash a beat before round 1 like at fresh start.
     window.setTimeout(() => startNextRound(), MATCH_FOUND_SPLASH_MS);
+  }
+
+  /** Mid-match quit → log a forfeit loss so the abandoned match still appears
+   *  in history (consistent with PlayGame.handleQuit / online leaveMatch). No
+   *  XP, no éclats (store skips eclatsReward on forfeit), no ladder move
+   *  (lpDelta 0 — local vs CPU has no compétitive ladder). When the match has
+   *  already been recorded (natural end or earlier forfeit), this is a no-op. */
+  function handleForfeit() {
+    if (!recordedRef.current) {
+      const battle = battleRef.current;
+      recordMatch({
+        id: `lanes-cpu-forfeit-${Date.now()}`,
+        mode: "constellation",
+        bestOf: winTo,
+        opponent: { kind: "cpu", mood: moodRef.current },
+        scorePlayer: battle.roundWinsA,
+        scoreOpponent: winTo,
+        outcome: "loss",
+        rounds: [],
+        xpDelta: 0,
+        lpDelta: 0,
+        timestamp: Date.now(),
+        forfeit: true,
+      });
+      recordedRef.current = true;
+    }
+    onQuit();
   }
 
   return (
@@ -255,9 +288,10 @@ export function LocalLanesGame({
       end={end}
       submitted={submitted}
       onSubmitPicks={handleSubmit}
-      onLeave={onQuit}
+      onLeave={handleForfeit}
       onRematch={rematch}
       showTimer={false}
+      competitive={false}
     />
   );
 }

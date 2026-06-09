@@ -871,8 +871,27 @@ export function OnlinePage() {
     if (winner === "a") hapticMatchWin();
     else if (winner === "b") hapticMatchLoss();
     else hapticTap();
+    // Bot fallback is a real match — register it so XP/éclats/quests credit.
+    // lpDelta stays 0: rankLp is server-authoritative (match_engine.rs), so a
+    // local bot match must not move the ladder.
+    const outcome = winner === "a" ? "win" : winner === "b" ? "loss" : "draw";
+    recordMatch({
+      id: `online-bot-${Date.now()}`,
+      mode: "online",
+      bestOf: cur.bestOf,
+      opponent: { kind: "cpu", mood: botMoodRef.current },
+      scorePlayer: cur.scoreA,
+      scoreOpponent: cur.scoreB,
+      outcome,
+      rounds: [],
+      xpDelta: outcome === "win" ? 60 : outcome === "draw" ? 25 : 15,
+      lpDelta: 0,
+      timestamp: Date.now(),
+      forfeit: false,
+    });
     setM((c) => ({ ...c, ended: { winner, forfeit: false } }));
     setPhase("match_end");
+    pushPlayerState(clientRef.current);
   }
 
   function cancel() {

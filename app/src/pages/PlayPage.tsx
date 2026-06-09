@@ -13,6 +13,8 @@ import { BracketPage } from "../ranked/BracketPage";
 import { DeckManager } from "../ranked/DeckManager";
 import { MatchPrepScreen, type Arena } from "../ranked/MatchPrepScreen";
 import { ArenaPadProvider } from "../ranked/arena";
+import { ArenaPage } from "../arena/ArenaPage";
+import { ArenaLobby } from "../arena/ArenaLobby";
 import { useArenaOverride } from "../ranked/arenaOverride";
 import { oppPersona } from "../ranked/personaSeed";
 import { applyTheme } from "../theme/theme";
@@ -27,7 +29,7 @@ type View =
   | { kind: "constellation_prep" }
   | { kind: "lanes_cpu"; winTo: number }
   | { kind: "ranked_lobby" }
-  | { kind: "ranked_deck" }
+  | { kind: "ranked_deck"; from?: "ranked" | "arena" }
   | { kind: "ranked_bracket" }
   // Pre-match staging: deck check + pad swap + coin flip for the arena.
   | { kind: "ranked_prep"; oppName: string; oppAvatar: string }
@@ -35,7 +37,10 @@ type View =
   // Classé (classic 1v1) hub — its own lobby + tournament + match.
   | { kind: "classe_lobby" }
   | { kind: "classe_bracket" }
-  | { kind: "classe_match"; oppName: string; oppAvatar: string };
+  | { kind: "classe_match"; oppName: string; oppAvatar: string }
+  // Constellation Pro — solo lobby (deck + rules + entry points) then match.
+  | { kind: "arena_lobby" }
+  | { kind: "arena_pro" };
 
 export function PlayPage({
   onNavigate, homeNonce,
@@ -120,9 +125,30 @@ export function PlayPage({
             onGoConstellation={(winTo) => setView({ kind: "lanes_cpu", winTo })}
             onGoConstellationMenu={() => setView({ kind: "constellation_prep" })}
             onGoRanked={() => setView({ kind: "ranked_lobby" })}
+            onGoArenaPro={() => setView({ kind: "arena_lobby" })}
             onGoSandbox={() => setView({ kind: "sandbox" })}
             onGoClasse={() => setView({ kind: "classe_lobby" })}
           />
+        )}
+        {view.kind === "arena_lobby" && (
+          <ArenaLobby
+            key="arena-lobby"
+            onTraining={() => setView({ kind: "arena_pro" })}
+            onManageDeck={() => setView({ kind: "ranked_deck", from: "arena" })}
+            onGoShop={() => setView({ kind: "ranked_lobby" })}
+            onBack={() => setView({ kind: "select" })}
+          />
+        )}
+        {view.kind === "arena_pro" && (
+          <motion.div
+            key="arena_pro"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            className="flex flex-col flex-1 min-h-0"
+          >
+            <ArenaPage onBack={() => setView({ kind: "arena_lobby" })} />
+          </motion.div>
         )}
         {view.kind === "constellation_prep" && (
           <ConstellationLobby
@@ -179,14 +205,16 @@ export function PlayPage({
               );
               setView({ kind: "ranked_bracket" });
             }}
-            onManageDeck={() => setView({ kind: "ranked_deck" })}
+            onManageDeck={() => setView({ kind: "ranked_deck", from: "ranked" })}
             onGoShop={onNavigate ? () => onNavigate("shop") : undefined}
           />
         )}
         {view.kind === "ranked_deck" && (
           <DeckManager
             key="ranked-deck"
-            onClose={() => setView({ kind: "ranked_lobby" })}
+            onClose={() => setView({
+              kind: view.from === "arena" ? "arena_lobby" : "ranked_lobby",
+            })}
           />
         )}
         {view.kind === "ranked_bracket" && (

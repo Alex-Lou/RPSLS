@@ -43,6 +43,9 @@ export function buildProgressFromPlayer(player: Player): PlayerProgress {
     classeWins: player.classeStats?.wins ?? 0,
     classeLosses: player.classeStats?.losses ?? 0,
     classeDraws: player.classeStats?.draws ?? 0,
+    arenaWins: player.arenaStats?.wins ?? 0,
+    arenaLosses: player.arenaStats?.losses ?? 0,
+    arenaDraws: player.arenaStats?.draws ?? 0,
     updatedAt: Date.now(),
     // Cosmetics — small prefs so a reinstall restores the look. The avatar is
     // synced only when it's a preset path / emoji; custom uploaded data: URLs
@@ -172,6 +175,17 @@ export function mergeServerState(
       wins: Math.max(localCs.wins, sW),
       losses: Math.max(localCs.losses, sL),
       draws: Math.max(localCs.draws, sD),
+    };
+  }
+
+  // Arena (Constellation Pro) record — same monotonic max-per-field merge.
+  const localAs = local.arenaStats ?? { wins: 0, losses: 0, draws: 0 };
+  const aW = server.arenaWins ?? 0, aL = server.arenaLosses ?? 0, aD = server.arenaDraws ?? 0;
+  if (aW > localAs.wins || aL > localAs.losses || aD > localAs.draws) {
+    patch.arenaStats = {
+      wins: Math.max(localAs.wins, aW),
+      losses: Math.max(localAs.losses, aL),
+      draws: Math.max(localAs.draws, aD),
     };
   }
 
@@ -311,6 +325,7 @@ function syncFingerprint(p: Player): string {
     (p.cardCollection ?? []).length, (p.claimedQuests ?? []).length, p.winStreak ?? 0,
     // Classé own ladder + record — so a Classé match pushes to the cloud too.
     p.classeLp ?? 1000, p.classeStats?.wins ?? 0, p.classeStats?.losses ?? 0,
+    p.arenaStats?.wins ?? 0, p.arenaStats?.losses ?? 0, p.arenaStats?.draws ?? 0,
     // Cosmetics + prefs — so picking a theme/background/pad/avatar/difficulty pushes too.
     p.themeId, p.backgroundId, p.padId, p.avatar, p.nickname,
     p.difficulty, p.fontScale ?? 1, p.padChosen ?? false,

@@ -135,6 +135,16 @@ export interface Player {
    *  apart from the global `stats` so the mode reports its OWN results
    *  ("son propre enregistrement"). */
   classeStats?: { wins: number; losses: number; draws: number };
+  /** Constellation Pro (mini-CCG arena) own record — separate from
+   *  Ranked and Classé. Cloud-synced via playerSync so it survives a
+   *  reinstall. Recorded by ArenaGame at phase=match-end. */
+  arenaStats?: { wins: number; losses: number; draws: number };
+  /** Constellation Pro v2 — the player's chosen "Voie" / affinity. The
+   *  symbol invocated of THIS type gets a passive bonus + counts towards
+   *  the 3-star Constellation Finisher unlock. Default to "rock" if
+   *  unset (CV-saved players from v1). User picks it in the Pro lobby
+   *  before each match. See docs/CONSTELLATION_PRO_V2_PLAN.md. */
+  arenaAffinity?: import("./engine/game").Move;
   /** Cosmetic background image painted behind every page. Defaults to the
    *  original radial-gradient. */
   backgroundId?: BackgroundId;
