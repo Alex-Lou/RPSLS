@@ -401,11 +401,44 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
   const lane = board.lanes[laneIdx];
   const ca = lane.a;
   const cb = lane.b;
-  // ENTRY log : confirme que resolveLaneCombat est bien appelée pour cette
-  // lane avec quelles créatures. Permet de diagnostiquer "combat T0 L0 n'a
-  // pas eu lieu" — si on voit pas cet entry log alors que post-summons
-  // montre 2 créatures, c'est que resolveLaneCombatAt n'est pas appelée.
   alog("combat", `L${laneIdx} ENTER ca=${ca?.move ?? "∅"} cb=${cb?.move ?? "∅"}`);
+
+  // 🔴 BUG FIX 2026-06-09 (TDZ "Cannot access 'c' before initialization") :
+  // hasAntiTaunt + findDeflector + consumeProvocation déclarés ICI (top
+  // de la fonction) au lieu d'après les counter branches. Le minifier de
+  // Vite renomme les const en variables courtes (`c`), et l'appel à
+  // findDeflector depuis le branche A-wins/B-wins se faisait AVANT
+  // l'initialisation du const hasAntiTaunt → TDZ throw → cascade silencieuse
+  // qui bloquait tous les combats des lanes suivantes. Maintenant déclarés
+  // AVANT toute utilisation, le hoisting fonctionne pour findDeflector
+  // (function declaration) et hasAntiTaunt est dans son scope au moment
+  // de la call.
+  const hasAntiTaunt = (b: BoardState, side: Side): boolean =>
+    b.lanes.some((l) => {
+      const c = side === "a" ? l.a : l.b;
+      return !!c && (c.move === "paper" || c.move === "spock");
+    });
+  function findDeflector(b: BoardState, defenderSide: Side): { lane: LaneIndex; side: Side } | null {
+    const attackerSide: Side = defenderSide === "a" ? "b" : "a";
+    if (hasAntiTaunt(b, attackerSide)) return null;
+    for (let i = 0; i < 3; i++) {
+      const lane = i as LaneIndex;
+      const c = defenderSide === "a" ? b.lanes[lane].a : b.lanes[lane].b;
+      if (c && c.taunt && c.provocationCharges > 0) {
+        return { lane, side: defenderSide };
+      }
+    }
+    return null;
+  }
+  function consumeProvocation(board: BoardState, deflector: { lane: LaneIndex; side: Side }): BoardState {
+    const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
+    const cur = lanes[deflector.lane];
+    const rock = deflector.side === "a" ? cur.a : cur.b;
+    if (!rock) return board;
+    const decremented: Creature = { ...rock, provocationCharges: Math.max(0, rock.provocationCharges - 1) };
+    lanes[deflector.lane] = deflector.side === "a" ? { ...cur, a: decremented } : { ...cur, b: decremented };
+    return { ...board, lanes };
+  }
 
   if (ca && cb) {
     const counterAB = moveCountersMove(ca.move, cb.move);
@@ -505,47 +538,8 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
     return { ...board, lanes, a: heroA, b: heroB };
   }
 
-  // TAUNT (Provocation): if the would-be-attacked side has a CHARGED
-  // taunt creature anywhere on the board, the undefended-lane attack is
-  // deflected onto that creature AND it consumes 1 provocationCharge.
-  // EXCEPT if the ATTACKER's side has a Paper (Étouffe) or Spock (Logique)
-  // alive — RPSLS-coherent anti-taunt suppression.
-  //
-  // 🔴 BUG FIX 2026-06-09 : findDeflector + hasAntiTaunt prennent maintenant
-  // le board ACTUEL en paramètre (au lieu de lire le closure outer `board`).
-  // Avant, après mort d'une créature en combat, le code lisait toujours le
-  // board ORIGINAL → trouvait la créature qui venait de mourir comme
-  // déflecteur valide → consumeProvocation no-op (rock=null) → hero ne
-  // prenait pas son dégât (silent fail). Cause directe du "Pierre vs Paper
-  // → aucun mort, aucun dégât" qu'Alex a flagué.
-  const hasAntiTaunt = (b: BoardState, side: Side): boolean =>
-    b.lanes.some((l) => {
-      const c = side === "a" ? l.a : l.b;
-      return !!c && (c.move === "paper" || c.move === "spock");
-    });
-  function findDeflector(b: BoardState, defenderSide: Side): { lane: LaneIndex; side: Side } | null {
-    const attackerSide: Side = defenderSide === "a" ? "b" : "a";
-    if (hasAntiTaunt(b, attackerSide)) return null;
-    for (let i = 0; i < 3; i++) {
-      const lane = i as LaneIndex;
-      const c = defenderSide === "a" ? b.lanes[lane].a : b.lanes[lane].b;
-      if (c && c.taunt && c.provocationCharges > 0) {
-        return { lane, side: defenderSide };
-      }
-    }
-    return null;
-  }
-  /** Apply 1 charge consumption to the deflecting Pierre — returns a new
-   *  board with the rock's provocationCharges decremented. */
-  function consumeProvocation(board: BoardState, deflector: { lane: LaneIndex; side: Side }): BoardState {
-    const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
-    const cur = lanes[deflector.lane];
-    const rock = deflector.side === "a" ? cur.a : cur.b;
-    if (!rock) return board;
-    const decremented: Creature = { ...rock, provocationCharges: Math.max(0, rock.provocationCharges - 1) };
-    lanes[deflector.lane] = deflector.side === "a" ? { ...cur, a: decremented } : { ...cur, b: decremented };
-    return { ...board, lanes };
-  }
+  // TAUNT (Provocation) — findDeflector + hasAntiTaunt + consumeProvocation
+  // sont déclarés en haut de cette fonction (voir TDZ fix).
 
   if (ca && !cb) {
     const deflect = findDeflector(board, "b");
