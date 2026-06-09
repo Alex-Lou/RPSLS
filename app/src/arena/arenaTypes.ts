@@ -20,8 +20,9 @@ import type { CardId } from "../ranked/rankedTypes";
 export const HERO_MAX_HP = 20;
 export const MANA_CAP = 10;
 export const LANE_COUNT = 3;
-export const HAND_CAP = 8;
-export const STARTING_HAND_SIZE = 4;
+// Alex feedback 2026-06-09 : "à court de jeu" → bump.
+export const HAND_CAP = 10;
+export const STARTING_HAND_SIZE = 5;
 /** Soft cap on turns — if neither hero is dead by then, the lower-HP loses
  *  (sudden-death fail-safe so an over-defensive match still ends). */
 export const TURN_HARD_CAP = 30;

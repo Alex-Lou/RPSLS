@@ -575,8 +575,12 @@ export function advanceToNextTurn(board: BoardState): BoardState {
   const nextTurn = board.turn + 1;
   alogSetTurn(nextTurn);
   alog("turn", `=== Tour ${nextTurn} === a.hp=${board.a.hp} b.hp=${board.b.hp}`);
-  const a = refreshHero(drawCards(board.a, 1));
-  const b = refreshHero(drawCards(board.b, 1));
+  // Alex feedback 2026-06-09 : "fin de tour pioche rien du tout, on se
+  // retrouve vite à court de jeu" → pioche 2 cartes au lieu de 1 pour
+  // garder de la matière à jouer plus longtemps. 2 cartes + main initiale
+  // de 5 + deck taille 12 = ~24 tours avant reshuffle complet.
+  const a = refreshHero(drawCards(board.a, 2));
+  const b = refreshHero(drawCards(board.b, 2));
   return {
     ...board,
     turn: nextTurn,
