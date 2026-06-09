@@ -15,7 +15,7 @@ import {
   endOfTurnCleanup,
   resolveLaneCombatAt,
 } from "./arenaRules";
-import type { BoardState, LaneIndex, TurnIntent } from "./arenaTypes";
+import { moveCountersMove, type BoardState, type LaneIndex, type TurnIntent } from "./arenaTypes";
 
 /** Resolver step labels — kept in sync with ArenaBoard's banner switch. */
 export type ResolveStep =
@@ -36,10 +36,11 @@ export interface ResolverFlowArgs {
   setResolveStep: (s: ResolveStep | null) => void;
   setCombatLane: (l: LaneIndex | null) => void;
   setHeroHit: (h: { side: "you" | "opp"; lane: LaneIndex; key: number } | null) => void;
-  /** Set when an undefended-lane attack is DEFLECTED by a taunt creature
-   *  elsewhere on the defender's board. `defenderSide` is which side owns
-   *  the taunt. The UI pops a "🪨 PROVOCATION BLOQUE" chip on that side. */
-  setTauntBlock: (b: { defenderSide: "a" | "b"; key: number } | null) => void;
+  /** Set when an undefended-lane attack is DEFLECTED by a taunt creature.
+   *  `defenderSide` owns the taunt. `rockLane` is the lane of the Pierre
+   *  that ate the deflection — used by the UI to pull a dotted line from
+   *  the attacker's lane to the Pierre + decrement its charge badge. */
+  setTauntBlock: (b: { defenderSide: "a" | "b"; rockLane: LaneIndex; key: number } | null) => void;
   /** Called BEFORE the resolver advances to the next turn — clears the
    *  player's pending intent and stops the "resolving" lock. */
   onSettle: (finalBoard: BoardState) => void;
@@ -98,25 +99,51 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
           const lane = b.lanes[laneIdx];
           const aHitsB = !!lane.a && !lane.b;
           const bHitsA = !!lane.b && !lane.a;
-          // TAUNT DEFLECTION DETECTION — if A attacks undefended but B has
-          // a taunt creature anywhere on the board, the attack is blocked
-          // (the rules engine handles this; we surface it as a UI chip).
-          const bHasTaunt = b.lanes.some((l) => !!l.b && l.b.taunt);
-          const aHasTaunt = b.lanes.some((l) => !!l.a && l.a.taunt);
-          const aDeflectedByB = aHitsB && bHasTaunt;
-          const bDeflectedByA = bHitsA && aHasTaunt;
+          // RPSLS counter follow-through (2026-06-09): if both creatures
+          // are present and one counters the other, the loser dies AND the
+          // winner pursues its ATK onto the opp hero (unless dodge or a
+          // charged Pierre deflects). Treat that as a hero hit for the
+          // anim layer too.
+          const bothPresent = !!lane.a && !!lane.b;
+          const counterAB = bothPresent && moveCountersMove(lane.a!.move, lane.b!.move);
+          const counterBA = bothPresent && moveCountersMove(lane.b!.move, lane.a!.move);
+          const aFollowsThroughOnB = bothPresent && counterAB && !counterBA && !lane.b!.dodgeCharge;
+          const bFollowsThroughOnA = bothPresent && counterBA && !counterAB && !lane.a!.dodgeCharge;
+          // TAUNT DEFLECTION DETECTION — keep in sync with rules.findDeflector:
+          //   first ALIVE+CHARGED Pierre on defender's side, EXCEPT if
+          //   attacker has Paper/Spock anti-taunt active. Returns the
+          //   Pierre's lane so the chip can point a dotted line at it.
+          const isAntiTaunt = (c: { move: string } | null | undefined): boolean =>
+            !!c && (c.move === "paper" || c.move === "spock");
+          const findDeflectorLane = (defenderSide: "a" | "b"): LaneIndex | null => {
+            const attackerSide: "a" | "b" = defenderSide === "a" ? "b" : "a";
+            const attackerHasAntiTaunt = b.lanes.some((l) =>
+              isAntiTaunt(attackerSide === "a" ? l.a : l.b),
+            );
+            if (attackerHasAntiTaunt) return null;
+            for (let i = 0; i < 3; i++) {
+              const c = defenderSide === "a" ? b.lanes[i].a : b.lanes[i].b;
+              if (c && c.taunt && c.provocationCharges > 0) return i as LaneIndex;
+            }
+            return null;
+          };
+          // a hits b's hero when either undefended attack or RPSLS follow-through.
+          const aReachesHeroB = aHitsB || aFollowsThroughOnB;
+          const bReachesHeroA = bHitsA || bFollowsThroughOnA;
+          const bDeflectorLane = aReachesHeroB ? findDeflectorLane("b") : null;
+          const aDeflectorLane = bReachesHeroA ? findDeflectorLane("a") : null;
           setCombatLane(laneIdx);
           // Mid-charge: flash the targeted hero BEFORE damage is committed,
           // OR pop the taunt block if the attack will be deflected.
           window.setTimeout(() => {
-            if (aDeflectedByB) {
-              setTauntBlock({ defenderSide: "b", key: Date.now() });
-            } else if (aHitsB) {
+            if (bDeflectorLane !== null) {
+              setTauntBlock({ defenderSide: "b", rockLane: bDeflectorLane, key: Date.now() });
+            } else if (aReachesHeroB) {
               setHeroHit({ side: "opp", lane: laneIdx, key: Date.now() });
             }
-            if (bDeflectedByA) {
-              setTauntBlock({ defenderSide: "a", key: Date.now() + 1 });
-            } else if (bHitsA) {
+            if (aDeflectorLane !== null) {
+              setTauntBlock({ defenderSide: "a", rockLane: aDeflectorLane, key: Date.now() + 1 });
+            } else if (bReachesHeroA) {
               setHeroHit({ side: "you", lane: laneIdx, key: Date.now() + 1 });
             }
           }, LANE_CHARGE_MS * 0.55);

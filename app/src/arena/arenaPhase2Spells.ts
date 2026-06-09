@@ -10,9 +10,10 @@
  * of truth for spell ordering); only the bodies live here.
  */
 
-import { drawCards, damageHero, healHero } from "./arenaRules";
+import { drawCards, damageHero, healHero, creatureEffectiveAtk } from "./arenaRules";
 import {
   getMyCreatureOnLane,
+  getOppCreatureOnLane,
   withMyCreatureOnLane,
   withOppCreatureOnLane,
   withSideHero,
@@ -41,23 +42,22 @@ export function applyOffre(board: BoardState, side: Side): BoardState {
   return withSideHero(board, side, { ...hero, maxMana: newMax });
 }
 
-/** Rempart — give every one of my creatures +2 max HP (also heals current
- *  hp by 2, since they're at full when summoned anyway). Permanent. */
+/** Rempart — give every one of my creatures +2 max HP. Spock Détaché skipped. */
 export function applyRempart(board: BoardState, side: Side): BoardState {
   const lanes = board.lanes.map((lane) => {
     const me = side === "a" ? lane.a : lane.b;
-    if (!me) return lane;
+    if (!me || me.move === "spock") return lane;
     const buffed: Creature = { ...me, hp: me.hp + 2 };
     return side === "a" ? { ...lane, a: buffed } : { ...lane, b: buffed };
   }) as [LaneState, LaneState, LaneState];
   return { ...board, lanes };
 }
 
-/** Bénédiction — +1 ATK this turn to ALL my creatures (mini Tide). */
+/** Bénédiction — +1 ATK this turn to ALL my creatures. Spock Détaché skipped. */
 export function applyBenediction(board: BoardState, side: Side): BoardState {
   const lanes = board.lanes.map((lane) => {
     const me = side === "a" ? lane.a : lane.b;
-    if (!me) return lane;
+    if (!me || me.move === "spock") return lane;
     const buffed: Creature = { ...me, atkBuff: me.atkBuff + 1 };
     return side === "a" ? { ...lane, a: buffed } : { ...lane, b: buffed };
   }) as [LaneState, LaneState, LaneState];
@@ -106,20 +106,26 @@ export function applyMascarade(board: BoardState, side: Side): BoardState {
   return withSideHero(board, oppS, { ...opp, hand: newHand, discard: newDiscard });
 }
 
-/** Sangsue — heal hero by the effective ATK of my creature on the lane. */
+/** Sangsue — heal hero by the effective ATK of my creature on the lane.
+ *  Uses creatureEffectiveAtk so the value matches what the creature
+ *  actually deals in combat (CREATURE_STATS + atkBuff). */
 export function applySangsue(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   if (spell.kind !== "lane") return board;
   const c = getMyCreatureOnLane(board, side, spell.lane);
   if (!c) return board;
-  const atk = Math.max(0, c.atkBuff + (c.move === "scissors" ? 4 : c.move === "rock" || c.move === "spock" ? 3 : 2));
+  const atk = creatureEffectiveAtk(c);
   const hero = side === "a" ? board.a : board.b;
   return withSideHero(board, side, healHero(hero, atk));
 }
 
-/** Trou Noir — destroy the opp's creature on a lane outright (ignores Anchor —
- *  this is a Singularity, not a poke). */
+/** Trou Noir — destroy the opp's creature on a lane outright (ignores Anchor
+ *  — this is a Singularity, not a poke). Spock's Logique IS strong enough to
+ *  resist a single-target removal — the only sort that can clear Spock is
+ *  combat or a board-wide (Genèse, Vortex). */
 export function applyTrouNoir(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   if (spell.kind !== "lane") return board;
+  const opp = getOppCreatureOnLane(board, side, spell.lane);
+  if (opp?.spellImmune) return board;
   return withOppCreatureOnLane(board, side, spell.lane, null);
 }
 

@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { CARDS } from "../ranked/cards";
+import { CardImage } from "../ranked/CardImage";
 import { useT } from "../i18n";
 import type { CardId } from "../ranked/rankedTypes";
 import type { HeroState } from "./arenaTypes";
@@ -185,31 +186,51 @@ export function ArenaHeroStrip({
           <span className="ml-auto font-bold text-ink-muted">🂠 {hero.hand.length}</span>
           {side === "you" && <span className="font-bold text-themed">T{turn}</span>}
         </div>
-        {/* Augur peek — when the OPPOSING player cast Augur on me, my hand
-         *  is revealed to them. The chips render on MY strip so the player
-         *  reading this strip (the opp) SEES what's been peeked. Pulses
-         *  amber + auto-clears at end of turn (via advanceToNextTurn). */}
+        {/* Augur peek — when the OPPOSING player cast Augur, this side's
+         *  hand is revealed to them. The chips render on this strip so it
+         *  reads as "look — I'm spying on these cards". Bigger + glow so
+         *  the player actually NOTICES the reveal (Alex flagged that the
+         *  chips were invisible at 9px). Auto-clears next turn via
+         *  advanceToNextTurn. */}
         {augurRevealed && augurRevealed.length > 0 && (
           <motion.div
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-wrap items-center gap-1 mt-0.5"
+            key={"augur-" + augurRevealed.join("|")}
+            initial={{ opacity: 0, y: -6, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: "spring", stiffness: 280, damping: 22 }}
+            className="flex items-center gap-1.5 mt-1 px-2 py-1 rounded-lg bg-amber-500/12 border border-amber-400/55"
+            style={{ boxShadow: "0 0 14px -2px rgba(252,211,77,0.55), inset 0 1px 0 rgba(252,211,77,0.2)" }}
           >
-            <span className="text-[9px] uppercase tracking-wider font-black text-amber-300">👁 Augur :</span>
-            {augurRevealed.slice(0, 4).map((id, i) => {
-              const card = CARDS[id];
-              if (!card) return null;
-              return (
-                <span
-                  key={`${id}-${i}`}
-                  className="inline-flex items-center gap-0.5 text-[9px] font-bold rounded-full px-1.5 py-0.5 bg-amber-500/25 border border-amber-400/55 text-amber-100"
-                  title={t(card.descKey)}
-                >
-                  <span>{card.glyph}</span>
-                  <span className="max-w-[60px] truncate">{t(card.nameKey)}</span>
-                </span>
-              );
-            })}
+            <motion.span
+              animate={{ opacity: [0.85, 1, 0.85] }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+              className="text-[10px] uppercase tracking-wider font-black text-amber-200 drop-shadow shrink-0"
+            >
+              👁
+            </motion.span>
+            <div className="flex items-center gap-1 flex-wrap">
+              {augurRevealed.slice(0, 4).map((id, i) => {
+                const card = CARDS[id];
+                if (!card) return null;
+                return (
+                  <motion.div
+                    key={`${id}-${i}`}
+                    initial={{ opacity: 0, scale: 0.6, y: -6, rotate: -8 }}
+                    animate={{ opacity: 1, scale: 1, y: 0, rotate: 0 }}
+                    transition={{ delay: 0.05 + i * 0.08, type: "spring", stiffness: 280, damping: 20 }}
+                    className="relative w-9 h-12 sm:w-10 sm:h-[3.4rem] rounded-md overflow-hidden ring-2 ring-amber-300/75 shadow-md shadow-amber-500/30"
+                    title={t(card.nameKey) + " — " + t(card.descKey)}
+                  >
+                    <CardImage id={id} glyphSize="text-base" />
+                    {/* Cost pip top-left so the player gauges mana risk at
+                     *  a glance instead of guessing from the glyph alone. */}
+                    <div className="absolute top-0.5 left-0.5 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-black/80 text-sky-200 text-[8px] font-black tabular-nums">
+                      {card.cost}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
           </motion.div>
         )}
       </div>

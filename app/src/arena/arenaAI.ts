@@ -65,10 +65,20 @@ export function cpuArenaDecision(
       const mine = sideCreature(board, side, lane);
       const opp = sideCreature(board, oppSide, lane);
       if (!mine || !opp) continue;
-      // Will mine die this turn from the opp's incoming attack?
-      const oppBaseAtk = CREATURE_STATS[opp.move].atk + opp.atkBuff;
-      const incoming = oppBaseAtk + (moveCountersMove(opp.move, mine.move) ? 1 : 0);
-      const wouldDie = mine.hp <= incoming && !mine.divineShield;
+      // Updated for RPSLS one-shot combat: if opp counters mine in RPSLS,
+      // mine dies instantly regardless of HP (unless saved by a shield/dodge).
+      // Mirror match → fall back to ATK/HP arithmetic.
+      const counterOM = moveCountersMove(opp.move, mine.move);
+      const counterMO = moveCountersMove(mine.move, opp.move);
+      let wouldDie: boolean;
+      if (counterOM && !counterMO) {
+        wouldDie = !mine.divineShield && !mine.dodgeCharge;
+      } else if (counterMO && !counterOM) {
+        wouldDie = false;
+      } else {
+        const incoming = CREATURE_STATS[opp.move].atk + opp.atkBuff;
+        wouldDie = mine.hp <= incoming && !mine.divineShield && !mine.dodgeCharge;
+      }
       if (!wouldDie) continue;
       // Try Aegis (1m) first — divine shield absorbs ALL the incoming dmg.
       if (mana >= 1 && playableHand.includes("aegis")) {
@@ -90,13 +100,26 @@ export function cpuArenaDecision(
    *      - Paradoxe (5 dmg both, 3 mana — risky if we're also low)
    *      Adversaire AI is "side", so "us" attacks the hero on `oppSide`. */
   const playerHero = side === "a" ? board.b : board.a; // the hero we're trying to kill
+  // Undefended attacks bypass to hero EXCEPT when blocked by Provocation —
+  // a live opp Rock anywhere on the board, unless WE have a live Paper
+  // (Étouffe) that suppresses that taunt.
+  const oppHasTaunt = ([0, 1, 2] as LaneIndex[]).some((i) => {
+    const c = sideCreature(board, oppSide, i);
+    return !!c && c.taunt;
+  });
+  const meHasStifle = ([0, 1, 2] as LaneIndex[]).some((i) => {
+    const c = sideCreature(board, side, i);
+    // Both RPSLS counters of Rock suppress its Provocation board-wide.
+    return !!c && (c.move === "paper" || c.move === "spock");
+  });
+  const tauntBlocksMe = oppHasTaunt && !meHasStifle;
   let lethalDmg = 0;
   for (let i = 0; i < 3; i++) {
     const lane = i as LaneIndex;
     const myC = sideCreature(board, side, lane);
     const oppC = sideCreature(board, oppSide, lane);
     if (myC && !oppC) {
-      // Undefended → we'll hit hero for myC.atk
+      if (tauntBlocksMe) continue; // attack deflected, contributes nothing
       lethalDmg += CREATURE_STATS[myC.move].atk + myC.atkBuff;
     }
   }
@@ -211,14 +234,30 @@ function consume(hand: CardId[], id: CardId): void {
   if (i >= 0) hand.splice(i, 1);
 }
 
-/** Pick the best RPSLS move to summon against `opp`. If opp empty, pick the
- *  highest-ATK move (Scissors 4 ATK). Else pick the one that counters opp. */
+/** Pick the best RPSLS move to summon against `opp`. If opp is null (empty
+ *  lane), use a WEIGHTED RANDOM bag so the CPU varies its openings instead
+ *  of spamming Scissors every time (Alex's "ia ne joue que ciseaux" bug).
+ *  Pierre is favored slightly (defensive opener, cheap and tanks attacks);
+ *  Ciseaux and Lézard are the offensive flavors. */
 function pickBestMove(opp: Creature | null): Move {
-  if (!opp) return "scissors"; // highest ATK on empty lane = fastest dmg to hero
+  if (!opp) {
+    // Bag of length 9 — pulls roughly: Pierre 33%, Spock 22%, Ciseaux 22%,
+    // Lézard 11%, Feuille 11%. Defensive-leaning so the CPU isn't a glass
+    // cannon that dies turn 2 + the player sees a varied roster early on.
+    const bag: Move[] = [
+      "rock", "rock", "rock",
+      "spock", "spock",
+      "scissors", "scissors",
+      "lizard",
+      "paper",
+    ];
+    return bag[Math.floor(Math.random() * bag.length)];
+  }
   for (const mv of MOVES) {
     if (moveCountersMove(mv, opp.move)) {
       // Among counters, pick the one with the best ATK/HP for this trade.
-      // E.g. if opp is Rock, both Paper (2/3) and Spock (3/3) counter — pick Spock.
+      // E.g. if opp is Rock, both Paper (3/1) and Spock (2/3) counter — pick
+      // by composite score so Feuille's ATK is rewarded.
       let best: Move = mv;
       for (const candidate of MOVES) {
         if (!moveCountersMove(candidate, opp.move)) continue;
@@ -229,7 +268,11 @@ function pickBestMove(opp: Creature | null): Move {
       return best;
     }
   }
-  return "scissors";
+  // Fallback when the move can't be RPSLS-countered (impossible in practice
+  // for the 5-symbol table, but guards against future extensions). Random
+  // from the bag instead of hardcoded Scissors.
+  const fallbackBag: Move[] = ["rock", "paper", "scissors", "lizard", "spock"];
+  return fallbackBag[Math.floor(Math.random() * fallbackBag.length)];
 }
 
 /** Build a PlayedSpell with a sensible target chosen for the CPU. Returns null
@@ -290,7 +333,9 @@ function targetOppBestCreature(
   for (let i = 0; i < 3; i++) {
     const lane = i as LaneIndex;
     const c = sideCreature(board, oppSide, lane);
-    if (!c || c.anchored) continue;
+    // Anchor (spell) AND Logique (Spock innate) both fizzle hostile spells —
+    // skip them or the CPU wastes mana on a no-op.
+    if (!c || c.anchored || c.spellImmune) continue;
     const score = CREATURE_STATS[c.move].atk * 2 + c.hp;
     if (score > bestScore) { bestScore = score; bestLane = lane; }
   }

@@ -151,14 +151,25 @@ export function applyArenaSpell(ctx: ArenaSpellContext): BoardState {
 
 /* ───────────────────────── Individual spells ───────────────────────── */
 
+/** Spock's Détaché malus — ANY of MY buffs (Aegis, Surge, Tide, etc.) that
+ *  target a Spock creature get ignored silently. Spock lives in autarky.
+ *  Sangsue/Échappée are NOT buffs (they read or destroy), they go through. */
+function isDetached(c: Creature | null | undefined): boolean {
+  return !!c && c.move === "spock";
+}
+
 /** Aegis — Divine Shield: lane-target → my creature there absorbs next dmg.
- *  Self-target → my HERO gets the shield. The shield is a single boolean
- *  consumed at the next damage instance (see damageCreature/damageHero). */
+ *  Self-target → my HERO gets the shield. Spock Détaché ignores it.
+ *  BONUS on a Pierre target: ALSO refills its Provocation charge to 1 — Aegis
+ *  becomes the dedicated "rebuild the tank" tool when its charge is spent. */
 function applyAegis(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   if (spell.kind === "lane") {
     const c = getMyCreatureOnLane(board, side, spell.lane);
-    if (!c) return board;
-    return withMyCreatureOnLane(board, side, spell.lane, { ...c, divineShield: true });
+    if (!c || isDetached(c)) return board;
+    const refilled = c.move === "rock"
+      ? { ...c, divineShield: true, provocationCharges: Math.max(c.provocationCharges, 1) }
+      : { ...c, divineShield: true };
+    return withMyCreatureOnLane(board, side, spell.lane, refilled);
   }
   if (spell.kind === "self") {
     const hero = side === "a" ? board.a : board.b;
@@ -168,19 +179,20 @@ function applyAegis(board: BoardState, side: Side, spell: PlayedSpell): BoardSta
 }
 
 /** Anchor — my creature on that lane is IMMUNE to enemy spells this turn.
- *  (Doesn't protect against combat — that's Aegis's job.) */
+ *  Spock Détaché ignores it (Spock has Logique anyway, doesn't need it). */
 function applyAnchor(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   if (spell.kind !== "lane") return board;
   const c = getMyCreatureOnLane(board, side, spell.lane);
-  if (!c) return board;
+  if (!c || isDetached(c)) return board;
   return withMyCreatureOnLane(board, side, spell.lane, { ...c, anchored: true });
 }
 
-/** Riposte — if my creature dies in combat this turn, its killer dies too. */
+/** Riposte — if my creature dies in combat this turn, its killer dies too.
+ *  Spock Détaché ignores it. */
 function applyRiposte(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   if (spell.kind !== "lane") return board;
   const c = getMyCreatureOnLane(board, side, spell.lane);
-  if (!c) return board;
+  if (!c || isDetached(c)) return board;
   return withMyCreatureOnLane(board, side, spell.lane, { ...c, ripostePrimed: true });
 }
 
@@ -190,27 +202,27 @@ function applySecondWind(board: BoardState, side: Side): BoardState {
   return withSideHero(board, side, healHero(hero, 4));
 }
 
-/** Precision — +2 ATK this turn to my creature on the chosen lane. */
+/** Precision — +2 ATK this turn to my creature. Spock Détaché ignores it. */
 function applyPrecision(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   if (spell.kind !== "lane") return board;
   const c = getMyCreatureOnLane(board, side, spell.lane);
-  if (!c) return board;
+  if (!c || isDetached(c)) return board;
   return withMyCreatureOnLane(board, side, spell.lane, { ...c, atkBuff: c.atkBuff + 2 });
 }
 
-/** Surge — +3 ATK this turn to my creature on the chosen lane (big boost). */
+/** Surge — +3 ATK this turn to my creature. Spock Détaché ignores it. */
 function applySurge(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   if (spell.kind !== "lane") return board;
   const c = getMyCreatureOnLane(board, side, spell.lane);
-  if (!c) return board;
+  if (!c || isDetached(c)) return board;
   return withMyCreatureOnLane(board, side, spell.lane, { ...c, atkBuff: c.atkBuff + 3 });
 }
 
-/** Tide — +1 ATK this turn to ALL my creatures. */
+/** Tide — +1 ATK this turn to ALL my creatures. Spock Détaché skipped. */
 function applyTide(board: BoardState, side: Side): BoardState {
   const lanes = board.lanes.map((lane) => {
     const me = side === "a" ? lane.a : lane.b;
-    if (!me) return lane;
+    if (!me || isDetached(me)) return lane;
     const bumped: Creature = { ...me, atkBuff: me.atkBuff + 1 };
     return side === "a" ? { ...lane, a: bumped } : { ...lane, b: bumped };
   }) as [LaneState, LaneState, LaneState];
@@ -218,11 +230,11 @@ function applyTide(board: BoardState, side: Side): BoardState {
 }
 
 /** Curse — -2 ATK this turn on the opp's creature on the chosen lane.
- *  Blocked by Anchor (the target's anchored flag). */
+ *  Blocked by Anchor OR by Logique (Spock's spell immunity). */
 function applyCurse(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   if (spell.kind !== "lane") return board;
   const opp = getOppCreatureOnLane(board, side, spell.lane);
-  if (!opp || opp.anchored) return board;
+  if (!opp || opp.anchored || opp.spellImmune) return board;
   return withOppCreatureOnLane(board, side, spell.lane, { ...opp, atkBuff: opp.atkBuff - 2 });
 }
 
@@ -276,7 +288,8 @@ function applySupernova(board: BoardState, side: Side, spell: PlayedSpell): Boar
   }
   if (spell.kind === "lane") {
     const opp = getOppCreatureOnLane(board, side, spell.lane);
-    if (!opp || opp.anchored) return board;
+    // Spock's Logique fizzle hostile spells, just like Anchor.
+    if (!opp || opp.anchored || opp.spellImmune) return board;
     const damaged = damageCreature(opp, 6);
     return withOppCreatureOnLane(board, side, spell.lane, damaged);
   }

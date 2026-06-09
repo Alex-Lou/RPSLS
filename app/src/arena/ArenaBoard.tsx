@@ -51,9 +51,9 @@ export interface ArenaBoardProps {
   heroHit?: { side: "you" | "opp"; lane: LaneIndex; key: number } | null;
   /** Taunt block flash — set when an undefended attack is DEFLECTED by a
    *  taunt creature on the defender's side. Pops a "🪨 ATTAQUE DÉTOURNÉE !"
-   *  chip on the defender's row so the player UNDERSTANDS why no damage
-   *  happened (a Rock elsewhere on the board pulled the attack onto it). */
-  tauntBlock?: { defenderSide: "a" | "b"; key: number } | null;
+   *  chip on the defender's row + glows the actual Pierre that ate the
+   *  deflection (rockLane), so the player SEES which rock saved them. */
+  tauntBlock?: { defenderSide: "a" | "b"; rockLane: LaneIndex; key: number } | null;
   /** Active targeting (lifted from ArenaPlanPhase) — when set on a lane
    *  target, the BOARD highlights ONLY the lane slots a spell of that
    *  kind can actually target (my creature for buffs, opp creature for
@@ -84,22 +84,27 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
   const oppSide: Side = playerSide === "a" ? "b" : "a";
   function stickersForSide(rowSide: Side) {
     const out: Array<{ lane: LaneIndex; id: import("../ranked/rankedTypes").CardId; owner: "you" | "opp"; position: "tl" | "tr" | "bl" | "br" }> = [];
-    // Player's own intent — cast spells the player commits.
+    // Player stickers go top-left (out of the way of ATK badge bottom-left
+    // — Alex's "le sticker cache l'ATK" feedback). Opp stickers stay top-
+    // right; they share that corner with the passive badges but opp data
+    // is less critical to read.
     const playerSpells = (playerPreview ?? intent).spells;
     for (const s of playerSpells) {
       if (s.kind !== "lane") continue;
       const tgt = LANE_SPELL_TARGET_SIDE[s.id] ?? "my-creature";
       const targetSide: Side = tgt === "opp-creature" ? oppSide : playerSide;
-      if (targetSide === rowSide) out.push({ lane: s.lane, id: s.id, owner: "you", position: "bl" });
+      if (targetSide === rowSide) out.push({ lane: s.lane, id: s.id, owner: "you", position: "tl" });
     }
-    // CPU's intent — only visible during the reveal/spells window.
     const cpuSpells = oppPreview?.spells ?? [];
     for (const s of cpuSpells) {
       if (s.kind !== "lane") continue;
       const tgt = LANE_SPELL_TARGET_SIDE[s.id] ?? "my-creature";
-      // For CPU, "my-creature" = oppSide, "opp-creature" = playerSide
       const targetSide: Side = tgt === "opp-creature" ? playerSide : oppSide;
-      if (targetSide === rowSide) out.push({ lane: s.lane, id: s.id, owner: "opp", position: "tr" });
+      // Opp stickers go bottom-right so they don't overlap the opp
+      // creature's TOP-RIGHT passive badges (Alex flagged that the
+      // mini-card hid the badge icons). HP badge bottom-right is slightly
+      // covered but that's an acceptable tradeoff vs hiding passive info.
+      if (targetSide === rowSide) out.push({ lane: s.lane, id: s.id, owner: "opp", position: "br" });
     }
     return out;
   }
@@ -114,7 +119,12 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
   const opp = board[oppSide];
 
   return (
-    <div className="relative w-full max-w-2xl mx-auto rounded-2xl overflow-hidden border border-emerald-900/40 shadow-[inset_0_0_36px_rgba(0,0,0,0.55)] flex-1 min-h-0 flex flex-col">
+    <div
+      className="relative w-full max-w-2xl mx-auto rounded-2xl overflow-hidden
+                 border border-emerald-900/40
+                 shadow-[inset_0_0_36px_rgba(0,0,0,0.55)]
+                 [@media(max-height:560px)]:max-w-md"
+    >
       {/* Backdrop — same pad system as Ranked, so themes carry over. */}
       <div className="absolute inset-0 pointer-events-none">
         <BattlePad padId={padId} className="w-full h-full" compact />
@@ -128,27 +138,118 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
         }}
       />
 
-      {/* TAUNT BLOCK CHIP — when an undefended attack is deflected, a big
-       *  "🪨 ATTAQUE DÉTOURNÉE !" chip pops near the defender's side so
-       *  the player UNDERSTANDS why no damage was taken (Alex's "rock cuts
-       *  my scissors but I don't lose HP" confusion). Old wording was
-       *  "PROVOCATION BLOQUE" which was ambiguous — could be read as the
-       *  taunt FAILING. New wording is unambiguous: the attack got
-       *  redirected (= no damage on hero). */}
+      {/* AUGUR FLASH — when EITHER side cast Augur this turn, a banner pops
+       *  at the center during the spells phase so the player KNOWS the
+       *  reveal just happened (then the chips on the hero strip show the
+       *  actual cards). Alex flagged that Augur was invisible. */}
+      <AnimatePresence>
+        {(resolveStep === "spells" || resolveStep === "summons") &&
+          ((oppPreview?.spells?.some((s) => s.id === "augur") ?? false) ||
+            (playerPreview?.spells?.some((s) => s.id === "augur") ?? false)) && (
+          <motion.div
+            key="augur-flash"
+            initial={{ opacity: 0, scale: 0.6, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ type: "spring", stiffness: 240, damping: 18 }}
+            className="absolute left-1/2 top-[44%] -translate-x-1/2 z-40 pointer-events-none"
+          >
+            <div
+              className="relative flex items-center gap-2 px-4 py-2 rounded-2xl backdrop-blur-sm shadow-2xl"
+              style={{
+                background: "linear-gradient(135deg, rgba(217,119,6,0.95) 0%, rgba(252,211,77,0.95) 50%, rgba(245,158,11,0.95) 100%)",
+                border: "1px solid rgba(252,211,77,0.7)",
+                boxShadow: "0 8px 32px -4px rgba(245,158,11,0.55), 0 0 24px rgba(252,211,77,0.5), inset 0 1px 0 rgba(255,255,255,0.25)",
+              }}
+            >
+              <motion.span
+                animate={{ scale: [1, 1.15, 1] }}
+                transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+                className="text-2xl leading-none drop-shadow"
+              >
+                👁
+              </motion.span>
+              <div className="flex flex-col items-start leading-none">
+                <span className="text-[8.5px] uppercase tracking-[0.22em] font-black text-amber-50/95">
+                  Augur
+                </span>
+                <span className="text-[12px] uppercase tracking-[0.14em] font-black text-white drop-shadow">
+                  Main révélée
+                </span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* TAUNT BLOCK CHIP — modern cosmic chip, lateral position so two
+       *  consecutive deflects on the same row don't overlap. Anchored to
+       *  the Pierre that absorbed the attack (rockLane drives left/center/
+       *  right). Lighter anim (3 sparks instead of 6) for smoother frame
+       *  pacing on mobile. */}
       <AnimatePresence>
         {tauntBlock && (
           <motion.div
             key={tauntBlock.key}
-            initial={{ opacity: 0, scale: 0.6, y: tauntBlock.defenderSide === (playerSide === "a" ? "a" : "b") ? 20 : -20 }}
-            animate={{ opacity: 1, scale: 1.1, y: 0 }}
+            initial={{ opacity: 0, scale: 0.75, y: tauntBlock.defenderSide === playerSide ? 18 : -18 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
+            transition={{ type: "spring", stiffness: 320, damping: 22 }}
             className={
-              "absolute left-1/2 -translate-x-1/2 z-40 pointer-events-none px-3 py-1.5 rounded-full bg-amber-400 text-black text-[12px] uppercase tracking-[0.18em] font-black shadow-2xl border-2 border-amber-600 " +
-              (tauntBlock.defenderSide === playerSide ? "bottom-[42%]" : "top-[42%]")
+              "absolute z-40 pointer-events-none " +
+              (tauntBlock.defenderSide === playerSide ? "bottom-[42%] " : "top-[42%] ") +
+              (tauntBlock.rockLane === 0 ? "left-[6%]" :
+               tauntBlock.rockLane === 2 ? "right-[6%]" :
+               "left-1/2 -translate-x-1/2")
             }
           >
-            🪨 ATTAQUE DÉTOURNÉE !
+            {/* Outer glow halo — single short pulse (lighter than before). */}
+            <motion.div
+              aria-hidden
+              initial={{ opacity: 0, scale: 0.85 }}
+              animate={{ opacity: [0, 0.8, 0], scale: [0.85, 1.8, 2.4] }}
+              transition={{ duration: 0.95, ease: "easeOut" }}
+              className="absolute inset-0 rounded-3xl"
+              style={{
+                background: "radial-gradient(circle, rgba(252,211,77,0.7) 0%, rgba(168,85,247,0.3) 40%, transparent 70%)",
+                filter: "blur(8px)",
+              }}
+            />
+            {/* Three sparkle motes — same radial pattern, fewer particles. */}
+            {[0, 1, 2].map((i) => (
+              <motion.span
+                key={i}
+                aria-hidden
+                initial={{ opacity: 0, x: 0, y: 0, scale: 0.5 }}
+                animate={{
+                  opacity: [0, 1, 0],
+                  x: Math.cos((i / 3) * Math.PI * 2) * 28,
+                  y: Math.sin((i / 3) * Math.PI * 2) * 28,
+                  scale: [0.5, 1.1, 0.4],
+                }}
+                transition={{ duration: 0.8, delay: 0.05 + i * 0.04, ease: "easeOut" }}
+                className="absolute left-1/2 top-1/2 w-1.5 h-1.5 rounded-full bg-amber-200"
+                style={{ boxShadow: "0 0 6px rgba(252,211,77,0.9)", marginLeft: -3, marginTop: -3 }}
+              />
+            ))}
+            <div
+              className="relative flex items-center gap-2 px-3 py-1.5 rounded-2xl backdrop-blur-sm shadow-2xl"
+              style={{
+                background: "linear-gradient(135deg, rgba(168,85,247,0.92) 0%, rgba(217,119,6,0.94) 70%, rgba(252,211,77,0.94) 100%)",
+                border: "1px solid rgba(252,211,77,0.65)",
+                boxShadow: "0 6px 24px -4px rgba(168,85,247,0.5), 0 0 18px rgba(252,211,77,0.4), inset 0 1px 0 rgba(255,255,255,0.18)",
+              }}
+            >
+              <span className="text-base leading-none drop-shadow">🪨</span>
+              <div className="flex flex-col items-start leading-none">
+                <span className="text-[7.5px] uppercase tracking-[0.2em] font-black text-amber-50/95">
+                  Pierre protège
+                </span>
+                <span className="text-[10.5px] uppercase tracking-[0.12em] font-black text-white drop-shadow">
+                  Attaque détournée
+                </span>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -167,7 +268,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
         )}
       </AnimatePresence>
 
-      <div className="relative flex flex-col gap-1.5 p-2 sm:p-3 flex-1 min-h-0">
+      <div className="relative p-3 sm:p-4 flex flex-col gap-3 sm:gap-4 [@media(max-height:560px)]:p-1.5 [@media(max-height:560px)]:gap-1.5">
         {/* Opponent strip — HP bar flashes when an attack lands on opp hero.
          *  Augur revealed on opp = my augurRevealedB (I cast augur on side b),
          *  i.e. board.augurRevealedB if I'm side a, else board.augurRevealedA. */}
@@ -190,6 +291,8 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
           targetLabel={targetLabel}
           onLaneTap={onLaneTap ? (l) => onLaneTap(l, oppSide) : undefined}
           stickers={oppRowStickers}
+          deflectingRockLane={tauntBlock?.defenderSide === oppSide ? tauntBlock.rockLane : null}
+          deflectKey={tauntBlock?.defenderSide === oppSide ? tauntBlock.key : null}
         />
 
         {/* CENTER STATUS ZONE — single bar that owns the phase chip + the
@@ -199,7 +302,6 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
         <CenterStatus
           step={resolveStep ?? null}
           turn={board.turn}
-          combatLane={combatLane}
           oppPreview={oppPreview}
           playerPreview={playerPreview}
         />
@@ -216,6 +318,8 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
           targetLabel={targetLabel}
           onLaneTap={onLaneTap ? (l) => onLaneTap(l, playerSide) : undefined}
           stickers={playerRowStickers}
+          deflectingRockLane={tauntBlock?.defenderSide === playerSide ? tauntBlock.rockLane : null}
+          deflectKey={tauntBlock?.defenderSide === playerSide ? tauntBlock.key : null}
         />
 
         {/* Player strip — HP bar flashes when an attack lands on player hero.
@@ -239,20 +343,20 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
  *  overlay below the chip so they don't push the rows around. This is
  *  what makes the pad "stable" like the Ranked LanesBoard. */
 function CenterStatus({
-  step, turn, combatLane, oppPreview, playerPreview,
+  step, turn, oppPreview, playerPreview,
 }: {
   step: ArenaBoardProps["resolveStep"];
   turn: number;
-  combatLane: LaneIndex | null;
   oppPreview: TurnIntent | null | undefined;
   playerPreview: TurnIntent | null | undefined;
 }) {
-  const laneLabel = combatLane !== null ? ` — Lane ${combatLane + 1}` : "";
+  // Combat label no longer says "Lane N" — the per-lane halo + charge anim
+  // already tells the eye which lane is live. Less text-clutter at center.
   const label =
     step === "reveal-opp" ? "Adversaire dévoile son tour" :
     step === "spells"  ? "✨ Sorts en cours" :
     step === "summons" ? "🌟 Invocations" :
-    step === "combat"  ? "⚔️ Combat" + laneLabel :
+    step === "combat"  ? "⚔️ Combat" :
     step === "settle"  ? "Fin du tour…" :
     "Tour " + turn + " · Premier à 0 ❤";
   const tone: ChipTone =
@@ -349,6 +453,8 @@ function LaneRow({
   lanes, renderSide, intent, isPlayer, combatLane = null,
   validLanes = [false, false, false], targetLabel = "", onLaneTap,
   stickers = [],
+  deflectingRockLane = null,
+  deflectKey = null,
 }: {
   lanes: BoardState["lanes"];
   renderSide: Side;
@@ -362,7 +468,22 @@ function LaneRow({
    *  pattern as Ranked's CardSlot. Computed in the parent so both rows
    *  stay in sync. */
   stickers?: Array<{ lane: LaneIndex; id: import("../ranked/rankedTypes").CardId; owner: "you" | "opp"; position: "tl" | "tr" | "bl" | "br" }>;
+  /** Lane of the Pierre that just absorbed a deflection on THIS row, if
+   *  any. The targeted slot pulses extra-bright for ~1.4s. */
+  deflectingRockLane?: LaneIndex | null;
+  /** Key that changes each deflection — drives the re-mount of the pulse
+   *  anim so consecutive deflects on the same rock re-fire. */
+  deflectKey?: number | null;
 }) {
+  // Pierre's Provocation (taunt) is suppressed while opp has ANY of the
+  // two RPSLS counters of Rock alive — Paper (Étouffe) OR Spock (Logique
+  // anti-taunt). Pre-compute once per row so each slot renders the right
+  // visual state (no halo + no badge when suppressed).
+  const oppSideKey: Side = renderSide === "a" ? "b" : "a";
+  const oppHasStifle = lanes.some((l) => {
+    const c = l[oppSideKey];
+    return !!c && (c.move === "paper" || c.move === "spock");
+  });
   return (
     <div className="grid grid-cols-3 gap-2 sm:gap-3">
       {[0, 1, 2].map((i) => {
@@ -372,8 +493,42 @@ function LaneRow({
         const inCombat = combatLane === lane;
         const valid = validLanes[i] ?? false;
         const laneStickers = stickers.filter((s) => s.lane === lane);
+        // Only Pierre cares about suppression today (Étouffe). Other innate
+        // passives (Tranchant, Esquive, Logique, Étouffe itself) have no
+        // counter-effect — they always render their badge.
+        const suppressed = !!c && c.taunt && oppHasStifle;
         return (
-          <div key={i} className="relative">
+          <div
+            key={i}
+            className="relative"
+            data-arena-lane={lane}
+            data-arena-side={renderSide}
+          >
+            {/* COMBAT HALO — golden pulsing ring around the lane slot during
+             *  its combat tick. Plays in sync with the per-creature charge
+             *  anim so the eye instantly locks on which lane is alive. */}
+            <AnimatePresence>
+              {inCombat && (
+                <motion.div
+                  key={"halo-" + i}
+                  aria-hidden
+                  initial={{ opacity: 0, scale: 1 }}
+                  animate={{
+                    opacity: [0, 0.85, 0.6, 0.85, 0],
+                    boxShadow: [
+                      "0 0 0 0 rgba(252,211,77,0)",
+                      "0 0 22px 5px rgba(252,211,77,0.7), inset 0 0 0 2px rgba(252,211,77,0.55)",
+                      "0 0 16px 4px rgba(252,211,77,0.5), inset 0 0 0 2px rgba(252,211,77,0.4)",
+                      "0 0 28px 8px rgba(252,211,77,0.85), inset 0 0 0 3px rgba(252,211,77,0.7)",
+                      "0 0 0 0 rgba(252,211,77,0)",
+                    ],
+                  }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 1.1, ease: "easeInOut" }}
+                  className="absolute -inset-1 rounded-xl pointer-events-none z-[3]"
+                />
+              )}
+            </AnimatePresence>
             <ArenaLaneSlot
               lane={lane}
               creature={c}
@@ -384,11 +539,20 @@ function LaneRow({
               clickable={valid}
               clickableLabel={targetLabel}
               onClick={valid && onLaneTap ? () => onLaneTap(lane) : undefined}
+              passiveSuppressed={suppressed}
+              deflectingPulse={deflectingRockLane === lane ? deflectKey ?? 0 : null}
             />
             {/* Card stickers — small CardSlot badges showing which spells
-             *  hit this lane this turn (mirrors Ranked LanesBoard pattern). */}
+             *  hit this lane this turn (mirrors Ranked LanesBoard pattern).
+             *  Owner "you" gets a swoop-from-hand entry anim so the player
+             *  sees the cast land on the lane in real time. */}
             {laneStickers.map((s, idx) => (
-              <CardSlot key={`${s.id}-${idx}`} id={s.id} position={s.position} />
+              <CardSlot
+                key={`${s.id}-${idx}`}
+                id={s.id}
+                position={s.position}
+                flyFromHand={s.owner === "you"}
+              />
             ))}
           </div>
         );

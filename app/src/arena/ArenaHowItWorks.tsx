@@ -10,6 +10,8 @@
 
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
+import { CREATURE_PASSIVES, CREATURE_STATS, MOVE_DESIGN_NOTES } from "./arenaTypes";
+import type { Move } from "../engine/game";
 
 export function ArenaHowItWorks({ onClose }: { onClose: () => void }) {
   return createPortal(
@@ -61,14 +63,31 @@ export function ArenaHowItWorks({ onClose }: { onClose: () => void }) {
           />
           <Section title="⋙ Mana" body="1 mana au tour 1, +1 chaque tour jusqu'à 10. Tes coups RPSLS coûtent 1 mana, tes sorts ont leur propre coût (1-4 mana)." />
           <Section title="🪨 Créatures qui RESTENT sur les lanes" body="Quand tu invoques un coup RPSLS, la créature PERSISTE sur sa lane d'un tour à l'autre — elle garde ses blessures, ses buffs, son shield. Elle ne disparaît QUE si ses HP tombent à 0 (animation rose qui éclate)." />
-          <Section title="⚔️ Combat à chaque fin de tour" body="Si deux créatures sont face à face sur une même lane: elles se frappent simultanément (ATK contre HP). Counter RPSLS = +1 ATK bonus (rock bat scissors, etc.). Si UNE seule créature est sur la lane (l'autre lane libre): elle frappe directement le héros adverse." />
           <Section
-            title="🛡️ Pourquoi certains coups passent à TRAVERS"
+            title="⚔️ Combat — la règle RPSLS-FIRST avec POURSUITE"
             body=""
             sub={[
-              "🛡️ Bouclier divin (Aegis): la prochaine attaque est ENTIÈREMENT absorbée puis le shield disparaît.",
-              "⚓ Ancré (Anchor): la créature est immunisée aux SORTS adverses ce tour (mais pas au combat).",
-              "🪨 Provocation (Rock par défaut): force l'opp à frapper TA créature au lieu de ton héros — l'attaque \"undefended\" est déviée.",
+              "Deux créatures FACE À FACE : la règle RPSLS tranche. Le perdant MEURT INSTANT, le gagnant survit intact. Ciseau vs Pierre → Ciseau mort, Pierre intacte.",
+              "POURSUITE : le gagnant ne s'arrête pas. Son ATK CONTINUE vers le HÉROS adverse. Spock 2 ATK bat Ciseaux → Ciseau mort + 2 dégâts au héros opp. La défense Provocation Pierre (ailleurs) peut détourner cette poursuite.",
+              "MÊME SYMBOLE des deux côtés (Pierre vs Pierre) : pas de winner RPSLS → échange ATK/HP normal (ils s'entre-tapent simultanément, pas de poursuite).",
+              "UNE SEULE créature sur la lane (lane opp vide) : elle frappe directement le HÉROS opp pour son ATK… SAUF si la nature passive de l'opp annule (voir ↓).",
+              "ESQUIVE du Lézard ABSORBE la poursuite : si Spock attaque un Lézard, le Lézard esquive (charge consommée) ET Spock n'atteint pas le héros — Esquive sauve les 2.",
+            ]}
+          />
+          {/* THE BIG ONE — single source of truth on les 5 passifs RPSLS.
+           *  Replaces 3 scattered earlier sections. */}
+          <PassiveGrid />
+          <Section
+            title="🪨 Et la chip 'Attaque détournée' alors ?"
+            body="Quand l'attaque d'une créature adverse est annulée par TA Pierre (Provocation), tu vois pop la chip jaune 🪨 ATTAQUE DÉTOURNÉE ! au centre du board. C'est juste la confirmation visuelle que ton héros vient d'être sauvé. La pierre n'encaisse rien, l'attaque part simplement dans le vide. Pour casser cette protection: l'opp doit poser une Feuille (Étouffe) OU détruire ta Pierre en combat / par un sort."
+          />
+          <Section
+            title="🛡️ Sorts de défense (en plus des passifs)"
+            body=""
+            sub={[
+              "🛡️ Bouclier divin (Aegis, sort): la prochaine attaque sur la cible est ENTIÈREMENT absorbée puis le shield disparaît. ATTENTION: les Ciseaux (Tranchant) percent quand même.",
+              "⚓ Ancré (Anchor, sort): la créature ciblée est immunisée aux sorts adverses ce tour seulement (Logique = la version permanente côté Spock).",
+              "⚔️ Riposte (sort): si ta créature MEURT en combat, son tueur meurt aussi (dommage de retour).",
             ]}
           />
           <Section
@@ -88,6 +107,73 @@ export function ArenaHowItWorks({ onClose }: { onClose: () => void }) {
       </motion.div>
     </motion.div>,
     document.body,
+  );
+}
+
+/** Per-symbole strategy cheat-sheet — one card per RPSLS symbol with
+ *  stats, passif name, BON / MOINS BON / 2 CONTRES (the 2 RPSLS counters).
+ *  This is the heart of "Comment ça marche" — single-glance strategy from
+ *  turn 1. Reads top-to-bottom on mobile, no horizontal scroll. */
+function PassiveGrid() {
+  const moves: Move[] = ["rock", "paper", "scissors", "lizard", "spock"];
+  const moveLabel: Record<Move, string> = {
+    rock: "Pierre",
+    paper: "Feuille",
+    scissors: "Ciseaux",
+    lizard: "Lézard",
+    spock: "Spock",
+  };
+  const toneBg: Record<string, string> = {
+    amber:   "bg-amber-400/95 text-black",
+    emerald: "bg-emerald-400/95 text-black",
+    rose:    "bg-rose-400/95 text-black",
+    sky:     "bg-sky-400/95 text-black",
+    violet:  "bg-violet-400/95 text-black",
+  };
+  return (
+    <div>
+      <h3 className="text-[12px] font-black uppercase tracking-wider text-emerald-200/95 mb-1">
+        🎴 LES 5 SYMBOLES — pouvoir, force, faiblesse, contres
+      </h3>
+      <p className="text-[12px] leading-relaxed text-zinc-400 mb-2">
+        Chaque symbole RPSLS a une <strong className="text-emerald-200">nature passive</strong> gratuite (badge en haut-droit de la créature) ET ses 2 contres RPSLS qui le tuent en combat de lane. Lis ces 5 cartes une fois — c'est ta strat de tout le match.
+      </p>
+      <div className="space-y-2">
+        {moves.map((move) => {
+          const p = CREATURE_PASSIVES[move];
+          const stats = CREATURE_STATS[move];
+          const notes = MOVE_DESIGN_NOTES[move];
+          return (
+            <div key={move} className="rounded-lg bg-zinc-900/70 border border-zinc-800 p-2">
+              <div className="flex items-center gap-2 mb-1">
+                <span className={"text-[14px] px-1.5 py-0.5 rounded font-black tracking-wider shadow leading-none " + (toneBg[p.tone] ?? "bg-zinc-400 text-black")}>
+                  {p.glyph}
+                </span>
+                <span className="text-[13px] font-black text-zinc-100">{moveLabel[move]}</span>
+                <span className="text-[10.5px] text-zinc-500 tabular-nums ml-auto">⚔ {stats.atk} · ❤ {stats.hp}</span>
+                <span className="text-[11px] font-bold text-emerald-300 whitespace-nowrap">{p.name}</span>
+              </div>
+              <div className="space-y-0.5 pl-1">
+                <p className="text-[11.5px] leading-snug text-emerald-200/90">
+                  <span className="font-black">💪 Bon —</span> {notes.good}
+                </p>
+                <p className="text-[11.5px] leading-snug text-rose-200/90">
+                  <span className="font-black">🔻 Moins bon —</span> {notes.bad}
+                </p>
+                <p className="text-[11.5px] leading-snug text-amber-200/90">
+                  <span className="font-black">⚠ 2 contres —</span> {notes.counters}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-2 rounded-lg bg-emerald-950/60 border border-emerald-800/40 p-2">
+        <p className="text-[11.5px] leading-snug text-emerald-100/90">
+          <span className="font-black text-emerald-300">🎯 Stratégie d'ouverture —</span> Pose une <strong>Pierre</strong> tôt (1 mana, défense). Si opp pose une Pierre, dégaine <strong>Feuille</strong> (cassure board-wide) ou <strong>Spock</strong> (cassure + immunité). Garde <strong>Ciseaux</strong> pour percer un Aegis adverse. <strong>Lézard</strong> = carte-piège anti-finisher. <strong>Spock</strong> = ancrage anti-sorts ET 2e levier anti-Pierre.
+        </p>
+      </div>
+    </div>
   );
 }
 

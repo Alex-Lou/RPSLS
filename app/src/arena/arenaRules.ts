@@ -139,22 +139,74 @@ export function makeCreature(move: Move, side: Side): Creature {
     divineShield: false,
     anchored: false,
     ripostePrimed: false,
-    // Rock creatures inherently have TAUNT — they
-    // block opp's undefended-lane attacks against my hero. Other moves
-    // start without taunt (Crepuscule / Riposte spells can grant it later).
-    taunt: move === "rock",
+    // Innate RPSLS passives — one per symbol, tied to RPSLS identity.
+    taunt:       move === "rock",     // 🛡 Provocation
+    stifles:     move === "paper",    // 🌿 Étouffe (UI badge only — actual
+                                       //   check uses move === "paper" || "spock")
+    pierces:     move === "scissors", // ⚔ Tranchant
+    dodgeCharge: move === "lizard",   // ✨ Esquive
+    spellImmune: move === "spock",    // 🧬 Logique
+    // Malus tracking — set at summon, drives the per-symbol drawback in
+    // creatureEffectiveAtk + endOfTurnReset.
+    summonedThisTurn: true,           // Lente (Pierre 0 ATK) / Lent (Lézard 1)
+    wiltedSteps: 0,                    // Fanaison (Feuille: -1/turn)
+    combatBlunted: false,              // Émoussé (Ciseaux: -1 after 1st combat)
+    // Provocation is charge-limited (1 at summon for Pierre, refillable by
+    // Aegis). 0 on every other symbol — they don't have Provocation anyway.
+    provocationCharges: move === "rock" ? 1 : 0,
   };
 }
 
 export function creatureEffectiveAtk(c: Creature): number {
-  return Math.max(0, CREATURE_STATS[c.move].atk + c.atkBuff);
+  const base = CREATURE_STATS[c.move].atk + c.atkBuff;
+  // ── Lente / Lent : the turn a Pierre or Lézard is summoned, its ATK is
+  //    suppressed (Pierre → 0, Lézard → 1). All other moves attack normally
+  //    the turn they land. Buff stacking still applies (a Surge on Pierre
+  //    the turn it's summoned still goes through).
+  if (c.summonedThisTurn) {
+    if (c.move === "rock")   return Math.max(0, 0 + c.atkBuff);
+    if (c.move === "lizard") return Math.max(0, 1 + c.atkBuff);
+  }
+  // ── Fanaison : Feuille loses 1 ATK per turn elapsed since summon, floor 1.
+  //    So a freshly summoned Paper is 3, next turn 2, then 1, then stays 1.
+  if (c.move === "paper" && c.wiltedSteps > 0) {
+    return Math.max(1, CREATURE_STATS.paper.atk - c.wiltedSteps + c.atkBuff);
+  }
+  // ── Émoussé : Ciseaux loses 1 ATK permanently after its first combat.
+  if (c.combatBlunted) {
+    return Math.max(0, base - 1);
+  }
+  return Math.max(0, base);
 }
 
-/** Apply damage to a creature, honoring its Divine Shield. Returns the new
- *  creature (or null if it died). */
+/** Apply damage to a creature, honoring its defenses in order:
+ *   1. Esquive (Lézard 1-charge) — intrinsèque, prioritaire sur divineShield.
+ *   2. Divine Shield (Aegis spell) — consommé au 1er dégât.
+ *  Returns the new creature, or null if it died. */
 export function damageCreature(c: Creature, dmg: number): Creature | null {
   if (dmg <= 0) return c;
+  if (c.dodgeCharge) return { ...c, dodgeCharge: false };
   if (c.divineShield) return { ...c, divineShield: false };
+  const hp = c.hp - dmg;
+  if (hp <= 0) return null;
+  return { ...c, hp };
+}
+
+/** Set combatBlunted on a surviving Scissors. Idempotent — re-flagging an
+ *  already-blunted Scissors is a no-op. */
+function bluntOnCombat(c: Creature): Creature {
+  if (c.move === "scissors" && !c.combatBlunted) {
+    return { ...c, combatBlunted: true };
+  }
+  return c;
+}
+
+/** Variant used by Tranchant (Scissors) attackers — bypasses divineShield.
+ *  Esquive still applies (it's intrinsic to the defender's nature). */
+function damageCreaturePierce(c: Creature, dmg: number): Creature | null {
+  if (dmg <= 0) return c;
+  if (c.dodgeCharge) return { ...c, dodgeCharge: false };
+  // skip divineShield — pierced by Tranchant
   const hp = c.hp - dmg;
   if (hp <= 0) return null;
   return { ...c, hp };
@@ -162,10 +214,21 @@ export function damageCreature(c: Creature, dmg: number): Creature | null {
 
 /** A creature's "per-turn" buffs (atkBuff, anchored, riposte) reset at the
  *  END of the turn so they don't snowball forever. Persistent damage stays.
+ *  Innate passives (taunt, stifles, pierces, spellImmune) and consumed
+ *  resources (dodgeCharge, combatBlunted) persist across turns.
  *  - divineShield: persists across turns until consumed by damage.
- *  - taunt: persists (intrinsic to the creature, doesn't expire). */
+ *  - summonedThisTurn: cleared (the "Lente/Lent" malus only bites turn 1).
+ *  - wiltedSteps: incremented for Paper (drives Fanaison). */
 export function endOfTurnReset(c: Creature): Creature {
-  return { ...c, atkBuff: 0, anchored: false, ripostePrimed: false };
+  const wilted = c.move === "paper" ? c.wiltedSteps + 1 : c.wiltedSteps;
+  return {
+    ...c,
+    atkBuff: 0,
+    anchored: false,
+    ripostePrimed: false,
+    summonedThisTurn: false,
+    wiltedSteps: wilted,
+  };
 }
 
 /* ───────────────────────── Resolver ───────────────────────── */
@@ -276,41 +339,128 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
   const cb = lane.b;
 
   if (ca && cb) {
-    // Both creatures present → trade. Damage values computed BEFORE either
-    // dies so trades are symmetric (CCG-style).
+    // RPSLS one-shot model (Alex design lock): RPSLS counter = the LOSER dies
+    // instantly, the WINNER survives intact. Same-symbol mirror = normal ATK
+    // /HP trade (no winner from RPSLS). Cross-symbol always has a clear
+    // winner — see moveCountersMove table.
+    const counterAB = moveCountersMove(ca.move, cb.move);
+    const counterBA = moveCountersMove(cb.move, ca.move);
+
+    if (counterAB && !counterBA) {
+      // A counters B in RPSLS. Two outcomes:
+      //  • Esquive on B consumes its dodge charge → B survives, A doesn't
+      //    pursue (the dodge "wasted A's swing").
+      //  • Otherwise: B dies instantly AND A's ATK pursues to B's hero
+      //    (Alex 2026-06-09 design lock: the winner finishes the swing on
+      //    the opponent hero — anything that beats X in RPSLS keeps swinging
+      //    onto the hero behind). A's hero attack can still be deflected by
+      //    a charged Pierre on B's side (consumes 1 charge).
+      const winnerA = bluntOnCombat(ca);
+      const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
+      if (cb.dodgeCharge) {
+        lanes[laneIdx] = { a: winnerA, b: { ...cb, dodgeCharge: false } };
+        return { ...board, lanes };
+      }
+      lanes[laneIdx] = { a: winnerA, b: null };
+      const updatedBoard = { ...board, lanes };
+      const deflect = findDeflector("b");
+      if (deflect) return consumeProvocation(updatedBoard, deflect);
+      const atkA = creatureEffectiveAtk(winnerA);
+      return { ...updatedBoard, b: damageHero(updatedBoard.b, atkA) };
+    }
+    if (counterBA && !counterAB) {
+      const winnerB = bluntOnCombat(cb);
+      const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
+      if (ca.dodgeCharge) {
+        lanes[laneIdx] = { a: { ...ca, dodgeCharge: false }, b: winnerB };
+        return { ...board, lanes };
+      }
+      lanes[laneIdx] = { a: null, b: winnerB };
+      const updatedBoard = { ...board, lanes };
+      const deflect = findDeflector("a");
+      if (deflect) return consumeProvocation(updatedBoard, deflect);
+      const atkB = creatureEffectiveAtk(winnerB);
+      return { ...updatedBoard, a: damageHero(updatedBoard.a, atkB) };
+    }
+
+    // Mirror match (same symbol on both sides) → normal ATK/HP trade.
+    // Damage values computed BEFORE either dies so trades are symmetric.
     const atkA = creatureEffectiveAtk(ca);
     const atkB = creatureEffectiveAtk(cb);
-    const dmgToA = atkB + (moveCountersMove(cb.move, ca.move) ? 1 : 0);
-    const dmgToB = atkA + (moveCountersMove(ca.move, cb.move) ? 1 : 0);
-    let newA: Creature | null = damageCreature(ca, dmgToA);
-    let newB: Creature | null = damageCreature(cb, dmgToB);
+    // Tranchant (Scissors) bypasses opp Aegis. The attacker's flag controls
+    // what the DEFENDER's shield can do.
+    let newA: Creature | null = cb.pierces
+      ? damageCreaturePierce(ca, atkB)
+      : damageCreature(ca, atkB);
+    let newB: Creature | null = ca.pierces
+      ? damageCreaturePierce(cb, atkA)
+      : damageCreature(cb, atkA);
     // Riposte: if a creature died AND was riposte-primed, its killer dies too.
     if (!newA && ca.ripostePrimed && newB) newB = null;
     if (!newB && cb.ripostePrimed && newA) newA = null;
+    // Émoussé — Ciseaux that SURVIVED a combat exchange lose 1 ATK
+    // permanently. The flag is consumed: subsequent combats keep it but
+    // creatureEffectiveAtk reads it once (−1 cap stays).
+    if (newA && newA.move === "scissors" && !newA.combatBlunted) {
+      newA = { ...newA, combatBlunted: true };
+    }
+    if (newB && newB.move === "scissors" && !newB.combatBlunted) {
+      newB = { ...newB, combatBlunted: true };
+    }
     const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
     lanes[laneIdx] = { a: newA, b: newB };
     return { ...board, lanes };
   }
 
-  // TAUNT: if the would-be-attacked side has ANY taunt creature
-  // anywhere on the board, the undefended-lane attack is deflected — the
-  // attacker hits nothing (the taunt-bearer "demands attention" but isn't on
-  // this lane to be hit either, so opp's lane creature wastes its turn).
-  const hasTaunt = (side: Side): boolean =>
+  // TAUNT (Provocation): if the would-be-attacked side has a CHARGED
+  // taunt creature anywhere on the board, the undefended-lane attack is
+  // deflected onto that creature AND it consumes 1 provocationCharge.
+  // EXCEPT if the ATTACKER's side has a Paper (Étouffe) or Spock (Logique)
+  // alive — RPSLS-coherent anti-taunt suppression.
+  const hasAntiTaunt = (side: Side): boolean =>
     board.lanes.some((l) => {
       const c = side === "a" ? l.a : l.b;
-      return !!c && c.taunt;
+      return !!c && (c.move === "paper" || c.move === "spock");
     });
+  /** Returns the {lane, side} of the first ALIVE+CHARGED Pierre on
+   *  defenderSide that should absorb an undefended-lane attack — or null
+   *  if none qualifies (no rock, no charges left, or attacker has the
+   *  anti-taunt suppression). */
+  function findDeflector(defenderSide: Side): { lane: LaneIndex; side: Side } | null {
+    const attackerSide: Side = defenderSide === "a" ? "b" : "a";
+    if (hasAntiTaunt(attackerSide)) return null;
+    for (let i = 0; i < 3; i++) {
+      const lane = i as LaneIndex;
+      const c = defenderSide === "a" ? board.lanes[lane].a : board.lanes[lane].b;
+      if (c && c.taunt && c.provocationCharges > 0) {
+        return { lane, side: defenderSide };
+      }
+    }
+    return null;
+  }
+  /** Apply 1 charge consumption to the deflecting Pierre — returns a new
+   *  board with the rock's provocationCharges decremented. */
+  function consumeProvocation(board: BoardState, deflector: { lane: LaneIndex; side: Side }): BoardState {
+    const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
+    const cur = lanes[deflector.lane];
+    const rock = deflector.side === "a" ? cur.a : cur.b;
+    if (!rock) return board;
+    const decremented: Creature = { ...rock, provocationCharges: Math.max(0, rock.provocationCharges - 1) };
+    lanes[deflector.lane] = deflector.side === "a" ? { ...cur, a: decremented } : { ...cur, b: decremented };
+    return { ...board, lanes };
+  }
 
   if (ca && !cb) {
-    // A's creature would attack B's hero unopposed — UNLESS B has a taunt
-    // creature elsewhere on the board.
-    if (hasTaunt("b")) return board;
+    // A's creature would attack B's hero unopposed — check for a charged
+    // taunt-bearer on B's side that can deflect (and consume a charge).
+    const deflect = findDeflector("b");
+    if (deflect) return consumeProvocation(board, deflect);
     return { ...board, b: damageHero(board.b, creatureEffectiveAtk(ca)) };
   }
 
   if (cb && !ca) {
-    if (hasTaunt("a")) return board;
+    const deflect = findDeflector("a");
+    if (deflect) return consumeProvocation(board, deflect);
     return { ...board, a: damageHero(board.a, creatureEffectiveAtk(cb)) };
   }
 

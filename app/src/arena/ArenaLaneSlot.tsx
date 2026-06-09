@@ -14,6 +14,15 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "../icons";
 import { CREATURE_STATS, type Creature, type LaneIndex } from "./arenaTypes";
+import { creatureEffectiveAtk } from "./arenaRules";
+
+// Per-creature net "bonus" vs "malus" indicator was retired after Alex
+// flagged the ▼ icon was being read as "-1 ATK". The function lived here
+// previously — if a future redesign brings it back, the rule was:
+//   bonus = divineShield, atkBuff>0, anchored, ripostePrimed, lizard
+//           dodgeCharge, rock taunt+charged.
+//   malus = summonedThisTurn (rock/lizard), paper wiltedSteps>0,
+//           combatBlunted, atkBuff<0, rock taunt suppressed-or-empty.
 
 export interface ArenaLaneSlotProps {
   lane: LaneIndex;
@@ -39,11 +48,22 @@ export interface ArenaLaneSlotProps {
   clickableLabel?: string;
   /** Tap handler — only called when `clickable` is true. */
   onClick?: () => void;
+  /** Set true when this creature's INNATE passive is currently suppressed
+   *  by an opp counter-effect (today only: Pierre Provocation is suppressed
+   *  while opp has a Feuille alive — Étouffe). When true, the gold halo and
+   *  the 🛡 badge are hidden so the UI never lies about the active state. */
+  passiveSuppressed?: boolean;
+  /** Number that changes each time THIS lane's Pierre absorbs a deflection
+   *  — drives a bright extra ring pulse so the player SEES which rock just
+   *  saved their hero. null = no recent deflection. */
+  deflectingPulse?: number | null;
 }
 
 export function ArenaLaneSlot({
   creature, plannedSummon, isPlayer, showPlanned = false, chargeAttack = false,
   clickable = false, clickableLabel = "✦ jouer ici", onClick,
+  passiveSuppressed = false,
+  deflectingPulse = null,
 }: ArenaLaneSlotProps) {
   // Track previous HP so we can spawn a "-N" floating popup when this lane's
   // creature takes damage. We guard by move identity to avoid false-positives
@@ -89,7 +109,13 @@ export function ArenaLaneSlot({
 
   if (creature) {
     const stats = CREATURE_STATS[creature.move];
-    const atk = Math.max(0, stats.atk + creature.atkBuff);
+    // Effective ATK = base + buff − (Lente/Lent on summon, Fanaison per
+    // turn for Paper, Émoussé after 1st combat for Scissors). This is the
+    // SAME function the combat engine uses, so the badge always tells the
+    // truth ("⚔ 0" really means 0 damage this turn).
+    const atk = creatureEffectiveAtk(creature);
+    const baseAtkPlusBuff = stats.atk + creature.atkBuff;
+    const atkReduced = atk < baseAtkPlusBuff; // a malus is biting
     const lowHp = creature.hp <= 1;
     const pal = MOVE_PALETTE[creature.move];
     const rim = moveRim(pal.hex);
@@ -162,12 +188,17 @@ export function ArenaLaneSlot({
             />
           )}
         </AnimatePresence>
-        {/* Side-affinity dot top-left */}
-        <div
-          className="absolute top-1 left-1 w-2 h-2 rounded-full"
-          style={{ background: sideTint, boxShadow: `0 0 6px ${sideTint}` }}
-          aria-hidden
-        />
+        {/* Side-affinity dot removed — Alex feedback: the rim color of the
+         *  slot + the row layout (player bottom, opp top) already distinguish
+         *  ownership. Freed up top-left for the player's card stickers (the
+         *  bottom-left was hiding the ATK badge). */}
+        {/* TURN INDICATOR retired — Alex read the ▼ as "-1 ATK" and was
+         *  confused. The ATK badge already displays the effective value
+         *  (Lente shows 0, Émoussé 3, Fanaison 2, etc.), and the top-right
+         *  badges show which passifs are active. The indicator was
+         *  duplicating info while creating confusion, so it's gone. The
+         *  `turnIndicator` helper is preserved above in case a future
+         *  surfacing of net-state becomes useful. */}
         <MoveGlyph move={creature.move} className="w-14 h-14 sm:w-16 sm:h-16" />
         <span
           className="text-[9px] uppercase tracking-wider font-black leading-none mt-0.5"
@@ -175,12 +206,22 @@ export function ArenaLaneSlot({
         >
           {creature.move}
         </span>
-        {/* ATK and HP corner badges */}
+        {/* ATK and HP corner badges. ATK badge is RED + ↓ when a malus
+         *  (Lente, Fanaison, Émoussé, Curse atkBuff<0) reduces the value
+         *  below base+buff — Alex's "-1 sur la Pierre" was this state. */}
         <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between px-1 pb-0.5">
-          <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-amber-500/85 text-amber-50 text-[10px] font-black leading-none tabular-nums shadow">
+          <span
+            className={
+              "inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[10px] font-black leading-none tabular-nums shadow " +
+              (atkReduced
+                ? "bg-rose-600/90 text-rose-50"
+                : "bg-amber-500/85 text-amber-50")
+            }
+            title={atkReduced ? "ATK réduite par un malus actif" : undefined}
+          >
             ⚔ {atk}
-            {creature.atkBuff > 0 && <span className="text-[7px] opacity-90">+{creature.atkBuff}</span>}
-            {creature.atkBuff < 0 && <span className="text-[7px] opacity-90">{creature.atkBuff}</span>}
+            {atkReduced && <span className="text-[8px] opacity-95">↓</span>}
+            {!atkReduced && creature.atkBuff > 0 && <span className="text-[7px] opacity-90">+{creature.atkBuff}</span>}
           </span>
           <motion.span
             key={creature.hp}
@@ -192,13 +233,88 @@ export function ArenaLaneSlot({
             ❤ {creature.hp}/{stats.hp}
           </motion.span>
         </div>
-        {/* Status icons top-right */}
+        {/* INNATE PASSIVE BADGE top-right — one per move, RPSLS identity.
+         *  Pierre's Provocation can be suppressed by opp Étouffe (Feuille)
+         *  in which case neither the badge nor the gold halo show, so the
+         *  UI never lies about the live state of the passive. */}
         <div className="absolute top-1 right-1 flex items-center gap-0.5">
-          {creature.divineShield && <span className="text-[10px]" title="Bouclier divin">🛡️</span>}
-          {creature.anchored && <span className="text-[10px]" title="Ancré">⚓</span>}
-          {creature.ripostePrimed && <span className="text-[10px]" title="Riposte">⚔️</span>}
-          {creature.taunt && <span className="text-[10px]" title="Provocation — protège le héros">🪨</span>}
+          {creature.taunt && !passiveSuppressed && creature.provocationCharges > 0 && (
+            <span
+              className="text-[9px] px-1 py-0.5 rounded bg-amber-400/95 text-black font-black tracking-wider shadow leading-none inline-flex items-center gap-0.5"
+              title={"Provocation — annule la prochaine attaque (charge " + creature.provocationCharges + ")"}
+            >
+              🛡{creature.provocationCharges > 1 ? <span className="text-[7px]">×{creature.provocationCharges}</span> : null}
+            </span>
+          )}
+          {creature.stifles && (
+            <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-400/95 text-black font-black tracking-wider shadow leading-none" title="Étouffe — annule la Provocation des Pierres adverses">
+              🌿
+            </span>
+          )}
+          {creature.pierces && (
+            <span className="text-[9px] px-1 py-0.5 rounded bg-rose-400/95 text-black font-black tracking-wider shadow leading-none" title="Tranchant — ignore les boucliers adverses au combat">
+              ⚔
+            </span>
+          )}
+          {creature.dodgeCharge && (
+            <span className="text-[9px] px-1 py-0.5 rounded bg-sky-400/95 text-black font-black tracking-wider shadow leading-none" title="Esquive — la prochaine blessure est ignorée">
+              ✨
+            </span>
+          )}
+          {creature.spellImmune && (
+            <span className="text-[9px] px-1 py-0.5 rounded bg-violet-400/95 text-black font-black tracking-wider shadow leading-none" title="Logique — immunisé aux sorts adverses">
+              🧬
+            </span>
+          )}
+          {/* Spell-granted statuses — secondary row of small emojis */}
+          {creature.divineShield && <span className="text-[10px]" title="Aegis (sort) — prochaine attaque absorbée">🛡️</span>}
+          {creature.anchored && <span className="text-[10px]" title="Ancré (sort) — immun aux sorts opp ce tour">⚓</span>}
+          {creature.ripostePrimed && <span className="text-[10px]" title="Riposte (sort) — si tué en combat, son tueur meurt aussi">⚔️</span>}
         </div>
+        {/* GOLD HALO — pulsing ring around the whole slot when Provocation is
+         *  active AND charged. Hidden when suppressed or out of charges. */}
+        {creature.taunt && !passiveSuppressed && creature.provocationCharges > 0 && (
+          <motion.div
+            aria-hidden
+            initial={{ opacity: 0.7 }}
+            animate={{
+              boxShadow: [
+                "inset 0 0 0 2px rgba(252,211,77,0.55), 0 0 14px 2px rgba(252,211,77,0.45)",
+                "inset 0 0 0 3px rgba(252,211,77,0.95), 0 0 26px 5px rgba(252,211,77,0.75)",
+                "inset 0 0 0 2px rgba(252,211,77,0.55), 0 0 14px 2px rgba(252,211,77,0.45)",
+              ],
+              opacity: [0.85, 1, 0.85],
+            }}
+            transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute inset-0 rounded-xl pointer-events-none z-[5]"
+          />
+        )}
+        {/* DEFLECTION PULSE — fires when THIS rock just ate an attack. A
+         *  bright violet→amber expanding ring + flash so the player sees
+         *  exactly which rock saved their hero. Keyed by deflectingPulse so
+         *  consecutive deflects re-fire the anim. */}
+        <AnimatePresence>
+          {deflectingPulse !== null && (
+            <motion.div
+              key={"defl-" + deflectingPulse}
+              aria-hidden
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{
+                opacity: [0, 1, 0.85, 0],
+                scale: [0.9, 1.1, 1.15, 1.2],
+                boxShadow: [
+                  "0 0 0 0 rgba(168,85,247,0)",
+                  "inset 0 0 0 4px rgba(168,85,247,0.95), 0 0 28px 8px rgba(252,211,77,0.85)",
+                  "inset 0 0 0 3px rgba(252,211,77,0.95), 0 0 36px 10px rgba(168,85,247,0.7)",
+                  "inset 0 0 0 0 rgba(252,211,77,0), 0 0 0 0 rgba(168,85,247,0)",
+                ],
+              }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.4, ease: "easeOut" }}
+              className="absolute inset-0 rounded-xl pointer-events-none z-[6]"
+            />
+          )}
+        </AnimatePresence>
         {/* Floating damage popup */}
         <AnimatePresence>
           {dmgPop && (

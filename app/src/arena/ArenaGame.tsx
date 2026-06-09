@@ -99,10 +99,9 @@ export function ArenaGame({
    *  side + lane so consecutive hits on the same hero re-trigger the anim. */
   const [heroHit, setHeroHit] = useState<{ side: "you" | "opp"; lane: LaneIndex; key: number } | null>(null);
   /** Taunt block: set when an undefended-lane attack is DEFLECTED by a
-   *  taunt creature elsewhere. Pop a chip on the defender side so the
-   *  player UNDERSTANDS why no damage was taken (Alex's "rock cuts my
-   *  scissors but I don't lose HP" confusion). */
-  const [tauntBlock, setTauntBlock] = useState<{ defenderSide: "a" | "b"; key: number } | null>(null);
+   *  taunt creature elsewhere. `rockLane` identifies the Pierre that ate
+   *  the deflection so the UI can pull a dotted line to it. */
+  const [tauntBlock, setTauntBlock] = useState<{ defenderSide: "a" | "b"; rockLane: LaneIndex; key: number } | null>(null);
 
   /** Imperative handle on the floating back button — lets the Android
    *  back-gesture trigger the SAME confirmation modal instead of just
@@ -169,6 +168,17 @@ export function ArenaGame({
     const id = window.setTimeout(() => setMatchSplash(false), MATCH_FOUND_SPLASH_MS);
     return () => window.clearTimeout(id);
   }, [matchSplash]);
+
+  // Auto-clear the "🪨 ATTAQUE DÉTOURNÉE !" chip after it's had time to be
+  // read. The resolver pops the chip but never clears it, so without this
+  // it stays glued on screen forever (and survives across turns / into the
+  // next planning phase). Each new pop (key change) restarts the timer,
+  // so back-to-back deflects each get their full read window.
+  useEffect(() => {
+    if (!tauntBlock) return;
+    const id = window.setTimeout(() => setTauntBlock(null), 1_600);
+    return () => window.clearTimeout(id);
+  }, [tauntBlock?.key]);
 
   // Match-end haptic + stat record. Fired once when the phase flips.
   // recordArenaMatch lives in the store and is sync'd to the cloud via the

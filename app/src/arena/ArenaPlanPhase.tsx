@@ -65,7 +65,7 @@ export interface ArenaPlanPhaseProps {
 export function ArenaPlanPhase({
   board, intent, intentCost, disabled,
   targeting, onSetTargeting,
-  onAddSpell, onRemoveSpell, onRemoveSummon, onLock,
+  onAddSpell, onRemoveSpell, onAddSummon, onRemoveSummon, onLock,
 }: ArenaPlanPhaseProps) {
   const t = useT();
   const me = board.a;
@@ -105,13 +105,60 @@ export function ArenaPlanPhase({
     setTargeting({ kind: "spell", id, targetKind });
   }
 
-  /** Long-press detection — Alex's preference: single tap = commit, hold
-   *  ~1.4s = open the inspect modal to READ the card. The pointer handlers
-   *  arm a timer on press; if the timer fires before release, it sets
-   *  longPressedRef so the release suppresses the commit. */
+  /** Drop-zone hit-test — finds the ArenaLaneSlot under a screen point and
+   *  commits the active targeting to that slot if valid. Used by both the
+   *  RPSLS picker drag and the hand-card drag handlers. Returns true if
+   *  something was committed (the drag is "consumed"), false otherwise so
+   *  the caller can leave targeting active for a regular tap-fallback. */
+  function commitDragDrop(point: { x: number; y: number }, current: ArenaTargeting): boolean {
+    if (!current) return false;
+    if (typeof document === "undefined") return false;
+    const els = document.elementsFromPoint(point.x, point.y);
+    for (const el of els) {
+      const slot = (el as HTMLElement).closest?.("[data-arena-lane]");
+      if (!slot) continue;
+      const laneStr = (slot as HTMLElement).dataset?.arenaLane;
+      const sideStr = (slot as HTMLElement).dataset?.arenaSide;
+      if (laneStr == null || sideStr == null) continue;
+      const lane = parseInt(laneStr, 10) as LaneIndex;
+      const side = sideStr as "a" | "b";
+      // Summon: only on MY (a) empty lanes.
+      if (current.kind === "summon") {
+        if (side !== "a") return false;
+        const mine = board.lanes[lane].a;
+        if (mine) return false;
+        hapticTap();
+        onAddSummon({ lane, move: current.move });
+        setTargeting(null);
+        return true;
+      }
+      // Spell lane-target: respect LANE_SPELL_TARGET_SIDE.
+      if (current.kind === "spell" && current.targetKind === "lane") {
+        const want = LANE_SPELL_TARGET_SIDE[current.id] ?? "my-creature";
+        const mine = board.lanes[lane].a;
+        const opp = board.lanes[lane].b;
+        const ok =
+          (want === "my-creature" && side === "a" && !!mine) ||
+          (want === "opp-creature" && side === "b" && !!opp) ||
+          (want === "my-empty-opp-occupied" && side === "a" && !mine && !!opp) ||
+          (want === "my-empty" && side === "a" && !mine);
+        if (!ok) return false;
+        hapticTap();
+        onAddSpell({ id: current.id, kind: "lane", lane });
+        setTargeting(null);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Long-press detection — single tap = commit, hold ~750ms = open the
+   *  inspect modal. Reduced again (1050 → 750ms) per Alex's "encore réduire
+   *  le temps". Still ENOUGH delay to filter out accidental holds but
+   *  noticeably snappier mid-turn. */
   const pressTimerRef = useRef<number | null>(null);
   const longPressedRef = useRef(false);
-  const LONG_PRESS_MS = 1_400;
+  const LONG_PRESS_MS = 750;
   function startPress(id: CardId) {
     longPressedRef.current = false;
     if (pressTimerRef.current) window.clearTimeout(pressTimerRef.current);
@@ -172,33 +219,36 @@ export function ArenaPlanPhase({
         </AnimatePresence>
       </div>
 
-      {/* Queued summons + spells chips */}
-      {(intent.spells.length > 0 || intent.summons.length > 0) && (
-        <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-md mx-auto w-full">
-          {intent.summons.map((s) => (
-            <button
-              key={`sum-${s.lane}`}
-              onClick={() => onRemoveSummon(s.lane)}
-              className="text-[10px] font-bold rounded-full px-2 py-0.5 bg-emerald-500/20 border border-emerald-400/50 text-emerald-100 inline-flex items-center gap-1"
-            >
-              <MoveGlyph move={s.move} className="w-3 h-3" />
-              <span>L{s.lane + 1} · 1m</span>
-              <span className="text-rose-300">✕</span>
-            </button>
-          ))}
-          {intent.spells.map((s, idx) => (
-            <button
-              key={`sp-${idx}`}
-              onClick={() => onRemoveSpell(idx)}
-              className="text-[10px] font-bold rounded-full px-2 py-0.5 bg-violet-500/20 border border-violet-400/50 text-violet-100 inline-flex items-center gap-1"
-            >
-              <span>{CARDS[s.id].glyph}</span>
-              <span>{CARDS[s.id].cost}m</span>
-              <span className="text-rose-300">✕</span>
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Queued summons + spells chips — FIXED HEIGHT to keep the board's
+       *  ScaleToFit measurement stable across the turn. Without this, every
+       *  added/removed chip changes the plan-phase height, which makes
+       *  ScaleToFit re-shrink the board → Alex's "le pad change de
+       *  dimensions". Chips themselves are bigger + show an explicit
+       *  "Annuler ✕" label so the player understands they're tappable. */}
+      <div className="h-7 flex flex-wrap items-center justify-center gap-1.5 max-w-md mx-auto w-full">
+        {intent.summons.map((s) => (
+          <button
+            key={`sum-${s.lane}`}
+            onClick={() => onRemoveSummon(s.lane)}
+            className="text-[11px] font-bold rounded-full pl-2 pr-1.5 py-0.5 bg-emerald-500/30 border border-emerald-400/65 text-emerald-50 inline-flex items-center gap-1.5 shadow shadow-emerald-500/20 active:scale-95"
+          >
+            <MoveGlyph move={s.move} className="w-3.5 h-3.5" />
+            <span>L{s.lane + 1}</span>
+            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-rose-500/85 text-white text-[10px] leading-none">✕</span>
+          </button>
+        ))}
+        {intent.spells.map((s, idx) => (
+          <button
+            key={`sp-${idx}`}
+            onClick={() => onRemoveSpell(idx)}
+            className="text-[11px] font-bold rounded-full pl-2 pr-1.5 py-0.5 bg-violet-500/30 border border-violet-400/65 text-violet-50 inline-flex items-center gap-1.5 shadow shadow-violet-500/20 active:scale-95"
+          >
+            <span className="text-[13px] leading-none">{CARDS[s.id].glyph}</span>
+            <span>{CARDS[s.id].cost}m</span>
+            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-rose-500/85 text-white text-[10px] leading-none">✕</span>
+          </button>
+        ))}
+      </div>
 
       {/* Card inspect — now a FULLSCREEN MODAL (z-50 overlay) rather than
        *  an inline panel, so opening it doesn't touch the plan-phase
@@ -225,9 +275,10 @@ export function ArenaPlanPhase({
         {inspecting && <span className="text-amber-300"> · lis puis tape ✓ JOUER pour confirmer</span>}
       </div>
 
-      {/* RPSLS move picker — compact strip. Was aspect-[4/5] cards that
-       *  took 15% of the screen; now h-12 pills so the board reclaims the
-       *  vertical space. Same dark-glass + neon-rim aesthetic. */}
+      {/* RPSLS move picker — compact strip. Tap to enter targeting mode
+       *  THEN tap a lane on the board, OR drag the symbol directly onto a
+       *  lane for one-gesture commit. Drag uses framer-motion with
+       *  dragSnapToOrigin so the button returns to its place after drop. */}
       <div className="grid grid-cols-5 gap-1 sm:gap-1.5 max-w-md mx-auto w-full">
         {MOVES.map((mv) => {
           const pal = MOVE_PALETTE[mv];
@@ -235,17 +286,36 @@ export function ArenaPlanPhase({
           const isTargeting = targeting?.kind === "summon" && targeting.move === mv;
           const rim = moveRim(pal.hex);
           const glow = moveGlow(pal.hex);
+          const canDrag = !cannotAfford && !disabled;
           return (
-            <button
+            <motion.button
               key={mv}
-              onClick={() => pickMoveToSummon(mv)}
+              type="button"
+              drag={canDrag}
+              dragSnapToOrigin
+              dragMomentum={false}
+              dragElastic={0.18}
+              dragTransition={{ bounceStiffness: 720, bounceDamping: 28, power: 0.35 }}
+              whileDrag={{ scale: 1.12, zIndex: 60, transition: { type: "spring", stiffness: 520, damping: 32 } }}
+              onTap={() => pickMoveToSummon(mv)}
+              onDragStart={() => {
+                if (!canDrag) return;
+                hapticTap();
+                setInspecting(null);
+                setTargeting({ kind: "summon", move: mv });
+              }}
+              onDragEnd={(_e, info) => {
+                if (!canDrag) return;
+                commitDragDrop(info.point, { kind: "summon", move: mv });
+              }}
               disabled={cannotAfford || disabled}
               className={
-                "relative h-12 sm:h-14 rounded-lg flex items-center justify-center transition active:scale-92 " +
+                "relative h-12 sm:h-14 rounded-lg flex items-center justify-center active:scale-92 select-none " +
                 (cannotAfford ? "opacity-30 grayscale " : "") +
                 (isTargeting ? "scale-105 " : "")
               }
               style={{
+                touchAction: "none",
                 background: "linear-gradient(160deg, rgba(20,22,32,0.92) 0%, rgba(10,12,20,0.92) 100%)",
                 border: `2px solid ${isTargeting ? "rgba(252, 211, 77, 0.9)" : rim}`,
                 boxShadow: isTargeting
@@ -255,15 +325,15 @@ export function ArenaPlanPhase({
             >
               <MoveGlyph move={mv} className="w-8 h-8 sm:w-9 sm:h-9" />
               <span className="absolute top-0.5 right-0.5 w-1 h-1 rounded-full bg-sky-300" />
-            </button>
+            </motion.button>
           );
         })}
       </div>
 
-      {/* Hand strip — compact (44-48px wide) cards with their NAMES visible
-       *  underneath so the player recognises what's in hand without having
-       *  to tap each one. The modal inspect (on tap) still gives the full
-       *  card text. */}
+      {/* Hand strip — tap = commit/target, hold 1.4s = inspect modal, DRAG =
+       *  one-gesture commit to a lane (only meaningful for lane-targeted
+       *  spells; non-lane cards just snap back). dragSnapToOrigin returns
+       *  the card to its slot after release. */}
       {me.hand.length > 0 ? (
         <div className="flex items-end justify-center gap-1 px-1 overflow-x-auto">
           {me.hand.map((id, i) => {
@@ -272,8 +342,36 @@ export function ArenaPlanPhase({
             const cannotAfford = manaLeft < card.cost;
             const isTargeting = targeting?.kind === "spell" && targeting.id === id;
             const isInspecting = inspecting === id;
+            const targetKind = CARD_TARGET_KIND[id] ?? "global";
+            const canDragCard = supported && !cannotAfford && !disabled && targetKind === "lane";
             return (
               <div key={`${id}-${i}`} className="flex flex-col items-center gap-0.5 shrink-0">
+              <motion.div
+                drag={canDragCard}
+                dragSnapToOrigin
+                dragMomentum={false}
+                dragElastic={0.18}
+                dragTransition={{ bounceStiffness: 720, bounceDamping: 28, power: 0.35 }}
+                whileDrag={{ scale: 1.12, zIndex: 60, transition: { type: "spring", stiffness: 520, damping: 32 } }}
+                onDragStart={() => {
+                  // Cancel any in-flight long-press timer — the user is
+                  // dragging, not holding to inspect.
+                  if (pressTimerRef.current) {
+                    window.clearTimeout(pressTimerRef.current);
+                    pressTimerRef.current = null;
+                  }
+                  longPressedRef.current = true; // suppress release-commit
+                  if (!canDragCard) return;
+                  hapticTap();
+                  setInspecting(null);
+                  setTargeting({ kind: "spell", id, targetKind: "lane" });
+                }}
+                onDragEnd={(_e, info) => {
+                  if (!canDragCard) return;
+                  commitDragDrop(info.point, { kind: "spell", id, targetKind: "lane" });
+                }}
+                style={{ touchAction: "none" }}
+              >
               <button
                 onPointerDown={() => startPress(id)}
                 onPointerUp={() => endPress(id, true)}
@@ -311,6 +409,7 @@ export function ArenaPlanPhase({
                   </div>
                 )}
               </button>
+              </motion.div>
               {/* Name label beneath the card — truncated to the card width
                *  so the player can scan their hand without tapping each. */}
               <span
@@ -332,24 +431,32 @@ export function ArenaPlanPhase({
         </div>
       )}
 
-      {/* Lock button only — Alex: "le ? doit aller dans la prep, pas en match"
-       *  → bouton "?" retiré ici, déplacé sur ArenaPrepScreen où le joueur a
-       *  le temps de lire les règles avant que le match commence. */}
+      {/* Lock button — straight HTML button (matches the Ranked lock button
+       *  pattern that's stable on device). No motion.button + drag combo
+       *  that was intercepting taps. Defensive targeting reset stays — if
+       *  a stuck targeting state existed, the tap clears it before locking. */}
       <button
-        onClick={onLock}
+        type="button"
+        onClick={() => {
+          if (targeting) setTargeting(null);
+          if (canLock) {
+            hapticTap();
+            onLock();
+          }
+        }}
         disabled={!canLock}
         className={
-          "self-center mt-0.5 px-5 py-1.5 rounded-xl font-bold text-white text-xs transition " +
+          "shrink-0 self-center mt-2 px-7 py-2.5 rounded-2xl font-black text-white text-sm transition active:scale-[0.97] " +
           (canLock
-            ? "shadow-md"
+            ? "shadow-lg ring-2 ring-amber-300/40"
             : "bg-hairline text-ink-faint cursor-not-allowed")
         }
         style={canLock ? {
-          background: "linear-gradient(to right, var(--theme-primary), var(--theme-secondary))",
-          boxShadow: "0 4px 14px -4px color-mix(in oklab, var(--theme-primary) 55%, transparent)",
+          background: "linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))",
           fontFamily: "var(--font-headline)",
-          letterSpacing: "0.08em",
-        } : undefined}
+          letterSpacing: "0.1em",
+          touchAction: "manipulation",
+        } : { touchAction: "manipulation" }}
       >
         ✓ FIN DE TOUR
       </button>
