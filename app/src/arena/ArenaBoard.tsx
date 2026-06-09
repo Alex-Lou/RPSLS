@@ -280,7 +280,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
         />
       </div>
 
-      <div className="relative px-3 pb-3 sm:px-4 sm:pb-4 flex flex-col gap-3 sm:gap-4 [@media(max-height:560px)]:px-1.5 [@media(max-height:560px)]:pb-1.5 [@media(max-height:560px)]:gap-1.5">
+      <div className="relative px-3 pb-3 sm:px-4 sm:pb-4 flex flex-col gap-4 sm:gap-5 [@media(max-height:560px)]:px-1.5 [@media(max-height:560px)]:pb-1.5 [@media(max-height:560px)]:gap-2">
         {/* Opponent lane row — ghost previews of opp summons during reveal.
          *  Slots become tappable when a spell targets OPP creatures (Curse,
          *  Sangsue, Trou Noir). */}

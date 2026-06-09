@@ -59,7 +59,7 @@ export function ArenaConstellationBar({
   return (
     <div
       className={
-        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full backdrop-blur " +
+        "inline-flex items-center gap-1.5 px-2 py-1 rounded-full backdrop-blur " +
         (side === "you" ? "self-start" : "self-end")
       }
       style={{
@@ -73,7 +73,7 @@ export function ArenaConstellationBar({
     >
       <MoveGlyph
         move={affinity}
-        className="w-3 h-3 shrink-0 opacity-90 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
+        className="w-4 h-4 shrink-0 opacity-90 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
       />
       <div className="flex items-center gap-0.5">
         {Array.from({ length: STAR_COUNT }).map((_, i) => {
@@ -109,7 +109,7 @@ export function ArenaConstellationBar({
               }
               className={
                 "leading-none " +
-                (isComplete ? "text-[14px] font-black" : filledCount === 2 ? "text-[12px] font-bold" : "text-[11px]") + " " +
+                (isComplete ? "text-[17px] font-black" : filledCount === 2 ? "text-[15px] font-bold" : "text-[14px]") + " " +
                 (filled ? "" : "opacity-25")
               }
               style={{ color: filled ? accentColor : "#71717a" }}
@@ -127,7 +127,7 @@ export function ArenaConstellationBar({
             scale: [1, 1.05, 1],
           }}
           transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-          className="text-[9px] uppercase tracking-wider font-black text-amber-200"
+          className="text-[10px] uppercase tracking-wider font-black text-amber-200"
           style={{ textShadow: `0 0 8px ${accentColor}, 0 0 4px #fbbf24` }}
         >
           FINISHER ✦
