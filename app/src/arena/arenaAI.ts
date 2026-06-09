@@ -170,14 +170,14 @@ export function cpuArenaDecision(
   // lanes every turn → player has zero undefended path to reach opp hero
   // (Alex's "opp ne perd jamais de vie" symptom). Leaving one lane open
   // also makes for real tactical games instead of "wall of creatures".
-  const MAX_SUMMONS_PER_TURN = 2;
-  // Count existing creatures already on the board — if the CPU already
-  // has ≥ 2 lanes occupied, don't summon a 3rd (saturates the board).
-  const myExistingCreatures = [0, 1, 2].reduce(
-    (acc, i) => acc + (sideCreature(board, side, i as LaneIndex) ? 1 : 0),
-    0,
-  );
-  const lanesAvailableForSummon = Math.max(0, MAX_SUMMONS_PER_TURN - myExistingCreatures);
+  // Alex feedback (d) 2026-06-09 : "le cpu n'invoque pas le troisième
+  // symbole sur la lane qui lui reste, c'est pas vraiment cool pour les
+  // test". Cap MAX_SUMMONS_PER_TURN passe de 2 à 3 pour autoriser opp à
+  // remplir toutes les lanes vides s'il a la mana. Le "leaving one lane
+  // open" tactique n'est plus prioritaire vs visibilité de test (et de
+  // toute façon les anti-taunts du joueur cassent souvent les lignes).
+  const MAX_SUMMONS_PER_TURN = 3;
+  const lanesAvailableForSummon = MAX_SUMMONS_PER_TURN;
   let summonsThisTurn = 0;
   for (const lane of laneOrder) {
     if (mana < 1) break;

@@ -176,7 +176,18 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
             }
           }, LANE_CHARGE_MS * 0.55);
           window.setTimeout(() => {
+            const prevB = b;
             b = resolveLaneCombatAt(b, laneIdx);
+            // Sanity log : confirme que resolveLaneCombatAt a bien renvoyé
+            // un board updated (Alex flag L1 paper>rock counter qui ne tue
+            // pas la Pierre opp). Si POST-RESOLVE dit "same-ref" alors la
+            // fonction n'a pas muté le state. Si "null" → return undefined.
+            if (!b) {
+              alog("combat", `L${laneIdx} POST-RESOLVE BUG : board=null !`);
+              b = prevB;
+            } else if (b === prevB) {
+              alog("combat", `L${laneIdx} POST-RESOLVE same-ref (pas de mutation)`);
+            }
             setBoard(b);
             if (b.a.hp <= 0 || b.b.hp <= 0) {
               setCombatLane(null);

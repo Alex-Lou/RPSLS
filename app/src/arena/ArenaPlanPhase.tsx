@@ -449,7 +449,12 @@ export function ArenaPlanPhase({
             🎴
           </div>
           <span className="text-[10px] text-ink-faint italic">
-            Main vide — fin de tour pour piocher
+            {/* Alex feedback (c) 2026-06-09 : si plus rien à piocher (deck
+             *  + discard vides), dire clairement "plus de cartes" — sinon
+             *  le message "fin de tour pour piocher" ment quand y'a rien. */}
+            {me.deck.length + me.discard.length === 0
+              ? "Plus de cartes à piocher (deck + défausse vides)"
+              : "Main vide — fin de tour pour piocher"}
           </span>
         </div>
       )}
