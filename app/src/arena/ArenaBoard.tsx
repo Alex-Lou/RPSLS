@@ -133,7 +133,10 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
        *  (Alex 2026-06-11). Le portal échappe au clip `overflow-y-auto` du
        *  <main> (la "muraille marron" qui coupait le haut) et se positionne
        *  en `fixed` au MÊME niveau que le burger, EN AVANT de tout. ════════ */}
-      <div className="shrink-0 h-[68px]" aria-hidden />
+      {/* Spacer réduit (Alex 2026-06-11) : h-[34px] pour remonter le haut du
+       *  pad et équilibrer l'espace haut (opp strip→pad) avec l'espace bas
+       *  (pad→strip you). Ajustable si pas pile symétrique. */}
+      <div className="shrink-0 h-[34px]" aria-hidden />
       {typeof document !== "undefined" && createPortal(
         <div
           className="fixed left-14 right-2 z-[55]"
