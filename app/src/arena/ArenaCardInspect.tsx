@@ -14,6 +14,7 @@
 import { motion } from "motion/react";
 import { CARDS, RARITY_COLOR } from "../ranked/cards";
 import { CardImage } from "../ranked/CardImage";
+import { arenaCardDescKey } from "./arenaTypes";
 import type { CardId } from "../ranked/rankedTypes";
 
 export type SpellTargetKind = "lane" | "self" | "hero" | "global";
@@ -87,8 +88,10 @@ export function ArenaCardInspect({
               {card.rarity}
             </span>
           </div>
+          {/* Description ARENA (pas la desc Classé : mêmes cartes, effets
+           *  différents — le texte Classé induisait le joueur en erreur). */}
           <p className="text-[12px] text-ink leading-relaxed">
-            {t(card.descKey)}
+            {t(arenaCardDescKey(id))}
           </p>
           <span className="text-[10px] uppercase tracking-wider text-amber-300/90 italic font-bold">
             {targetLabel}

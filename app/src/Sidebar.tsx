@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store/store";
 import { levelFromXp } from "./engine/leveling";
@@ -6,6 +6,7 @@ import { THEMES, gradientFromTheme } from "./theme/theme";
 import { useT } from "./i18n";
 import { LanguagePicker } from "./LanguagePicker";
 import { avatarImgStyle } from "./theme/avatar";
+import { getMatchExit, subscribeMatchExit } from "./matchExitStore";
 
 export type Page = "play" | "online" | "leaderboard" | "shop" | "quests" | "packs" | "profile" | "history" | "about" | "contact" | "privacy";
 
@@ -186,6 +187,10 @@ export function MobileShell({
   onNavigate: (p: Page) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // Callback de sortie d'un match en cours (Alex 2026-06-11) : rendu EN HAUT
+  // du drawer pour intégrer la sortie au burger plutôt qu'avoir un 2e bouton
+  // HUD. ArenaGame (et autres modes match) le register au mount.
+  const matchExit = useSyncExternalStore(subscribeMatchExit, getMatchExit, () => null);
 
   // Lock body scroll when drawer is open
   useEffect(() => {
@@ -268,6 +273,21 @@ export function MobileShell({
                   <line x1="6" y1="18" x2="18" y2="6" />
                 </svg>
               </button>
+
+              {/* Match exit — premier item, rouge/ambre pour bien indiquer la
+               *  sortie (Alex 2026-06-11). Visible UNIQUEMENT pendant un match
+               *  (ArenaGame, RankedMatchView, etc. register leur handleForfeit). */}
+              {matchExit && (
+                <button
+                  onClick={() => { matchExit.onExit(); setOpen(false); }}
+                  className="mb-3 mt-1 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-rose-500/15 border border-rose-400/55 text-rose-100 font-bold active:scale-95 transition shadow-md hover:bg-rose-500/25"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M15 18l-6-6 6-6" />
+                  </svg>
+                  <span className="text-sm uppercase tracking-wider">{matchExit.label}</span>
+                </button>
+              )}
 
               <SidebarBody
                 page={page}

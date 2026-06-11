@@ -76,6 +76,10 @@ export function ArenaLaneSlot({
   const [shieldBlocked, setShieldBlocked] = useState<{ key: number } | null>(null);
   /** "✨ ESQUIVÉ" chip — when dodgeCharge true→false with HP unchanged. */
   const [dodgedHit, setDodgedHit] = useState<{ key: number } | null>(null);
+  /** "🩸 BOUCLIER PERCÉ" chip — the creature died WHILE still shielded, which
+   *  only happens when Tranchant (Ciseau) / LAME pierces it (a normal hit is
+   *  fully absorbed). Makes the pierce visible (Alex: chip Tranchant explicite). */
+  const [pierced, setPierced] = useState<{ key: number } | null>(null);
   /** Death overlay — when a creature that WAS here is now gone, render a
    *  brief shatter/fade animation for ~600ms before the slot becomes empty.
    *  Tracks the move that just died so we can show its glyph one last time. */
@@ -122,8 +126,16 @@ export function ArenaLaneSlot({
     if (!creature && prev && prev.move !== null) {
       setDeathGhost({ move: prev.move, key: Date.now() });
       const id = window.setTimeout(() => setDeathGhost(null), 650);
+      // Aegis pierced — the creature died WHILE still shielded, which only
+      // happens when Tranchant (Ciseau) / LAME pierces it (a normal hit would
+      // be fully absorbed). Surface the pierce so it isn't invisible.
+      let pid: number | undefined;
+      if (prev.shield) {
+        setPierced({ key: Date.now() });
+        pid = window.setTimeout(() => setPierced(null), 1400);
+      }
       prevRef.current = null;
-      return () => window.clearTimeout(id);
+      return () => { window.clearTimeout(id); if (pid !== undefined) window.clearTimeout(pid); };
     }
     prevRef.current = snap;
   }, [creature]);
@@ -512,6 +524,24 @@ export function ArenaLaneSlot({
             style={{ filter: "drop-shadow(0 0 12px rgba(244,63,94,0.7))" }}
           >
             <MoveGlyph move={deathGhost.move} className="w-12 h-12 opacity-90" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Aegis pierced chip — the shielded creature here was just pierced
+       *  (Tranchant / LAME). Red "bouclier percé" so the pierce is visible. */}
+      <AnimatePresence>
+        {pierced && (
+          <motion.div
+            key={pierced.key}
+            initial={{ opacity: 0, scale: 0.5, y: 4 }}
+            animate={{ opacity: 1, scale: 1, y: -22 }}
+            exit={{ opacity: 0, y: -34 }}
+            transition={{ duration: 1.2, ease: "easeOut" }}
+            className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
+          >
+            <span className="px-1.5 py-0.5 rounded bg-rose-400/95 text-black text-[9px] uppercase tracking-wider font-black shadow-lg whitespace-nowrap">
+              🩸 Bouclier percé
+            </span>
           </motion.div>
         )}
       </AnimatePresence>

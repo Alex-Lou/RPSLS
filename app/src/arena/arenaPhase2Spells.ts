@@ -28,18 +28,21 @@ export function applyGaia(board: BoardState, side: Side): BoardState {
   return withSideHero(board, side, healHero(hero, 6));
 }
 
-/** Sablier — +2 mana refresh THIS turn (over the cap if needed). Pure tempo. */
+/** Sablier — +2 mana THIS turn, plafonné à MANA_CAP (8). Pure tempo. Le
+ *  texte de carte Arena dit explicitement "plafond 8" — pas d'over-cap. */
 export function applySablier(board: BoardState, side: Side): BoardState {
   const hero = side === "a" ? board.a : board.b;
   return withSideHero(board, side, { ...hero, mana: Math.min(MANA_CAP, hero.mana + 2) });
 }
 
-/** Offre — +1 to max mana permanently (cap MANA_CAP). Stays for the rest of
- *  the match. Mana refreshes to the new cap on next turn. */
+/** Offre — +2 to max mana permanently (cap MANA_CAP). L'illustration montre
+ *  "+2" (Alex 2026-06-11), on suit l'image. Le mana courant grimpe aussi de
+ *  +2 (capé au nouveau max) pour que le gain soit utilisable dès ce tour. */
 export function applyOffre(board: BoardState, side: Side): BoardState {
   const hero = side === "a" ? board.a : board.b;
-  const newMax = Math.min(MANA_CAP, hero.maxMana + 1);
-  return withSideHero(board, side, { ...hero, maxMana: newMax });
+  const newMax = Math.min(MANA_CAP, hero.maxMana + 2);
+  const newMana = Math.min(newMax, hero.mana + 2);
+  return withSideHero(board, side, { ...hero, maxMana: newMax, mana: newMana });
 }
 
 /** Rempart — give every one of my creatures +2 max HP. Spock Détaché skipped. */
@@ -64,11 +67,12 @@ export function applyBenediction(board: BoardState, side: Side): BoardState {
   return { ...board, lanes };
 }
 
-/** Oracle Inverse — peek FULL opp hand (Augur shows the first 4 only). */
+/** Oracle Inverse — peek FULL opp hand (Augur shows the first 4 only).
+ *  Reste affichée 2 tours comme Augur (Alex 2026-06-11). */
 export function applyOracleInverse(board: BoardState, side: Side): BoardState {
   const opp = side === "a" ? board.b : board.a;
-  if (side === "a") return { ...board, augurRevealedB: opp.hand.slice() };
-  return { ...board, augurRevealedA: opp.hand.slice() };
+  if (side === "a") return { ...board, augurRevealedB: opp.hand.slice(), augurTurnsLeftB: 2 };
+  return { ...board, augurRevealedA: opp.hand.slice(), augurTurnsLeftA: 2 };
 }
 
 /** Cascade — draw 3 cards, then discard 1 random from hand (cycle a bad hand). */

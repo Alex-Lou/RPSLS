@@ -37,15 +37,25 @@ export function ScaleToFit({
   children,
   className = "",
   align = "center",
+  fill = false,
 }: {
   children: React.ReactNode;
   className?: string;
   /** Vertical anchor of the scaled content within the available box. */
   align?: "center" | "top";
+  /** When the content FITS (no scale-down needed), stretch the inner to the
+   *  full available height and lay its DIRECT children out with space-between,
+   *  instead of leaving empty box above/below. On a short viewport it falls
+   *  straight back to natural height + scale-down. Used by the Arena pad so
+   *  the lanes fill the frame on tall phones (Alex: "espace vide en dessous")
+   *  while still never clipping on short ones. Default off → no behaviour
+   *  change for the classic 1v1 callers. */
+  fill?: boolean;
 }) {
   const outerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
+  const [filled, setFilled] = useState(false);
 
   useLayoutEffect(() => {
     const outer = outerRef.current;
@@ -53,30 +63,53 @@ export function ScaleToFit({
     if (!outer || !inner) return;
     const measure = () => {
       const availH = outer.clientHeight;
-      const needH = inner.offsetHeight; // pre-transform layout height
+      // scrollHeight reports the content's REAL height even when the inner is
+      // stretched to h-full in fill mode, so genuine overflow is still caught.
+      const needH = inner.scrollHeight;
       if (!availH || !needH) return;
-      const next = needH > availH ? Math.max(0.4, availH / needH) : 1;
-      setScale((prev) => (Math.abs(prev - next) > 0.005 ? next : prev));
+      if (needH > availH + 1) {
+        // Doesn't fit → scale down to fit, natural layout (no fill).
+        setFilled(false);
+        const next = Math.max(0.4, availH / needH);
+        setScale((prev) => (Math.abs(prev - next) > 0.005 ? next : prev));
+      } else {
+        // Fits → no scaling; optionally fill the spare height.
+        setScale((prev) => (prev !== 1 ? 1 : prev));
+        setFilled(fill);
+      }
     };
     measure();
+    // The fill consumer (Arena board) mounts AFTER the match splash, so the
+    // first measure can run before the flex heights are final — re-measure on
+    // the next two frames so `filled` reliably latches on a real-device WebView
+    // (where the initial layout lagged and the pad ended up un-stretched).
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => { measure(); raf2 = requestAnimationFrame(measure); });
     const ro = new ResizeObserver(measure);
     ro.observe(outer);
     ro.observe(inner);
-    return () => ro.disconnect();
-  }, []);
+    return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); ro.disconnect(); };
+  }, [fill]);
+
+  // When filling, STRETCH the inner to the full available height via flexbox
+  // (outer `items-stretch`) instead of `height:100%` — percentage heights
+  // against a flex-grown ancestor don't resolve reliably in the Android
+  // WebView, which left the pad un-stretched on device (Alex: "le pad doit
+  // être étiré vers le bas"). The child (ArenaBoard) then fills via its flex-1.
+  const fillActive = fill && filled;
 
   return (
     <div
       ref={outerRef}
       className={
         "flex-1 min-h-0 w-full overflow-hidden flex justify-center " +
-        (align === "top" ? "items-start " : "items-center ") +
+        (fillActive ? "items-stretch " : align === "top" ? "items-start " : "items-center ") +
         className
       }
     >
       <div
         ref={innerRef}
-        className="w-full"
+        className={"w-full " + (fill ? "flex flex-col " : "")}
         style={{ transform: `scale(${scale})`, transformOrigin: align === "top" ? "center top" : "center center" }}
       >
         {children}
@@ -247,8 +280,13 @@ export const FloatingMatchBackButton = forwardRef<
       /** "danger" colors the confirm CTA red to flag a punitive action. */
       severity?: "default" | "danger";
     };
+    /** Hidden mode (Alex 2026-06-11) : ne render PAS le bouton visible mais
+     *  garde l'imperative handle (triggerConfirm) + le modal de confirm.
+     *  Utilisé quand l'exit est exposé via le drawer burger (matchExitStore)
+     *  pour éviter d'avoir 2 boutons HUD en haut de l'écran. */
+    hidden?: boolean;
   }
->(function FloatingMatchBackButtonImpl({ onClick, label, confirm }, ref) {
+>(function FloatingMatchBackButtonImpl({ onClick, label, confirm, hidden = false }, ref) {
   const [open, setOpen] = useState(false);
   const handleClick = () => {
     if (confirm) setOpen(true);
@@ -268,24 +306,26 @@ export const FloatingMatchBackButton = forwardRef<
   // view enter.
   return createPortal(
     <>
-      <button
-        onClick={handleClick}
-        aria-label={label}
-        title={label}
-        className="
-          fixed z-30 w-11 h-11 rounded-2xl bg-black/55 backdrop-blur border border-hairline
-          flex items-center justify-center text-ink active:scale-95 transition shadow-lg
-          hover:bg-black/70
-          top-[max(env(safe-area-inset-top),32px)]
-          left-[calc(max(env(safe-area-inset-left),12px)+44px+8px)]
-          md:top-3
-          md:left-3
-        "
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M15 18l-6-6 6-6" />
-        </svg>
-      </button>
+      {!hidden && (
+        <button
+          onClick={handleClick}
+          aria-label={label}
+          title={label}
+          className="
+            fixed z-30 w-11 h-11 rounded-2xl bg-black/55 backdrop-blur border border-hairline
+            flex items-center justify-center text-ink active:scale-95 transition shadow-lg
+            hover:bg-black/70
+            top-[max(env(safe-area-inset-top),32px)]
+            left-[calc(max(env(safe-area-inset-left),12px)+44px+8px)]
+            md:top-3
+            md:left-3
+          "
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
+      )}
       <AnimatePresence>
         {open && confirm && (
           <motion.div

@@ -34,12 +34,14 @@ const VOIE_BONUS: Record<Move, string> = {
   lizard:   "Esquive 2 charges (au lieu de 1)",
   spock:    "+1 ATK (ATK 3 au lieu de 2)",
 };
+/** Renommage épique des Voies (Alex 2026-06-11) — chaque nom évoque l'effet
+ *  gameplay et l'identité du symbole. */
 const VOIE_LABEL: Record<Move, string> = {
-  rock: "Voie de la Pierre",
-  paper: "Voie de la Feuille",
-  scissors: "Voie des Ciseaux",
-  lizard: "Voie du Lézard",
-  spock: "Voie de Spock",
+  rock:     "Voie de la Montagne",
+  paper:    "Voie de la Forêt",
+  scissors: "Voie du Tranchant",
+  lizard:   "Voie du Mirage",
+  spock:    "Voie du Cosmos",
 };
 
 export function ArenaLobby({

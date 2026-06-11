@@ -39,14 +39,28 @@ export const TURN_HARD_CAP = 30;
 
 export type Side = "a" | "b";
 
+/** Persona CPU — pick aléatoire au match start, garde la cohérence tout le
+ *  match (Alex 2026-06-11 "varier les niveaux et mentalités"). Chaque persona
+ *  module les choix de l'IA : focus Voie, agression, blocage de la Voie
+ *  adverse, etc. */
+export type CpuPersona = "tactician" | "aggressor" | "builder" | "defender";
+
+export const CPU_PERSONAS: CpuPersona[] = ["tactician", "aggressor", "builder", "defender"];
+
+export const CPU_PERSONA_LABEL: Record<CpuPersona, string> = {
+  tactician: "Tacticien",
+  aggressor: "Agresseur",
+  builder:   "Bâtisseur",
+  defender:  "Gardien",
+};
+
 export interface HeroState {
   hp: number;
   maxHp: number;
   affinity?: import("../engine/game").Move;
-  /** Alex feedback A 2026-06-09 : "Aegis 1 cast par hero par match" pour
-   *  casser les stalemates où l'opp re-cast Aegis sur la même créature à
-   *  chaque tour. Set à true à la première cast d'Aegis (lane ou self) ;
-   *  applyAegis fizzle silencieusement si déjà true. Reset au match start. */
+  /** Aegis : lock 1×/match RETIRÉ (Alex 2026-06-11). Le champ reste optional
+   *  pour la back-compat des saves persistées ; jamais set ni lu côté code
+   *  vivant. À nettoyer du save schema dans une migration future. */
   aegisCastThisMatch?: boolean;
   /** Alex feedback D 2026-06-09 : "récompenser l'agression" → si ce hero
    *  a tué une créature opp ce tour, il pioche +1 carte bonus au prochain
@@ -82,6 +96,10 @@ export interface HeroState {
   /** Lot D — flag CALCUL QUANTIQUE : tous mes sorts coûtent −1m (min 0).
    *  Vérifié dans applyAllSpells.cost. */
   calculActive?: boolean;
+  /** Persona du CPU (Alex 2026-06-11) — choisie au match start côté CPU.
+   *  Module les heuristiques de l'IA : agression, focus sur sa Voie, focus
+   *  sur contrer la Voie joueur, défensivité. undefined côté joueur. */
+  cpuPersona?: CpuPersona;
   /** Mana available THIS turn. Refreshes to maxMana at the start of each turn. */
   mana: number;
   /** Mana ceiling — increments by 1 every turn up to MANA_CAP. */
@@ -156,7 +174,7 @@ export const MOVE_DESIGN_NOTES: Record<Move, MoveDesignNote> = {
     counters: "Ciseaux OU Lézard opp en lane = one-shot la Feuille.",
   },
   scissors: {
-    good: "Tranchant — perce les Aegis adverses. ATK 4 (le plus haut du roster).",
+    good: "Tranchant — perce un Aegis adverse UNE seule fois (charge unique). ATK 4 (le plus haut du roster).",
     bad: "Émoussé — −1 ATK permanent après son 1er combat (4→3). HP 1, fragile.",
     counters: "Pierre OU Spock opp en lane = one-shot le Ciseau.",
   },
@@ -191,7 +209,7 @@ export const CREATURE_PASSIVES: Record<Move, CreaturePassive> = {
     id: "tranchant",
     glyph: "⚔",
     name: "Tranchant",
-    desc: "Au combat de lane, perce les boucliers divins (Aegis) adverses.",
+    desc: "Charge unique : perce le 1er bouclier divin (Aegis) adverse rencontré, puis disparaît.",
     tone: "rose",
   },
   lizard: {
@@ -242,6 +260,12 @@ export interface Creature {
    *  defender's divineShield is bypassed (full damage lands). Set inherently
    *  on Scissors at summon, never granted by spells. */
   pierces: boolean;
+  /** Tranchant CHARGE (Alex 2026-06-11) : true tant que le Tranchant n'a
+   *  pas encore percé une Aegis. Au 1er bypass, set true → les attaques
+   *  suivantes respectent la divineShield comme tout le monde. La Lame
+   *  Finisher (lameActive sur le hero) IGNORE cette charge — pierce
+   *  permanent pour le reste du match. */
+  pierceUsed: boolean;
   /** Spock's "Logique" — opponent's spells that target THIS creature fizzle
    *  silently. Doesn't affect combat damage or summons replacement. Set
    *  inherently on Spock at summon. */
@@ -275,7 +299,9 @@ export interface Creature {
   /** Pierre's Provocation is now a CHARGE-LIMITED resource: 1 charge at
    *  summon, consumed by the first deflection. Once at 0, the Pierre stops
    *  redirecting attacks (badge + halo hide). Aegis (spell) cast on a Pierre
-   *  refills +1 charge. Always 0 on non-Rock moves.
+   *  recharge la Provocation À 1 si elle est épuisée (max(charges, 1) — cf.
+   *  applyAegis ; comportement validé live, ce n'est PAS un "+1" cumulable).
+   *  Always 0 on non-Rock moves.
    *
    *  Voie de la Pierre (affinity match) : 2 charges initiales au lieu d'1.
    *
@@ -341,6 +367,17 @@ export interface BoardState {
    *  see of side B's hand). Cleared each turn. */
   augurRevealedB: CardId[];
   augurRevealedA: CardId[];
+  /** Compteur de tours restants avant clear du peek (Alex 2026-06-11 : "ne
+   *  pas retirer la main trop vite"). 2 tours = tour de cast + tour suivant.
+   *  Decrement dans advanceToNextTurn ; clear cards à 0. */
+  augurTurnsLeftA?: number;
+  augurTurnsLeftB?: number;
+  /** ID de la dernière carte volée par chaque côté (Alex 2026-06-11). Lu par
+   *  l'UI pour que l'anim Larcin reveal la VRAIE carte volée (sinon affichait
+   *  une heuristique "première carte de la main adverse"). Mis à jour par
+   *  applyHeist au cast. Pas besoin de clear : écrasée au cast suivant. */
+  lastHeistStolenA?: CardId;
+  lastHeistStolenB?: CardId;
 }
 
 export type ArenaPhase =
@@ -484,6 +521,16 @@ export function targetLabelFor(targeting: ArenaTargeting, slotHasCreature = fals
     if (tgtSide === "my-empty") return "✦ Ici";
   }
   return "✦";
+}
+
+/** Clé i18n de la description ARENA d'une carte. Les textes `ranked.cards.
+ *  <id>.desc` décrivent les effets du mode CLASSÉ ; en Arena les mêmes cartes
+ *  ont des effets DIFFÉRENTS (arenaCardEffects) — afficher le texte Classé
+ *  induisait le joueur en erreur (ex. Trou Noir : "annule la carte adverse"
+ *  vs effet Arena réel "détruit une créature"). FR+EN fournis dans les
+ *  locales ; les autres langues retombent sur EN (fallback i18n standard). */
+export function arenaCardDescKey(id: CardId): string {
+  return `arena.cards.${id}.desc`;
 }
 
 /* ───────────────────────── RPSLS counter table ───────────────────────── */

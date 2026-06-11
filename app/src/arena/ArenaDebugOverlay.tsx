@@ -49,13 +49,13 @@ export function ArenaDebugOverlay() {
 
   return (
     <>
-      {/* Floating bug button — repositionné top-right (Alex feedback 2026-06-09
-       *  point #3 : était bottom-right, chevauchait les boutons système Android.
-       *  Top-right colle au burger menu sans gêner ni la barre nav système ni
-       *  les chips status du board. */}
+      {/* Floating bug button — déplacé EN BAS À DROITE au-dessus des nav
+       *  Android (Alex 2026-06-11 : "ne pas empiéter sur l'UI/UX"). Utilise
+       *  safe-area-inset-bottom + 3rem de clearance. */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="fixed top-2.5 right-2.5 z-[9998] inline-flex items-center gap-1 px-2 py-1 rounded-full bg-zinc-900/90 border border-zinc-700 text-emerald-200 text-[10px] font-black shadow-lg backdrop-blur active:scale-95"
+        className="fixed right-2.5 z-[9998] inline-flex items-center gap-1 px-2 py-1 rounded-full bg-zinc-900/90 border border-zinc-700 text-emerald-200 text-[10px] font-black shadow-lg backdrop-blur active:scale-95"
+        style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 5.5rem)" }}
         aria-label="Logs match"
       >
         🐛 <span className="tabular-nums">{logs.length}</span>

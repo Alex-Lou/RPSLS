@@ -16,6 +16,7 @@
  */
 
 import { arenaSupported } from "./arenaCardEffects";
+import { cpuCanPlay } from "./arenaAI";
 import { isFinisherCard } from "./arenaFinishers";
 import { CARDS } from "../ranked/cards";
 import type { TurnIntent } from "./arenaTypes";
@@ -56,19 +57,24 @@ export function buildCpuDeckMirroring(playerDeck: CardId[]): CardId[] {
     if (!card) continue;
     counts[card.rarity] = (counts[card.rarity] ?? 0) + 1;
   }
-  // Pool de cartes Arena-supported par rareté.
+  // Pool de cartes Arena-supported par rareté — restreint aux cartes que le
+  // cerveau CPU sait jouer (cpuCanPlay) : une carte que buildSpellTarget ne
+  // cible jamais serait une carte MORTE dans la main du CPU.
   const pools: Record<string, CardId[]> = { common: [], rare: [], epic: [], legendary: [] };
   for (const id of Object.keys(CARDS) as CardId[]) {
-    if (!isDeckable(id)) continue;
+    if (!isDeckable(id) || !cpuCanPlay(id)) continue;
     const card = CARDS[id];
     pools[card.rarity].push(id);
   }
   // Pour chaque rareté du joueur, pige N cartes (doublon autorisé jusqu'à 2).
+  // Cartes plafonnées à 1 copie : cf. SINGLE_COPY_CARDS (parité player/CPU).
+  const SINGLE_COPY_CARDS = new Set<CardId>(["supernova"]);
   const out: CardId[] = [];
   const inOut = new Map<CardId, number>();
   const tryAdd = (id: CardId, max: number): boolean => {
     const cur = inOut.get(id) ?? 0;
-    if (cur >= max) return false;
+    const cap = SINGLE_COPY_CARDS.has(id) ? Math.min(max, 1) : max;
+    if (cur >= cap) return false;
     out.push(id);
     inOut.set(id, cur + 1);
     return true;
@@ -130,6 +136,11 @@ export function buildPlayerDeck(saved: CardId[] | undefined): CardId[] {
     "heist", "supernova",
     // Tempo / draw / control
     "surge", "curse", "mirror", "tide",
+    // Info / utility — Augur garanti dans le deck Arena (Alex 2026-06-11 :
+    // "Augure ne fait plus du tout apparaître les cartes de l'autre" — cause
+    // = il n'était PAS dans le FILLER, donc les decks Arena n'avaient Augur
+    // que si le ranked deck en contenait. Maintenant systématique).
+    "augur",
   ];
   // Alex feedback 2026-06-09 : "Précision en boucle infinie" — cause = le
   // deck contenait plusieurs copies de la même carte (saved + FILLER non
@@ -137,12 +148,17 @@ export function buildPlayerDeck(saved: CardId[] | undefined): CardId[] {
   // 2 fois par run (avec reshuffle après discard), pas en boucle infinie.
   const DECK_SIZE = 12;
   const MAX_COPIES = 2;
+  // Cartes plafonnées à 1 copie (Alex 2026-06-11) : Supernova = 6 dmg hero
+  // direct, 2 copies = 12 dmg lethal trop facile. À étendre si d'autres
+  // cartes méritent le même traitement.
+  const SINGLE_COPY_CARDS = new Set<CardId>(["supernova"]);
   const counts = new Map<CardId, number>();
   const out: CardId[] = [];
   const tryPush = (c: CardId): void => {
     if (out.length >= DECK_SIZE) return;
     const cur = counts.get(c) ?? 0;
-    if (cur >= MAX_COPIES) return;
+    const cap = SINGLE_COPY_CARDS.has(c) ? 1 : MAX_COPIES;
+    if (cur >= cap) return;
     out.push(c);
     counts.set(c, cur + 1);
   };

@@ -178,36 +178,29 @@ function isDetached(c: Creature | null | undefined): boolean {
 /** Aegis — Divine Shield: lane-target → my creature there absorbs next dmg.
  *  Self-target → my HERO gets the shield. Spock Détaché ignores it.
  *  BONUS on a Pierre target: ALSO refills its Provocation charge to 1 — Aegis
- *  becomes the dedicated "rebuild the tank" tool when its charge is spent. */
+ *  becomes the dedicated "rebuild the tank" tool when its charge is spent.
+ *
+ *  Le lock 1×/match (aegisCastThisMatch) a été LEVÉ (Alex 2026-06-11) :
+ *  une copie en main = un cast, la règle générique suffit. Une cible
+ *  invalide (Spock Détaché, lane vide) fizzle silencieusement comme tout
+ *  sort. */
 function applyAegis(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
-  // Alex feedback A 2026-06-09 : Aegis Pro = 1 cast par hero par match.
-  // CRITIQUE : le lock est appliqué AVANT toute fizzle branch pour qu'on
-  // ne puisse PAS bypass en castant sur une cible invalide (empty lane,
-  // Spock Détaché). Sinon opp peut spam Aegis "perdues" sur null pour
-  // garder le lock à false.
-  const heroBefore = side === "a" ? board.a : board.b;
-  if (heroBefore.aegisCastThisMatch) {
-    alog("spell", `${side} aegis FIZZLE (lock déjà actif)`);
-    return board;
-  }
-  // Verrou immédiat : aegisCastThisMatch=true peu importe le succès cast.
-  const locked = withSideHero(board, side, { ...heroBefore, aegisCastThisMatch: true });
   if (spell.kind === "lane") {
-    const c = getMyCreatureOnLane(locked, side, spell.lane);
+    const c = getMyCreatureOnLane(board, side, spell.lane);
     if (!c || isDetached(c)) {
-      alog("spell", `${side} aegis lane fizzle (cible invalide) — lock pris quand même`);
-      return locked;
+      alog("spell", `${side} aegis lane fizzle (cible invalide)`);
+      return board;
     }
     const refilled = c.move === "rock"
       ? { ...c, divineShield: true, provocationCharges: Math.max(c.provocationCharges, 1) }
       : { ...c, divineShield: true };
-    return withMyCreatureOnLane(locked, side, spell.lane, refilled);
+    return withMyCreatureOnLane(board, side, spell.lane, refilled);
   }
   if (spell.kind === "self") {
-    const heroLocked = side === "a" ? locked.a : locked.b;
-    return withSideHero(locked, side, { ...heroLocked, divineShield: true });
+    const hero = side === "a" ? board.a : board.b;
+    return withSideHero(board, side, { ...hero, divineShield: true });
   }
-  return locked;
+  return board;
 }
 
 /** Anchor — my creature on that lane is IMMUNE to enemy spells this turn.
@@ -277,11 +270,11 @@ function applyPrescience(board: BoardState, side: Side): BoardState {
 }
 
 /** Augur — reveal the opp's hand to the casting side. (Stored on the board
- *  so the UI can render the peek for one turn.) */
+ *  so the UI can render the peek for two turns — Alex 2026-06-11). */
 function applyAugur(board: BoardState, side: Side): BoardState {
   const opp = side === "a" ? board.b : board.a;
-  if (side === "a") return { ...board, augurRevealedB: opp.hand.slice(0, 4) };
-  return { ...board, augurRevealedA: opp.hand.slice(0, 4) };
+  if (side === "a") return { ...board, augurRevealedB: opp.hand.slice(0, 4), augurTurnsLeftB: 2 };
+  return { ...board, augurRevealedA: opp.hand.slice(0, 4), augurTurnsLeftA: 2 };
 }
 
 /** Oracle — draw 3 cards. */
@@ -302,15 +295,36 @@ function applyMirror(board: BoardState, side: Side, spell: PlayedSpell): BoardSt
   return withMyCreatureOnLane(board, side, spell.lane, makeCreature(opp.move, side, myAffinity));
 }
 
-/** Heist — 3 damage to the opp HERO + draw 1 card. */
+/** Larcin (Heist) — vrai VOL d'une carte aléatoire de la main adverse
+ *  (Alex 2026-06-11). La carte volée arrive dans MA main (respecte HAND_CAP,
+ *  sinon burn). Si l'adversaire n'a plus de cartes en main, fallback sur
+ *  3 dégâts au héros opp — un Larcin n'est jamais vain.
+ *
+ *  Cohérent avec l'anim Larcin (carte qui s'arrache de l'opp, vole vers moi). */
 function applyHeist(board: BoardState, side: Side): BoardState {
   const oppS = oppSide(side);
   const oppHero = oppS === "a" ? board.a : board.b;
-  const damaged = damageHero(oppHero, 3);
-  let after = withSideHero(board, oppS, damaged);
+  if (oppHero.hand.length === 0) {
+    alog("spell", `${side} LARCIN → main adverse vide, fallback 3 dmg hero ${oppS}`);
+    return withSideHero(board, oppS, damageHero(oppHero, 3));
+  }
+  // Pige aléatoire dans la main adverse.
+  const idx = Math.floor(Math.random() * oppHero.hand.length);
+  const stolen = oppHero.hand[idx];
+  const newOppHand = [...oppHero.hand.slice(0, idx), ...oppHero.hand.slice(idx + 1)];
+  let after = withSideHero(board, oppS, { ...oppHero, hand: newOppHand });
   const mine = side === "a" ? after.a : after.b;
-  after = withSideHero(after, side, drawCards(mine, 1));
-  return after;
+  // Larcin OVERDRAW (Alex 2026-06-11 "pourquoi elle va pas dans ma main ?") :
+  // la carte volée arrive TOUJOURS dans la main, même si tu es déjà à
+  // HAND_CAP=7 → 8 cartes autorisées pour le Larcin. Sinon le sort perdait
+  // tout son sens narratif quand ta main était pleine.
+  const newMyHand = [...mine.hand, stolen];
+  alog("spell", `${side} LARCIN → [${stolen}] volée à ${oppS} et ajoutée en main (${newMyHand.length}/8 cap+1)`);
+  // Side-channel : on stocke l'ID volé sur le board pour que l'UI sync l'anim
+  // Larcin avec la VRAIE carte (au lieu d'une heuristique première-carte).
+  after = withSideHero(after, side, { ...mine, hand: newMyHand });
+  return { ...after, lastHeistStolenA: side === "a" ? stolen : after.lastHeistStolenA,
+                     lastHeistStolenB: side === "b" ? stolen : after.lastHeistStolenB };
 }
 
 /** Supernova — 6 damage to a target (lane creature OR opp hero). */

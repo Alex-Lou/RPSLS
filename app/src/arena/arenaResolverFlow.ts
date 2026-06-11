@@ -16,7 +16,7 @@ import {
   endOfTurnCleanup,
   resolveLaneCombatAt,
 } from "./arenaRules";
-import { CREATURE_STATS, moveCountersMove, type BoardState, type LaneIndex, type TurnIntent } from "./arenaTypes";
+import { CREATURE_STATS, TURN_HARD_CAP, moveCountersMove, type BoardState, type LaneIndex, type TurnIntent } from "./arenaTypes";
 import { alog } from "./arenaLog";
 
 /** Snapshot helper — log compact d'une lane avec flags. Réutilise le même
@@ -42,8 +42,8 @@ function logBoardSnapshot(b: BoardState, tag: string): void {
   // Alex feedback : "ajouter les cartes de chacun dans les logs" → mains
   // visibles côté joueur ET côté CPU pour analyse CCG post-mortem.
   // Format compact : main=[id1,id2,...] deck=N discard=M mana=X/Y.
-  alog("hand", `${tag} a hand=[${b.a.hand.join(",")}] deck=${b.a.deck.length} discard=${b.a.discard.length} mana=${b.a.mana}/${b.a.maxMana}${b.a.killBonusPending ? " +K" : ""}${b.a.aegisCastThisMatch ? " [AEGIS-LOCK]" : ""}`);
-  alog("hand", `${tag} b hand=[${b.b.hand.join(",")}] deck=${b.b.deck.length} discard=${b.b.discard.length} mana=${b.b.mana}/${b.b.maxMana}${b.b.killBonusPending ? " +K" : ""}${b.b.aegisCastThisMatch ? " [AEGIS-LOCK]" : ""}`);
+  alog("hand", `${tag} a hand=[${b.a.hand.join(",")}] deck=${b.a.deck.length} discard=${b.a.discard.length} mana=${b.a.mana}/${b.a.maxMana}${b.a.killBonusPending ? " +K" : ""}`);
+  alog("hand", `${tag} b hand=[${b.b.hand.join(",")}] deck=${b.b.deck.length} discard=${b.b.discard.length} mana=${b.b.mana}/${b.b.maxMana}${b.b.killBonusPending ? " +K" : ""}`);
 }
 
 /** Resolver step labels — kept in sync with ArenaBoard's banner switch. */
@@ -70,6 +70,10 @@ export interface ResolverFlowArgs {
    *  that ate the deflection — used by the UI to pull a dotted line from
    *  the attacker's lane to the Pierre + decrement its charge badge. */
   setTauntBlock: (b: { defenderSide: "a" | "b"; rockLane: LaneIndex; key: number } | null) => void;
+  /** Anti-taunt bypass — set when an attack reaches a hero despite a charged
+   *  Pierre, because the attacker carries Étouffe (Paper) / Logique (Spock)
+   *  which cancel Provocation. `bypassedSide` owns the bypassed Pierre. */
+  setAntiTaunt: (b: { bypassedSide: "a" | "b"; rockLane: LaneIndex; cause: "paper" | "spock"; key: number } | null) => void;
   /** Called BEFORE the resolver advances to the next turn — clears the
    *  player's pending intent and stops the "resolving" lock. */
   onSettle: (finalBoard: BoardState) => void;
@@ -98,7 +102,7 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
   const {
     startBoard, playerIntent, cpuIntent,
     setBoard, setOppPreview, setPlayerPreview, setResolveStep,
-    setCombatLane, setHeroHit, setTauntBlock,
+    setCombatLane, setHeroHit, setTauntBlock, setAntiTaunt,
     onSettle, onAdvanceTurn, onMatchEnd,
   } = args;
 
@@ -143,8 +147,18 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
           const bothPresent = !!lane.a && !!lane.b;
           const counterAB = bothPresent && moveCountersMove(lane.a!.move, lane.b!.move);
           const counterBA = bothPresent && moveCountersMove(lane.b!.move, lane.a!.move);
-          const aFollowsThroughOnB = bothPresent && counterAB && !counterBA && lane.b!.dodgeCharges === 0;
-          const bFollowsThroughOnA = bothPresent && counterBA && !counterAB && lane.a!.dodgeCharges === 0;
+          // Sync avec arenaCombat : la poursuite n'a PAS lieu si le perdant est
+          // sauvé par Esquive OU par Aegis (sauf attaquant Tranchant/LAME qui
+          // percent le bouclier ; LAME perce aussi l'Esquive). Sans ces termes
+          // l'anim flashait le héros alors que l'engine ne frappait pas.
+          const aLame = !!lane.a && b.a.lameActive && lane.a.move === "scissors";
+          const bLame = !!lane.b && b.b.lameActive && lane.b.move === "scissors";
+          const aFollowsThroughOnB = bothPresent && counterAB && !counterBA
+            && (lane.b!.dodgeCharges === 0 || aLame)
+            && (!lane.b!.divineShield || lane.a!.pierces || aLame);
+          const bFollowsThroughOnA = bothPresent && counterBA && !counterAB
+            && (lane.a!.dodgeCharges === 0 || bLame)
+            && (!lane.a!.divineShield || lane.b!.pierces || bLame);
           // TAUNT DEFLECTION DETECTION — keep in sync with rules.findDeflector:
           //   first ALIVE+CHARGED Pierre on defender's side, EXCEPT if
           //   attacker has Paper/Spock anti-taunt active. Returns the
@@ -153,6 +167,10 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
             !!c && (c.move === "paper" || c.move === "spock");
           const findDeflectorLane = (defenderSide: "a" | "b"): LaneIndex | null => {
             const attackerSide: "a" | "b" = defenderSide === "a" ? "b" : "a";
+            // LAME Finisher : l'attaquant Ciseau LAME perce la Provoc — pas de
+            // chip "détourné" (sync avec le skip deflect d'arenaCombat).
+            const attackerLame = attackerSide === "a" ? aLame : bLame;
+            if (attackerLame) return null;
             const attackerHasAntiTaunt = b.lanes.some((l) =>
               isAntiTaunt(attackerSide === "a" ? l.a : l.b),
             );
@@ -163,9 +181,38 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
             }
             return null;
           };
+          // ANTI-TAUNT BYPASS — when an attack reaches the hero AND the
+          // defender HAS a charged Pierre but the attacker carries Étouffe
+          // (Paper) / Logique (Spock), the Provocation is cancelled. Surface
+          // WHICH passive bypassed the rock so the player understands why it
+          // didn't defend (keep the move check in sync with isAntiTaunt above).
+          const findAntiTauntBypass = (defenderSide: "a" | "b"): { rockLane: LaneIndex; cause: "paper" | "spock" } | null => {
+            const attackerSide: "a" | "b" = defenderSide === "a" ? "b" : "a";
+            let cause: "paper" | "spock" | null = null;
+            for (let i = 0; i < 3; i++) {
+              const c = attackerSide === "a" ? b.lanes[i].a : b.lanes[i].b;
+              if (c && (c.move === "paper" || c.move === "spock")) { cause = c.move; break; }
+            }
+            if (!cause) return null;
+            for (let i = 0; i < 3; i++) {
+              const c = defenderSide === "a" ? b.lanes[i].a : b.lanes[i].b;
+              if (c && c.taunt && c.provocationCharges > 0) return { rockLane: i as LaneIndex, cause };
+            }
+            return null;
+          };
           // a hits b's hero when either undefended attack or RPSLS follow-through.
+          // Splash damage (Alex 2026-06-11) : la poursuite après counter-kill
+          // est réduite à max(0, ATK − HP cible). Si splash = 0 → le hero ne
+          // prend RIEN, pas d'anim flash sur sa HP bar (sinon induit en erreur).
+          const atkA = lane.a ? creatureEffectiveAtk(lane.a) : 0;
+          const atkB = lane.b ? creatureEffectiveAtk(lane.b) : 0;
+          const splashAtoB = aFollowsThroughOnB && lane.b ? Math.max(0, atkA - lane.b.hp) : 0;
+          const splashBtoA = bFollowsThroughOnA && lane.a ? Math.max(0, atkB - lane.a.hp) : 0;
           const aReachesHeroB = aHitsB || aFollowsThroughOnB;
           const bReachesHeroA = bHitsA || bFollowsThroughOnA;
+          // damage RÉEL qui va toucher le hero (filtre les follow-through à 0)
+          const aHitsHeroBForReal = (aHitsB && atkA > 0) || splashAtoB > 0;
+          const bHitsHeroAForReal = (bHitsA && atkB > 0) || splashBtoA > 0;
           const bDeflectorLane = aReachesHeroB ? findDeflectorLane("b") : null;
           const aDeflectorLane = bReachesHeroA ? findDeflectorLane("a") : null;
           setCombatLane(laneIdx);
@@ -174,12 +221,17 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
           window.setTimeout(() => {
             if (bDeflectorLane !== null) {
               setTauntBlock({ defenderSide: "b", rockLane: bDeflectorLane, key: Date.now() });
-            } else if (aReachesHeroB) {
+            } else if (aHitsHeroBForReal) {
+              // Anti-taunt bypass chip seulement si dmg réellement infligé.
+              const bypass = findAntiTauntBypass("b");
+              if (bypass) setAntiTaunt({ bypassedSide: "b", rockLane: bypass.rockLane, cause: bypass.cause, key: Date.now() });
               setHeroHit({ side: "opp", lane: laneIdx, key: Date.now() });
             }
             if (aDeflectorLane !== null) {
               setTauntBlock({ defenderSide: "a", rockLane: aDeflectorLane, key: Date.now() + 1 });
-            } else if (bReachesHeroA) {
+            } else if (bHitsHeroAForReal) {
+              const bypass = findAntiTauntBypass("a");
+              if (bypass) setAntiTaunt({ bypassedSide: "a", rockLane: bypass.rockLane, cause: bypass.cause, key: Date.now() + 1 });
               setHeroHit({ side: "you", lane: laneIdx, key: Date.now() + 1 });
             }
           }, LANE_CHARGE_MS * 0.55);
@@ -226,9 +278,7 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
         const TOTAL_COMBAT_MS = LANE_CHARGE_MS * 3 + LANE_PAUSE_MS * 2 + 200;
         window.setTimeout(() => {
           b = endOfTurnCleanup(b);
-          const aDead = b.a.hp <= 0;
-          const bDead = b.b.hp <= 0;
-          if (aDead && bDead) {
+          if (b.a.hp <= 0 && b.b.hp <= 0) {
             // Round 10 VRAI BUT D'OR : égalité parfaite → phase sudden-death
             // (Mort subite RPSLS) au lieu de match-end direct. ArenaGame
             // détecte cette phase et affiche le component ArenaSuddenDeath.
@@ -239,19 +289,40 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
             // après résolution. Délai 1.6s pour laisser respirer la transition.
             return;
           }
-          if (aDead || bDead) {
+          if (b.a.hp <= 0 || b.b.hp <= 0) {
             b = { ...b, phase: "match-end" };
+          } else if (b.turn >= TURN_HARD_CAP) {
+            // Fail-safe documenté (arenaTypes.TURN_HARD_CAP) mais jamais câblé
+            // jusqu'ici : un match trop défensif doit FINIR. Au tour 30 résolu,
+            // le héros au HP le plus bas perd (HP forcé à 0 pour que MatchEnd
+            // et recordArenaMatch lisent le verdict normalement). HP égaux →
+            // BUT D'OR, même chemin que l'égalité parfaite.
+            if (b.a.hp === b.b.hp) {
+              alog("turn", `HARD CAP T${b.turn} — HP égaux (${b.a.hp}) → 🌟 BUT D'OR / Mort subite RPSLS`);
+              b = { ...b, phase: "sudden-death" };
+              setBoard(b);
+              return;
+            }
+            const aLoses = b.a.hp < b.b.hp;
+            alog("turn", `HARD CAP T${b.turn} — ${aLoses ? "a" : "b"} perd (HP ${b.a.hp} vs ${b.b.hp})`);
+            b = aLoses
+              ? { ...b, a: { ...b.a, hp: 0 }, phase: "match-end" }
+              : { ...b, b: { ...b.b, hp: 0 }, phase: "match-end" };
           }
+          const aDead = b.a.hp <= 0;
+          const bDead = b.b.hp <= 0;
           setBoard(b);
           if ((aDead || bDead) && onMatchEnd) {
-            // Alex feedback 2026-06-09 point #6 : laisser respirer l'UI 1.6s
-            // avant la transition match-end screen (était 200ms = transition
-            // brutale). Donne le temps de voir le dernier état du board.
+            // Alex feedback 2026-06-11 : laisser respirer 2.8s avant la
+            // transition match-end (était 1.6s, trop court — l'écran de
+            // fin tombait dessus avant que la dernière anim de combat L2
+            // / chip taunt / flash hero ait terminé). 2.8s couvre la chaîne
+            // anim impact + retreat + chip auto-clear de la dernière lane.
             window.setTimeout(() => {
               // Convention onMatchEnd(playerWon) : true = player win.
               const playerWon = bDead && !aDead;
               onMatchEnd(playerWon);
-            }, 1600);
+            }, 2800);
           }
         }, TOTAL_COMBAT_MS);
 
@@ -261,7 +332,11 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
           onSettle(b);
           window.setTimeout(() => {
             setResolveStep(null);
-            if (b.phase === "match-end") return;
+            // 🔴 Le garde DOIT couvrir sudden-death : sans ça, onAdvanceTurn
+            // repassait le board en "planning" ~3s après le déclenchement du
+            // BUT D'OR (les timers settle continuent de courir) → la mort
+            // subite était ANNULÉE et le match reprenait comme si de rien.
+            if (b.phase === "match-end" || b.phase === "sudden-death") return;
             onAdvanceTurn();
           }, SETTLE_MS);
         }, COMBAT_MS);

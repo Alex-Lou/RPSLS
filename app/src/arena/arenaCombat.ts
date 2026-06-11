@@ -131,26 +131,74 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
         lanes[laneIdx] = { a: winnerA, b: { ...cb, dodgeCharges: cb.dodgeCharges - 1 } };
         return { ...board, lanes };
       }
-      if (cb.divineShield && !ca.pierces && !aLamePierce) {
-        alog("combat", `L${laneIdx} A wins → AEGIS save B (shield consumed)`);
-        lanes[laneIdx] = { a: winnerA, b: { ...cb, divineShield: false } };
-        return { ...board, lanes };
+      if (cb.divineShield && !aLamePierce) {
+        // Tranchant : ne perce que si charge non encore consummée.
+        const canPierce = ca.pierces && !ca.pierceUsed;
+        if (!canPierce) {
+          alog("combat", `L${laneIdx} A wins → AEGIS save B (shield consumed${ca.pierces ? ", Tranchant déjà épuisé" : ""})`);
+          lanes[laneIdx] = { a: winnerA, b: { ...cb, divineShield: false } };
+          return { ...board, lanes };
+        }
+        // Tranchant frais : perce + consume la charge sur le Ciseau.
+        alog("combat", `L${laneIdx} A wins → TRANCHANT pierce 🛡 (charge consummée)`);
+        const piercedWinner: Creature = { ...winnerA, pierceUsed: true };
+        lanes[laneIdx] = { a: piercedWinner, b: null };
+        const updatedBoard = { ...board, lanes, a: { ...board.a, killBonusPending: true } };
+        // Splash damage (Alex 2026-06-11) : HP du défenseur tué absorbe l'ATK
+        // du tueur. Le résidu = splash → hero. Pierre 3 HP devient un vrai mur.
+        const atkA = creatureEffectiveAtk(ca);
+        const splash = Math.max(0, atkA - cb.hp);
+        if (splash === 0) {
+          alog("combat", `L${laneIdx} A wins → B die. Splash absorbé (atk ${atkA} ≤ hp ${cb.hp}) — hero b 0 dmg`);
+          return updatedBoard;
+        }
+        const deflect = findDeflector(updatedBoard, "b");
+        if (deflect) {
+          alog("combat", `L${laneIdx} A wins → B die. Splash ${splash} → DEFLECTED par Pierre L${deflect.lane}`);
+          return consumeProvocation(updatedBoard, deflect);
+        }
+        alog("combat", `L${laneIdx} A wins → B die. Splash ${splash} (atk ${atkA} − hp ${cb.hp}) → hero b`);
+        return { ...updatedBoard, b: damageHero(updatedBoard.b, splash) };
       }
       if (aLamePierce) alog("combat", `L${laneIdx} A wins → LAME pierce TOUT (no save)`);
       alog("combat", `L${laneIdx} step=noSave killing-B`);
+      // RIPOSTE — contrat carte : "si ta créature meurt au combat, son tueur
+      // meurt aussi". S'applique AUSSI au counter-kill (pas seulement au
+      // mirror trade). Le tueur tombe avec sa proie : pas de poursuite héros,
+      // kill bonus des DEUX côtés (même règle que la destruction mutuelle).
+      if (cb.ripostePrimed) {
+        lanes[laneIdx] = { a: null, b: null };
+        alog("combat", `L${laneIdx} A wins → B die + RIPOSTE → A meurt aussi (pas de poursuite)`);
+        return {
+          ...board,
+          lanes,
+          a: { ...board.a, killBonusPending: true },
+          b: { ...board.b, killBonusPending: true },
+        };
+      }
       lanes[laneIdx] = { a: winnerA, b: null };
       const updatedBoard = { ...board, lanes, a: { ...board.a, killBonusPending: true } };
       alog("combat", `L${laneIdx} step=updatedBoardBuilt`);
-      const deflect = findDeflector(updatedBoard, "b");
-      alog("combat", `L${laneIdx} step=deflectCheck deflect=${deflect ? `L${deflect.lane}/${deflect.side}` : "null"}`);
+      // LAME Finisher : la poursuite perce aussi la Provoc (deflect skip).
+      const deflect = aLamePierce ? null : findDeflector(updatedBoard, "b");
+      alog("combat", `L${laneIdx} step=deflectCheck deflect=${deflect ? `L${deflect.lane}/${deflect.side}` : aLamePierce ? "LAME-pierce" : "null"}`);
+      // Splash damage (Alex 2026-06-11) : HP du défenseur tué absorbe l'ATK
+      // du tueur. Le hero ne prend que le résidu. Pierre 3 HP = vrai mur.
+      // Émoussé ne mord qu'APRÈS ce combat : la poursuite frappe à l'ATK
+      // pré-blunt (on lit ca, pas winnerA déjà flaggé).
+      const atkA = creatureEffectiveAtk(ca);
+      const splashA = Math.max(0, atkA - cb.hp);
+      alog("combat", `L${laneIdx} step=atkComputed atkA=${atkA} hpB=${cb.hp} splash=${splashA}`);
+      if (splashA === 0) {
+        alog("combat", `L${laneIdx} A wins → B die. Splash absorbé — hero b 0 dmg`);
+        return updatedBoard;
+      }
       if (deflect) {
-        alog("combat", `L${laneIdx} A wins → B die. Poursuite hero b → DEFLECTED par Pierre L${deflect.lane}`);
+        alog("combat", `L${laneIdx} A wins → B die. Splash ${splashA} → DEFLECTED par Pierre L${deflect.lane}`);
         return consumeProvocation(updatedBoard, deflect);
       }
-      const atkA = creatureEffectiveAtk(winnerA);
-      alog("combat", `L${laneIdx} step=atkComputed atkA=${atkA}`);
-      alog("combat", `L${laneIdx} A wins → B die. Poursuite hero b atk=${atkA}`);
-      const finalBoard = { ...updatedBoard, b: damageHero(updatedBoard.b, atkA) };
+      alog("combat", `L${laneIdx} A wins → B die. Splash ${splashA} → hero b`);
+      const finalBoard = { ...updatedBoard, b: damageHero(updatedBoard.b, splashA) };
       alog("combat", `L${laneIdx} step=finalBoardReturn b.hp=${finalBoard.b.hp}`);
       return finalBoard;
     }
@@ -165,37 +213,93 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
         lanes[laneIdx] = { a: { ...ca, dodgeCharges: ca.dodgeCharges - 1 }, b: winnerB };
         return { ...board, lanes };
       }
-      if (ca.divineShield && !cb.pierces && !bLamePierce) {
-        alog("combat", `L${laneIdx} B wins → AEGIS save A (shield consumed)`);
-        lanes[laneIdx] = { a: { ...ca, divineShield: false }, b: winnerB };
-        return { ...board, lanes };
+      if (ca.divineShield && !bLamePierce) {
+        const canPierce = cb.pierces && !cb.pierceUsed;
+        if (!canPierce) {
+          alog("combat", `L${laneIdx} B wins → AEGIS save A (shield consumed${cb.pierces ? ", Tranchant déjà épuisé" : ""})`);
+          lanes[laneIdx] = { a: { ...ca, divineShield: false }, b: winnerB };
+          return { ...board, lanes };
+        }
+        alog("combat", `L${laneIdx} B wins → TRANCHANT pierce 🛡 (charge consummée)`);
+        const piercedWinner: Creature = { ...winnerB, pierceUsed: true };
+        lanes[laneIdx] = { a: null, b: piercedWinner };
+        const updatedBoard = { ...board, lanes, b: { ...board.b, killBonusPending: true } };
+        // Splash damage : HP du défenseur tué absorbe l'ATK du tueur.
+        const atkB = creatureEffectiveAtk(cb);
+        const splashB = Math.max(0, atkB - ca.hp);
+        if (splashB === 0) {
+          alog("combat", `L${laneIdx} B wins → A die. Splash absorbé (atk ${atkB} ≤ hp ${ca.hp}) — hero a 0 dmg`);
+          return updatedBoard;
+        }
+        const deflect = findDeflector(updatedBoard, "a");
+        if (deflect) {
+          alog("combat", `L${laneIdx} B wins → A die. Splash ${splashB} → DEFLECTED par Pierre L${deflect.lane}`);
+          return consumeProvocation(updatedBoard, deflect);
+        }
+        alog("combat", `L${laneIdx} B wins → A die. Splash ${splashB} (atk ${atkB} − hp ${ca.hp}) → hero a`);
+        return { ...updatedBoard, a: damageHero(updatedBoard.a, splashB) };
       }
       if (bLamePierce) alog("combat", `L${laneIdx} B wins → LAME pierce TOUT (no save)`);
+      // RIPOSTE — symétrique du branch A-wins : la créature A mourante
+      // emporte son tueur. Kill bonus des deux côtés, pas de poursuite.
+      if (ca.ripostePrimed) {
+        lanes[laneIdx] = { a: null, b: null };
+        alog("combat", `L${laneIdx} B wins → A die + RIPOSTE → B meurt aussi (pas de poursuite)`);
+        return {
+          ...board,
+          lanes,
+          a: { ...board.a, killBonusPending: true },
+          b: { ...board.b, killBonusPending: true },
+        };
+      }
       lanes[laneIdx] = { a: null, b: winnerB };
       // Alex feedback D : kill bonus pour le côté attaquant (B a tué A).
       const updatedBoard = { ...board, lanes, b: { ...board.b, killBonusPending: true } };
-      const deflect = findDeflector(updatedBoard, "a");
+      // Splash damage : HP du défenseur tué absorbe l'ATK du tueur.
+      const atkB = creatureEffectiveAtk(cb);
+      const splashB = Math.max(0, atkB - ca.hp);
+      if (splashB === 0) {
+        alog("combat", `L${laneIdx} B wins → A die. Splash absorbé (atk ${atkB} ≤ hp ${ca.hp}) — hero a 0 dmg`);
+        return updatedBoard;
+      }
+      // LAME Finisher : la poursuite perce aussi la Provoc (deflect skip).
+      const deflect = bLamePierce ? null : findDeflector(updatedBoard, "a");
       if (deflect) {
-        alog("combat", `L${laneIdx} B wins → A die. Poursuite hero a → DEFLECTED par Pierre L${deflect.lane}`);
+        alog("combat", `L${laneIdx} B wins → A die. Splash ${splashB} → DEFLECTED par Pierre L${deflect.lane}`);
         return consumeProvocation(updatedBoard, deflect);
       }
-      const atkB = creatureEffectiveAtk(winnerB);
-      alog("combat", `L${laneIdx} B wins → A die. Poursuite hero a atk=${atkB}`);
-      return { ...updatedBoard, a: damageHero(updatedBoard.a, atkB) };
+      alog("combat", `L${laneIdx} B wins → A die. Splash ${splashB} (atk ${atkB} − hp ${ca.hp}) → hero a`);
+      return { ...updatedBoard, a: damageHero(updatedBoard.a, splashB) };
     }
 
     // Mirror match (same symbol on both sides) → normal ATK/HP trade.
     // Damage values computed BEFORE either dies so trades are symmetric.
     const atkA = creatureEffectiveAtk(ca);
     const atkB = creatureEffectiveAtk(cb);
-    // Tranchant (Scissors) bypasses opp Aegis. The attacker's flag controls
-    // what the DEFENDER's shield can do.
-    let newA: Creature | null = cb.pierces
+    // Tranchant (Scissors) pierce Aegis : 1 charge, consummée au 1er bypass.
+    // Lame Finisher du hero override : pierce permanent. La charge ne se
+    // consume QUE si la cible avait effectivement divineShield à percer.
+    const bLameMirror = board.b.lameActive && cb.move === "scissors";
+    const aLameMirror = board.a.lameActive && ca.move === "scissors";
+    const bCanPierceA = cb.pierces && ca.divineShield && (bLameMirror || !cb.pierceUsed);
+    const aCanPierceB = ca.pierces && cb.divineShield && (aLameMirror || !ca.pierceUsed);
+    let newA: Creature | null = bCanPierceA
       ? damageCreaturePierce(ca, atkB)
       : damageCreature(ca, atkB);
-    let newB: Creature | null = ca.pierces
+    let newB: Creature | null = aCanPierceB
       ? damageCreaturePierce(cb, atkA)
       : damageCreature(cb, atkA);
+    // Si A a vraiment percé le bouclier de B (et que B est encore vivant),
+    // décrément à reprendre côté A. Idem inverse. Lame ne consume pas.
+    if (aCanPierceB && !aLameMirror && newA) {
+      newA = { ...newA, pierceUsed: true };
+    }
+    if (bCanPierceA && !bLameMirror && newB) {
+      newB = { ...newB, pierceUsed: true };
+    }
+    // Pour le mirror scissors-vs-scissors classique : aucun des deux n'avait
+    // d'Aegis (pas de bouclier à percer), donc damageCreature normal a été
+    // utilisé via le path non-pierce ci-dessus. ✓
     // Riposte: if a creature died AND was riposte-primed, its killer dies too.
     if (!newA && ca.ripostePrimed && newB) newB = null;
     if (!newB && cb.ripostePrimed && newA) newA = null;
@@ -222,7 +326,14 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
   // sont déclarés en haut de cette fonction (voir TDZ fix).
 
   if (ca && !cb) {
-    const deflect = findDeflector(board, "b");
+    // LAME Finisher : un Ciseau LAME attaque en voie libre SANS être déviable
+    // par la Provoc adverse (pierce documenté : Aegis + Provoc + Esquive).
+    const aLame = board.a.lameActive && ca.move === "scissors";
+    const wouldDeflectB = findDeflector(board, "b");
+    if (aLame && wouldDeflectB) {
+      alog("combat", `L${laneIdx} LAME pierce Provoc — Pierre L${wouldDeflectB.lane} ignorée`);
+    }
+    const deflect = aLame ? null : wouldDeflectB;
     if (deflect) {
       alog("combat", `L${laneIdx} ${csnap(ca)} undefended → hero b DEFLECTED par Pierre L${deflect.lane}`);
       return consumeProvocation(board, deflect);
@@ -233,7 +344,12 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
   }
 
   if (cb && !ca) {
-    const deflect = findDeflector(board, "a");
+    const bLame = board.b.lameActive && cb.move === "scissors";
+    const wouldDeflectA = findDeflector(board, "a");
+    if (bLame && wouldDeflectA) {
+      alog("combat", `L${laneIdx} LAME pierce Provoc — Pierre L${wouldDeflectA.lane} ignorée`);
+    }
+    const deflect = bLame ? null : wouldDeflectA;
     if (deflect) {
       alog("combat", `L${laneIdx} ${csnap(cb)} undefended → hero a DEFLECTED par Pierre L${deflect.lane}`);
       return consumeProvocation(board, deflect);

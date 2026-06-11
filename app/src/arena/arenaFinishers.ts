@@ -66,7 +66,13 @@ function mutateLaneCreature(
 /** Effet FORTERESSE — tes Pierres existantes prennent 🛡 (divineShield) + ATK
  *  perm +2 (base 1 + 2 = 3). N'affecte pas les Pierres futures (design : c'est
  *  un sort "snap des Pierres présentes" — incitation à poser 3 Pierres avant
- *  de cast). */
+ *  de cast).
+ *
+ *  ⚠️ Le "+2 perm" passe par voieAtkBonus (PAS atkBuff) : atkBuff est un buff
+ *  PAR TOUR remis à 0 par endOfTurnReset — l'ancienne implémentation rendait
+ *  le "permanent" du texte de carte faux dès le tour suivant. voieAtkBonus
+ *  persiste (cf. arenaTypes) et est compté par creatureEffectiveAtk, y compris
+ *  pendant Lente. */
 function applyForteresse(board: BoardState, side: Side): BoardState {
   let b = board;
   let count = 0;
@@ -76,12 +82,12 @@ function applyForteresse(board: BoardState, side: Side): BoardState {
       b = mutateLaneCreature(b, side, i, (cur) => ({
         ...cur,
         divineShield: true,
-        atkBuff: (cur.atkBuff ?? 0) + 2,
+        voieAtkBonus: (cur.voieAtkBonus ?? 0) + 2,
       }));
       count++;
     }
   }
-  alog("spell", `${side} FINISHER FORTERESSE → ${count} Pierre(s) 🛡 +ATK perm`);
+  alog("spell", `${side} FINISHER FORTERESSE → ${count} Pierre(s) 🛡 +2 ATK perm`);
   return b;
 }
 

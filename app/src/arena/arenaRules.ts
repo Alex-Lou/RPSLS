@@ -26,6 +26,7 @@ import { AFFINITY_TO_FINISHER } from "./arenaFinishers";
 import { resolveLaneCombatAt as _rlCombatAt, resolveCombat as _rCombat } from "./arenaCombat";
 import {
   CREATURE_STATS,
+  HAND_CAP,
   HERO_MAX_HP,
   MANA_CAP,
   MAX_SPELLS_PER_TURN,
@@ -44,6 +45,7 @@ import {
   spellPriority,
   type ArenaSpellContext,
 } from "./arenaCardEffects";
+import { arenaSpellCost } from "./arenaSpellHelpers";
 import { CARDS } from "../ranked/cards";
 import type { CardId } from "../ranked/rankedTypes";
 import type { Move } from "../engine/game";
@@ -54,7 +56,7 @@ import type { Move } from "../engine/game";
  *  the 8 cards equipped in the player's saved deck; passives equipped in
  *  Ranked are IGNORED in Arena — they don't exist as concept here.
  *  `affinity` is the Constellation Pro v2 Voie picked by this player. */
-export function makeHero(deckIds: CardId[], affinity?: Move): HeroState {
+export function makeHero(deckIds: CardId[], affinity?: Move, cpuPersona?: import("./arenaTypes").CpuPersona): HeroState {
   const cleaned = deckIds.filter(
     (id): id is CardId => Object.prototype.hasOwnProperty.call(CARDS, id),
   );
@@ -72,6 +74,7 @@ export function makeHero(deckIds: CardId[], affinity?: Move): HeroState {
     divineShield: false,
     affinity,
     constellationCount: 0,
+    cpuPersona,
   };
 }
 
@@ -80,10 +83,11 @@ export function makeInitialBoard(
   deckB: CardId[],
   affinityA?: Move,
   affinityB?: Move,
+  cpuPersonaB?: import("./arenaTypes").CpuPersona,
 ): BoardState {
   return {
     a: makeHero(deckA, affinityA),
-    b: makeHero(deckB, affinityB),
+    b: makeHero(deckB, affinityB, cpuPersonaB),
     lanes: [makeEmptyLane(), makeEmptyLane(), makeEmptyLane()],
     turn: 1,
     phase: "planning",
@@ -162,7 +166,9 @@ export function drawCards(hero: HeroState, n: number): HeroState {
       drawn = card;
     }
     if (drawn === null) break; // 3 retries fail ou deck vide
-    if (hand.length < 8) hand.push(drawn);
+    // Cap de main = HAND_CAP (7, décision Alex). Était un `< 8` codé en dur
+    // (résidu du cap 10→7) qui autorisait une 8e carte hors-contrat.
+    if (hand.length < HAND_CAP) hand.push(drawn);
     // else: burn (overdraw — design choice to discourage over-stuffing the hand)
   }
   return { ...hero, hand, deck, discard };
@@ -204,6 +210,7 @@ export function makeCreature(move: Move, side: Side, affinity?: Move): Creature 
     stifles:     move === "paper",    // 🌿 Étouffe (UI badge only — actual
                                        //   check uses move === "paper" || "spock")
     pierces:     move === "scissors", // ⚔ Tranchant
+    pierceUsed:  false,                // Tranchant : 1 charge (consume au 1er bypass Aegis)
     dodgeCharges,                      // ✨ Esquive (Lézard 1 ou 2 charges)
     spellImmune: move === "spock",    // 🧬 Logique
     summonedThisTurn: true,           // Lente (Pierre 0 ATK) / Lent (Lézard 1)
@@ -262,15 +269,19 @@ export function damageCreature(c: Creature, dmg: number): Creature | null {
  *  - divineShield: persists across turns until consumed by damage.
  *  - summonedThisTurn: cleared (the "Lente/Lent" malus only bites turn 1).
  *  - wiltedSteps: incremented for Paper (drives Fanaison).
- *  - wiltSkipNext: Voie Feuille toggle — skip wilt this turn et flip false. */
-export function endOfTurnReset(c: Creature): Creature {
+ *  - wiltSkipNext: Voie Feuille toggle — skip wilt this turn et flip false.
+ *  - vergerActive (param) : Finisher VERGER ÉTERNEL du hero propriétaire —
+ *    Fanaison OFF en continu (le wilt ne s'incrémente plus du tout). Avant,
+ *    le finisher ne faisait qu'un reset one-shot et les Feuilles re-fanaient
+ *    dès le tour suivant, contrairement au texte de la carte. */
+export function endOfTurnReset(c: Creature, vergerActive = false): Creature {
   // Lot B Round 8 — Voie Feuille slow wilt (Fanaison ÷ 2) :
   //   voieFeuille=true + wiltSkipNext=true  → SKIP wilt ce tour, flip à false
   //   voieFeuille=true + wiltSkipNext=false → wilt + flip à true (skip prochain)
   //   voieFeuille=false (Feuille normale)   → wilt chaque tour, no toggle
   let wilted = c.wiltedSteps;
   let nextSkip = c.wiltSkipNext;
-  if (c.move === "paper") {
+  if (c.move === "paper" && !vergerActive) {
     if (c.voieFeuille) {
       if (c.wiltSkipNext) {
         // Skip ce tour, prochain tour wilt.
@@ -300,7 +311,12 @@ export function endOfTurnReset(c: Creature): Creature {
 
 /** Top-level turn resolver. Called when both sides have locked their intents.
  *  Returns the post-resolution board. The caller renders the diff with
- *  animations (combat hits, deaths, hero damage). */
+ *  animations (combat hits, deaths, hero damage).
+ *
+ *  NOTE : le chemin LIVE de l'app est runResolverFlow (arenaResolverFlow.ts)
+ *  qui séquence ces mêmes étapes avec les timings d'anim + l'égalité parfaite
+ *  (sudden-death) + le TURN_HARD_CAP. Cette composition pure reste la
+ *  référence unit-testable du pipeline. */
 export function resolveTurn(
   board: BoardState,
   intentA: TurnIntent,
@@ -329,33 +345,25 @@ export function resolveTurn(
   return b;
 }
 
-/** Apply one side's spells, ordered by spellPriority asc (defensive first).
- *  Each spell consumes its mana cost from the side's pool. Spells that
- *  can't be paid for at the moment they'd fire are skipped silently.
- *
- *  NOTE — kept for backwards compatibility / single-side callers. The
- *  resolver should use applyAllSpells (below) which intercales the two
- *  sides by priority for fairness. See docs/CONSTELLATION_PRO_AUDIT.md
- *  bug #1 for the asymmetry this single-side helper would cause if used
- *  for both sides sequentially. */
-export function applySpellPhase(board: BoardState, intent: TurnIntent, side: Side): BoardState {
-  const ordered = intent.spells.slice().sort((s1, s2) => {
-    return spellPriority(s1.id) - spellPriority(s2.id);
-  });
-  let b = board;
-  for (const spell of ordered) {
-    const card = CARDS[spell.id];
-    const hero = side === "a" ? b.a : b.b;
-    if (hero.mana < card.cost) continue;
-    // Spend mana up-front so the same card can't be "fizzled" twice for cost.
-    b = {
-      ...b,
-      [side]: { ...hero, mana: hero.mana - card.cost },
-    } as BoardState;
-    const ctx: ArenaSpellContext = { board: b, side, spell };
-    b = applyArenaSpell(ctx);
+/** Caps de sorts partagés engine/UI/IA : max MAX_SPELLS_PER_TURN sorts
+ *  lane-target + 1 sort utility (self/hero/global) par tour. Exporté pour
+ *  que l'IA applique EXACTEMENT le même droit de jeu que le joueur (avant
+ *  elle se tronquait à 2 sorts TOTAL — désavantage CPU). */
+export function truncateIntentByCaps(intent: TurnIntent): TurnIntent {
+  let laneCount = 0;
+  let utilityCount = 0;
+  const kept: PlayedSpell[] = [];
+  for (const s of intent.spells) {
+    if (s.kind === "lane") {
+      if (laneCount >= MAX_SPELLS_PER_TURN) continue;
+      laneCount++;
+    } else {
+      if (utilityCount >= 1) continue;
+      utilityCount++;
+    }
+    kept.push(s);
   }
-  return b;
+  return kept.length === intent.spells.length ? intent : { ...intent, spells: kept };
 }
 
 /** Apply BOTH sides' spells, INTERCALATED by priority — fixes the audit
@@ -365,27 +373,10 @@ export function applySpellPhase(board: BoardState, intent: TurnIntent, side: Sid
  *  Same priority WITHIN a side : original tap order (intent.spells order). */
 export function applyAllSpells(board: BoardState, intentA: TurnIntent, intentB: TurnIntent): BoardState {
   // Alex feedback 2026-06-09 v2 : aligné sur les caps UI (ArenaGame.addSpell)
-  // — max MAX_SPELLS_PER_TURN sorts lane-target + 1 sort utility (self/hero)
-  // par tour. Total max 3 sorts/tour. Le filet engine truncate selon les
-  // mêmes règles pour rester cohérent avec ce que l'UI a laissé passer.
-  const truncateByCaps = (intent: TurnIntent): TurnIntent => {
-    let laneCount = 0;
-    let utilityCount = 0;
-    const kept: PlayedSpell[] = [];
-    for (const s of intent.spells) {
-      if (s.kind === "lane") {
-        if (laneCount >= MAX_SPELLS_PER_TURN) continue;
-        laneCount++;
-      } else {
-        if (utilityCount >= 1) continue;
-        utilityCount++;
-      }
-      kept.push(s);
-    }
-    return kept.length === intent.spells.length ? intent : { ...intent, spells: kept };
-  };
-  const safeIntentA = truncateByCaps(intentA);
-  const safeIntentB = truncateByCaps(intentB);
+  // — le filet engine truncate selon les mêmes règles que l'UI (cf.
+  // truncateIntentByCaps ci-dessus).
+  const safeIntentA = truncateIntentByCaps(intentA);
+  const safeIntentB = truncateIntentByCaps(intentB);
   if (safeIntentA !== intentA) {
     alog("spell", `BYPASS BLOCKED a — intent had ${intentA.spells.length} spells (cap lane=${MAX_SPELLS_PER_TURN} + utility=1), truncated to ${safeIntentA.spells.length}`);
   }
@@ -406,10 +397,20 @@ export function applyAllSpells(board: BoardState, intentA: TurnIntent, intentB: 
   });
   let b = board;
   for (const { spell, side } of combined) {
-    const card = CARDS[spell.id as CardId];
     const hero = side === "a" ? b.a : b.b;
-    // Lot D — CALCUL QUANTIQUE : tous mes sorts coûtent −1m (min 0).
-    const effectiveCost = hero.calculActive ? Math.max(0, card.cost - 1) : card.cost;
+    // Finisher : 1×/match en dur côté engine. La carte peut revenir en main
+    // via Juge (reshuffle) ou Genèse alors qu'elle a déjà été utilisée
+    // (hero.finisherUsed=true). On fizzle silencieusement le cast pour ne
+    // pas brûler la carte en mana sans effet (le removeSpentCards en amont
+    // l'a déjà retirée de la main, on l'a juste perdue — c'est le prix du
+    // contrat "1×/match").
+    if (spell.id.startsWith("finisher-") && hero.finisherUsed) {
+      alog("spell", `${side} ${spell.id} FIZZLE (déjà utilisé ce match)`);
+      continue;
+    }
+    // Lot D — CALCUL QUANTIQUE : source unique arenaSpellCost (partagée avec
+    // l'UI plan/intent et l'IA, sinon le discount n'était dépensable nulle part).
+    const effectiveCost = arenaSpellCost(hero, spell.id as CardId);
     if (hero.mana < effectiveCost) continue;
     b = {
       ...b,
@@ -444,33 +445,14 @@ export function applySummons(board: BoardState, intent: TurnIntent, side: Side):
     } else {
       alog("summon", `${side} pose ${summon.move} L${summon.lane} affinity=${hero.affinity ?? "∅"}`);
     }
-    // Lot C — Constellation 3⭐ : Alex feedback 2026-06-09 — passage en mode
-    // SIMULTANÉ (vs cumulé). Le compteur compte les Voie-créatures VIVANTES
-    // sur le board, pas les poses cumulées. Force le joueur à garder ses 3
-    // Voies en vie pour atteindre 3⭐.
-    const aliveVoieCount = countAliveAffinity(lanes, side, hero.affinity);
-    const unlocked = aliveVoieCount >= 3 && !hero.finisherUnlocked;
-    if (hero.affinity && summon.move === hero.affinity) {
-      alog("summon", `${side} constellation ⭐ ${aliveVoieCount}/3 ${unlocked ? "→ FINISHER UNLOCKED" : ""}`);
-    }
-    // Lot D — Injection automatique de la carte Finisher dans la main au
-    // moment où on passe 3⭐ pour la 1ère fois. Choix selon l'Affinité.
-    let nextHand = hero.hand;
-    if (unlocked && hero.affinity) {
-      const finisherId = AFFINITY_TO_FINISHER[hero.affinity];
-      nextHand = [...hero.hand, finisherId];
-      alog("summon", `${side} → carte Finisher [${finisherId}] injectée en main`);
-    }
+    // Constellation 3⭐ : on ne PROMET PAS au summon (Alex 2026-06-11 "faux
+     // espoir"). L'unlock + l'injection du Finisher se font au settle-time
+     // dans endOfTurnCleanup, une fois la créature confirmée vivante après
+     // combat. Ici on touche au mana/board seulement.
     b = {
       ...b,
       lanes,
-      [side]: {
-        ...hero,
-        mana: hero.mana - 1,
-        hand: nextHand,
-        constellationCount: aliveVoieCount,
-        finisherUnlocked: hero.finisherUnlocked || unlocked,
-      },
+      [side]: { ...hero, mana: hero.mana - 1 },
     } as BoardState;
   }
   return b;
@@ -504,10 +486,37 @@ export { resolveCombat };
 
 export function endOfTurnCleanup(board: BoardState): BoardState {
   const lanes = board.lanes.map((lane) => ({
-    a: lane.a ? endOfTurnReset(lane.a) : null,
-    b: lane.b ? endOfTurnReset(lane.b) : null,
+    a: lane.a ? endOfTurnReset(lane.a, board.a.vergerActive) : null,
+    b: lane.b ? endOfTurnReset(lane.b, board.b.vergerActive) : null,
   })) as [LaneState, LaneState, LaneState];
-  return { ...board, lanes };
+  // Constellation 3⭐ SIMULTANÉE — resynchronise le compteur sur les Voies
+  // VIVANTES post-combat (une mort décompte, cf. design "simultané" Alex) et
+  // couvre les arrivées hors-summon (Mirror copie une créature d'Affinité :
+  // avant, la 3e étoile via Mirror ne débloquait le Finisher qu'au summon
+  // suivant). L'unlock + l'injection restent 1×/match (guard finisherUnlocked).
+  const refreshConstellation = (hero: HeroState, side: Side): HeroState => {
+    const alive = countAliveAffinity(lanes, side, hero.affinity);
+    const unlocked = alive >= 3 && !hero.finisherUnlocked;
+    if (alive === hero.constellationCount && !unlocked) return hero;
+    let hand = hero.hand;
+    if (unlocked && hero.affinity) {
+      const finisherId = AFFINITY_TO_FINISHER[hero.affinity];
+      hand = [...hero.hand, finisherId];
+      alog("turn", `${side} constellation ⭐ ${alive}/3 (post-combat) → FINISHER UNLOCKED — [${finisherId}] injecté en main`);
+    }
+    return {
+      ...hero,
+      constellationCount: alive,
+      finisherUnlocked: hero.finisherUnlocked || unlocked,
+      hand,
+    };
+  };
+  return {
+    ...board,
+    lanes,
+    a: refreshConstellation(board.a, "a"),
+    b: refreshConstellation(board.b, "b"),
+  };
 }
 
 /* ───────────────────────── Turn lifecycle ───────────────────────── */
@@ -545,8 +554,8 @@ export function advanceToNextTurn(board: BoardState): BoardState {
   // Cartes dispos (Alex feedback : "ajouter les cartes de chacun dans les
   // logs pour voir ce que chacun aurait pu/du jouer"). Mains complètes
   // listées avec mana + flags (kill bonus pending, aegis lock).
-  alog("hand", `a hand=[${board.a.hand.join(",")}] deck=${board.a.deck.length} discard=${board.a.discard.length} mana=${board.a.mana}/${board.a.maxMana}${board.a.killBonusPending ? " +K" : ""}${board.a.aegisCastThisMatch ? " [AEGIS-LOCK]" : ""}`);
-  alog("hand", `b hand=[${board.b.hand.join(",")}] deck=${board.b.deck.length} discard=${board.b.discard.length} mana=${board.b.mana}/${board.b.maxMana}${board.b.killBonusPending ? " +K" : ""}${board.b.aegisCastThisMatch ? " [AEGIS-LOCK]" : ""}`);
+  alog("hand", `a hand=[${board.a.hand.join(",")}] deck=${board.a.deck.length} discard=${board.a.discard.length} mana=${board.a.mana}/${board.a.maxMana}${board.a.killBonusPending ? " +K" : ""}`);
+  alog("hand", `b hand=[${board.b.hand.join(",")}] deck=${board.b.deck.length} discard=${board.b.discard.length} mana=${board.b.mana}/${board.b.maxMana}${board.b.killBonusPending ? " +K" : ""}`);
   // Alex feedback 2026-06-09 D : "récompenser l'agression" → si tu as
   // tué une créature opp ce tour, tu pioches +1 carte bonus au tour
   // suivant. killBonusPending reset après la pioche bonus.
@@ -577,14 +586,20 @@ export function advanceToNextTurn(board: BoardState): BoardState {
   if (board.b.vergerActive) alog("turn", `b VERGER → +1 HP (${board.b.hp} → ${heroBVerger.hp})`);
   const a = refreshHero({ ...drawCards(heroAVerger, drawA), killBonusPending: false });
   const b = refreshHero({ ...drawCards(heroBVerger, drawB), killBonusPending: false });
+  // Augur / Oracle Inverse : durée 2 tours (Alex 2026-06-11). Decrement à
+  // chaque advance, clear cards quand reach 0.
+  const nextATurns = Math.max(0, (board.augurTurnsLeftA ?? 0) - 1);
+  const nextBTurns = Math.max(0, (board.augurTurnsLeftB ?? 0) - 1);
   return {
     ...board,
     lanes: lanesAfterFinishers,
     turn: nextTurn,
     phase: "planning",
     a, b,
-    augurRevealedA: [],
-    augurRevealedB: [],
+    augurRevealedA: nextATurns > 0 ? board.augurRevealedA : [],
+    augurRevealedB: nextBTurns > 0 ? board.augurRevealedB : [],
+    augurTurnsLeftA: nextATurns,
+    augurTurnsLeftB: nextBTurns,
   };
 }
 

@@ -18,7 +18,7 @@
  * l'écran de tie-break, basta.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { MoveGlyph } from "../icons";
 import { moveCountersMove } from "./arenaTypes";
@@ -59,24 +59,34 @@ export function ArenaSuddenDeath({ onResolved }: ArenaSuddenDeathProps) {
     }, 600);
   }
 
-  // Reveal complete → counter check + resolve ou re-spin
-  if (reveal && playerPick && cpuPick) {
+  // Reveal complete → counter check + resolve ou re-spin.
+  // ⚠️ En useEffect (PAS dans le render) : planifier un setTimeout pendant le
+  // render re-programmait la résolution à CHAQUE re-render parent pendant la
+  // fenêtre de reveal (ex. l'auto-clear des chips taunt d'ArenaGame ~1.6s
+  // après le dernier combat) → onResolved/re-spin doublés. L'effect ne se
+  // déclenche qu'au passage reveal=true et nettoie son timer.
+  useEffect(() => {
+    if (!reveal || !playerPick || !cpuPick) return;
     const counterAB = moveCountersMove(playerPick, cpuPick);
     const counterBA = moveCountersMove(cpuPick, playerPick);
+    let id: number;
     if (counterAB && !counterBA) {
-      window.setTimeout(() => onResolved("a"), 1800);
+      id = window.setTimeout(() => onResolved("a"), 1800);
     } else if (counterBA && !counterAB) {
-      window.setTimeout(() => onResolved("b"), 1800);
+      id = window.setTimeout(() => onResolved("b"), 1800);
     } else {
       // Mirror — re-spin
-      window.setTimeout(() => {
+      id = window.setTimeout(() => {
         setPlayerPick(null);
         setCpuPick(null);
         setReveal(false);
         setRound((r) => r + 1);
       }, 2200);
     }
-  }
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onResolved est
+    // une closure inline du parent ; la re-créer ne doit pas re-armer le timer.
+  }, [reveal, playerPick, cpuPick]);
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-gradient-to-b from-amber-950/95 via-zinc-950/97 to-amber-900/85 backdrop-blur-md">
