@@ -22,6 +22,7 @@ import {
 } from "../haptic";
 import { useStore } from "../store/store";
 import { CARDS } from "../ranked/cards";
+import { useT } from "../i18n";
 import type { CardId } from "../ranked/rankedTypes";
 import type { Move } from "../engine/game";
 import {
@@ -32,17 +33,18 @@ import { ArenaBoard } from "./ArenaBoard";
 import { ArenaDebugOverlay } from "./ArenaDebugOverlay";
 import { ArenaMatchEnd } from "./ArenaMatchEnd";
 import { ArenaMatchSplash } from "./ArenaMatchSplash";
-import { AnimatePresence } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { ArenaHeistAnim } from "./ArenaHeistAnim";
 import { ArenaPlanPhase } from "./ArenaPlanPhase";
 import { ArenaSuddenDeath } from "./ArenaSuddenDeath";
-import { arenaLogReset } from "./arenaLog";
-import { advanceToNextTurn, makeInitialBoard } from "./arenaRules";
+import { arenaLogReset, alog } from "./arenaLog";
+import { advanceToNextTurn, makeInitialBoard, truncateIntentByCaps } from "./arenaRules";
 import { cpuArenaDecision } from "./arenaAI";
 import {
   CPU_PERSONAS,
   HERO_MAX_HP,
   MAX_SPELLS_PER_TURN,
+  UTILITY_SPELLS_PER_TURN,
   type ArenaTargeting,
   type BoardState,
   type LaneIndex,
@@ -52,7 +54,7 @@ import {
 } from "./arenaTypes";
 import { isFinisherCard } from "./arenaFinishers";
 import { setMatchExit } from "../matchExitStore";
-import { buildCpuDeckMirroring, buildPlayerDeck, removeSpentCards } from "./arenaDecks";
+import { buildCpuDeckMirroring, buildPlayerDeck, removeSpentCardsDetailed } from "./arenaDecks";
 import { arenaSpellCost } from "./arenaSpellHelpers";
 import { runResolverFlow, type ResolveStep } from "./arenaResolverFlow";
 
@@ -162,6 +164,12 @@ export function ArenaGame({
     arenaLogReset();
     logResetRef.current = true;
   }
+
+  const t = useT();
+  // Nom "vulgarisé" d'une carte pour les logs (Alex 2026-06-12 : "détails
+  // vulgarisés pour dire pourquoi xxx ne peut pas faire yyy"). Retombe sur
+  // l'id si la clé i18n manque.
+  const cardFr = (id: CardId) => t(CARDS[id]?.nameKey ?? "") || id;
 
   const [board, setBoard] = useState<BoardState>(() =>
     makeInitialBoard(playerDeck.current, buildCpuDeckMirroring(playerDeck.current), playerAffinity.current, cpuAffinity.current, cpuPersona.current),
@@ -348,16 +356,24 @@ export function ArenaGame({
     // Pour spells non-lane (self / hero / global), simple check sur id.
     hapticTap();
     setIntent((cur) => {
-      // Alex feedback 2026-06-09 point #2 : cap MAX_SPELLS_PER_TURN s'applique
-      // SEULEMENT aux sorts qui ciblent une LANE (offensive / debuff / buff
-      // creature). Les sorts "hero/self" (Second Wind heal, Sangsue heal,
-      // etc.) ne touchent pas la lane d'attaque → exempt du cap. Permet le
-      // combo Anchor lane + Second Wind hero le même tour. Cap utility
-      // séparé : max 1 par tour pour éviter le spam Second Wind+Sangsue.
+      // Cap MAX_SPELLS_PER_TURN sur les sorts LANE. Cap utility (hero/self/
+      // global) RELEVÉ 1 → 2 (Alex 2026-06-11, watch live) : l'ancien cap 1
+      // bloquait Supernova + Second Souffle le même tour (combo légitime, pas
+      // du spam) sans aucun feedback en jeu. Le mana + le cap lane limitent
+      // déjà le spam. 2 utilities/tour autorisés.
+      const UTILITY_CAP = UTILITY_SPELLS_PER_TURN; // source unique partagée engine/UI
       const laneCount = cur.spells.filter((s) => s.kind === "lane").length;
       const utilityCount = cur.spells.filter((s) => s.kind !== "lane").length;
-      if (spell.kind === "lane" && laneCount >= MAX_SPELLS_PER_TURN) return cur;
-      if (spell.kind !== "lane" && utilityCount >= 1) return cur;
+      // Logs de blocage (Alex 2026-06-11) : pour diagnostiquer "carte bloquée"
+      // pendant une manche — on dit POURQUOI le cast est refusé.
+      if (spell.kind === "lane" && laneCount >= MAX_SPELLS_PER_TURN) {
+        alog("hand", `🚫 « ${cardFr(spell.id)} » impossible : déjà ${laneCount} sorts posés sur le terrain ce tour (max ${MAX_SPELLS_PER_TURN}). Retire un sort de lane pour le jouer.`);
+        return cur;
+      }
+      if (spell.kind !== "lane" && utilityCount >= UTILITY_CAP) {
+        alog("hand", `🚫 « ${cardFr(spell.id)} » impossible : déjà ${utilityCount} sorts sur toi/ton héros ce tour (max ${UTILITY_CAP}). Retire l'un d'eux pour le jouer.`);
+        return cur;
+      }
       // Alex feedback 2026-06-09 (round 4) : 1 carte en main = 1 cast max.
       // Avant le check duplicate refusait seulement (même id + même lane),
       // donc une seule copie en main pouvait être cast 2× sur 2 lanes
@@ -367,7 +383,10 @@ export function ArenaGame({
       // copies en main.
       const usageCount = cur.spells.filter((s) => s.id === spell.id).length;
       const handCount = board.a.hand.filter((id) => id === spell.id).length;
-      if (usageCount >= handCount) return cur;
+      if (usageCount >= handCount) {
+        alog("hand", `🚫 « ${cardFr(spell.id)} » impossible : plus de copie dispo (1 carte = 1 usage ; ${usageCount} déjà planifié(s), ${handCount} en main).`);
+        return cur;
+      }
       // Aegis : lock 1×/match levé (Alex 2026-06-11) — la règle "1 copie en
       // main = 1 cast" via usageCount/handCount + le check duplicate (même
       // id + même lane) suffisent à empêcher l'abus. Si tu as 2 Aegis en
@@ -378,7 +397,10 @@ export function ArenaGame({
         if (s.kind === "lane" && spell.kind === "lane") return s.lane === spell.lane;
         return true; // same id + same non-lane target → dup
       });
-      if (duplicate) return cur;
+      if (duplicate) {
+        alog("hand", `🚫 « ${cardFr(spell.id)} » impossible : déjà planifié sur cette cible. Vise une autre lane/créature.`);
+        return cur;
+      }
       // Alex feedback 2026-06-11 : la mutual exclusion Aegis/Anchor même lane
       // est LEVÉE — empiler les deux défenses sur la même créature est
       // explicitement autorisé. Le check duplicate (même id + même lane)
@@ -386,7 +408,10 @@ export function ArenaGame({
       // Finisher = lock 1×/match (cf hero.finisherUsed). Une fois cast il
       // peut être ré-injecté en main (Juge reshuffle, Genèse, etc.) — le
       // garde ici empêche de le rejouer.
-      if (isFinisherCard(spell.id) && board.a.finisherUsed) return cur;
+      if (isFinisherCard(spell.id) && board.a.finisherUsed) {
+        alog("hand", `🚫 « ${cardFr(spell.id)} » impossible : ton Finisher a déjà été lancé ce match (1 seul par partie).`);
+        return cur;
+      }
       return { ...cur, spells: [...cur.spells, spell] };
     });
   }
@@ -433,16 +458,30 @@ export function ArenaGame({
 
     const cpuIntent = cpuArenaDecision(board, "b", difficulty);
     // Pre-clean hands so spell cards leave hand BEFORE the spells step shows.
+    // Les cartes jouées vont à la DÉFAUSSE (Alex 2026-06-11) → drawCards les
+    // reshuffle quand le deck se vide → le deck cycle, plus de pénurie sèche.
+    // Tronquer AUX CAPS avant de retirer les cartes (Alex 2026-06-12 :
+    // "applications noyées / mélangées"). Bug racine : on retirait de la main
+    // TOUTES les cartes de l'intent, mais la résolution tronquait au cap →
+    // une carte au-delà du cap quittait la main SANS effet = carte brûlée
+    // (vu en live : consumed=[oracle,second-wind] mais "truncated to 1").
+    // En tronquant AVANT, on retire EXACTEMENT ce qui sera appliqué :
+    // consommé == appliqué, invariant garanti. (cpuIntent est déjà tronqué
+    // par l'IA ; re-tronquer est idempotent.)
+    const safeIntent = truncateIntentByCaps(intent);
+    const safeCpuIntent = truncateIntentByCaps(cpuIntent);
+    const aSpent = removeSpentCardsDetailed(board.a.hand, safeIntent);
+    const bSpent = removeSpentCardsDetailed(board.b.hand, safeCpuIntent);
     const startBoard: BoardState = {
       ...board,
-      a: { ...board.a, hand: removeSpentCards(board.a.hand, intent) },
-      b: { ...board.b, hand: removeSpentCards(board.b.hand, cpuIntent) },
+      a: { ...board.a, hand: aSpent.hand, discard: [...board.a.discard, ...aSpent.spent] },
+      b: { ...board.b, hand: bSpent.hand, discard: [...board.b.discard, ...bSpent.spent] },
     };
 
     runResolverFlow({
       startBoard,
-      playerIntent: intent,
-      cpuIntent,
+      playerIntent: safeIntent,
+      cpuIntent: safeCpuIntent,
       setBoard,
       setOppPreview,
       setPlayerPreview,
@@ -559,6 +598,7 @@ export function ArenaGame({
             targeting={targeting}
             onLaneTap={handleBoardLaneTap}
             onRemoveSpell={removeSpell}
+            onRemoveSummon={removeSummon}
           />
         )}
       </BoardFillSlot>
@@ -585,6 +625,27 @@ export function ArenaGame({
             caster={heistAnim.caster}
             stolen={heistAnim.stolen}
             animKey={heistAnim.key}
+          />
+        )}
+      </AnimatePresence>
+      {/* FLASH ÉCRAN dégâts héros (Alex 2026-06-11) — vignette bord d'écran qui
+       *  pulse quand un héros prend un coup : ROUGE = TOI qui prends, DORÉ = tu
+       *  infliges. Très "Hearthstone", rend la perte de PV palpable. Ne fire
+       *  que sur dégât réel (heroHit n'est posé que si dmg > 0). */}
+      <AnimatePresence>
+        {heroHit && (
+          <motion.div
+            key={`hitflash-${heroHit.key}`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: heroHit.side === "you" ? [0, 0.9, 0] : [0, 0.45, 0] }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.65, times: [0, 0.18, 1], ease: "easeOut" }}
+            className="fixed inset-0 z-[70] pointer-events-none"
+            style={{
+              background: heroHit.side === "you"
+                ? "radial-gradient(ellipse 120% 90% at center, transparent 42%, rgba(244,63,94,0.6) 100%)"
+                : "radial-gradient(ellipse 120% 90% at center, transparent 55%, rgba(252,211,77,0.4) 100%)",
+            }}
           />
         )}
       </AnimatePresence>

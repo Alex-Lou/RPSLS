@@ -30,11 +30,13 @@ import {
   HERO_MAX_HP,
   MANA_CAP,
   MAX_SPELLS_PER_TURN,
+  UTILITY_SPELLS_PER_TURN,
   STARTING_HAND_SIZE,
   type ArenaMatchResult,
   type BoardState,
   type Creature,
   type HeroState,
+  type LaneIndex,
   type LaneState,
   type PlayedSpell,
   type Side,
@@ -224,6 +226,10 @@ export function makeCreature(move: Move, side: Side, affinity?: Move): Creature 
 }
 
 export function creatureEffectiveAtk(c: Creature): number {
+  // Toile Gluante (2026-06-12) : la créature englutée ne peut pas attaquer ce
+  // tour → ATK effectif 0 (badge ⚔0). En combat son counter est aussi annulé
+  // (cf. arenaCombat) pour qu'elle ne gagne aucune lane.
+  if (c.cannotAttack) return 0;
   const base = CREATURE_STATS[c.move].atk + c.atkBuff + c.voieAtkBonus;
   // ── Lente / Lent : the turn a Pierre or Lézard is summoned, its ATK is
   //    suppressed (Pierre → 0, Lézard → 1). All other moves attack normally
@@ -257,6 +263,14 @@ export function damageCreature(c: Creature, dmg: number): Creature | null {
   const hp = c.hp - dmg;
   if (hp <= 0) return null;
   return { ...c, hp };
+}
+
+/** Soigne une créature (Sève). Plafonne à ses PV de base (CREATURE_STATS) MAIS
+ *  ne RÉDUIT jamais une créature déjà au-dessus (ex. boostée par Rempart). */
+export function healCreature(c: Creature, amount: number): Creature {
+  if (amount <= 0) return c;
+  const cap = Math.max(c.hp, CREATURE_STATS[c.move].hp);
+  return { ...c, hp: Math.min(cap, c.hp + amount) };
 }
 
 // bluntOnCombat / damageCreaturePierce → déplacés dans ./arenaCombat.ts
@@ -301,6 +315,7 @@ export function endOfTurnReset(c: Creature, vergerActive = false): Creature {
     atkBuff: 0,
     anchored: false,
     ripostePrimed: false,
+    cannotAttack: false, // Toile Gluante expire en fin de tour
     summonedThisTurn: false,
     wiltedSteps: wilted,
     wiltSkipNext: nextSkip,
@@ -358,7 +373,7 @@ export function truncateIntentByCaps(intent: TurnIntent): TurnIntent {
       if (laneCount >= MAX_SPELLS_PER_TURN) continue;
       laneCount++;
     } else {
-      if (utilityCount >= 1) continue;
+      if (utilityCount >= UTILITY_SPELLS_PER_TURN) continue;
       utilityCount++;
     }
     kept.push(s);
@@ -378,10 +393,10 @@ export function applyAllSpells(board: BoardState, intentA: TurnIntent, intentB: 
   const safeIntentA = truncateIntentByCaps(intentA);
   const safeIntentB = truncateIntentByCaps(intentB);
   if (safeIntentA !== intentA) {
-    alog("spell", `BYPASS BLOCKED a — intent had ${intentA.spells.length} spells (cap lane=${MAX_SPELLS_PER_TURN} + utility=1), truncated to ${safeIntentA.spells.length}`);
+    alog("spell", `BYPASS BLOCKED a — intent had ${intentA.spells.length} spells (cap lane=${MAX_SPELLS_PER_TURN} + utility=${UTILITY_SPELLS_PER_TURN}), truncated to ${safeIntentA.spells.length}`);
   }
   if (safeIntentB !== intentB) {
-    alog("spell", `BYPASS BLOCKED b — intent had ${intentB.spells.length} spells (cap lane=${MAX_SPELLS_PER_TURN} + utility=1), truncated to ${safeIntentB.spells.length}`);
+    alog("spell", `BYPASS BLOCKED b — intent had ${intentB.spells.length} spells (cap lane=${MAX_SPELLS_PER_TURN} + utility=${UTILITY_SPELLS_PER_TURN}), truncated to ${safeIntentB.spells.length}`);
   }
   const combined: Array<{ spell: PlayedSpell; side: Side; idx: number }> = [
     ...safeIntentA.spells.map((spell, idx) => ({ spell, side: "a" as Side, idx })),
@@ -418,6 +433,12 @@ export function applyAllSpells(board: BoardState, intentA: TurnIntent, intentB: 
     } as BoardState;
     const ctx: ArenaSpellContext = { board: b, side, spell };
     b = applyArenaSpell(ctx);
+    // Réverbération (2026-06-12) : on mémorise le dernier sort NON-réverbération
+    // appliqué par CE côté ce tour, pour que Réverbération (priorité plus tardive)
+    // puisse le rejouer sur sa cible d'origine.
+    if (spell.id !== "reverberation") {
+      b = side === "a" ? { ...b, lastSpellAppliedA: spell } : { ...b, lastSpellAppliedB: spell };
+    }
   }
   return b;
 }
@@ -489,6 +510,24 @@ export function endOfTurnCleanup(board: BoardState): BoardState {
     a: lane.a ? endOfTurnReset(lane.a, board.a.vergerActive) : null,
     b: lane.b ? endOfTurnReset(lane.b, board.b.vergerActive) : null,
   })) as [LaneState, LaneState, LaneState];
+  // 🔥 PHÉNIX (2026-06-12) : ressuscite à 1 PV les créatures snapshotées au
+  // cast (applyPhenix) qui sont mortes ce tour — lane désormais vide. Si la
+  // lane a été reprise par une autre créature (survivante / nouveau summon),
+  // pas de résurrection (on n'écrase rien).
+  const revive = (snap: { lane: LaneIndex; move: Move }[] | undefined, side: Side): void => {
+    if (!snap || snap.length === 0) return;
+    const aff = side === "a" ? board.a.affinity : board.b.affinity;
+    for (const { lane, move } of snap) {
+      const cur = side === "a" ? lanes[lane].a : lanes[lane].b;
+      if (!cur) {
+        const reborn: Creature = { ...makeCreature(move, side, aff), hp: 1, summonedThisTurn: false };
+        lanes[lane] = side === "a" ? { ...lanes[lane], a: reborn } : { ...lanes[lane], b: reborn };
+        alog("turn", `${side} 🔥 PHÉNIX → ${move} renaît à 1 PV (L${lane})`);
+      }
+    }
+  };
+  revive(board.phenixReviveA, "a");
+  revive(board.phenixReviveB, "b");
   // Constellation 3⭐ SIMULTANÉE — resynchronise le compteur sur les Voies
   // VIVANTES post-combat (une mort décompte, cf. design "simultané" Alex) et
   // couvre les arrivées hors-summon (Mirror copie une créature d'Affinité :
@@ -516,6 +555,8 @@ export function endOfTurnCleanup(board: BoardState): BoardState {
     lanes,
     a: refreshConstellation(board.a, "a"),
     b: refreshConstellation(board.b, "b"),
+    phenixReviveA: undefined, // snapshot Phénix consommé
+    phenixReviveB: undefined,
   };
 }
 
@@ -584,8 +625,15 @@ export function advanceToNextTurn(board: BoardState): BoardState {
   const heroBVerger = board.b.vergerActive ? { ...board.b, hp: Math.min(board.b.maxHp, board.b.hp + 1) } : board.b;
   if (board.a.vergerActive) alog("turn", `a VERGER → +1 HP (${board.a.hp} → ${heroAVerger.hp})`);
   if (board.b.vergerActive) alog("turn", `b VERGER → +1 HP (${board.b.hp} → ${heroBVerger.hp})`);
-  const a = refreshHero({ ...drawCards(heroAVerger, drawA), killBonusPending: false });
-  const b = refreshHero({ ...drawCards(heroBVerger, drawB), killBonusPending: false });
+  // Filet de sécurité (Alex 2026-06-11) : si après la pioche normale la main
+  // est VIDE, on pioche 1 carte de plus (la pioche reshuffle la défausse,
+  // alimentée par les cartes jouées → il y a presque toujours de quoi).
+  const drawnA = drawCards(heroAVerger, drawA);
+  const safeA = drawnA.hand.length === 0 ? drawCards(drawnA, 1) : drawnA;
+  const drawnB = drawCards(heroBVerger, drawB);
+  const safeB = drawnB.hand.length === 0 ? drawCards(drawnB, 1) : drawnB;
+  const a = refreshHero({ ...safeA, killBonusPending: false });
+  const b = refreshHero({ ...safeB, killBonusPending: false });
   // Augur / Oracle Inverse : durée 2 tours (Alex 2026-06-11). Decrement à
   // chaque advance, clear cards quand reach 0.
   const nextATurns = Math.max(0, (board.augurTurnsLeftA ?? 0) - 1);
@@ -600,6 +648,16 @@ export function advanceToNextTurn(board: BoardState): BoardState {
     augurRevealedB: nextBTurns > 0 ? board.augurRevealedB : [],
     augurTurnsLeftA: nextATurns,
     augurTurnsLeftB: nextBTurns,
+    // RESET du side-channel Larcin (Alex 2026-06-12 "Larcin n'a plus d'anim") :
+    // l'anim se déclenche sur le CHANGEMENT de lastHeistStolenA/B. Si on ne
+    // remet pas à undefined entre les tours, voler 2× la même carte ne change
+    // pas la valeur → l'effet React ne re-fire pas → pas d'anim. On nettoie
+    // chaque tour pour garantir une transition undefined→carte à chaque vol.
+    lastHeistStolenA: undefined,
+    lastHeistStolenB: undefined,
+    // Réverbération : le "dernier sort" est par-tour → reset à chaque tour.
+    lastSpellAppliedA: undefined,
+    lastSpellAppliedB: undefined,
   };
 }
 

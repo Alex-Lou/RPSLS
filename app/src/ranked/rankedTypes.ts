@@ -28,7 +28,12 @@ export type CardId =
   | "schrodinger" | "juge" | "genese"                                     // legendary (4 mana)
   // ── Constellation Pro Finishers (Lot D) — Pro-only, 1× par match, unlocked à 3⭐ ──
   | "finisher-forteresse" | "finisher-verger" | "finisher-lame"
-  | "finisher-metamorphose" | "finisher-calcul";                          // legendary (4 mana)
+  | "finisher-metamorphose" | "finisher-calcul"                           // legendary (4 mana)
+  // ── Nouvelles cartes Constellation Pro (Lot 2026-06-12) ──
+  | "jet-caillou" | "seve" | "coup-oeil"                                  // commons (1)
+  | "permutation" | "toile-gluante" | "reverberation"                    // rares (2)
+  | "gravite" | "doppelganger" | "purge"                                 // epics (3)
+  | "roue-destin" | "phenix" | "singularite";                           // legendaries (4-5)
 
 export type CardRarity = "common" | "rare" | "epic" | "legendary";
 

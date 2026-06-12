@@ -94,6 +94,10 @@ export const SETTLE_MS = 1_500;
 // sacrifier la lisibilité du combat.
 const LANE_CHARGE_MS = 380;
 const LANE_PAUSE_MS = 200;
+// Alex 2026-06-12 : pause sur le board final (coup fatal + HP à 0 visibles)
+// AVANT d'afficher l'écran victoire/défaite — sinon la bascule est trop brusque
+// juste après le combat de la 3e lane.
+const VICTORY_REVEAL_MS = 1_600;
 
 /** Run the sequenced resolver. Schedules a chain of setTimeouts that drive
  *  the visual flow. Returns nothing — the caller's React state is the only
@@ -278,6 +282,7 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
         const TOTAL_COMBAT_MS = LANE_CHARGE_MS * 3 + LANE_PAUSE_MS * 2 + 200;
         window.setTimeout(() => {
           b = endOfTurnCleanup(b);
+          const prePhase = b.phase; // phase de jeu AVANT tout flip match-end (pour l'écran d'attente du coup fatal)
           if (b.a.hp <= 0 && b.b.hp <= 0) {
             // Round 10 VRAI BUT D'OR : égalité parfaite → phase sudden-death
             // (Mort subite RPSLS) au lieu de match-end direct. ArenaGame
@@ -311,18 +316,22 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
           }
           const aDead = b.a.hp <= 0;
           const bDead = b.b.hp <= 0;
-          setBoard(b);
           if ((aDead || bDead) && onMatchEnd) {
-            // Alex feedback 2026-06-11 : laisser respirer 2.8s avant la
-            // transition match-end (était 1.6s, trop court — l'écran de
-            // fin tombait dessus avant que la dernière anim de combat L2
-            // / chip taunt / flash hero ait terminé). 2.8s couvre la chaîne
-            // anim impact + retreat + chip auto-clear de la dernière lane.
+            // Alex 2026-06-12 "trop brusque" : on AFFICHE D'ABORD le board final
+            // (coup fatal + HP à 0) pendant VICTORY_REVEAL_MS — écran de fin
+            // SUSPENDU (on rend le board avec sa phase de jeu, pas match-end) —
+            // PUIS on bascule l'écran victoire/défaite. La closure `b` a déjà
+            // phase="match-end" → les gardes settle/onAdvanceTurn bloquent bien
+            // (pas de reprise de partie). resolving reste true (onMatchEnd
+            // différé) → pas de picker pendant la révélation.
+            setBoard({ ...b, phase: prePhase });
             window.setTimeout(() => {
-              // Convention onMatchEnd(playerWon) : true = player win.
+              setBoard(b); // phase match-end → ArenaMatchEnd s'affiche enfin
               const playerWon = bDead && !aDead;
               onMatchEnd(playerWon);
-            }, 2800);
+            }, VICTORY_REVEAL_MS);
+          } else {
+            setBoard(b);
           }
         }, TOTAL_COMBAT_MS);
 

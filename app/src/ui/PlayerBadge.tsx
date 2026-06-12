@@ -160,13 +160,16 @@ export function PlayerBadge({
           <CurrencyBadges onClick={onCurrencyTap} />
         </div>
 
-        {/* Row 3: XP bar — full card width. */}
-        <ThemedXpBar
-          current={info.xpInLevel}
-          total={info.xpForNext}
-          gainPulse={gain}
-          variant="xp"
-        />
+        {/* Row 3: XP bar — full card width. mt-1.5 (Alex 2026-06-12) : de l'air
+            entre la rangée monnaies et la barre, elles étaient trop collées. */}
+        <div className="mt-1.5">
+          <ThemedXpBar
+            current={info.xpInLevel}
+            total={info.xpForNext}
+            gainPulse={gain}
+            variant="xp"
+          />
+        </div>
       </div>
     </div>
   );

@@ -360,35 +360,111 @@ export const CARDS: Record<CardId, RankedCard> = {
     target: "none", palette: "amber", glyph: "🛡️",
     nameKey: "ranked.cards.finisher-forteresse.name", descKey: "ranked.cards.finisher-forteresse.desc",
     targetHintKey: "ranked.cards.finisher-forteresse.targetHint",
-    art: null,
+    art: "/Cards Bonus/finisher-forteresse.png",
   },
   "finisher-verger": {
     id: "finisher-verger", cost: 4, rarity: "legendary",
     target: "none", palette: "emerald", glyph: "🌿",
     nameKey: "ranked.cards.finisher-verger.name", descKey: "ranked.cards.finisher-verger.desc",
     targetHintKey: "ranked.cards.finisher-verger.targetHint",
-    art: null,
+    art: "/Cards Bonus/finisher-verger.png",
   },
   "finisher-lame": {
     id: "finisher-lame", cost: 4, rarity: "legendary",
     target: "none", palette: "rose", glyph: "⚔️",
     nameKey: "ranked.cards.finisher-lame.name", descKey: "ranked.cards.finisher-lame.desc",
     targetHintKey: "ranked.cards.finisher-lame.targetHint",
-    art: null,
+    art: "/Cards Bonus/finisher-lame.png",
   },
   "finisher-metamorphose": {
     id: "finisher-metamorphose", cost: 4, rarity: "legendary",
     target: "none", palette: "lime", glyph: "🐉",
     nameKey: "ranked.cards.finisher-metamorphose.name", descKey: "ranked.cards.finisher-metamorphose.desc",
     targetHintKey: "ranked.cards.finisher-metamorphose.targetHint",
-    art: null,
+    art: "/Cards Bonus/finisher-metamorphose.png",
   },
   "finisher-calcul": {
     id: "finisher-calcul", cost: 4, rarity: "legendary",
     target: "none", palette: "cyan", glyph: "🌠",
     nameKey: "ranked.cards.finisher-calcul.name", descKey: "ranked.cards.finisher-calcul.desc",
     targetHintKey: "ranked.cards.finisher-calcul.targetHint",
-    art: null,
+    art: "/Cards Bonus/finisher-calcul.png",
+  },
+
+  /* ──────────── Nouvelles cartes Constellation Pro (2026-06-12) ────────────
+   * Art à générer (cf docs/NOUVELLES_CARTES_PRO.md) → art:null = glyph fallback
+   * via CardImage en attendant. Effets Arena dans arenaPhase3Spells.ts. */
+  "jet-caillou": {
+    id: "jet-caillou", cost: 1, rarity: "common",
+    target: "lane", palette: "zinc", glyph: "⛰️",
+    nameKey: "ranked.cards.jet-caillou.name", descKey: "ranked.cards.jet-caillou.desc",
+    targetHintKey: "ranked.cards.jet-caillou.targetHint", art: "/Cards Bonus/Jet de Caillou.png",
+  },
+  "seve": {
+    id: "seve", cost: 1, rarity: "common",
+    target: "lane", palette: "emerald", glyph: "🌱",
+    nameKey: "ranked.cards.seve.name", descKey: "ranked.cards.seve.desc",
+    targetHintKey: "ranked.cards.seve.targetHint", art: "/Cards Bonus/Sève.png",
+  },
+  "coup-oeil": {
+    id: "coup-oeil", cost: 1, rarity: "common",
+    target: "none", palette: "cyan", glyph: "🔍",
+    nameKey: "ranked.cards.coup-oeil.name", descKey: "ranked.cards.coup-oeil.desc",
+    targetHintKey: "ranked.cards.coup-oeil.targetHint", art: "/Cards Bonus/Coup d'Œil.png",
+  },
+  "permutation": {
+    id: "permutation", cost: 2, rarity: "rare",
+    target: "lane", palette: "indigo", glyph: "🔄",
+    nameKey: "ranked.cards.permutation.name", descKey: "ranked.cards.permutation.desc",
+    targetHintKey: "ranked.cards.permutation.targetHint", art: null,
+  },
+  "toile-gluante": {
+    id: "toile-gluante", cost: 2, rarity: "rare",
+    target: "lane", palette: "lime", glyph: "🕸️",
+    nameKey: "ranked.cards.toile-gluante.name", descKey: "ranked.cards.toile-gluante.desc",
+    targetHintKey: "ranked.cards.toile-gluante.targetHint", art: "/Cards Bonus/Toile Gluante.png",
+  },
+  "reverberation": {
+    id: "reverberation", cost: 2, rarity: "rare",
+    target: "none", palette: "fuchsia", glyph: "🔊",
+    nameKey: "ranked.cards.reverberation.name", descKey: "ranked.cards.reverberation.desc",
+    targetHintKey: "ranked.cards.reverberation.targetHint", art: "/Cards Bonus/Réverbération.png",
+  },
+  "gravite": {
+    id: "gravite", cost: 3, rarity: "epic",
+    target: "none", palette: "indigo", glyph: "🌑",
+    nameKey: "ranked.cards.gravite.name", descKey: "ranked.cards.gravite.desc",
+    targetHintKey: "ranked.cards.gravite.targetHint", art: null,
+  },
+  "doppelganger": {
+    id: "doppelganger", cost: 3, rarity: "epic",
+    target: "none", palette: "sky", glyph: "👥",
+    nameKey: "ranked.cards.doppelganger.name", descKey: "ranked.cards.doppelganger.desc",
+    targetHintKey: "ranked.cards.doppelganger.targetHint", art: null,
+  },
+  "purge": {
+    id: "purge", cost: 3, rarity: "epic",
+    target: "none", palette: "amber", glyph: "🧹",
+    nameKey: "ranked.cards.purge.name", descKey: "ranked.cards.purge.desc",
+    targetHintKey: "ranked.cards.purge.targetHint", art: null,
+  },
+  "roue-destin": {
+    id: "roue-destin", cost: 4, rarity: "legendary",
+    target: "gamble", palette: "rose", glyph: "🎡",
+    nameKey: "ranked.cards.roue-destin.name", descKey: "ranked.cards.roue-destin.desc",
+    targetHintKey: "ranked.cards.roue-destin.targetHint", art: null,
+  },
+  "phenix": {
+    id: "phenix", cost: 4, rarity: "legendary",
+    target: "none", palette: "orange", glyph: "🔥",
+    nameKey: "ranked.cards.phenix.name", descKey: "ranked.cards.phenix.desc",
+    targetHintKey: "ranked.cards.phenix.targetHint", art: null,
+  },
+  "singularite": {
+    id: "singularite", cost: 4, rarity: "legendary",
+    target: "none", palette: "indigo", glyph: "🌀",
+    nameKey: "ranked.cards.singularite.name", descKey: "ranked.cards.singularite.desc",
+    targetHintKey: "ranked.cards.singularite.targetHint", art: null,
   },
 };
 

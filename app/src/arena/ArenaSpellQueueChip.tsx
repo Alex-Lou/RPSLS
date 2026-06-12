@@ -32,11 +32,14 @@ interface ArenaSpellQueueChipProps {
   side?: "you" | "opp";
   /** Si true, mini-mode encore plus compact (rangée utility avatar). */
   compact?: boolean;
+  /** Index dans un éventail (Alex 2026-06-11) : >0 → overlap vers la gauche
+   *  + léger tilt + zIndex croissant, pour empiler proprement sans déborder. */
+  fanIndex?: number;
   onRemove?: () => void;
 }
 
 export function ArenaSpellQueueChip({
-  id, laneLabel, cost, side = "you", compact = false, onRemove,
+  id, laneLabel, cost, side = "you", compact = false, fanIndex = 0, onRemove,
 }: ArenaSpellQueueChipProps) {
   const card = CARDS[id];
   if (!card) return null;
@@ -62,7 +65,13 @@ export function ArenaSpellQueueChip({
         RING_BY_RARITY[rarity] + " " +
         (isOpp ? "shadow-rose-900/55 " : "shadow-emerald-900/55 ")
       }
-      style={{ width: w, height: h }}
+      style={{
+        width: w,
+        height: h,
+        marginLeft: fanIndex > 0 ? -Math.round(w * 0.45) : 0, // overlap éventail
+        rotate: fanIndex > 0 ? `${Math.min(fanIndex, 4) * 3}deg` : "0deg",
+        zIndex: 10 + fanIndex,
+      }}
       aria-label={onRemove ? `Retirer ${card.nameKey}` : card.nameKey}
     >
       {/* Wrapper qui clip l'art à l'intérieur du chip seulement (croix exclue) */}

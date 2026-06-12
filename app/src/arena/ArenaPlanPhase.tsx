@@ -28,6 +28,7 @@ import { useT } from "../i18n";
 import type { CardId } from "../ranked/rankedTypes";
 import { arenaSupported } from "./arenaCardEffects";
 import { arenaSpellCost } from "./arenaSpellHelpers";
+import { alog } from "./arenaLog";
 import { ArenaHeroStrip } from "./ArenaHeroStrip";
 import { ArenaCardInspect } from "./ArenaCardInspect";
 import { CARD_TARGET_KIND as SHARED_TARGET_KIND, LANE_SPELL_TARGET_SIDE, type ArenaTargeting } from "./arenaTypes";
@@ -93,6 +94,7 @@ export function ArenaPlanPhase({
   const [inspecting, setInspecting] = useState<CardId | null>(null);
 
   function pickMoveToSummon(mv: Move) {
+    alog("hand", `TAP move ${mv}${disabled ? " (disabled)" : ""}`);
     if (disabled) return;
     // Re-tap sur le move déjà en target = ANNULER (Alex 2026-06-11). Avant
     // une phrase jaune "Annuler" était affichée ; maintenant retap suffit.
@@ -109,6 +111,7 @@ export function ArenaPlanPhase({
 
   /** Commit a card — fire if no target needed, else enter targeting. */
   function commitCard(id: CardId) {
+    alog("hand", `TAP card ${id}${disabled ? " (disabled)" : ""}`);
     if (disabled) return;
     // Re-tap sur la carte déjà en target = ANNULER (Alex 2026-06-11).
     if (targeting?.kind === "spell" && targeting.id === id) {
@@ -336,12 +339,14 @@ export function ArenaPlanPhase({
         })}
       </div>
 
+      {/* É1 COCKPIT (audit UX 2026-06-12) — la main et le bouton FIN DE TOUR
+       *  partagent une RANGÉE façon Hearthstone : main éventail flex-1 +
+       *  bouton ROND doré fixe à droite (badge mana planifié intégré). */}
+      <div className="shrink-0 flex items-end gap-1.5">
       {/* Hand strip — tap = commit/target, hold 1.4s = inspect modal, DRAG =
-       *  one-gesture commit to a lane (only meaningful for lane-targeted
-       *  spells; non-lane cards just snap back). dragSnapToOrigin returns
-       *  the card to its slot after release. */}
-      {/* Hand strip — pas de mt (Alex 2026-06-11 "aucune marge"). */}
-      <div className="h-[82px] flex items-end justify-center relative z-30">
+       *  one-gesture commit to a lane. É2 : éventail COURBE (rotate/y par
+       *  index, carte active remontée ×1.16) — transform-only, GPU. */}
+      <div className="h-[88px] flex-1 min-w-0 flex items-end justify-center relative z-30">
       {(() => {
         // Filtre visuel (Alex 2026-06-11) : les cartes mises dans l'intent
         // sont DIRECTEMENT retirées de la main affichée → sentiment CCG net.
@@ -371,13 +376,22 @@ export function ArenaPlanPhase({
           style={{ touchAction: "pan-x", scrollbarWidth: "thin" }}
         >
           <AnimatePresence>
-          {visibleHand.map(({ id, i }) => {
+          {visibleHand.map(({ id, i }, pos) => {
             const card = CARDS[id];
             const supported = arenaSupported(id);
             const cannotAfford = manaLeft < arenaSpellCost(me, id);
             const isTargeting = targeting?.kind === "spell" && targeting.id === id;
             const isInspecting = inspecting === id;
             const targetKind = CARD_TARGET_KIND[id] ?? "global";
+            // É2 — géométrie de l'éventail : rotation répartie (max ±12°),
+            // creux parabolique vers les bords, carte active redressée +
+            // remontée au-dessus des voisines.
+            const n = visibleHand.length;
+            const center = (n - 1) / 2;
+            const stepDeg = n > 1 ? Math.min(5, 24 / (n - 1)) : 0;
+            const fanAngle = (pos - center) * stepDeg;
+            const fanY = Math.pow(Math.abs(pos - center), 2) * (n > 6 ? 1.1 : 1.7);
+            const fanActive = isTargeting || isInspecting;
             // Lock Aegis 1×/match levé (Alex 2026-06-11) — la règle "1 copie
             // en main = 1 cast" suffit pour empêcher l'abus.
             const canDragCard = supported && !cannotAfford && !disabled && targetKind === "lane";
@@ -386,13 +400,21 @@ export function ArenaPlanPhase({
                 key={`${id}-${i}`}
                 layout
                 initial={{ scale: 0.7, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
+                // É2 — éventail : rotation/creux par index ; carte active
+                // redressée, remontée et agrandie AU-DESSUS des voisines.
+                animate={{
+                  scale: fanActive ? 1.16 : 1,
+                  opacity: 1,
+                  rotate: fanActive ? 0 : fanAngle,
+                  y: fanActive ? -12 : fanY,
+                }}
                 exit={{ scale: 0.5, opacity: 0, y: -16 }}
                 // Réarrangement QUASI-INSTANTANÉ (Alex 2026-06-11) : layout +
                 // exit très courts (~90ms) pour que le joueur enchaîne la
                 // carte suivante sans attendre la fin de l'anim.
-                transition={{ layout: { duration: 0.09, ease: "easeOut" }, duration: 0.09, ease: "easeOut" }}
-                className="flex flex-col items-center gap-0.5 shrink-0"
+                transition={{ layout: { duration: 0.09, ease: "easeOut" }, duration: 0.12, ease: "easeOut" }}
+                className="flex flex-col items-center gap-0.5 shrink-0 -ml-2 first:ml-0"
+                style={{ transformOrigin: "50% 100%", zIndex: fanActive ? 60 : pos }}
               >
               <motion.div
                 drag={canDragCard}
@@ -428,9 +450,11 @@ export function ArenaPlanPhase({
                 disabled={!supported || cannotAfford || disabled}
                 className={
                   "relative w-[44px] h-[60px] sm:w-[48px] sm:h-[66px] rounded-lg overflow-hidden bg-surface-raised transition " +
+                  // É2 : plus de scale-110 interne — l'emphase (×1.16 + remontée)
+                  // est portée par l'enveloppe éventail.
                   "ring-2 " + (
-                    isTargeting ? "ring-amber-300 scale-110"
-                    : isInspecting ? "ring-sky-300 scale-110"
+                    isTargeting ? "ring-amber-300"
+                    : isInspecting ? "ring-sky-300"
                     : "ring-white/20"
                   ) +
                   (!supported ? " grayscale opacity-30" : cannotAfford ? " opacity-40" : "")
@@ -474,7 +498,7 @@ export function ArenaPlanPhase({
                *  so the player can scan their hand without tapping each. */}
               <span
                 className={
-                  "text-[8px] sm:text-[9px] font-bold uppercase tracking-wider truncate max-w-[48px] leading-none " +
+                  "text-[8px] sm:text-[9px] font-bold uppercase tracking-wider truncate max-w-[44px] leading-none " +
                   (cannotAfford || !supported ? "text-ink-faint" : "text-ink")
                 }
                 title={t(card.nameKey)}
@@ -503,18 +527,17 @@ export function ArenaPlanPhase({
       })()}
       </div>
 
-      {/* Lock button — pas de mt ni translate (Alex 2026-06-11). */}
-      <div className="relative shrink-0 self-center">
+      {/* É1 — FIN DE TOUR : bouton ROND doré fixe (ancre visuelle façon
+       *  Hearthstone), badge MANA PLANIFIÉ intégré. Remplace l'ancien pill
+       *  centré + la ligne texte "Mana restant" (info dans le bouton). */}
+      <div className="relative shrink-0 pb-1.5 pr-0.5">
         {canLock && (
           <motion.div
             aria-hidden
-            animate={{ opacity: [0.35, 0.85, 0.35], scale: [0.96, 1.06, 0.96] }}
+            animate={{ opacity: [0.35, 0.85, 0.35], scale: [0.94, 1.1, 0.94] }}
             transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute inset-0 rounded-2xl pointer-events-none"
-            style={{
-              background: "linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))",
-              filter: "blur(14px)",
-            }}
+            className="absolute inset-0 rounded-full pointer-events-none"
+            style={{ background: "radial-gradient(circle, rgba(252,211,77,0.85), transparent 70%)", filter: "blur(10px)" }}
           />
         )}
         <button
@@ -528,30 +551,30 @@ export function ArenaPlanPhase({
           }}
           disabled={!canLock}
           className={
-            "relative px-5 py-2 rounded-2xl font-black text-white text-sm transition active:scale-[0.97] " +
+            "relative w-14 h-14 rounded-full flex flex-col items-center justify-center leading-none transition active:scale-[0.94] " +
             (canLock
-              ? "shadow-lg ring-2 ring-amber-300/40"
-              : "bg-hairline text-ink-faint cursor-not-allowed")
+              ? "text-zinc-900 shadow-xl ring-2 ring-amber-200/80"
+              : "bg-hairline text-ink-faint cursor-not-allowed ring-2 ring-white/10")
           }
           style={canLock ? {
-            background: "linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))",
+            background: "linear-gradient(140deg, #fde68a 0%, #f59e0b 55%, #b45309 100%)",
             fontFamily: "var(--font-headline)",
-            letterSpacing: "0.1em",
+            boxShadow: "0 6px 18px -4px rgba(245,158,11,0.7), inset 0 1px 0 rgba(255,255,255,0.5)",
             touchAction: "manipulation",
           } : { touchAction: "manipulation" }}
         >
-          ✓ FIN DE TOUR
+          <span className="text-[11px] font-black tracking-wider">FIN</span>
+          <span
+            className={
+              "mt-0.5 text-[10px] font-black tabular-nums " +
+              (canLock ? "text-zinc-900/80" : intentCost > me.mana ? "text-rose-300" : "text-sky-300")
+            }
+            title="Mana restant après ton plan"
+          >
+            {manaLeft}⋙
+          </span>
         </button>
       </div>
-      {/* Mana summary — text-[10px] + whitespace-nowrap (Alex 2026-06-11) :
-       *  TOUJOURS sur une seule ligne (sinon le layout saute quand ça wrappe).
-       *  Affichage RESTANT/TOTAL (manaLeft d'abord), pas spent/total. */}
-      <div className="text-center text-[10px] text-ink-muted font-bold tabular-nums mt-1 pointer-events-none select-none whitespace-nowrap">
-        Mana restant : <span className={intentCost > me.mana ? "text-rose-300" : "text-sky-300"}>
-          {manaLeft}/{me.mana}
-        </span>
-        {intentCost === 0 && !inspecting && <span className="text-ink-faint"> · tape une carte / un coup · hold 1.5s pour lire</span>}
-        {inspecting && <span className="text-amber-300"> · lis puis tape ✓ JOUER pour confirmer</span>}
       </div>
     </div>
   );

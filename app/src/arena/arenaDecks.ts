@@ -68,7 +68,10 @@ export function buildCpuDeckMirroring(playerDeck: CardId[]): CardId[] {
   }
   // Pour chaque rareté du joueur, pige N cartes (doublon autorisé jusqu'à 2).
   // Cartes plafonnées à 1 copie : cf. SINGLE_COPY_CARDS (parité player/CPU).
-  const SINGLE_COPY_CARDS = new Set<CardId>(["supernova"]);
+  // oracle (pioche 3) + heist (vol) ajoutés (Alex 2026-06-12 "reviennent trop
+  // souvent, un peu cheaté") : 2 copies dans un deck de 14 + reshuffle = récurrence
+  // trop forte de ces 2 cartes à fort impact.
+  const SINGLE_COPY_CARDS = new Set<CardId>(["supernova", "oracle", "heist"]);
   const out: CardId[] = [];
   const inOut = new Map<CardId, number>();
   const tryAdd = (id: CardId, max: number): boolean => {
@@ -129,51 +132,42 @@ export function buildCpuDeckMirroring(playerDeck: CardId[]): CardId[] {
  *  ZERO way to damage the opp hero (Alex's "opp ne perd jamais de vie"
  *  symptom). Direct-damage spells fix that. */
 export function buildPlayerDeck(saved: CardId[] | undefined): CardId[] {
-  const FILLER: CardId[] = [
-    // Defensive / buffs
-    "aegis", "precision", "anchor", "second-wind",
-    // Direct damage / reach (KEEP — without these the player can't push lethal)
-    "heist", "supernova",
-    // Tempo / draw / control
-    "surge", "curse", "mirror", "tide",
-    // Info / utility — Augur garanti dans le deck Arena (Alex 2026-06-11 :
-    // "Augure ne fait plus du tout apparaître les cartes de l'autre" — cause
-    // = il n'était PAS dans le FILLER, donc les decks Arena n'avaient Augur
-    // que si le ranked deck en contenait. Maintenant systématique).
-    "augur",
-  ];
-  // Alex feedback 2026-06-09 : "Précision en boucle infinie" — cause = le
-  // deck contenait plusieurs copies de la même carte (saved + FILLER non
-  // dédupliqués). Avec MAX_COPIES = 2, une carte ne peut être tirée que
-  // 2 fois par run (avec reshuffle après discard), pas en boucle infinie.
-  const DECK_SIZE = 12;
+  // REFONTE Alex 2026-06-12 "j'ai des cartes que je n'ai PAS DU TOUT choisies
+  // (grave erreur)". Avant : on bourrait jusqu'à 14 avec un gros FILLER +
+  // force heist/supernova/augur → ~6 cartes parasites non choisies. Désormais
+  // le deck RESPECTE les choix du joueur :
+  //   1) deck = SES cartes (Arena-supportées) de son deck Ranked.
+  //   2) on garantit UNE SEULE carte de "portée" (reach) s'il n'en a aucune —
+  //      sinon impossible d'entamer le héros adverse quand le board est plein
+  //      ("opp ne perd jamais de PV").
+  //   3) filler MINIMAL seulement si le deck filtré est sous le plancher
+  //      jouable (joueur sans deck Arena, ou cartes non adaptées). Un vrai
+  //      deck Arena ne montre QUE ses choix.
+  const MIN_PLAYABLE = 8; // plancher anti-pénurie (≈ taille d'un deck Ranked)
   const MAX_COPIES = 2;
-  // Cartes plafonnées à 1 copie (Alex 2026-06-11) : Supernova = 6 dmg hero
-  // direct, 2 copies = 12 dmg lethal trop facile. À étendre si d'autres
-  // cartes méritent le même traitement.
-  const SINGLE_COPY_CARDS = new Set<CardId>(["supernova"]);
+  // oracle/heist/supernova à 1 copie (récurrence + lethal — cf. Alex 2026-06-12).
+  const SINGLE_COPY_CARDS = new Set<CardId>(["supernova", "oracle", "heist"]);
+  // Cartes capables d'entamer le HÉROS adverse même board plein.
+  const REACH_CARDS = new Set<CardId>(["supernova", "heist"]);
   const counts = new Map<CardId, number>();
   const out: CardId[] = [];
-  const tryPush = (c: CardId): void => {
-    if (out.length >= DECK_SIZE) return;
+  const tryPush = (c: CardId): boolean => {
     const cur = counts.get(c) ?? 0;
     const cap = SINGLE_COPY_CARDS.has(c) ? 1 : MAX_COPIES;
-    if (cur >= cap) return;
+    if (cur >= cap) return false;
     out.push(c);
     counts.set(c, cur + 1);
+    return true;
   };
-  // Pass 1 : the saved Ranked deck (1 copy each at most).
-  const base = (saved ?? []).filter(isDeckable);
-  for (const c of base) tryPush(c);
-  // Force-include direct damage so the player can push lethal even when
-  // all lanes are creature-blocked.
-  tryPush("heist");
-  tryPush("supernova");
-  // Pass 2 : top up with FILLER (1 copy each).
-  for (const f of FILLER) tryPush(f);
-  // Pass 3 : if still under size, allow 2nd copies of FILLER.
+  // 1) Les CHOIX du joueur (cartes Arena-supportées de son deck).
+  const chosen = (saved ?? []).filter(isDeckable);
+  for (const c of chosen) tryPush(c);
+  // 2) Filet de portée : 1 carte reach garantie SEULEMENT si aucune présente.
+  if (!out.some((c) => REACH_CARDS.has(c))) tryPush("supernova");
+  // 3) Plancher : filler minimal uniquement si le deck est trop maigre.
+  const FILLER: CardId[] = ["aegis", "precision", "second-wind", "surge", "augur", "anchor", "tide", "curse", "mirror"];
   for (const f of FILLER) {
-    if (out.length >= DECK_SIZE) break;
+    if (out.length >= MIN_PLAYABLE) break;
     tryPush(f);
   }
   return out;
@@ -188,16 +182,24 @@ export function buildPlayerDeck(saved: CardId[] | undefined): CardId[] {
  *  consommer 1 copie. Si l'intent contient N copies du même id, removeSpent
  *  doit consommer N copies différentes. */
 export function removeSpentCards(hand: CardId[], intent: TurnIntent): CardId[] {
+  return removeSpentCardsDetailed(hand, intent).hand;
+}
+
+/** Variante qui retourne AUSSI les cartes réellement consommées (Alex
+ *  2026-06-11) — utilisé pour les recycler vers la défausse (la pioche
+ *  reshuffle la défausse quand le deck est vide → le deck cycle, plus de
+ *  "à court de cartes"). */
+export function removeSpentCardsDetailed(hand: CardId[], intent: TurnIntent): { hand: CardId[]; spent: CardId[] } {
   let out = hand.slice();
   const consumed: CardId[] = [];
+  const spent: CardId[] = [];
   for (const s of intent.spells) {
     const i = out.indexOf(s.id);
     if (i >= 0) {
       out = [...out.slice(0, i), ...out.slice(i + 1)];
       consumed.push(s.id);
+      spent.push(s.id);
     } else {
-      // Carte absente de la main — bug rare (intent ajouté mais carte déjà
-      // partie au tour précédent ?). On loggue pour diagnostic.
       consumed.push(`MISSING:${s.id}` as CardId);
     }
   }
@@ -205,5 +207,5 @@ export function removeSpentCards(hand: CardId[], intent: TurnIntent): CardId[] {
     // eslint-disable-next-line no-console
     console.log(`[arena:hand] consumed cards=[${consumed.join(",")}] hand was=${hand.length} now=${out.length}`);
   }
-  return out;
+  return { hand: out, spent };
 }

@@ -21,6 +21,7 @@ import type { BoardState, HeroState, PlayedSpell } from "./arenaTypes";
 import { arenaSpellCost } from "./arenaSpellHelpers";
 import { ArenaConstellationBar } from "./ArenaConstellationBar";
 import { ArenaSpellQueueChip } from "./ArenaSpellQueueChip";
+import { VoieAura } from "./ArenaVoieAura";
 
 export interface ArenaHeroStripProps {
   hero: HeroState;
@@ -85,7 +86,11 @@ export function ArenaHeroStrip({
     prevHpRef.current = hero.hp;
   }, [hero.hp]);
   return (
-    <div className={"relative flex items-center gap-2 " + (side === "you" ? "pl-0 pr-1" : "px-1")}>
+    <div className={"relative flex items-center gap-1 " + (side === "you" ? "pl-0 pr-1" : "px-1")}>
+      {/* 🎨 Identité visuelle PERSO de la Voie — calque animé derrière le HUD,
+       *  UNIQUEMENT côté joueur (jamais l'adversaire). z-0 ; le contenu passe
+       *  en relative z-10 pour rester au-dessus. (Alex 2026-06-12) */}
+      {side === "you" && hero.affinity && <VoieAura affinity={hero.affinity} />}
       {/* Augur peek — overlay FULL WIDTH du strip outer (Alex 2026-06-11) :
        *  le rendu était dans le portrait div w-16 → cartes invisibles car
        *  l'overlay débordait. Ici on a tout l'espace du strip. */}
@@ -128,38 +133,10 @@ export function ArenaHeroStrip({
           </div>
         </motion.div>
       )}
-      {/* Mini-cards utility — repositionnées AUX COINS DU STRIP (Alex 2026-06-11) :
-       *  you → bas-gauche, opp → haut-droite, MÊME logique que l'anim défilé
-       *  croupier ArenaSpellsReveal. En overlay absolute → hors flow, pad stable. */}
-      {pendingUtility && pendingUtility.length > 0 && (
-        <div
-          className={
-            "absolute z-30 flex items-center gap-0.5 " +
-            (onRemoveUtility ? "" : "pointer-events-none ") +
-            (side === "you"
-              ? "right-1 top-1/2 -translate-y-1/2"  // À DROITE pour you (Alex 2026-06-11) : avatar+infos sont collés à gauche, l'espace droit est libre.
-              : "right-1 top-0 translate-y-1")
-          }
-          aria-label="Sorts utility planifiés"
-        >
-          <AnimatePresence>
-            {pendingUtility.map((s, idx) => (
-              <ArenaSpellQueueChip
-                key={`util-${side}-${idx}-${s.id}`}
-                id={s.id}
-                cost={arenaSpellCost(hero, s.id)}
-                side={side}
-                compact
-                onRemove={onRemoveUtility ? () => onRemoveUtility(idx) : undefined}
-              />
-            ))}
-          </AnimatePresence>
-        </div>
-      )}
       {/* Portrait — avatar + name in a circle so each side has a face.
        *  Floating damage popup pops out of the portrait on HP loss. Opp =
-       *  scale-95 (-5% Alex 2026-06-11 "pas dépasser en haut"). */}
-      <div className={"flex flex-col items-center shrink-0 w-16 relative " + (side === "opp" ? "scale-95 origin-top" : "")}>
+       *  scale-95 (-5%). w-14 (au lieu de w-16) pour rapprocher les infos. */}
+      <div className={"flex flex-col items-center shrink-0 w-14 relative z-10 " + (side === "opp" ? "scale-95 origin-top" : "")}>
         <HeroPortrait avatar={avatar} ringColor={ringColor} divineShield={hero.divineShield} damaged={!!dmgPop} />
         <span className={"text-[9px] uppercase tracking-wider font-black truncate max-w-[64px] mt-0.5 " + accent}>
           {name}
@@ -194,8 +171,24 @@ export function ArenaHeroStrip({
           )}
         </AnimatePresence>
       </div>
-      {/* HP + mana stacked vertically — the player reads them in one column. */}
-      <div className="flex-1 flex flex-col gap-1 min-w-0">
+      {/* HP + mana — largeur naturelle, collée à l'avatar (Alex 2026-06-11) :
+       *  shrink-0 (plus flex-1) pour ne PAS s'étirer → l'espace à droite est
+       *  libéré pour le slot des cartes utility lancées. */}
+      <div className="relative z-10 shrink-0 flex flex-col justify-center gap-0.5 min-h-[3.4rem]">
+        {/* Ligne 1 — VOIE / constellation AU-DESSUS (Alex 2026-06-12) : passée
+         *  sur sa propre ligne. Les 3 lignes (voie / vie / mana) sont
+         *  distribuées sur la hauteur de l'avatar via justify-center +
+         *  gap serré, SANS agrandir le strip (sinon la main se fait expulser
+         *  hors écran). */}
+        {hero.affinity && (
+          <ArenaConstellationBar
+            count={hero.constellationCount ?? 0}
+            affinity={hero.affinity}
+            side={side}
+            finisherUnlocked={hero.finisherUnlocked}
+          />
+        )}
+        {/* Ligne 2 — barre de vie. */}
         {/* HP bar — taller, segmented every 5 HP, glow on the filled portion,
          *  pulse at low HP. Wrapped in a motion.div that SHAKES + flashes
          *  ring rose each time an attack lands on this hero. */}
@@ -211,13 +204,13 @@ export function ArenaHeroStrip({
             initial={{ scale: 1.35, color: "#fda4af" }}
             animate={{ scale: 1, color: lowHp ? "#fb7185" : "#ffffff" }}
             transition={{ duration: 0.3 }}
-            className="text-[13px] font-black tabular-nums w-12 text-right"
+            className="text-[13px] font-black tabular-nums shrink-0"
           >
             ❤ {hero.hp}/{hero.maxHp}
           </motion.span>
           <div
             className={
-              "relative flex-1 h-3 rounded-full bg-zinc-900/80 overflow-hidden ring-1 ring-black/50 " +
+              "relative w-28 sm:w-32 h-3 rounded-full bg-zinc-900/80 overflow-hidden ring-1 ring-black/50 " +
               (lowHp ? "animate-pulse" : "")
             }
           >
@@ -278,12 +271,10 @@ export function ArenaHeroStrip({
             </AnimatePresence>
           </div>
         </motion.div>
-        {/* Mana + hand + turn — MÊME arrangement pour les 2 côtés (Alex
-         *  2026-06-11) : mana agrandi (text-[11px]) + constellation inline
-         *  JUSTE À DROITE du mana. */}
+        {/* Ligne 3 — mana + main + tour (constellation déplacée en ligne 1). */}
         <div className="flex items-center gap-2 text-[11px]">
           <div className="flex items-center gap-1 shrink-0">
-            <span className="font-bold text-sky-300 tabular-nums w-12 text-right">⋙ {hero.mana}/{hero.maxMana}</span>
+            <span className="font-bold text-sky-300 tabular-nums shrink-0">⋙ {hero.mana}/{hero.maxMana}</span>
             <div className="flex items-center gap-0.5">
               {Array.from({ length: hero.maxMana }, (_, i) => (
                 <span
@@ -298,15 +289,6 @@ export function ArenaHeroStrip({
             <span className="font-bold text-ink-muted">🂠 {hero.hand.length}</span>
             {side === "you" && <span className="font-bold text-themed">T{turn}</span>}
           </div>
-          {/* Constellation/voie JUSTE À DROITE du mana, inline (les 2 côtés) */}
-          {hero.affinity && (
-            <ArenaConstellationBar
-              count={hero.constellationCount ?? 0}
-              affinity={hero.affinity}
-              side={side}
-              finisherUnlocked={hero.finisherUnlocked}
-            />
-          )}
         </div>
         {/* La rangée pendingUtility est maintenant en overlay absolute sur
          *  le portrait (cf. plus haut) — hors du flow pour ne pas modifier
@@ -330,6 +312,36 @@ export function ArenaHeroStrip({
           </motion.div>
         )}
       </div>
+      {/* Slot cartes UTILITY lancées (hero/self/global) — dans le flow, à DROITE,
+       *  dans l'espace libéré par les infos collées à gauche (Alex 2026-06-11).
+       *  flex-1 prend tout le reste. Les sorts LANE-target ne viennent PAS ici
+       *  (ils sont en éventail coin sup-gauche de leur lane). Tappables = retire. */}
+      {pendingUtility && pendingUtility.length > 0 && (
+        <div
+          className={
+            // overflow-visible (Alex 2026-06-11) : la croix ✕ déborde du chip,
+            // overflow-auto la clippait. pl-1 pr-2 pour que la 1re carte et la
+            // croix de la dernière ne touchent pas les bords. Éventail overlap.
+            "relative z-10 flex-1 flex items-center min-w-0 overflow-visible justify-start pl-1 pr-2 " +
+            (onRemoveUtility ? "" : "pointer-events-none")
+          }
+          aria-label="Sorts utility planifiés"
+        >
+          <AnimatePresence>
+            {pendingUtility.map((s, idx) => (
+              <ArenaSpellQueueChip
+                key={`util-${side}-${idx}-${s.id}`}
+                id={s.id}
+                cost={arenaSpellCost(hero, s.id)}
+                side={side}
+                compact
+                fanIndex={idx}
+                onRemove={onRemoveUtility ? () => onRemoveUtility(idx) : undefined}
+              />
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 }

@@ -10,16 +10,17 @@
  * of truth for spell ordering); only the bodies live here.
  */
 
-import { drawCards, damageHero, healHero, creatureEffectiveAtk } from "./arenaRules";
+import { drawCards, damageHero, healHero, creatureEffectiveAtk, makeCreature } from "./arenaRules";
 import {
   getMyCreatureOnLane,
   getOppCreatureOnLane,
   withMyCreatureOnLane,
   withOppCreatureOnLane,
   withSideHero,
-  oppSide,
 } from "./arenaSpellHelpers";
-import { MANA_CAP, type BoardState, type Creature, type LaneState, type PlayedSpell, type Side } from "./arenaTypes";
+import { MANA_CAP, moveCountersMove, type BoardState, type Creature, type LaneState, type PlayedSpell, type Side } from "./arenaTypes";
+import { MOVES, type Move } from "../engine/game";
+import { alog } from "./arenaLog";
 import type { CardId } from "../ranked/rankedTypes";
 
 /** Gaia — heal hero +6 HP. */
@@ -99,15 +100,31 @@ export function applyEchappee(board: BoardState, side: Side, spell: PlayedSpell)
   return after;
 }
 
-/** Mascarade — opp discards 1 random card from hand. */
-export function applyMascarade(board: BoardState, side: Side): BoardState {
-  const oppS = oppSide(side);
-  const opp = oppS === "a" ? board.a : board.b;
-  if (opp.hand.length === 0) return board;
-  const idx = Math.floor(Math.random() * opp.hand.length);
-  const newHand = [...opp.hand.slice(0, idx), ...opp.hand.slice(idx + 1)];
-  const newDiscard = [...opp.discard, opp.hand[idx]];
-  return withSideHero(board, oppS, { ...opp, hand: newHand, discard: newDiscard });
+/** Mascarade — DÉGUISEMENT (Alex 2026-06-11, refonte) : transforme TA créature
+ *  ciblée en le symbole qui BAT la créature adverse en face (elle gagne la
+ *  lane ce tour). Sans adversaire en face : elle prend le symbole de ta Voie.
+ *  Fizzle s'il n'y a pas de créature à toi sur la lane. La créature redevient
+ *  fraîche (PV/charges du nouveau symbole + passif correspondant). */
+export function applyMascarade(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
+  if (spell.kind !== "lane") return board;
+  const me = getMyCreatureOnLane(board, side, spell.lane);
+  if (!me) {
+    alog("spell", `💤 ${side} Mascarade L${spell.lane} ne fait rien : aucune créature à toi sur cette lane à déguiser.`);
+    return board;
+  }
+  const oppC = getOppCreatureOnLane(board, side, spell.lane);
+  const hero = side === "a" ? board.a : board.b;
+  // Symbole de déguisement : celui qui counter l'adversaire en face ;
+  // sinon le symbole de Voie (pour relancer la Constellation).
+  let newMove: Move;
+  if (oppC) {
+    newMove = MOVES.find((m) => moveCountersMove(m, oppC.move)) ?? me.move;
+  } else {
+    newMove = hero.affinity ?? me.move;
+  }
+  const disguised = makeCreature(newMove, side, hero.affinity);
+  alog("spell", `${side} MASCARADE L${spell.lane} : ${me.move} → ${newMove}${oppC ? ` (counter ${oppC.move})` : ""}`);
+  return withMyCreatureOnLane(board, side, spell.lane, disguised);
 }
 
 /** Sangsue — heal hero by the effective ATK of my creature on the lane.

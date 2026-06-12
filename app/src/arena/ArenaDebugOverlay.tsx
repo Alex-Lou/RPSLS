@@ -55,7 +55,7 @@ export function ArenaDebugOverlay() {
       <button
         onClick={() => setOpen((o) => !o)}
         className="fixed right-2.5 z-[9998] inline-flex items-center gap-1 px-2 py-1 rounded-full bg-zinc-900/90 border border-zinc-700 text-emerald-200 text-[10px] font-black shadow-lg backdrop-blur active:scale-95"
-        style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 5.5rem)" }}
+        style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 3.5rem)" }}
         aria-label="Logs match"
       >
         🐛 <span className="tabular-nums">{logs.length}</span>

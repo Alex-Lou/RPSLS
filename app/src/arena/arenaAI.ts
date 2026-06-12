@@ -90,6 +90,10 @@ const CPU_PLAYABLE = new Set<CardId>([
   "vortex",
   "gaia", "sablier", "offre", "rempart", "benediction", "cascade",
   "marchand-ames", "mascarade", "sangsue", "trou-noir", "paradoxe",
+  // ── Nouvelles cartes Pro (2026-06-12) — permutation + reverberation
+  //    laissées au JOUEUR (ciblage trop spécifique pour l'IA). ──
+  "jet-caillou", "seve", "coup-oeil", "toile-gluante", "gravite",
+  "doppelganger", "purge", "roue-destin", "phenix", "singularite",
 ]);
 export function cpuCanPlay(id: CardId): boolean {
   return CPU_PLAYABLE.has(id);
@@ -426,10 +430,10 @@ function buildSpellTarget(
       const me = side === "a" ? board.a : board.b;
       return me.hp > 5 ? { id, kind: "self" } : null;
     }
-    case "mascarade": {
-      const opp = oppSide === "a" ? board.a : board.b;
-      return opp.hand.length > 0 ? { id, kind: "global" } : null;
-    }
+    case "mascarade":
+      // Refonte déguisement (Alex 2026-06-11) : cible une de mes créatures
+      // (elle se transforme pour counter l'adversaire en face).
+      return targetMyBestCreature(board, side, "lane", id);
     case "sangsue": {
       // Heal = ATK de ma créature — gaspillé à pleine vie ou board vide.
       const me = side === "a" ? board.a : board.b;
@@ -441,6 +445,50 @@ function buildSpellTarget(
       const me = side === "a" ? board.a : board.b;
       const opp = oppSide === "a" ? board.a : board.b;
       return opp.hp <= 5 && me.hp > 5 ? { id, kind: "global" } : null;
+    }
+    // ── Nouvelles cartes Pro (2026-06-12) ──
+    case "jet-caillou":   return targetOppBestCreature(board, oppSide, id);
+    case "toile-gluante": return targetOppBestCreature(board, oppSide, id);
+    case "seve": {
+      // Soin créature : utile seulement si une de mes créatures est blessée.
+      const hurt = ([0, 1, 2] as LaneIndex[]).some((l) => {
+        const c = sideCreature(board, side, l);
+        return !!c && c.hp < CREATURE_STATS[c.move].hp;
+      });
+      return hurt ? targetMyBestCreature(board, side, "lane", id) : null;
+    }
+    case "coup-oeil": return { id, kind: "self" };
+    case "gravite": {
+      // Dégât de zone : utile seulement s'il y a ≥1 créature adverse.
+      const hasOpp = ([0, 1, 2] as LaneIndex[]).some((l) => !!sideCreature(board, oppSide, l));
+      return hasOpp ? { id, kind: "global" } : null;
+    }
+    case "purge": {
+      // Dissipe : utile s'il y a ≥1 créature adverse buffée/protégée.
+      const worth = ([0, 1, 2] as LaneIndex[]).some((l) => {
+        const c = sideCreature(board, oppSide, l);
+        return !!c && (c.atkBuff > 0 || c.divineShield || c.anchored || c.ripostePrimed);
+      });
+      return worth ? { id, kind: "global" } : null;
+    }
+    case "doppelganger": {
+      // Copie : besoin d'≥1 créature ET d'une lane vide à moi.
+      const hasCreature = ([0, 1, 2] as LaneIndex[]).some((l) => !!sideCreature(board, side, l));
+      const hasEmpty = ([0, 1, 2] as LaneIndex[]).some((l) => !sideCreature(board, side, l));
+      return hasCreature && hasEmpty ? { id, kind: "self" } : null;
+    }
+    case "phenix": {
+      // Phénix : utile seulement si j'ai des créatures à protéger.
+      const hasCreature = ([0, 1, 2] as LaneIndex[]).some((l) => !!sideCreature(board, side, l));
+      return hasCreature ? { id, kind: "self" } : null;
+    }
+    case "roue-destin": return { id, kind: "self" };
+    case "singularite": {
+      // Burst héros qui scale avec le board : ne tente que s'il reste ≥1 créature.
+      const anyCreature = ([0, 1, 2] as LaneIndex[]).some(
+        (l) => !!sideCreature(board, side, l) || !!sideCreature(board, oppSide, l),
+      );
+      return anyCreature ? { id, kind: "hero" } : null;
     }
     default:          return null;
   }

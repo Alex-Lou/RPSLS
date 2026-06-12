@@ -52,3 +52,12 @@ logo-source.png
 
 ## ────── Misc ──────
 .sentryclirc
+
+## ────── Graphify / backups / vestiges ──────
+# Graphe de code local (~3.3MB, régénérable via `graphify update .`)
+graphify-out/
+# Backup avatars local d'Alex
+_avatar_backup/
+# Copie dist→assets vestigiale : le frontend servi est embarqué dans libapp_lib.so,
+# ce dossier n'est JAMAIS utilisé par l'app (cf. piège APK en mémoire/roadmap)
+app/src-tauri/gen/android/app/src/main/assets/

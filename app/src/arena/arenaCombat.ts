@@ -113,8 +113,11 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
   }
 
   if (ca && cb) {
-    const counterAB = moveCountersMove(ca.move, cb.move);
-    const counterBA = moveCountersMove(cb.move, ca.move);
+    // Toile Gluante (2026-06-12) : une créature englutée (cannotAttack) NE
+    // GAGNE PAS son counter — elle ne peut pas attaquer. Combiné à l'ATK
+    // effectif 0 (creatureEffectiveAtk), elle est neutralisée mais survit.
+    const counterAB = !ca.cannotAttack && moveCountersMove(ca.move, cb.move);
+    const counterBA = !cb.cannotAttack && moveCountersMove(cb.move, ca.move);
     alog("combat", `L${laneIdx} BOTH-PRESENT counterAB=${counterAB} counterBA=${counterBA}`);
 
     if (counterAB && !counterBA) {

@@ -32,7 +32,12 @@ export const STARTING_HAND_SIZE = 5;
 // Alex feedback 2026-06-09 F : "controler usage et nombre de cartes par
 // main/manche" → max 2 sorts intent par tour. Empêche les tours dump-tout
 // quand on a beaucoup de mana, force à étaler les plays.
-export const MAX_SPELLS_PER_TURN = 2;
+export const MAX_SPELLS_PER_TURN = 3; // 2 → 3 (Alex 2026-06-12) : 1 sort-lane par lane possible (le board a 3 lanes). Le mana limite déjà le spam.
+// Cap des sorts UTILITY (hero/self/global) par tour. SOURCE UNIQUE partagée
+// entre ArenaGame.addSpell (UI) ET truncateIntentByCaps (engine) — sinon les
+// 2 divergent et une carte planifiée se fait brûler à la résolution (bug
+// Alex 2026-06-12, watch live). 1 → 2.
+export const UTILITY_SPELLS_PER_TURN = 2;
 /** Soft cap on turns — if neither hero is dead by then, the lower-HP loses
  *  (sudden-death fail-safe so an over-defensive match still ends). */
 export const TURN_HARD_CAP = 30;
@@ -238,6 +243,10 @@ export interface Creature {
   hp: number;
   /** Per-turn ATK modifier (Surge +3, Precision +2, Tide +1 to all, Curse -2). */
   atkBuff: number;
+  /** Toile Gluante (2026-06-12) : la créature ne peut pas attaquer ce tour —
+   *  ATK effectif forcé à 0 ET son counter est annulé en combat (elle survit
+   *  mais n'inflige rien). Per-turn (reset par endOfTurnReset). */
+  cannotAttack?: boolean;
   /** Per-turn flags. */
   divineShield: boolean;
   /** Anchor: this creature is immune to ENEMY spell effects this turn. */
@@ -378,6 +387,16 @@ export interface BoardState {
    *  applyHeist au cast. Pas besoin de clear : écrasée au cast suivant. */
   lastHeistStolenA?: CardId;
   lastHeistStolenB?: CardId;
+  /** Réverbération (2026-06-12) : dernier sort NON-réverbération appliqué par
+   *  chaque côté ce tour (tracké dans applyAllSpells). Réverbération le rejoue.
+   *  Reset chaque tour (advanceToNextTurn). */
+  lastSpellAppliedA?: PlayedSpell;
+  lastSpellAppliedB?: PlayedSpell;
+  /** Phénix (2026-06-12) : snapshot des créatures de chaque côté au moment du
+   *  cast — celles qui meurent ce tour renaissent à 1 PV en fin de tour (sur
+   *  leur lane si libre). Posé par applyPhenix, consommé par endOfTurnCleanup. */
+  phenixReviveA?: { lane: LaneIndex; move: Move }[];
+  phenixReviveB?: { lane: LaneIndex; move: Move }[];
 }
 
 export type ArenaPhase =
@@ -434,13 +453,26 @@ export const CARD_TARGET_KIND: Partial<Record<CardId, SpellTargetKind>> = {
   "oracle-inverse": "global",
   cascade:      "self",
   echappee:     "lane",
-  mascarade:    "global",
+  mascarade:    "lane",
   sangsue:      "lane",
   "trou-noir":  "lane",
   "marchand-ames": "self",
   paradoxe:     "global",
   juge:         "global",
   genese:       "global",
+  // ── Nouvelles cartes Pro (2026-06-12) ──
+  "jet-caillou":   "lane",
+  seve:            "lane",
+  "coup-oeil":     "self",
+  permutation:     "lane",
+  "toile-gluante": "lane",
+  reverberation:   "self",
+  gravite:         "global",
+  doppelganger:    "self",
+  purge:           "global",
+  "roue-destin":   "self",
+  phenix:          "self",
+  singularite:     "hero",
 };
 
 /** Active targeting state shared across the board + plan phase so that
@@ -460,7 +492,7 @@ export type ArenaTargeting =
  *  - "opp-creature"            → highlight OPP lanes that have a creature
  *  - "my-empty-opp-occupied"   → highlight MY lanes that are empty AND opp has a creature
  *  - "my-empty"                → highlight MY empty lanes (used by summons) */
-export type LaneTargetSide = "my-creature" | "opp-creature" | "my-empty-opp-occupied" | "my-empty";
+export type LaneTargetSide = "my-creature" | "opp-creature" | "my-empty-opp-occupied" | "my-empty" | "both-occupied";
 
 export const LANE_SPELL_TARGET_SIDE: Partial<Record<CardId, LaneTargetSide>> = {
   aegis:      "my-creature",
@@ -469,10 +501,16 @@ export const LANE_SPELL_TARGET_SIDE: Partial<Record<CardId, LaneTargetSide>> = {
   surge:      "my-creature",
   riposte:    "my-creature",
   echappee:   "my-creature",
+  mascarade:  "my-creature",
   curse:      "opp-creature",
   sangsue:    "opp-creature",
   "trou-noir": "opp-creature",
   mirror:     "my-empty-opp-occupied",
+  // ── Nouvelles cartes Pro (2026-06-12) ──
+  "jet-caillou":   "opp-creature",
+  seve:            "my-creature",
+  "toile-gluante": "opp-creature",
+  permutation:     "both-occupied", // lane où MOI ET l'adversaire avons une créature
 };
 
 /** Returns whether `lane` on `side` is a valid drop target for the active
@@ -503,6 +541,7 @@ export function isValidLaneTarget(
     if (tgtSide === "opp-creature") return !isPlayerRow && !!opp;
     if (tgtSide === "my-empty-opp-occupied") return isPlayerRow && !mine && !!opp;
     if (tgtSide === "my-empty") return isPlayerRow && !mine;
+    if (tgtSide === "both-occupied") return isPlayerRow && !!mine && !!opp;
   }
   return false;
 }
@@ -519,6 +558,7 @@ export function targetLabelFor(targeting: ArenaTargeting, slotHasCreature = fals
     if (tgtSide === "opp-creature") return "✦ Cible cette créature";
     if (tgtSide === "my-empty-opp-occupied") return "✦ Mirror ici";
     if (tgtSide === "my-empty") return "✦ Ici";
+    if (tgtSide === "both-occupied") return "✦ Échanger";
   }
   return "✦";
 }

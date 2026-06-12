@@ -16,6 +16,18 @@ import { MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "../icons";
 import { CREATURE_STATS, type Creature, type LaneIndex } from "./arenaTypes";
 import { creatureEffectiveAtk } from "./arenaRules";
 
+/** Vecteurs FIXES des étincelles d'impact (pas de Math.random au render —
+ *  zéro jitter de re-render). 7 directions en éventail, alternance ambre/rose. */
+const SPARK_VECTORS: Array<{ dx: number; dy: number; amber: boolean }> = [
+  { dx: -30, dy: -24, amber: true },
+  { dx: 0,   dy: -34, amber: false },
+  { dx: 30,  dy: -24, amber: true },
+  { dx: -36, dy: 2,   amber: false },
+  { dx: 36,  dy: 2,   amber: true },
+  { dx: -22, dy: 26,  amber: false },
+  { dx: 22,  dy: 26,  amber: true },
+];
+
 // Per-creature net "bonus" vs "malus" indicator was retired after Alex
 // flagged the ▼ icon was being read as "-1 ATK". The function lived here
 // previously — if a future redesign brings it back, the rule was:
@@ -57,6 +69,9 @@ export interface ArenaLaneSlotProps {
    *  — drives a bright extra ring pulse so the player SEES which rock just
    *  saved their hero. null = no recent deflection. */
   deflectingPulse?: number | null;
+  /** Annule l'invocation planifiée sur cette lane (croix rouge sur le ghost,
+   *  joueur uniquement) — Alex 2026-06-12 "0 souplesse pour retirer". */
+  onRemoveSummon?: () => void;
 }
 
 export function ArenaLaneSlot({
@@ -64,6 +79,7 @@ export function ArenaLaneSlot({
   clickable = false, clickableLabel = "✦ jouer ici", onClick,
   passiveSuppressed = false,
   deflectingPulse = null,
+  onRemoveSummon,
 }: ArenaLaneSlotProps) {
   // Track previous HP so we can spawn a "-N" floating popup when this lane's
   // creature takes damage. We guard by move identity to avoid false-positives
@@ -84,6 +100,12 @@ export function ArenaLaneSlot({
    *  brief shatter/fade animation for ~600ms before the slot becomes empty.
    *  Tracks the move that just died so we can show its glyph one last time. */
   const [deathGhost, setDeathGhost] = useState<{ move: Creature["move"]; key: number } | null>(null);
+  /** Secousse de DÉGÂT (Alex 2026-06-12 "manque secousse quand attaquée/altérée") :
+   *  recul brutal + flash rouge quand la créature perd des PV. */
+  const [hitShake, setHitShake] = useState<{ key: number } | null>(null);
+  /** Pulse de BUFF : la créature gonfle + halo doré-vert quand son ATK monte
+   *  ou qu'elle gagne un bouclier (Alex "buffées trop molles"). */
+  const [buffPulse, setBuffPulse] = useState<{ key: number } | null>(null);
   useEffect(() => {
     const prev = prevRef.current;
     const snap = creature
@@ -92,9 +114,11 @@ export function ArenaLaneSlot({
     if (creature && prev && prev.move === creature.move && creature.hp < prev.hp) {
       const dmg = prev.hp - creature.hp;
       setDmgPop({ n: dmg, key: Date.now() });
+      setHitShake({ key: Date.now() }); // SECOUSSE de dégât (recul + flash rouge)
       const id = window.setTimeout(() => setDmgPop(null), 1000);
+      const sid = window.setTimeout(() => setHitShake(null), 480);
       prevRef.current = snap;
-      return () => window.clearTimeout(id);
+      return () => { window.clearTimeout(id); window.clearTimeout(sid); };
     }
     // SHIELD ABSORBED — prev had shield, now doesn't, HP unchanged.
     if (creature && prev && prev.move === creature.move && prev.shield && !creature.divineShield && creature.hp === prev.hp) {
@@ -140,6 +164,46 @@ export function ArenaLaneSlot({
     prevRef.current = snap;
   }, [creature]);
 
+  // 🎭 MASCARADE / déguisement — détecte un changement de symbole IN-PLACE
+  // (la créature reste vivante mais son `move` change : seul Mascarade fait
+  // ça aujourd'hui). Déclenche un flash de transformation (voile violet +
+  // balayage doré + masque 🎭) et le glyphe se retourne sur sa nouvelle
+  // identité. Effet ISOLÉ du pipeline de dégâts pour ne pas interférer avec
+  // les chips save/death. Pas de faux positif sur résummon : une créature
+  // qui meurt passe par un render `null` (slot vide) avant le nouveau summon,
+  // donc prevMoveRef retombe à null entre les deux.
+  const prevMoveRef = useRef<Creature["move"] | null>(creature?.move ?? null);
+  const [disguiseFlash, setDisguiseFlash] = useState<{ key: number } | null>(null);
+  useEffect(() => {
+    const prevM = prevMoveRef.current;
+    const curM = creature?.move ?? null;
+    if (prevM && curM && prevM !== curM) {
+      setDisguiseFlash({ key: Date.now() });
+      const id = window.setTimeout(() => setDisguiseFlash(null), 850);
+      prevMoveRef.current = curM;
+      return () => window.clearTimeout(id);
+    }
+    prevMoveRef.current = curM;
+  }, [creature?.move]);
+
+  // 💪 BUFF pulse — détecte une hausse d'ATK (atkBuff) ou un bouclier gagné
+  // IN-PLACE. Déclenche un pop + halo (cf. reactAnim). Isolé du pipeline
+  // dégâts. Pas de faux positif sur résummon (passage par null entre deux).
+  const prevBuffRef = useRef<{ atk: number; shield: boolean } | null>(
+    creature ? { atk: creature.atkBuff, shield: creature.divineShield } : null,
+  );
+  useEffect(() => {
+    const prev = prevBuffRef.current;
+    const cur = creature ? { atk: creature.atkBuff, shield: creature.divineShield } : null;
+    if (cur && prev && (cur.atk > prev.atk || (!prev.shield && cur.shield))) {
+      setBuffPulse({ key: Date.now() });
+      const id = window.setTimeout(() => setBuffPulse(null), 680);
+      prevBuffRef.current = cur;
+      return () => window.clearTimeout(id);
+    }
+    prevBuffRef.current = cur;
+  }, [creature?.atkBuff, creature?.divineShield]);
+
   if (creature) {
     const stats = CREATURE_STATS[creature.move];
     // Effective ATK = base + buff − (Lente/Lent on summon, Fanaison per
@@ -161,38 +225,74 @@ export function ArenaLaneSlot({
     // midline → recoil from the impact → snap back. Adds rotate for weight,
     // brightness apex 1.85 + drop-shadow doré 22px so the creature looks
     // FORGED OF LIGHT at the impact frame. Way more imposing than a wiggle.
-    const chargeAnim = chargeAttack
+    // CHARGE — SLAM intensifié (Alex 2026-06-12 "attaque trop molle") : lunge
+    // 70px, scale apex 1.42, brightness 2.1 + drop-shadow 28px → le coup CLAQUE.
+    const chargeAnim = {
+      y: isPlayer ? [0, -34, -70, -64, -22, 0] : [0, 34, 70, 64, 22, 0],
+      x: [0, 0, -6, 8, -5, 0],
+      scale: [1, 1.1, 1.42, 1.28, 1.06, 1],
+      rotate: isPlayer ? [0, -3, -7, -4, 1, 0] : [0, 3, 7, 4, -1, 0],
+      filter: [
+        "brightness(1) drop-shadow(0 0 0 transparent)",
+        "brightness(1.3) drop-shadow(0 0 9px rgba(252,211,77,0.6))",
+        "brightness(2.1) drop-shadow(0 0 28px rgba(252,211,77,1))",
+        "brightness(1.5) drop-shadow(0 0 16px rgba(252,211,77,0.85))",
+        "brightness(1.12) drop-shadow(0 0 5px rgba(252,211,77,0.4))",
+        "brightness(1) drop-shadow(0 0 0 transparent)",
+      ],
+    };
+    // Animation de RÉACTION composite (Alex 2026-06-12 "tout trop mou") :
+    // priorité attaque > dégât (secousse + flash rouge) > buff (pop doré-vert)
+    // > repos. Une seule de ces réactions joue à la fois sur une case.
+    const idleAnim = { y: 0, x: 0, scale: 1, rotate: 0, filter: "brightness(1) drop-shadow(0 0 0 transparent)" };
+    const reactAnim = chargeAttack
+      ? chargeAnim
+      : hitShake
       ? {
-          y: isPlayer
-            ? [0, -30, -60, -56, -20, 0]   // wind-up → SLAM → recoil → snap back
-            : [0, 30, 60, 56, 20, 0],
-          scale: [1, 1.08, 1.28, 1.20, 1.05, 1],
-          rotate: isPlayer
-            ? [0, -2, -4, -2, 0, 0]
-            : [0, 2, 4, 2, 0, 0],
+          x: [0, -8, 9, -7, 5, -2, 0],
+          y: isPlayer ? [0, 5, 0, 3, 0, 0, 0] : [0, -5, 0, -3, 0, 0, 0],
+          scale: [1, 0.92, 1.04, 0.97, 1.01, 1, 1],
+          rotate: [0, -4, 4, -2, 1, 0, 0],
           filter: [
             "brightness(1) drop-shadow(0 0 0 transparent)",
-            "brightness(1.25) drop-shadow(0 0 8px rgba(252,211,77,0.55))",
-            "brightness(1.85) drop-shadow(0 0 22px rgba(252,211,77,1))",
-            "brightness(1.45) drop-shadow(0 0 14px rgba(252,211,77,0.85))",
-            "brightness(1.1) drop-shadow(0 0 4px rgba(252,211,77,0.4))",
+            "brightness(1.85) drop-shadow(0 0 12px rgba(244,63,94,0.95))",
+            "brightness(0.8)",
+            "brightness(1.35) drop-shadow(0 0 7px rgba(244,63,94,0.6))",
+            "brightness(1) drop-shadow(0 0 0 transparent)",
+            "brightness(1) drop-shadow(0 0 0 transparent)",
             "brightness(1) drop-shadow(0 0 0 transparent)",
           ],
         }
-      : { y: 0, scale: 1, rotate: 0, filter: "brightness(1) drop-shadow(0 0 0 transparent)" };
+      : buffPulse
+      ? {
+          y: 0, x: 0,
+          scale: [1, 1.18, 1.05, 1],
+          rotate: [0, -2, 2, 0],
+          filter: [
+            "brightness(1) drop-shadow(0 0 0 transparent)",
+            "brightness(1.55) drop-shadow(0 0 14px rgba(52,211,153,0.9))",
+            "brightness(1.18) drop-shadow(0 0 7px rgba(252,211,77,0.6))",
+            "brightness(1) drop-shadow(0 0 0 transparent)",
+          ],
+        }
+      : idleAnim;
     return (
       <motion.div
         layout
         initial={{ opacity: 0, y: isPlayer ? 12 : -12, scale: 0.85 }}
-        animate={{ opacity: 1, ...chargeAnim }}
+        animate={{ opacity: 1, ...reactAnim }}
         transition={
           chargeAttack
             ? { duration: 0.72, ease: "easeOut", times: [0, 0.2, 0.42, 0.55, 0.78, 1] }
+            : hitShake
+            ? { duration: 0.46, ease: "easeOut" }
+            : buffPulse
+            ? { duration: 0.6, ease: "easeOut" }
             : undefined
         }
         className="aspect-[5/4] w-full rounded-xl relative flex flex-col items-center justify-center overflow-hidden transition"
         style={{
-          zIndex: chargeAttack ? 30 : 1,
+          zIndex: chargeAttack ? 30 : hitShake || buffPulse ? 20 : 1,
           background: "linear-gradient(160deg, rgba(20,22,32,0.94) 0%, rgba(10,12,20,0.94) 100%)",
           border: `2px solid ${creature.divineShield ? "rgba(252,211,77,0.95)" : rim}`,
           boxShadow:
@@ -220,6 +320,96 @@ export function ArenaLaneSlot({
               }}
             />
           )}
+          {/* ONDE DE CHOC (Alex 2026-06-12 "combats trop mous") : un anneau
+           *  net qui claque vers l'extérieur à l'apex du slam. Transform-only. */}
+          {chargeAttack && (
+            <motion.div
+              key="shockwave"
+              initial={{ opacity: 0, scale: 0.45 }}
+              animate={{ opacity: [0, 0.95, 0], scale: [0.45, 1.7, 2.6] }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.5, ease: "easeOut", times: [0, 0.3, 1], delay: 0.24 }}
+              className="absolute inset-0 pointer-events-none rounded-full border-2"
+              style={{ borderColor: "rgba(252,211,77,0.9)", boxShadow: "0 0 12px rgba(252,211,77,0.5)" }}
+            />
+          )}
+        </AnimatePresence>
+        {/* ÉTINCELLES D'IMPACT — 7 particules en éventail quand la créature
+         *  encaisse (hitShake). Vecteurs fixes, transform/opacity only. */}
+        <AnimatePresence>
+          {hitShake && (
+            <motion.div
+              key={`sparks-${hitShake.key}`}
+              className="absolute inset-0 pointer-events-none"
+              style={{ zIndex: 25 }}
+              exit={{ opacity: 0 }}
+            >
+              {SPARK_VECTORS.map((v, i) => (
+                <motion.span
+                  key={i}
+                  initial={{ x: 0, y: 0, scale: 1, opacity: 1 }}
+                  animate={{ x: v.dx, y: v.dy, scale: 0.2, opacity: 0 }}
+                  transition={{ duration: 0.42, ease: "easeOut", delay: i * 0.012 }}
+                  className="absolute left-1/2 top-1/2 w-1.5 h-1.5 rounded-full"
+                  style={{
+                    background: v.amber ? "#fcd34d" : "#fb7185",
+                    boxShadow: v.amber
+                      ? "0 0 6px rgba(252,211,77,0.95)"
+                      : "0 0 6px rgba(251,113,133,0.95)",
+                  }}
+                />
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+        {/* 🎭 MASCARADE — voile de déguisement : un balayage conique doré
+         *  tourne autour de la créature pendant qu'un voile violet pulse, et
+         *  un masque 🎭 éclôt au centre. Signature visuelle du changement
+         *  d'identité (Alex 2026-06-12). */}
+        <AnimatePresence>
+          {disguiseFlash && (
+            <motion.div
+              key={`disg-${disguiseFlash.key}`}
+              className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden"
+              style={{ zIndex: 20 }}
+            >
+              {/* voile violet qui pulse */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [0, 0.85, 0.4, 0] }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.85, times: [0, 0.25, 0.6, 1] }}
+                className="absolute inset-0"
+                style={{
+                  background:
+                    "radial-gradient(circle, rgba(192,132,252,0.9) 0%, rgba(126,34,206,0.6) 45%, transparent 72%)",
+                  mixBlendMode: "screen",
+                }}
+              />
+              {/* balayage conique doré qui tourne */}
+              <motion.div
+                initial={{ rotate: 0, opacity: 0, scale: 0.6 }}
+                animate={{ rotate: 320, opacity: [0, 1, 0], scale: [0.6, 1.6, 2] }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+                className="absolute inset-0"
+                style={{
+                  background:
+                    "conic-gradient(from 0deg, transparent 0deg, rgba(252,211,77,0.95) 40deg, transparent 90deg)",
+                  mixBlendMode: "screen",
+                }}
+              />
+              {/* masque 🎭 qui éclôt au centre */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.2, y: 6 }}
+                animate={{ opacity: [0, 1, 1, 0], scale: [0.2, 1.25, 1.1, 1.3], y: [6, -2, -2, -8] }}
+                transition={{ duration: 0.85, times: [0, 0.3, 0.65, 1] }}
+                className="absolute inset-0 flex items-center justify-center text-3xl"
+                style={{ filter: "drop-shadow(0 0 8px rgba(192,132,252,0.9))" }}
+              >
+                🎭
+              </motion.div>
+            </motion.div>
+          )}
         </AnimatePresence>
         {/* Side-affinity dot removed — Alex feedback: the rim color of the
          *  slot + the row layout (player bottom, opp top) already distinguish
@@ -232,7 +422,20 @@ export function ArenaLaneSlot({
          *  duplicating info while creating confusion, so it's gone. The
          *  `turnIndicator` helper is preserved above in case a future
          *  surfacing of net-state becomes useful. */}
-        <MoveGlyph move={creature.move} className="w-14 h-14 sm:w-16 sm:h-16" />
+        {/* Le glyphe se RETOURNE (rotateY) sur sa nouvelle identité quand la
+         *  créature est déguisée (Mascarade). Au repos : animate no-op. */}
+        <motion.div
+          animate={
+            disguiseFlash
+              ? { rotateY: [90, -20, 0], scale: [0.7, 1.18, 1], filter: ["brightness(2)", "brightness(1.3)", "brightness(1)"] }
+              : { rotateY: 0, scale: 1, filter: "brightness(1)" }
+          }
+          transition={disguiseFlash ? { duration: 0.7, times: [0, 0.55, 1] } : { duration: 0.2 }}
+          style={{ transformStyle: "preserve-3d", lineHeight: 0 }}
+        >
+          {/* É3 (audit UX 2026-06-12) : glyphe +~9% — slot INCHANGÉ. */}
+          <MoveGlyph move={creature.move} className="w-[3.8rem] h-[3.8rem] sm:w-[4.35rem] sm:h-[4.35rem]" />
+        </motion.div>
         <span
           className="text-[9px] uppercase tracking-wider font-black leading-none mt-0.5"
           style={{ color: rim }}
@@ -485,25 +688,45 @@ export function ArenaLaneSlot({
         </div>
       </motion.div>
     );
+    // Croix rouge d'ANNULATION (Alex 2026-06-12 "0 souplesse") — retire
+    // l'invocation planifiée sur la lane. Rendue en SIBLING du contenu (pas
+    // enfant du <button> clickable) pour éviter un bouton imbriqué invalide.
+    const removeX = onRemoveSummon ? (
+      <button
+        onClick={(e) => { e.stopPropagation(); onRemoveSummon(); }}
+        className="absolute -top-1.5 -left-1.5 z-40 inline-flex items-center justify-center w-5 h-5 rounded-full bg-rose-600 text-white text-[11px] font-black leading-none shadow-lg ring-2 ring-black/40 active:scale-90"
+        aria-label="Annuler l'invocation"
+      >
+        ✕
+      </button>
+    ) : null;
     // Alex feedback 2026-06-09 : "remplacement ne marche pas" — quand on a
     // déjà planifié un symbole sur la lane, le slot était figé sans
     // clickable. Maintenant on wrap dans un button avec label "↻ Remplacer
     // (planifié)" pour permettre de changer d'avis avant le lock.
     if (clickable) {
       return (
-        <button
-          onClick={onClick}
-          className="w-full focus:outline-none relative"
-          aria-label={clickableLabel}
-        >
-          {plannedContent}
-          <span className="absolute bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-amber-400/95 text-black text-[9px] uppercase tracking-wider font-black shadow-lg whitespace-nowrap z-30">
-            {clickableLabel}
-          </span>
-        </button>
+        <div className="relative w-full">
+          <button
+            onClick={onClick}
+            className="w-full focus:outline-none relative"
+            aria-label={clickableLabel}
+          >
+            {plannedContent}
+            <span className="absolute bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-amber-400/95 text-black text-[9px] uppercase tracking-wider font-black shadow-lg whitespace-nowrap z-30">
+              {clickableLabel}
+            </span>
+          </button>
+          {removeX}
+        </div>
       );
     }
-    return plannedContent;
+    return (
+      <div className="relative w-full">
+        {plannedContent}
+        {removeX}
+      </div>
+    );
   }
 
   // Empty slot — but wrapped as a BUTTON when clickable, with pulsing amber

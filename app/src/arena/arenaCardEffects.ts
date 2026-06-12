@@ -35,6 +35,10 @@ import {
   applyOracleInverse, applyCascade, applyEchappee, applyMascarade, applySangsue,
   applyTrouNoir, applyMarchandAmes, applyParadoxe, applyJuge, applyGenese,
 } from "./arenaPhase2Spells";
+import {
+  applyJetCaillou, applySeve, applyCoupOeil, applyPermutation, applyToileGluante,
+  applyGravite, applyDoppelganger, applyPurge, applyRoueDestin, applyPhenix, applySingularite,
+} from "./arenaPhase3Spells";
 import { type BoardState, type Creature, type LaneState, type PlayedSpell, type Side } from "./arenaTypes";
 import type { CardId } from "../ranked/rankedTypes";
 
@@ -94,6 +98,19 @@ const PRIORITY_TABLE: Partial<Record<CardId, number>> = {
   "finisher-lame":         60,
   "finisher-metamorphose": 60,
   "finisher-calcul":       60,
+  // ── Nouvelles cartes Pro (2026-06-12) ──
+  phenix:          130, // setup défensif (snapshot avant tout)
+  seve:            148, // soin créature (avant buffs)
+  "toile-gluante": 245, // debuff (après les buffs adverses)
+  purge:           250, // dissipe APRÈS que les buffs adverses aient atterri
+  permutation:     255, // manipulation de board
+  "coup-oeil":     308, // pioche / info
+  doppelganger:    348, // invocation utilitaire
+  reverberation:   365, // TARD : rejoue le dernier sort déjà appliqué
+  "jet-caillou":   405, // dégât direct créature
+  gravite:         408, // dégât de zone
+  singularite:     414, // dégât héros (scale board)
+  "roue-destin":   418, // gamble, très tard
 };
 
 export function spellPriority(id: CardId): number {
@@ -139,7 +156,7 @@ export function applyArenaSpell(ctx: ArenaSpellContext): BoardState {
     case "oracle-inverse": return applyOracleInverse(board, side);
     case "cascade":     return applyCascade(board, side);
     case "echappee":    return applyEchappee(board, side, spell);
-    case "mascarade":   return applyMascarade(board, side);
+    case "mascarade":   return applyMascarade(board, side, spell);
     // ── Direct damage / removal ──
     case "heist":       return applyHeist(board, side);
     case "sangsue":     return applySangsue(board, side, spell);
@@ -151,6 +168,30 @@ export function applyArenaSpell(ctx: ArenaSpellContext): BoardState {
     // ── Hand / board wipes ──
     case "juge":        return applyJuge(board);
     case "genese":      return applyGenese(board);
+    // ── Nouvelles cartes Pro (2026-06-12) ──
+    case "jet-caillou":   return applyJetCaillou(board, side, spell);
+    case "seve":          return applySeve(board, side, spell);
+    case "coup-oeil":     return applyCoupOeil(board, side);
+    case "permutation":   return applyPermutation(board, side, spell);
+    case "toile-gluante": return applyToileGluante(board, side, spell);
+    case "gravite":       return applyGravite(board, side);
+    case "doppelganger":  return applyDoppelganger(board, side);
+    case "purge":         return applyPurge(board, side);
+    case "roue-destin":   return applyRoueDestin(board, side);
+    case "phenix":        return applyPhenix(board, side);
+    case "singularite":   return applySingularite(board, side);
+    case "reverberation": {
+      // Rejoue le DERNIER sort non-réverbération appliqué par ce côté ce tour
+      // (tracké dans applyAllSpells) sur sa cible d'origine. Appel récursif à
+      // self — borné (le sort rejoué n'est jamais une réverbération).
+      const last = side === "a" ? board.lastSpellAppliedA : board.lastSpellAppliedB;
+      if (!last) {
+        alog("spell", `💤 ${side} Réverbération ne fait rien : aucun sort joué avant elle ce tour.`);
+        return board;
+      }
+      alog("spell", `${side} RÉVERBÉRATION → rejoue [${last.id}]`);
+      return applyArenaSpell({ board, side, spell: last });
+    }
     // ── Finishers Lot D — Constellation Pro ──
     case "finisher-forteresse":
     case "finisher-verger":
@@ -188,7 +229,7 @@ function applyAegis(board: BoardState, side: Side, spell: PlayedSpell): BoardSta
   if (spell.kind === "lane") {
     const c = getMyCreatureOnLane(board, side, spell.lane);
     if (!c || isDetached(c)) {
-      alog("spell", `${side} aegis lane fizzle (cible invalide)`);
+      alog("spell", `💤 ${side} Aegis L${spell.lane} ne fait rien : pas de créature à toi sur cette lane (ou Spock, immunisé aux buffs).`);
       return board;
     }
     const refilled = c.move === "rock"
@@ -339,7 +380,7 @@ function applySupernova(board: BoardState, side: Side, spell: PlayedSpell): Boar
     const opp = getOppCreatureOnLane(board, side, spell.lane);
     // Spock's Logique fizzle hostile spells, just like Anchor.
     if (!opp || opp.anchored || opp.spellImmune) {
-      alog("spell", `${side} SUPERNOVA L${spell.lane} fizzle (cible invalide ou anchored)`);
+      alog("spell", `💤 ${side} Supernova L${spell.lane} ne fait rien : aucune créature adverse, ou elle est ancrée/immunisée (Spock).`);
       return board;
     }
     alog("spell", `${side} SUPERNOVA L${spell.lane} → 6 dmg creature opp`);

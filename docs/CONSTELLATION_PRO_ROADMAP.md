@@ -1,26 +1,24 @@
 # Constellation Pro — Roadmap & État Complet
 
-> **Dernière mise à jour : 2026-06-10 (Round 12 — layout strips + WebView cache fix)**
+> **Dernière mise à jour : 2026-06-11 (Round 17 — AUDIT LOGIQUE moteur : 14 correctifs, dont BUT D'OR annulé par les timers + Finishers FORTERESSE/VERGER/LAME/CALCUL qui ne respectaient pas leur texte)**
 > Document actualisé à chaque session. Source de vérité unique pour reprendre le travail.
-> Branche : `constellation-pro`. Dernier commit poussé : `c589dc8` (Round 11.5). Round 12 (layout) NON commité (attend validation Alex).
+> Branche : `constellation-pro`. Dernier commit poussé : `c589dc8` (Round 11.5). **Rounds 12→17 NON commités** (attendent feu vert commit Alex). **Pad VALIDÉ device** sur build `index-jUIZZstP.js` (hash servi vérifié via DevTools). Aussi non commités : Aegis/Anchor double-cast fix, chips passifs Étouffe/Logique/Tranchant, chip lane label `L{n}`, éventail élargi, + tout le Round 17 ci-dessous.
 
 ---
 
 ## 🔴🔴 PRIORITÉ ABSOLUE POUR LE PROCHAIN AGENT 🔴🔴
 
-### 1. LE PAD DE JEU DOIT ÊTRE **AGRANDI**, PAS RÉTRÉCI
+### 1. ✅✅ PAD — RÉSOLU & VALIDÉ DEVICE PAR ALEX (Round 16, build `index-jUIZZstP.js`)
 
-**Alex a demandé À PLUSIEURS REPRISES (rounds 9, 11, 11.5, 12) d'AGRANDIR le pad de jeu des lanes (plus large ET plus haut).** L'agent précédent a fait l'INVERSE — le pad paraît rétréci / écrasé. C'est la frustration #1 d'Alex.
+**Solution finale = `BoardFillSlot` dans `ArenaGame.tsx` + prop `fillHeight` sur `ArenaBoard.tsx`.** Cause racine des ~3h perdues : le **WebView Android NE résout PAS de façon fiable** une chaîne `flex-1` profonde NI `height:100%`/`h-full` contre un parent flex-grow (le pad restait court → **rangée du bas COUPÉE**) — alors que **ça marche en preview Chromium desktop** (LE piège qui trompe). MAIS `clientHeight` (mesure post-layout) EST fiable.
 
-**Contrainte exacte d'Alex** : pad plus large + plus haut, MAIS la hauteur ne doit **PAS empiéter sur la zone des "chip queues"** (les chips au-dessus de la ligne de mains jouables, dans `ArenaPlanPhase`).
+**Mécanisme :** `BoardFillSlot` = un slot `flex-1 min-h-0 overflow-hidden` qui **mesure son `clientHeight`** et le passe à `ArenaBoard` via `fillHeight` → posé en **`minHeight` px** sur la racine du board → le pad `flex-1 min-h-0 justify-between` REMPLIT pour de vrai (les 2 rangées de lanes s'écartent haut/bas, **espace au centre** pour les chip queues), **cartes `aspect-[5/4]` INCHANGÉES (zéro scale)**. Filet écran court : `BoardFillSlot` mesure aussi `inner.scrollHeight` ; si > dispo → `transform:scale(dispo/nh)` (réduit UNIQUEMENT si ça ne rentre pas, **jamais de coupe**). **La plan phase (moves + deck) est DEHORS du slot → JAMAIS rétrécie** (exigence Alex : "touche QUE le pad").
 
-**Ce qui a été tenté (et a échoué à satisfaire Alex)** :
-- `ArenaBoard.tsx` : padding `px-5 py-6 sm:px-6 sm:py-7`, `gap-5 sm:gap-6`, `min-h-[440px] sm:min-h-[520px]`, `justify-between`
-- Round 12 : sorti les 2 hero strips HORS du pad (opp en haut, player en bas) pour libérer de l'espace board — **PAS ENCORE VALIDÉ par Alex sur le bon build** (cf. piège WebView ci-dessous).
+**Vérifié preview puis validé device :** 412×915 (tel d'Alex) → scale 1, board=slot=477px, `center_gap` 71px, carte 97px intacte, main 293px naturelle ; 412×680 (court) → scale 0.52, aucune coupe.
 
-**Hypothèse de pourquoi ça paraît petit** : il y a un `ScaleToFit` (`app/src/match/sharedMatchUI.tsx`) qui SCALE tout le board pour tenir dans l'écran. Si le contenu total (board + strips + main) dépasse, le ScaleToFit réduit le tout → le pad paraît petit. **Piste à creuser** : augmenter le pad SANS augmenter le contenu hors-pad, ou ajuster le ScaleToFit pour donner plus de place au board et moins aux marges. Mesurer les hauteurs réelles avec WebView DevTools (Runtime.evaluate sur `getBoundingClientRect`).
+⚠️ **NE JAMAIS REFAIRE** (chacun a échoué sur device) : (a) `flex-1` profond pour remplir le pad ; (b) `height:100%`/`h-full` contre flex-grow ; (c) `ScaleToFit` autour de TOUTE la stage (ça rétrécit AUSSI la main → rejeté par Alex). Le harness preview `#measure-arena` donne un contexte flex propre que l'app réelle (PlayPage→ArenaPage) n'a PAS dans le WebView → **ne pas s'y fier pour le fill, seul le device fait foi**.
 
-**Le board (pad) est rendu dans** : `ArenaBoard.tsx` → wrapper externe flex-col (Round 12) contenant : [opp strip] + [div pad avec BattlePad backdrop, lanes + center] + [player strip]. Le `ArenaBoard` est lui-même wrappé par `ScaleToFit` dans `ArenaGame.tsx`.
+**Saga des tentatives ratées (pour mémoire) :** R13 (retrait ScaleToFit global, pad `flex-1`) + R14 (flexbox pur `items-stretch`) → marchaient en preview, lanes COUPÉES sur device (flex profond non résolu). R15 (calque Ranked, `ScaleToFit` autour de board+main) → pad OK mais **rétrécit la main** (rejeté). **R16 (`BoardFillSlot` measured-fill) → ✅ validé.**
 
 ### 2. PIÈGE WEBVIEW CACHE (perte de temps majeure cette session)
 
@@ -125,23 +123,73 @@ Alex teste UNIQUEMENT la Voie Pierre pour l'instant (pour ne pas tout mélanger)
 - **Problème** : Alex perçoit toujours le pad comme RÉTRÉCI, pas agrandi. À RETRAVAILLER en priorité.
 - Fichiers modifiés non commités : `ArenaBoard.tsx` (layout strips)
 
+### Round 13 ✅ NON COMMITÉ — build+install+hash vérifiés device, attend validation Alex
+- **PAD FIX architectural** (cf. priorité #1 RÉSOLUE) : `ScaleToFit` (sharedMatchUI) a un nouveau mode **`fill`**. `ArenaGame.tsx` wrappe TOUT le board dans `<ScaleToFit fill>` ; `ArenaBoard.tsx` : pad = cadre `flex-1 min-h-[280px] w-full flex flex-col` pleine largeur, strips `shrink-0`, contenu lanes `h-full justify-between` (REMPLIT le pad). Mesuré preview : écran haut (le tel d'Alex) → scale 1, pleine largeur **412px**, lanes remplissent le pad (plus d'espace vide en dessous — 2e feedback Alex) ; écran court 620px → scale-down 0.4 propre, lock visible, **pas de clip**. Vrai diag via `getBoundingClientRect` : l'ancien `ScaleToFit` global scalait tout à **0.76** (board 625>slot 477) → gouttières = effet "écrasé". Bumps min-h aggravaient. `fill` mode : si le contenu tient → stretch + space-between (remplit) ; sinon → scale-down (sécurité court). Alex d'abord "non plus haut" puis "remplis l'espace vide" → fill.
+- **P1 Aegis double-cast FIXÉ** : garde dans `ArenaGame.addSpell` — refuse un 2e aegis (déjà en queue ce tour OU `board.a.aegisCastThisMatch`) → la carte n'est plus gaspillée. Aegis = seul sort lock 1×/match aujourd'hui.
+- **P1 Supernova investigué (pas de fix code)** : `targetOppBestCreature` (arenaAI.ts:357-359) skippe DÉJÀ anchored/spellImmune. Le fizzle T5 = Anchor même tour du joueur (imprévisible → comportement correct). "CPU préfère héros" = tweak DIFFICULTÉ en attente décision Alex (ne pas changer à l'aveugle).
+- **Animations passifs (lot P2)** : chips Étouffe/Logique ("Provoc annulée") + Tranchant ("🩸 Bouclier percé"). Resolver `setAntiTaunt` + `ArenaLaneSlot` pierce. Typecheck OK. **NON buildé** (attend prochain build).
+- Build device COURANT : **`index-VF5-XvkD.js`** (pad fill + Aegis double-cast) installé + servi vérifié via DevTools — à tester par Alex. Les chips passifs ne sont PAS dedans (build suivant).
+- Fichiers Round 13 : `ArenaBoard.tsx`, `ArenaGame.tsx`, `arenaResolverFlow.ts`, `ArenaLaneSlot.tsx`, `match/sharedMatchUI.tsx` (ScaleToFit `fill`). Harness mesure `App.tsx` ajouté/retiré.
+
+### Round 14 ✅ NON COMMITÉ — build en cours (corrections feedback test Alex sur VF5-XvkD)
+- **(B) PAD pas assez étiré vers le bas** : cause = `height:100%` (`h-full`) contre un parent flex-grow NE RÉSOUT PAS dans le WebView Android (marchait en preview desktop, d'où le piège). FIX = remplissage 100 % flexbox : `ScaleToFit` filled → outer **`items-stretch`** (au lieu de `h-full` sur l'inner) ; pad content **`flex-1`** (au lieu de `h-full`). + re-mesure sur **2 frames (rAF)** car le board monte APRÈS le splash → 1ʳᵉ mesure trop tôt → `filled` pas latché → pad non étiré. ⚠️ DURABLE : pour étirer dans le WebView, flexbox pur, jamais `h-full` sur flex-grow.
+- **(A) espace milieu pour chip queues** : `justify-between` garde les lanes à leur taille (PAS agrandies), l'espace va dans les gaps → les chips au centre ont de la place.
+- **(#1) Aegis ET Anchor cast 2× sur la même main** : VRAIE cause = les sorts à lane se posent via `handleBoardLaneTap` (tap sur la lane) qui faisait `setIntent` direct → CONTOURNAIT toutes les vérifs (cap, 1 carte=1 cast, exclusion aegis/anchor, lock aegis). Le garde `addSpell` du Round 13 ne couvrait QUE le flux main. FIX = `handleBoardLaneTap` route via `addSpell`. ⚠️ DURABLE : les lane-spells passent par le tap-board, pas addSpell direct.
+- **(#2) supprimer une carte assignée à une lane** : les chips removables sous la main existaient déjà mais SANS le n° de lane → FIX : chip sort affiche `L{n}` (`ArenaPlanPhase`).
+- **(#3) éventail dur à distinguer** : fan-out élargi (angle ×15, X ×16) dans `ArenaBoard` LaneRow.
+- Inclut le lot **Animations passifs** (chips Étouffe/Logique/Tranchant).
+- Typecheck OK. Fichiers : `match/sharedMatchUI.tsx`, `ArenaBoard.tsx`, `ArenaGame.tsx`, `ArenaPlanPhase.tsx`, `arenaResolverFlow.ts`, `ArenaLaneSlot.tsx`.
+
+### Round 15 🔴 NON COMMITÉ — superseded par Round 16 (itération pad ratée)
+- Tentatives pad sur device qui marchaient en preview mais PAS sur le WebView (flex profond non résolu → lanes coupées). Puis calque EXACT du mode Ranked : `ScaleToFit` autour de TOUTE la stage (board + main). Pad OK MAIS **rétrécit aussi la main/deck** (le scale s'applique à tout) → Alex : "touche QUE le pad, dé-serre les moves/deck". Abandonné au profit de Round 16.
+
+### Round 16 ✅ VALIDÉ DEVICE par Alex — build `index-jUIZZstP.js` (attend commit)
+- **PAD RÉSOLU** (cf. priorité #1) : composant `BoardFillSlot` (`ArenaGame.tsx`) qui **mesure `clientHeight`** (fiable WebView) → `ArenaBoard` prop `fillHeight` → `minHeight` px sur la racine → pad `flex-1 min-h-0 justify-between` remplit (lanes écartées, espace au centre), **cartes `aspect-[5/4]` intactes**. Filet `transform:scale` si écran trop court (jamais de coupe). **Plan phase (moves+deck) DEHORS du slot → jamais rétrécie.** Vérifié preview 412×915 (scale 1, center_gap 71px, carte 97px) + 412×680 (scale 0.52, no clip). **Alex a validé sur device.**
+- Fichiers : `ArenaGame.tsx` (BoardFillSlot + plan phase sortie du wrap + import `useLayoutEffect`/`ReactNode`), `ArenaBoard.tsx` (prop `fillHeight`→minHeight, pad `flex-1 justify-between`).
+- **Travail gameplay des Rounds 13-14 toujours présent et non commité** : Aegis/Anchor double-cast fix (lane-tap→`addSpell`), chips passifs Étouffe/Logique ("Provoc annulée") + Tranchant ("🩸 Bouclier percé"), chip lane label `L{n}` (`ArenaPlanPhase`), éventail élargi (`ArenaBoard` LaneRow).
+- ⚠️ Dead code : le mode `fill` ajouté au `ScaleToFit` (`sharedMatchUI.tsx`, Rounds 13-14) n'est plus utilisé (l'arène passe par `BoardFillSlot`) → à nettoyer plus tard, inoffensif (Classic/Ranked utilisent `ScaleToFit` sans `fill`).
+
+### Round 17 ✅ NON COMMITÉ — AUDIT LOGIQUE complet du moteur (2026-06-11, à tester device)
+
+Audit systématique arenaRules/arenaCombat/arenaCardEffects/arenaFinishers/arenaAI/arenaResolverFlow vs les contrats écrits (textes de cartes, docs des types, design lockées). **14 correctifs logiques** — AUCUNE retouche au pad (BoardFillSlot intact) ni aux 8 mécaniques Voie Pierre validées :
+
+1. **🔴 BUT D'OR ANNULÉ PAR LES TIMERS** (`arenaResolverFlow`) : le garde du settle ne couvrait que `match-end` → quand l'égalité parfaite déclenchait `sudden-death`, `onAdvanceTurn()` repartait en planning ~3s après (les timers settle courent toujours). La mort subite était ANNULÉE. Jamais vu en live car aucune égalité rencontrée. Garde élargi à `sudden-death`.
+2. **TURN_HARD_CAP=30 jamais câblé** (`arenaResolverFlow`) : constante documentée "fail-safe match défensif" mais appliquée nulle part → match infini possible. Câblé au cleanup : T30 résolu sans mort → plus bas HP perd (HP forcé 0) ; HP égaux → BUT D'OR.
+3. **FORTERESSE pas permanent** (`arenaFinishers`) : "+2 ATK permanents" (texte carte) via `atkBuff`… remis à 0 chaque fin de tour → durait 1 tour. Passé sur `voieAtkBonus` (persistant, compté par creatureEffectiveAtk).
+4. **VERGER Fanaison pas désactivée** (`arenaRules`) : reset one-shot des wiltedSteps, mais `endOfTurnReset` re-fanait dès le tour suivant (le doc des types prétendait le contraire). `endOfTurnReset(c, vergerActive)` skippe le wilt en continu.
+5. **LAME ne perçait PAS la Provoc** (`arenaCombat`) : texte carte "perce TOUT (Aegis, Provoc…)" et doc types "findDeflector (skip)" — mais aucun check. Deflect skippé sur les 4 sites (poursuites A/B-wins + 2 branches undefended) + sync anim (`findDeflectorLane`/follow-through dans le flow).
+6. **RIPOSTE ignorée sur counter-kill** (`arenaCombat`) : contrat "si elle meurt au combat, son tueur meurt aussi" — seul le mirror l'honorait. Les branches A-wins/B-wins tuent maintenant le tueur (pas de poursuite, kill bonus des 2 côtés, même règle que mutual-kill mirror).
+7. **Émoussé appliqué AVANT la poursuite** (`arenaCombat`) : le Ciseau counter-kill poursuivait le héros à 3 au lieu de 4 (blunt prématuré). Poursuite à l'ATK pré-blunt ; le −1 ne vaut que pour les combats suivants.
+8. **CALCUL QUANTIQUE injouable** : le −1m n'existait qu'à la résolution — l'UI (intentCost, affordability, chips) et l'IA budgétaient au coût plein → discount jamais dépensable. Nouvelle source unique `arenaSpellCost(hero,id)` (`arenaSpellHelpers`) branchée engine + ArenaGame + ArenaPlanPhase + IA.
+9. **Main à 8 cartes** (`arenaRules.drawCards`) : `< 8` codé en dur (résidu cap 10→7) vs HAND_CAP=7 → utilise la constante.
+10. **CPU piochait des cartes injouables** (`arenaAI`/`arenaDecks`) : le deck-mirror puisait dans TOUTES les cartes supportées mais `buildSpellTarget` ne gérait que la Phase-1 → cartes mortes en main CPU. Ajout des cibles Phase-2 (gaia/sablier/offre/rempart/bénédiction/cascade/marchand/mascarade/sangsue/trou-noir/paradoxe avec conditions sensées) + pool CPU restreint à `cpuCanPlay` (oracle-inverse/échappée/juge/genèse restent joueur-only).
+11. **CPU gaspillait Aegis** (`arenaAI`) : aucune garde lock 1×/match → cast fizzle = carte+mana brûlés. Guards symétriques au joueur (lock + déjà-en-file).
+12. **CPU tronqué à 2 sorts TOTAL** (`arenaAI`) : la règle est 2 lane + 1 utility = 3. `truncateIntentByCaps` exportée d'arenaRules, partagée engine/IA (parité exacte). `applySpellPhase` legacy (orphelin, sans caps ni CALCUL) supprimé.
+13. **Textes de cartes = mode CLASSÉ en Arena** (UI + i18n) : l'inspect/tooltips affichaient `ranked.cards.*.desc` qui décrivent les effets Classé (ex. Trou Noir "annule la carte adverse ce round" vs effet Arena réel "détruit une créature ciblée"). 31 clés `arena.cards.*.desc` FR+EN (fallback EN pour les 13 autres langues) + `arenaCardDescKey()` branchée dans ArenaCardInspect/ArenaBoard/ArenaHeroStrip. Aussi : peek Oracle Inverse ne tronque plus à 4 cartes (sa plus-value vs Augur = main COMPLÈTE).
+14. **Mort subite : résolution dans le render** (`ArenaSuddenDeath`) : les setTimeout d'onResolved/re-spin étaient programmés à chaque render (un re-render parent pendant le reveal = double fire). Passé en `useEffect` avec cleanup. + **Constellation** : resync du compteur sur les Voies vivantes en fin de tour (`endOfTurnCleanup`) — couvre la 3e étoile obtenue via Mirror (avant : unlock seulement au summon suivant) et le champ stale après morts.
+
+Hors périmètre (signalé, pas touché) : doc vs code sur la recharge Provoc par Aegis (roadmap dit "+1 charge", code = recharge-à-1 `max(charges,1)` — comportement validé live conservé, commentaires alignés sur le code) ; Sablier reste plafonné à 8 (le texte Arena le dit maintenant explicitement).
+
+Fichiers : `arenaRules.ts`, `arenaCombat.ts`, `arenaFinishers.ts`, `arenaSpellHelpers.ts`, `arenaPhase2Spells.ts` (comment), `arenaResolverFlow.ts`, `arenaAI.ts`, `arenaDecks.ts`, `arenaTypes.ts`, `ArenaGame.tsx`, `ArenaPlanPhase.tsx`, `ArenaCardInspect.tsx`, `ArenaBoard.tsx` (title only), `ArenaHeroStrip.tsx`, `ArenaSuddenDeath.tsx`, `i18n/locales/fr.ts`, `i18n/locales/en.ts`. Typecheck OK.
+
 ---
 
 ## TODO restants (priorité décroissante)
 
-### 🔴 P0 — Pad agrandi (cf. priorité absolue en haut)
-- [ ] Retravailler le pad pour qu'il soit VRAIMENT plus grand visuellement (mesurer via DevTools, ajuster ScaleToFit si besoin)
-- [ ] Valider sur le bon build (vérifier hash servi)
+### ✅✅ P0 — Pad — RÉSOLU & VALIDÉ DEVICE Round 16 (reste : commit)
+- [x] `BoardFillSlot` measured-fill : pad remplit la hauteur dispo, lanes écartées, espace au centre, **cartes intactes**, main NON rétrécie
+- [x] Vérifié preview (915 scale 1 / 680 scale 0.52) + **VALIDÉ device par Alex** (`index-jUIZZstP.js`)
+- [ ] **COMMIT** les Rounds 12→16 (pad + gameplay) — attend feu vert Alex
 
 ### 🟠 P1 — Bugs gameplay observés
-- [ ] **Aegis double-cast gaspillé** : le joueur peut cast 2 Aegis le même tour, le 2e FIZZLE (lock 1×/match) mais est consommé quand même → carte perdue. Fix dans `ArenaGame.addSpell` : refuser un 2e aegis si déjà 1 dans l'intent ce tour OU `aegisCastThisMatch`. (chip task_20ee6566 spawné) Généraliser aux autres sorts lock/1×.
-- [ ] **Supernova CPU fizzle** : observé `T5 b SUPERNOVA L1 fizzle (cible invalide ou anchored)` — le CPU gaspille son burst 6 dmg (ciblage AI Supernova lane buggé ?). Affecte l'équilibre (CPU trop faible). Investiguer `arenaAI.buildSpellTarget` pour supernova + `applySupernova`.
+- [x] **Aegis double-cast gaspillé** — FIXÉ Round 13 (garde `addSpell` : refuse 2e aegis si déjà en queue OU `board.a.aegisCastThisMatch`). Attend prochain build. (chip task_20ee6566)
+- [~] **Supernova CPU fizzle** — investigué Round 13 : `targetOppBestCreature` skippe DÉJÀ anchored/spellImmune (arenaAI.ts:357-359), donc pas de bug code. Fizzle T5 = Anchor même tour du joueur (correct). Optionnel restant : "CPU préfère héros sur supernova" = décision DIFFICULTÉ Alex.
 
 ### 🟡 P2 — Features restantes
 - [ ] **CPU theme+pad assortis** au pile-ou-face (le CPU choisit une apparence parmi `BG_DEFAULT_THEME` dans `themes.ts`, révélée au coin-flip). Refactor `ArenaPrepScreen` + passer le thème CPU au board.
 - [ ] **Surcharge ×2** : 2 copies même carte cast simultané = effet doublé (consume les 2). **Besoin UX decision Alex** (tap-and-hold ? bouton dédié ?) avant de coder.
 - [ ] **5 cartes anti-counter** (anti-stalemate, nouveau set) : Brouillard (3m, no counter ce tour), Triade (4m, pose 3 lanes atomique), Aveuglement (5m, opp pose en aveugle), Miroir parfait (5m, copie summon opp), Inversion (4m, swap counter rules). Nouveau set dans `cards.ts` + `rankedTypes.ts` CardId + i18n FR/EN + effets `arenaCardEffects`/`arenaPhase2Spells`.
-- [ ] **Animations passifs restants** : chip Étouffe (Feuille), chip Logique (Spock), chip Tranchant explicite (Ciseau) — actuellement seuls Aegis/Esquive ont des chips save.
+- [x] **Animations passifs restants** — FAIT Round 13 (code, attend build) : chip Étouffe/Logique = "Provoc annulée" sur la Pierre bypassée (resolver `findAntiTauntBypass` + `setAntiTaunt` → chip `ArenaBoard`), chip Tranchant = "🩸 Bouclier percé" quand une créature meurt bouclier levé (`ArenaLaneSlot` `prev.shield` à la mort). Typecheck OK. (Heuristique pierce : couvre aussi LAME ; un sort tuant une créature bouclier afficherait le chip — cosmétique mineur acceptable.)
 - [ ] **Animation cinématique cast Finisher** (overlay grand format slow-mo au cast d'un des 5 Finishers).
 
 ### 🟢 P3 — Optionnel / long terme
@@ -156,11 +204,11 @@ Alex teste UNIQUEMENT la Voie Pierre pour l'instant (pour ne pas tout mélanger)
 
 ```
 app/src/arena/
-├── ArenaBoard.tsx            ~600 — board layout (Round 12 : strips sortis du pad)
+├── ArenaBoard.tsx            ~600 — board layout (strips hors pad ; R16 prop fillHeight→minHeight, pad flex-1 justify-between)
 ├── ArenaCardInspect.tsx      106 — modal inspect carte
 ├── ArenaConstellationBar.tsx ~150 — 3⭐ counter + label Voie (Round 9)
 ├── ArenaDebugOverlay.tsx     156 — panneau logs in-app (🐛 button bottom-right)
-├── ArenaGame.tsx             ~450 — orchestrateur state + tour loop + sudden-death route
+├── ArenaGame.tsx             ~490 — orchestrateur + tour loop + sudden-death + BoardFillSlot (measured-fill pad R16)
 ├── ArenaHeroStrip.tsx        332 — portrait + HP + mana + augur (utilisé 2× hors pad)
 ├── ArenaHowItWorks.tsx       ~210 — modal règles (Round 11 : section Provoc)
 ├── ArenaLaneSlot.tsx         534 — single lane slot + chips save
