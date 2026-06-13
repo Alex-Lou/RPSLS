@@ -6,7 +6,7 @@
 
 ## 0. TL;DR — où on en est
 - **Jeu** RPSLS (pierre-papier-ciseaux-lézard-spock) devenu un vrai **CCG** multi-modes, app **Tauri Android** (React/TS), serveur **Rust** sur **Render** + **Upstash Redis**.
-- **Branche de travail actuelle** : `feat/fusion-card-art`. **HEAD = main = develop = `fcaf310`** (déployé). Du **travail non commité** est posé dessus (cf. §7).
+- **Base de départ** : pars de **`develop`** = `main` (déployé ; **redeploy Render déclenché cette session** pour le cap collection + la fondation éco). Le lot léger (#23/#27/#8 + anim forge) est **promu**. **➜ Crée une branche neuve `feat/accounts` depuis `develop`.** Plus aucun WIP en attente (`_screen_debug.png` racine = junk non tracké, ignore-le). Détail des derniers commits en §7.
 - **Gros chantiers EN COURS** : (A) **économie serveur-autoritaire anti-triche** (β, fondation faite), (B) **comptes e-mail/mot de passe + bonus de bienvenue + mode invité** (designé, modal mocké, pas codé). Voir §9.
 - **Workflow Alex** : il **build l'APK lui-même** et teste sur tel → toi tu **codes + typecheck**, tu dis « prêt à builder », tu **commit/push seulement après son OK**. Voir §4.
 
@@ -76,20 +76,22 @@ app/src/
 ## 6. PERSISTANCE DES DONNÉES (CRITIQUE — « rien perdre pour le joueur »)
 Deux couches : **localStorage** (Zustand persist, clé `rpsls-app-state` v22 + side-channel `rpsls-history`) — **WIPÉ à chaque réinstall** — et **Redis** (`PlayerProgress`) = **ce qui survit au réinstall**. Identité durable = anchor Tauri (id+claimToken).
 - ✅ Persisté DB : xp, rankLp, éclats/poussière/stars, stats, **cardCollection** (union-merge), cardMastery, codex, quêtes, **rankedDeck + arenaDeck**, premium sets, season, streak, classeLp+stats, **arenaStats**, **history+voies**, cosmetics.
-- 🔴 **Corrections récentes (cette session) NON ENCORE déployées** (sur `feat/fusion-card-art`, §7) : struct serveur recevait `arena_deck`/`arena_*`/`history` (FAIT, déployé via fcaf310) MAIS **caps `card_collection`/`card_mastery` relevés 64→256** (sinon 79 cartes tronquées = perte) → **PAS encore sur main → REDEPLOY requis**.
+- ✅ **Caps `card_collection`/`card_mastery` relevés 64→256** (sinon ~79 cartes tronquées = perte) — **promu sur `main` + déployé cette session**. (Le reste de la struct — `arena_deck`/`arena_*`/`history` — était déjà déployé via `fcaf310`.)
 - Merge : `mergeServerState` (playerSync.ts) restaure decks sur **install fraîche** (`!syncedAt`) ; history **restore-only-si-local-vide** (jamais d'écrasement).
 - Réf complète : memory `data-persistence.md`.
 
 ---
 
-## 7. TRAVAIL NON COMMITÉ sur `feat/fusion-card-art` (à committer/promouvoir, typecheck OK)
-- **#27 art cartes fusion** : `cards.ts` — 7 fusions wirées (BASTION/AVALANCHE/SOURCE VITALE/OMNISCIENCE/cocon/APOCALYPSE/IMPOSTEUR.png), casse exacte (Android sensible).
-- **#23 couleurs strip** : `ArenaHeroStrip.tsx` + `ArenaSpellQueueChip.tsx` — joueur = **bleu (sky)**, adversaire = **rouge (rose)**.
-- **#8 Cadence** : `RankedGame.tsx` (effet relatif `MAX_MANA+1` au lieu de `5`) + `fr/en.ts` (desc « +1 à ton plafond de mana »).
-- **#13 cap collection** : `player_state.rs` 64→256 (collection + mastery). **= changement SERVEUR → redeploy quand promu.**
-- **Éco Incrément 1 (fondation)** : `scripts/gen-card-meta.mjs` (génère `crates/rpsls-server/cards_meta.json` depuis cards.ts) + `crates/rpsls-server/src/economy.rs` (méta + barèmes) + `mod economy` dans `main.rs`. **Pur, additif, test vert.**
-- `_screen_debug.png` (racine) = **junk, NE PAS committer**.
-- ⚠️ Branche `feat/fusion-card-art` mélange tâches légères + fondation éco — envisager d'en sortir l'éco sur `feat/server-economy`.
+## 7. DERNIÈRE PROMOTION (cette session, 2026‑06‑13) — sur `develop` + `main` (déployé)
+Lot validé par Alex + correctif persistance + fondation éco : **commités proprement** (zéro trace IA, auteur Alex), **mergés `feat/fusion-card-art` → develop → main (FF)**, **poussés** → **redeploy Render déclenché**. Les commits :
+- **#27 art cartes fusion** (`cards.ts`) : 7 fusions wirées (BASTION/AVALANCHE/SOURCE VITALE/OMNISCIENCE/cocon/APOCALYPSE/IMPOSTEUR.png), casse exacte (Android sensible).
+- **#23 couleurs strip** (`ArenaHeroStrip.tsx` + `ArenaSpellQueueChip.tsx`) : joueur = **bleu (sky)**, adversaire = **rouge (rose)**.
+- **#8 Cadence** (`RankedGame.tsx` + `fr/en.ts`) : effet relatif `MAX_MANA+1` (au lieu d'un `5` en dur).
+- **Anim forge « Récupérer »** (`ArenaForge.tsx` composant `RecoverBurst` one‑shot : anneau or + cœur ambre + 12 motes biaisées **vers le bas** = rappel vers la main ; + wiring `ArenaBoard.tsx`/`ArenaGame.tsx`). **Déclenchée UNIQUEMENT** sur la récup d'une carte **FUSIONNÉE** (« ✨ Récupérer ») — une simple reprise de dépôt reste **silencieuse**. Vérifiée live device (chunk `index-TieQ5hOX.js`).
+- **#13 cap collection/maîtrise 64→256** (`player_state.rs`) : **changement SERVEUR, déployé**.
+- **Éco Incrément 1 (fondation)** : `scripts/gen-card-meta.mjs` → `crates/rpsls-server/cards_meta.json` + `crates/rpsls-server/src/economy.rs` (méta + barèmes) + `mod economy` dans `main.rs`. **Pur, additif, inerte, test vert** — prêt à servir au **bonus de bienvenue** (§9‑A étape 4).
+- `_screen_debug.png` (racine) = **junk non tracké, NE PAS committer**.
+- ✅ `feat/fusion-card-art` a rempli son rôle. **Le prochain chantier (comptes) part d'une branche neuve `feat/accounts` depuis `develop`** (§9‑A). Pour la suite éco, une branche `feat/server-economy` dédiée reste pertinente (§9‑B).
 
 ---
 
