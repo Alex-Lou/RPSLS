@@ -54,7 +54,25 @@ export function ArenaSpellQueueChip({
       layout
       initial={{ scale: 0.5, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
-      exit={{ scale: 0.5, opacity: 0, y: -4 }}
+      // Sortie : RETRAIT manuel (croix dispo) = disparition sobre ; sinon la
+      // carte a été UTILISÉE → désintégration « poussière d'étoile dorée » qui
+      // s'envole vers le haut (Alex 2026-06-13). One-shot, leak-free.
+      exit={onRemove
+        ? { scale: 0.5, opacity: 0, y: -4 }
+        : {
+            // ⚠ DEUX conditions pour que la désintégration JOUE (Alex 2026-06-13,
+            // 2 fois remontée) : (1) transition DURATION ici — l'exit anime des
+            // KEYFRAMES (tableaux) qu'un RESSORT snappe ; (2) l'AnimatePresence
+            // parent (ArenaHeroStrip) doit rester MONTÉ à la consommation, sinon
+            // l'exit ne joue jamais. La carte CONSOMMÉE gonfle, se dore à blanc,
+            // puis se DISSOUT vers le haut.
+            opacity: [1, 1, 0],
+            y: [0, -10, -38],
+            scale: [1, 1.25, 0.35],
+            rotate: [0, -3, 7],
+            filter: ["brightness(1)", "brightness(2.2) saturate(2.4)", "brightness(1.6)"],
+            transition: { duration: 0.64, ease: "easeOut", times: [0, 0.4, 1] },
+          }}
       transition={{ type: "spring", stiffness: 420, damping: 26 }}
       whileTap={onRemove ? { scale: 0.92 } : undefined}
       onClick={onRemove}
@@ -94,6 +112,36 @@ export function ArenaSpellQueueChip({
           ✕
         </span>
       )}
+      {/* ✨ DÉSINTÉGRATION dorée — flash central + 12 paillettes en éventail vers
+       *  le HAUT. Invisibles à l'affichage, jouées À LA SORTIE seulement quand la
+       *  carte est CONSOMMÉE (pas de croix). One-shot via exit (durée), leak-free.
+       *  Enfants du chip → s'animent quand l'AnimatePresence parent le démonte. */}
+      {!onRemove && (
+        <motion.span
+          key="dust-flash"
+          className="absolute left-1/2 top-1/2 w-6 h-6 -ml-3 -mt-3 rounded-full pointer-events-none"
+          style={{ background: "radial-gradient(circle, rgba(255,243,191,0.95), transparent 70%)", mixBlendMode: "screen" }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0 }}
+          exit={{ opacity: [0, 1, 0], scale: [0.3, 1.9, 2.6] }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        />
+      )}
+      {!onRemove && Array.from({ length: 12 }, (_, i) => i).map((i) => {
+        const a = (-150 + i * (120 / 11)) * (Math.PI / 180); // éventail vers le HAUT
+        const dist = 16 + (i % 3) * 10;
+        return (
+          <motion.span
+            key={`dust-${i}`}
+            className="absolute left-1/2 top-1/2 w-1 h-1 -ml-0.5 -mt-0.5 rounded-full bg-amber-200 pointer-events-none"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0 }}
+            exit={{ opacity: [0, 1, 0], x: [0, Math.cos(a) * dist], y: [0, Math.sin(a) * dist - 6], scale: [0.3, 1, 0.15] }}
+            transition={{ duration: 0.62, ease: "easeOut", delay: (i % 6) * 0.025 }}
+            style={{ boxShadow: "0 0 5px rgba(252,211,77,0.95)" }}
+          />
+        );
+      })}
     </motion.button>
   );
 }

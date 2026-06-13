@@ -12,7 +12,7 @@
  * the plan phase, which routes back to ArenaGame's handlers.
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useAnimationControls } from "motion/react";
 import { useStore } from "../store/store";
@@ -24,8 +24,14 @@ import { ArenaLaneSlot } from "./ArenaLaneSlot";
 import { ArenaHeroStrip } from "./ArenaHeroStrip";
 import { CardSlot } from "../ranked/CardSlot";
 import { ArenaSpellsReveal } from "./ArenaSpellsReveal";
-import { arenaCardDescKey, isValidLaneTarget, targetLabelFor, LANE_SPELL_TARGET_SIDE } from "./arenaTypes";
+import { ArenaSpellFX } from "./ArenaSpellFX";
+import { ForgeSlot } from "./ArenaForge";
+import { ArenaHpVignette } from "./ArenaHpVignette";
+import { arenaCardDescKey, isValidLaneTarget, targetLabelFor, LANE_SPELL_TARGET_SIDE, CARD_TARGET_KIND } from "./arenaTypes";
+import { ArenaCardInspect } from "./ArenaCardInspect";
+import { fusionPartnersOf } from "./arenaFusionCards";
 import type { ArenaTargeting, BoardState, LaneIndex, Side, TurnIntent } from "./arenaTypes";
+import type { CardId } from "../ranked/rankedTypes";
 import { InlineBurger } from "../ui/ModeLobbyShell";
 import { setBurgerHidden } from "../Sidebar";
 import { MoveGlyph } from "../icons";
@@ -62,6 +68,13 @@ export interface ArenaBoardProps {
    *  attacker's Étouffe (Feuille) / Logique (Spock) cancelled the defender's
    *  charged Pierre Provocation. Pops a chip on the bypassed Pierre. */
   antiTaunt?: { bypassedSide: "a" | "b"; rockLane: LaneIndex; cause: "paper" | "spock"; key: number } | null;
+  /** Signatures FX plein-board (Genèse, Supernova…) — déclenché au step
+   *  SPELLS. null au repos. Cf. ArenaSpellFX. */
+  spellFX?: { ids: CardId[]; key: number } | null;
+  /** Identité cosmétique CPU (strip adverse) — nom réel + portrait hero_*.png
+   *  au lieu de « CPU » + 🤖 (Alex 2026-06-13). */
+  oppName?: string;
+  oppAvatar?: string;
   /** Active targeting (lifted from ArenaPlanPhase) — when set on a lane
    *  target, the BOARD highlights ONLY the lane slots a spell of that
    *  kind can actually target (my creature for buffs, opp creature for
@@ -77,13 +90,24 @@ export interface ArenaBoardProps {
   /** Annule une invocation planifiée sur une lane (Alex 2026-06-12 "0 souplesse,
    *  je peux pas retirer une invocation juste posée") — tap sur la croix du ghost. */
   onRemoveSummon?: (lane: LaneIndex) => void;
+  /** ⚗️ Forge (2026-06-13) : carte posée sur la forge de chaque camp. */
+  forgeYou?: CardId | null;
+  forgeOpp?: CardId | null;
+  /** Tap sur TA forge : dépôt (carte sélectionnée) / fusion (partenaire) /
+   *  reprise (rien de sélectionné). */
+  onForgeTap?: () => void;
+  /** Bump à chaque fusion réussie — déclenche le flash ⚗️. */
+  forgeFlashKey?: number | null;
+  /** Étát visuel de TA forge selon la sélection : "deposit" (pulse dépôt),
+   *  "fuse" (pulse OR partenaire prêt), null. */
+  forgeHighlight?: "deposit" | "fuse" | null;
   /** Hauteur px mesurée du slot (BoardFillSlot). Posée en hauteur EXPLICITE sur
    *  la racine du board → le pad `flex-1` la remplit de façon FIABLE sur le
    *  WebView (≠ flex profond), sans scaler les cartes. 0 = pas encore mesuré. */
   fillHeight?: number;
 }
 
-export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPreview, resolveStep, combatLane = null, heroHit = null, tauntBlock = null, antiTaunt = null, targeting, onLaneTap, onRemoveSpell, onRemoveSummon, fillHeight }: ArenaBoardProps) {
+export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPreview, resolveStep, combatLane = null, heroHit = null, tauntBlock = null, antiTaunt = null, spellFX = null, oppName, oppAvatar, targeting, onLaneTap, onRemoveSpell, onRemoveSummon, forgeYou = null, forgeOpp = null, onForgeTap, forgeFlashKey = null, forgeHighlight = null, fillHeight }: ArenaBoardProps) {
   // SECOUSSE D'IMPACT (Alex 2026-06-12) : à chaque tick de combat (combatLane
   // change), le pad tremble brièvement, calé sur l'apex du slam (~0.3s après
   // le départ de la charge). Animation controls = pas de remount des lanes.
@@ -95,6 +119,9 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
   }, []);
 
   const padShake = useAnimationControls();
+  const t = useT();
+  // Fiche LECTURE SEULE d'une carte adverse révélée par Augure (long-press).
+  const [inspectOpp, setInspectOpp] = useState<CardId | null>(null);
   useEffect(() => {
     if (combatLane === null) return;
     padShake.start({
@@ -154,6 +181,9 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
       className="relative w-full max-w-3xl mx-auto px-0.5 flex flex-col gap-0 sm:gap-0.5 [@media(max-height:560px)]:max-w-md"
       style={{ minHeight: fillHeight ? fillHeight : undefined }}
     >
+      {/* 🩸 Danger rouge crescendo quand TES PV ≤ 10 → 0 (fixed plein écran,
+       *  auto-démonté hors danger — cf. ArenaHpVignette). */}
+      <ArenaHpVignette hp={board[playerSide].hp} />
       {/* ════════ OPP HERO STRIP — SPACER en flow (réserve la place pour que
        *  le pad NE BOUGE PAS) + strip réel rendu en PORTAL vers document.body
        *  (Alex 2026-06-11). Le portal échappe au clip `overflow-y-auto` du
@@ -169,19 +199,41 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
         // cf. useEffect setBurgerHidden plus haut). left-14 → left-2 : plus
         // d'espace réservé au flottant.
         <div
-          className="fixed left-2 right-2 z-[55] flex items-center gap-1.5"
+          // right-12 : coin haut-droit réservé au bouton Logs 🐛 (Alex 2026-06-12).
+          className="fixed left-2 right-12 z-[55] flex items-center gap-1.5"
           style={{ top: "max(env(safe-area-inset-top, 0px), 32px)" }}
         >
           <InlineBurger />
           <div className="flex-1 min-w-0">
             <ArenaHeroStrip
-              hero={opp} board={board} side="opp" turn={board.turn} name="CPU" avatar={undefined}
+              hero={opp} board={board} side="opp" turn={board.turn} name={oppName ?? "CPU"} avatar={oppAvatar}
               incomingAttackKey={heroHit?.side === "opp" ? heroHit.key : null}
               augurRevealed={playerSide === "a" ? board.augurRevealedB : board.augurRevealedA}
               pendingUtility={oppPreview?.spells.filter((s) => s.kind !== "lane")}
+              onInspectCard={setInspectOpp}
             />
           </div>
         </div>,
+        document.body,
+      )}
+      {/* Fiche LECTURE SEULE d'une carte adverse révélée (Augure) — portal. */}
+      {createPortal(
+        <AnimatePresence>
+          {inspectOpp && (
+            <ArenaCardInspect
+              id={inspectOpp}
+              targetKind={CARD_TARGET_KIND[inspectOpp] ?? "global"}
+              t={t}
+              readOnly
+              onCommit={() => {}}
+              onClose={() => setInspectOpp(null)}
+              fusionRecipes={fusionPartnersOf(inspectOpp).map((r) => ({
+                partner: r.a === inspectOpp ? r.b : r.a,
+                result: r.result,
+              }))}
+            />
+          )}
+        </AnimatePresence>,
         document.body,
       )}
 
@@ -414,6 +466,9 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
             <MoveGlyph move={board[playerSide].affinity!} className="w-28 h-28 sm:w-36 sm:h-36 opacity-[0.05]" />
           </div>
         )}
+        {/* ✦ SIGNATURES FX plein-board (Genèse, Supernova…) — overlay z-40 sur
+         *  toute la zone des lanes, joué au step SPELLS puis auto-démonté. */}
+        <ArenaSpellFX fx={spellFX} />
         {/* Opponent lane row — ghost previews of opp summons during reveal.
          *  Slots become tappable when a spell targets OPP creatures (Curse,
          *  Sangsue, Trou Noir). */}
@@ -441,12 +496,26 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
          *  Alex feedback 2026-06-09 point #2 : pad trop serré, agrandir le
          *  board. Réduit le my-* du wrapper (was my-2 sm:my-3) pour rendre
          *  le pad plus dense et combler l'espace vide vers la main strip. */}
-        <div className="shrink-0">
-          <CenterStatus
-            step={resolveStep ?? null}
-            turn={board.turn}
-            oppPreview={oppPreview}
-            playerPreview={playerPreview}
+        {/* Bande centrale = [⚗️ Forge adverse] [statut flex-1] [⚗️ TA Forge]
+         *  (Alex 2026-06-13) — les flancs vides du pad deviennent les cases
+         *  de fusion, visibles des deux camps (info warfare). */}
+        <div className="shrink-0 flex items-center gap-1.5">
+          <ForgeSlot card={forgeOpp} mine={false} />
+          <div className="flex-1 min-w-0">
+            <CenterStatus
+              step={resolveStep ?? null}
+              turn={board.turn}
+              oppPreview={oppPreview}
+              playerPreview={playerPreview}
+            />
+          </div>
+          <ForgeSlot
+            card={forgeYou}
+            mine
+            onTap={onForgeTap}
+            highlight={forgeHighlight}
+            flashKey={forgeFlashKey}
+            forged={!!forgeYou && CARDS[forgeYou]?.kind === "fusion"}
           />
         </div>
 
@@ -481,6 +550,9 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
   );
 }
 
+
+// ⚗️ ForgeSlot + FusionBurst → extraits dans ./ArenaForge (Alex 2026-06-13,
+// « au fil de l'eau » : on dégraisse ArenaBoard sous 400 lignes).
 
 /** Center status zone — UNIFIED replacement for the old (PhaseBanner +
  *  OppRevealBanner × 2) stack. ONE element at the center between the two
@@ -739,6 +811,18 @@ function LaneRow({
                   // prenne pas tout l'œil.
                   const fanAngle = count > 1 ? (idx - (count - 1) / 2) * 12 : 0;
                   const fanShiftX = count > 1 ? (idx - (count - 1) / 2) * 11 : 0;
+                  // ANTI-REJOUE (Alex 2026-06-13) : une CARTE-SORT posée est
+                  // DÉFINITIVE — pas de retour en main. Sinon : poser, voir
+                  // l'aperçu fantôme, retirer = scout gratuit + carte « jamais
+                  // jouée » qui repart au deck = gros breach. Les INVOCATIONS
+                  // (moves RPSLS) restent retirables via onRemoveSummon : ce ne
+                  // sont pas des cartes, elles ne viennent/repartent pas du deck.
+                  // onRemoveSticker conservé câblé pour une future RELOCALISATION
+                  // (déplacer vers une autre lane sans repasser par la main).
+                  // Retirable AVANT « Fin de tour » (Alex 2026-06-13 : « la
+                  // petite croix tant que pas locké »). Post-lock c'est
+                  // combatLane/resolving qui bloquent côté plan phase. Le breach
+                  // « voir l'effet PUIS retirer » est post-lock — déjà interdit.
                   const removable = s.owner === "you" && !!onRemoveSticker && combatLane === null;
                   out.push(
                     <div

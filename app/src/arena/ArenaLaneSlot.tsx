@@ -15,6 +15,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "../icons";
 import { CREATURE_STATS, type Creature, type LaneIndex } from "./arenaTypes";
 import { creatureEffectiveAtk } from "./arenaRules";
+import { DisguiseOverlay, CreatureBuffOverlay, CreatureDebuffOverlay, CreatureHealBloom } from "./ArenaCreatureFX";
 
 /** Vecteurs FIXES des étincelles d'impact (pas de Math.random au render —
  *  zéro jitter de re-render). 7 directions en éventail, alternance ambre/rose. */
@@ -106,6 +107,11 @@ export function ArenaLaneSlot({
   /** Pulse de BUFF : la créature gonfle + halo doré-vert quand son ATK monte
    *  ou qu'elle gagne un bouclier (Alex "buffées trop molles"). */
   const [buffPulse, setBuffPulse] = useState<{ key: number } | null>(null);
+  /** SOIN (Sève, etc.) : lueur verte douce + "+N" — calme et smooth,
+   *  par contraste avec le hit brutal (Alex 2026-06-13 "fortes ou calmes"). */
+  const [healFlash, setHealFlash] = useState<{ n: number; key: number } | null>(null);
+  /** DEBUFF (Curse −ATK, Toile englue) : flash violet sombre + tassement sec. */
+  const [debuffPulse, setDebuffPulse] = useState<{ key: number } | null>(null);
   useEffect(() => {
     const prev = prevRef.current;
     const snap = creature
@@ -119,6 +125,13 @@ export function ArenaLaneSlot({
       const sid = window.setTimeout(() => setHitShake(null), 480);
       prevRef.current = snap;
       return () => { window.clearTimeout(id); window.clearTimeout(sid); };
+    }
+    // SOIN — hp REMONTE in-place (même créature) : pulse vert + "+N".
+    if (creature && prev && prev.move === creature.move && creature.hp > prev.hp) {
+      setHealFlash({ n: creature.hp - prev.hp, key: Date.now() });
+      const id = window.setTimeout(() => setHealFlash(null), 900);
+      prevRef.current = snap;
+      return () => window.clearTimeout(id);
     }
     // SHIELD ABSORBED — prev had shield, now doesn't, HP unchanged.
     if (creature && prev && prev.move === creature.move && prev.shield && !creature.divineShield && creature.hp === prev.hp) {
@@ -189,20 +202,30 @@ export function ArenaLaneSlot({
   // 💪 BUFF pulse — détecte une hausse d'ATK (atkBuff) ou un bouclier gagné
   // IN-PLACE. Déclenche un pop + halo (cf. reactAnim). Isolé du pipeline
   // dégâts. Pas de faux positif sur résummon (passage par null entre deux).
-  const prevBuffRef = useRef<{ atk: number; shield: boolean } | null>(
-    creature ? { atk: creature.atkBuff, shield: creature.divineShield } : null,
+  const prevBuffRef = useRef<{ atk: number; shield: boolean; webbed: boolean } | null>(
+    creature ? { atk: creature.atkBuff, shield: creature.divineShield, webbed: !!creature.cannotAttack } : null,
   );
   useEffect(() => {
     const prev = prevBuffRef.current;
-    const cur = creature ? { atk: creature.atkBuff, shield: creature.divineShield } : null;
+    const cur = creature
+      ? { atk: creature.atkBuff, shield: creature.divineShield, webbed: !!creature.cannotAttack }
+      : null;
     if (cur && prev && (cur.atk > prev.atk || (!prev.shield && cur.shield))) {
       setBuffPulse({ key: Date.now() });
       const id = window.setTimeout(() => setBuffPulse(null), 680);
       prevBuffRef.current = cur;
       return () => window.clearTimeout(id);
     }
+    // DEBUFF — ATK qui BAISSE (Curse) ou englument Toile (cannotAttack
+    // false→true) : tassement sec violet (Alex 2026-06-13).
+    if (cur && prev && (cur.atk < prev.atk || (!prev.webbed && cur.webbed))) {
+      setDebuffPulse({ key: Date.now() });
+      const id = window.setTimeout(() => setDebuffPulse(null), 620);
+      prevBuffRef.current = cur;
+      return () => window.clearTimeout(id);
+    }
     prevBuffRef.current = cur;
-  }, [creature?.atkBuff, creature?.divineShield]);
+  }, [creature?.atkBuff, creature?.divineShield, creature?.cannotAttack]);
 
   if (creature) {
     const stats = CREATURE_STATS[creature.move];
@@ -263,6 +286,32 @@ export function ArenaLaneSlot({
             "brightness(1) drop-shadow(0 0 0 transparent)",
           ],
         }
+      : debuffPulse
+      ? {
+          // DEBUFF — tassement SEC : la créature s'écrase brièvement,
+          // teinte violette sombre. Brutal mais court.
+          y: isPlayer ? 3 : -3, x: 0,
+          scale: [1, 0.88, 0.96, 1],
+          rotate: [0, 2, -1, 0],
+          filter: [
+            "brightness(1) drop-shadow(0 0 0 transparent)",
+            "brightness(0.65) drop-shadow(0 0 10px rgba(139,92,246,0.85))",
+            "brightness(0.85) drop-shadow(0 0 6px rgba(139,92,246,0.5))",
+            "brightness(1) drop-shadow(0 0 0 transparent)",
+          ],
+        }
+      : healFlash
+      ? {
+          // SOIN — respiration DOUCE : gonflement lent, lueur émeraude.
+          y: 0, x: 0,
+          scale: [1, 1.08, 1],
+          rotate: 0,
+          filter: [
+            "brightness(1) drop-shadow(0 0 0 transparent)",
+            "brightness(1.35) drop-shadow(0 0 16px rgba(52,211,153,0.95))",
+            "brightness(1) drop-shadow(0 0 0 transparent)",
+          ],
+        }
       : buffPulse
       ? {
           y: 0, x: 0,
@@ -279,16 +328,23 @@ export function ArenaLaneSlot({
     return (
       <motion.div
         layout
-        initial={{ opacity: 0, y: isPlayer ? 12 : -12, scale: 0.85 }}
+        // ENTRÉE D'INVOCATION dramatisée (Alex 2026-06-13) : la créature
+        // JAILLIT de son camp (offset + rotation) et atterrit avec un
+        // overshoot spring — fini le simple fondu.
+        initial={{ opacity: 0, y: isPlayer ? 20 : -20, scale: 0.55, rotate: isPlayer ? -6 : 6 }}
         animate={{ opacity: 1, ...reactAnim }}
         transition={
           chargeAttack
             ? { duration: 0.72, ease: "easeOut", times: [0, 0.2, 0.42, 0.55, 0.78, 1] }
             : hitShake
             ? { duration: 0.46, ease: "easeOut" }
+            : debuffPulse
+            ? { duration: 0.5, ease: "easeOut" }
+            : healFlash
+            ? { duration: 0.85, ease: "easeInOut" }
             : buffPulse
             ? { duration: 0.6, ease: "easeOut" }
-            : undefined
+            : { type: "spring", stiffness: 380, damping: 24 }
         }
         className="aspect-[5/4] w-full rounded-xl relative flex flex-col items-center justify-center overflow-hidden transition"
         style={{
@@ -367,47 +423,53 @@ export function ArenaLaneSlot({
          *  un masque 🎭 éclôt au centre. Signature visuelle du changement
          *  d'identité (Alex 2026-06-12). */}
         <AnimatePresence>
-          {disguiseFlash && (
-            <motion.div
-              key={`disg-${disguiseFlash.key}`}
-              className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden"
-              style={{ zIndex: 20 }}
+          {disguiseFlash && <DisguiseOverlay key={`disg-${disguiseFlash.key}`} />}
+        </AnimatePresence>
+        {/* 💪 BUFF / 💀 MALUS — overlays SIGNATURE niveau Mascarade (Alex
+         *  2026-06-13). Le sujet réagit déjà (reactAnim) ; ceci ajoute l'aura
+         *  montante (buff) ou le voile qui s'enfonce (malus) par-dessus.
+         *  cf. ArenaCreatureFX. One-shot, leak-free. */}
+        <AnimatePresence>
+          {buffPulse && <CreatureBuffOverlay key={`buff-${buffPulse.key}`} />}
+        </AnimatePresence>
+        <AnimatePresence>
+          {debuffPulse && <CreatureDebuffOverlay key={`debuff-${debuffPulse.key}`} />}
+        </AnimatePresence>
+        {/* 🕸 TOILE GLUANTE — voile lime + badge tant que la créature est
+         *  engluée (cannotAttack, expire en fin de tour). L'UI ne ment pas :
+         *  ⚔ affiche déjà 0, ceci montre POURQUOI. */}
+        {creature.cannotAttack && (
+          <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 15 }} aria-hidden>
+            <div
+              className="absolute inset-0 rounded-xl"
+              style={{ background: "radial-gradient(circle, rgba(132,204,22,0.16) 0%, rgba(132,204,22,0.05) 60%, transparent 80%)" }}
+            />
+            <motion.span
+              animate={{ rotate: [0, -6, 6, 0] }}
+              transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute top-1 left-1/2 -translate-x-1/2 text-[13px] drop-shadow"
+              title="Engluée — ne peut pas attaquer ce tour"
             >
-              {/* voile violet qui pulse */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: [0, 0.85, 0.4, 0] }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.85, times: [0, 0.25, 0.6, 1] }}
-                className="absolute inset-0"
-                style={{
-                  background:
-                    "radial-gradient(circle, rgba(192,132,252,0.9) 0%, rgba(126,34,206,0.6) 45%, transparent 72%)",
-                  mixBlendMode: "screen",
-                }}
-              />
-              {/* balayage conique doré qui tourne */}
-              <motion.div
-                initial={{ rotate: 0, opacity: 0, scale: 0.6 }}
-                animate={{ rotate: 320, opacity: [0, 1, 0], scale: [0.6, 1.6, 2] }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-                className="absolute inset-0"
-                style={{
-                  background:
-                    "conic-gradient(from 0deg, transparent 0deg, rgba(252,211,77,0.95) 40deg, transparent 90deg)",
-                  mixBlendMode: "screen",
-                }}
-              />
-              {/* masque 🎭 qui éclôt au centre */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.2, y: 6 }}
-                animate={{ opacity: [0, 1, 1, 0], scale: [0.2, 1.25, 1.1, 1.3], y: [6, -2, -2, -8] }}
-                transition={{ duration: 0.85, times: [0, 0.3, 0.65, 1] }}
-                className="absolute inset-0 flex items-center justify-center text-3xl"
-                style={{ filter: "drop-shadow(0 0 8px rgba(192,132,252,0.9))" }}
-              >
-                🎭
-              </motion.div>
+              🕸️
+            </motion.span>
+          </div>
+        )}
+        {/* ✚ SOIN — floraison émeraude (signature) + « +N » qui s'élève. */}
+        <AnimatePresence>
+          {healFlash && <CreatureHealBloom key={`heal-bloom-${healFlash.key}`} />}
+        </AnimatePresence>
+        <AnimatePresence>
+          {healFlash && (
+            <motion.div
+              key={`heal-${healFlash.key}`}
+              initial={{ opacity: 0, y: 6, scale: 0.7 }}
+              animate={{ opacity: [0, 1, 1, 0], y: -22, scale: 1.15 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.9, ease: "easeOut" }}
+              className="absolute inset-x-0 top-1 flex justify-center pointer-events-none text-base font-black text-emerald-300"
+              style={{ zIndex: 26, textShadow: "0 2px 8px rgba(52,211,153,0.85), 0 0 2px black" }}
+            >
+              +{healFlash.n}
             </motion.div>
           )}
         </AnimatePresence>

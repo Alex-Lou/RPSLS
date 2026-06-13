@@ -33,18 +33,24 @@ import { ArenaBoard } from "./ArenaBoard";
 import { ArenaDebugOverlay } from "./ArenaDebugOverlay";
 import { ArenaMatchEnd } from "./ArenaMatchEnd";
 import { ArenaMatchSplash } from "./ArenaMatchSplash";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useAnimationControls } from "motion/react";
+import { ArenaImpactFX } from "./ArenaImpactFX";
+import { ArenaCastOnDrawFX, useCastOnDrawQueue } from "./ArenaCastOnDrawFX";
 import { ArenaHeistAnim } from "./ArenaHeistAnim";
 import { ArenaPlanPhase } from "./ArenaPlanPhase";
 import { ArenaSuddenDeath } from "./ArenaSuddenDeath";
 import { arenaLogReset, alog } from "./arenaLog";
-import { advanceToNextTurn, makeInitialBoard, truncateIntentByCaps } from "./arenaRules";
+import { advanceToNextTurn, makeInitialBoard, truncateIntentByCaps, mulliganSwap, mulliganReplaceInPlace } from "./arenaRules";
+import { ArenaMulligan } from "./ArenaMulligan";
+import { findFusionResult } from "./arenaFusionCards";
 import { cpuArenaDecision } from "./arenaAI";
 import {
   CPU_PERSONAS,
   HERO_MAX_HP,
   MAX_SPELLS_PER_TURN,
   UTILITY_SPELLS_PER_TURN,
+  intentManaGrant,
+  type HeroState,
   type ArenaTargeting,
   type BoardState,
   type LaneIndex,
@@ -123,14 +129,32 @@ function BoardFillSlot({ children }: { children: (h: number) => ReactNode }) {
   );
 }
 
+/** Étiquettes d'effets BINAIRES (on/off, non cumulables) par carte — sert au
+ *  garde anti-redondance d'addSpell (Alex 2026-06-13). Une carte qui re-pose
+ *  un tag déjà couvert par une autre carte planifiée sur la même lane est
+ *  refusée (ex. Bastion ⊃ bouclier+ancre → bloque Aegis & Anchor). Les buffs
+ *  ADDITIFS (Précision/Surge +ATK) ne sont PAS listés ici : ils s'empilent. */
+const BINARY_EFFECT_TAGS: Partial<Record<CardId, string[]>> = {
+  aegis:           ["shield"],
+  anchor:          ["anchor"],
+  riposte:         ["riposte"],
+  bastion:         ["shield", "anchor"], // fusion Aegis+Anchor
+  "toile-gluante": ["noattack"],
+  cocon:           ["noattack"],         // fusion Toile+Curse (le -ATK de Curse, lui, s'empile)
+};
+
 export function ArenaGame({
-  onQuit, onRematch,
+  onQuit, onRematch, oppName, oppAvatar,
 }: {
   onQuit: () => void;
   /** Called when the player taps "Rejouer" on the match-end screen.
    *  Bubbled up so ArenaPage can route back to the prep screen (fresh
    *  coin flip → fresh theme/pad for the new match). */
   onRematch?: () => void;
+  /** Identité cosmétique CPU (depuis le prep) — affichée sur le strip adverse
+   *  en match : nom réel + portrait hero_*.png, plus de « CPU » + 🤖. */
+  oppName?: string;
+  oppAvatar?: string;
 }) {
   const player = useStore((s) => s.player);
   const difficulty = player.difficulty ?? "normal";
@@ -141,7 +165,9 @@ export function ArenaGame({
   // the saved deck has too few supported cards. Saved deck is `string[]` in
   // the store; we re-narrow to CardId by filtering against the registry.
   const playerDeck = useRef<CardId[]>(buildPlayerDeck(
-    (player.rankedDeck ?? []).filter(
+    // Deck Pro SÉPARÉ (arenaDeck, 8 cartes) — fallback rankedDeck pour les
+    // joueurs sans arenaDeck encore (migration douce). Alex 2026-06-13.
+    (player.arenaDeck ?? player.rankedDeck ?? []).filter(
       (id): id is CardId => Object.prototype.hasOwnProperty.call(CARDS, id),
     ),
   ));
@@ -174,9 +200,142 @@ export function ArenaGame({
   const [board, setBoard] = useState<BoardState>(() =>
     makeInitialBoard(playerDeck.current, buildCpuDeckMirroring(playerDeck.current), playerAffinity.current, cpuAffinity.current, cpuPersona.current),
   );
+
+  // ── MULLIGAN T1 (Alex 2026-06-13 économie expert) ──
+  // Une fois par match : remplace jusqu'à 2 cartes de la main de départ.
+  // Le CPU mulligan EN MÊME TEMPS (heuristique : il rend ses cartes chères
+  // surnuméraires) pour l'équité. "Garder tout" laisse aussi le CPU décider.
+  const [mulliganOpen, setMulliganOpen] = useState(true);
+  // Échanges restants (départ 2). Modèle IMMÉDIAT : chaque rejet remplace EN
+  // PLACE (cf. ArenaMulligan) → plus de sélection multi-index.
+  const [mulliganSwapsLeft, setMulliganSwapsLeft] = useState(2);
+  function cpuMulliganIndices(h: HeroState): number[] {
+    // Garde 1 carte chère max en ouverture ; rend les suivantes (≤2).
+    const idx: number[] = [];
+    let expensive = 0;
+    h.hand.forEach((c, i) => {
+      if ((CARDS[c]?.cost ?? 0) >= 3) {
+        expensive += 1;
+        if (expensive > 1 && idx.length < 2) idx.push(i);
+      }
+    });
+    return idx;
+  }
+  // ── ⚗️ FORGE (2026-06-13) — dépôt gratuit / fusion / reprise, au TAP de
+  // la case Forge (centre-droite du pad). Aucun tour perdu, aucun mana au
+  // dépôt : le coût se paie au cast de la carte fusionnée. ──
+  const [forgeFlash, setForgeFlash] = useState<number | null>(null);
+  // Helper PARTAGÉ (DRY) : dépose `id` sur la forge si vide, OU fusionne avec
+  // la carte présente si une recette existe. Retire la carte de la MAIN.
+  // Utilisé par le tap forge (carte armée) ET par le bouton ⚗ de la fiche
+  // (carte explicite). Une seule source de vérité pour la mécanique.
+  function depositOrFuse(id: CardId) {
+    const forge = board.forgeA ?? null;
+    if (!forge) {
+      setBoard((cur) => {
+        const i = cur.a.hand.indexOf(id);
+        if (i < 0) return cur;
+        const hand = [...cur.a.hand.slice(0, i), ...cur.a.hand.slice(i + 1)];
+        alog("hand", `a FORGE dépôt : ${id}`);
+        return { ...cur, a: { ...cur.a, hand }, forgeA: id };
+      });
+      hapticTap();
+      return;
+    }
+    const result = findFusionResult(id, forge);
+    if (result) {
+      // La carte fusionnée RESTE sur la forge (Alex 2026-06-13) — le joueur la
+      // RÉCUPÈRE au tap (« ✨ Récupérer »). S'il la laisse, elle reste exposée
+      // → une carte « Pillage » adverse peut la voler. Risque/récompense.
+      setBoard((cur) => {
+        const i = cur.a.hand.indexOf(id);
+        if (i < 0) return cur;
+        const hand = [...cur.a.hand.slice(0, i), ...cur.a.hand.slice(i + 1)];
+        alog("hand", `a FUSION ⚗️ : ${forge} + ${id} = ${result} (reste sur la forge → à récupérer)`);
+        return { ...cur, a: { ...cur.a, hand }, forgeA: result };
+      });
+      setForgeFlash(Date.now());
+      hapticTap();
+      return;
+    }
+    alog("hand", `🚫 « ${cardFr(id)} » ne fusionne pas avec « ${cardFr(forge)} » — voir Règles ⚗️.`);
+  }
+
+  // Tap sur la forge : dépôt/fusion de la carte ARMÉE, sinon REPRISE.
+  function handleForgeTap() {
+    if (resolving) return;
+    if (targeting?.kind === "spell") {
+      depositOrFuse(targeting.id);
+      setTargeting(null);
+      return;
+    }
+    const forge = board.forgeA ?? null;
+    if (forge) {
+      // REPRISE — la carte revient en main (aucune sélection active).
+      setBoard((cur) => ({ ...cur, a: { ...cur.a, hand: [...cur.a.hand, forge] }, forgeA: null }));
+      alog("hand", `a FORGE reprise : ${forge}`);
+      hapticTap();
+    }
+  }
+
+  // Dépôt/fusion FIABLE d'une carte EXPLICITE (bouton ⚗ de la fiche) — marche
+  // pour TOUT ciblage (les utilitaires qui s'auto-jouaient au tap passent
+  // désormais par ici). Nettoie aussi un éventuel sort utilitaire déjà
+  // planifié avec cette carte (anti double-dépense).
+  function handleForgeDeposit(id: CardId) {
+    if (resolving) return;
+    setIntent((cur) => {
+      const i = cur.spells.findIndex((s) => s.id === id && s.kind !== "lane");
+      return i < 0 ? cur : { ...cur, spells: [...cur.spells.slice(0, i), ...cur.spells.slice(i + 1)] };
+    });
+    depositOrFuse(id);
+    if (targeting?.kind === "spell" && targeting.id === id) setTargeting(null);
+  }
+
+  // Rejet IMMÉDIAT d'une carte → remplacée EN PLACE (le joueur voit la nouvelle
+  // arriver). Décrémente les échanges restants.
+  function handleMulliganReject(i: number) {
+    if (mulliganSwapsLeft <= 0) return;
+    setBoard((cur) => ({ ...cur, a: mulliganReplaceInPlace(cur.a, i) }));
+    setMulliganSwapsLeft((n) => Math.max(0, n - 1));
+    hapticTap();
+  }
+  // Fermeture (« C'est parti ! ») : le CPU mulligan UNE fois, puis on ferme.
+  function handleMulliganClose() {
+    setBoard((cur) => ({ ...cur, b: mulliganSwap(cur.b, cpuMulliganIndices(cur.b)) }));
+    setMulliganOpen(false);
+  }
   const [intent, setIntent] = useState<TurnIntent>({ spells: [], summons: [] });
   const [matchSplash, setMatchSplash] = useState(true);
   const [resolving, setResolving] = useState(false);
+  // Signatures FX plein-board (Genèse, Supernova…). Purgé après l'anim par un
+  // timer NETTOYÉ → aucune fuite (cf. demande Alex « zéro thread non achevée »).
+  const [spellFX, setSpellFX] = useState<{ ids: CardId[]; key: number } | null>(null);
+  useEffect(() => {
+    if (!spellFX) return;
+    const id = window.setTimeout(() => setSpellFX(null), 1500);
+    return () => window.clearTimeout(id);
+  }, [spellFX?.key]);
+  // IMPACT FX plein-écran (coup puissant/fatal) + TREMBLEMENT de l'écran. Purgé
+  // par timer nettoyé, shake one-shot via controls → leak-free.
+  const [impactFX, setImpactFX] = useState<{ move: Move; power: "strong" | "fatal"; key: number } | null>(null);
+  const screenShake = useAnimationControls();
+  useEffect(() => {
+    if (!impactFX) return;
+    const fatal = impactFX.power === "fatal";
+    const amp = fatal ? 11 : 6;
+    // Secousse one-shot (pas de repeat) — séquence d'amplitude décroissante.
+    screenShake.start({
+      x: [0, -amp, amp, -amp * 0.7, amp * 0.5, -amp * 0.25, 0],
+      y: [0, amp * 0.6, -amp * 0.5, amp * 0.4, -amp * 0.2, amp * 0.1, 0],
+      transition: { duration: fatal ? 0.6 : 0.45, ease: "easeOut" },
+    });
+    const id = window.setTimeout(() => setImpactFX(null), 900);
+    return () => window.clearTimeout(id);
+  }, [impactFX?.key]);
+  // ⚡ Cartes « à la pioche » (Cast When Drawn) — file d'événements lue à chaque
+  // changement de tour, jouée une par une (hook co-localisé avec son FX).
+  const castDraw = useCastOnDrawQueue(board);
   /** Opp intent preview: set after lock, cleared when the spells step fires.
    *  Drives the "Adversaire joue X / summon Y" banner + ghost previews on
    *  the opp lanes so the player SEES what they committed. */
@@ -387,20 +546,12 @@ export function ArenaGame({
         alog("hand", `🚫 « ${cardFr(spell.id)} » impossible : plus de copie dispo (1 carte = 1 usage ; ${usageCount} déjà planifié(s), ${handCount} en main).`);
         return cur;
       }
-      // Aegis : lock 1×/match levé (Alex 2026-06-11) — la règle "1 copie en
-      // main = 1 cast" via usageCount/handCount + le check duplicate (même
-      // id + même lane) suffisent à empêcher l'abus. Si tu as 2 Aegis en
-      // main, tu peux les caster sur 2 lanes différentes.
-      const duplicate = cur.spells.some((s) => {
-        if (s.id !== spell.id) return false;
-        if (s.kind !== spell.kind) return false;
-        if (s.kind === "lane" && spell.kind === "lane") return s.lane === spell.lane;
-        return true; // same id + same non-lane target → dup
-      });
-      if (duplicate) {
-        alog("hand", `🚫 « ${cardFr(spell.id)} » impossible : déjà planifié sur cette cible. Vise une autre lane/créature.`);
-        return cur;
-      }
+      // Check "duplicate même cible" LEVÉ (Alex 2026-06-13 CCG expert, "pas
+      // de limites quand pas nécessaires") : 2 copies de Précision sur la
+      // MÊME créature (+4 ATK) est un play CCG légitime. L'abus réel (caster
+      // 2× une copie UNIQUE) est déjà bloqué par usageCount/handCount
+      // ci-dessus. Un recast idempotent (2e Aegis sur créature déjà
+      // bouclier) gâche le mana du joueur — son choix, pas celui du moteur.
       // Alex feedback 2026-06-11 : la mutual exclusion Aegis/Anchor même lane
       // est LEVÉE — empiler les deux défenses sur la même créature est
       // explicitement autorisé. Le check duplicate (même id + même lane)
@@ -411,6 +562,25 @@ export function ArenaGame({
       if (isFinisherCard(spell.id) && board.a.finisherUsed) {
         alog("hand", `🚫 « ${cardFr(spell.id)} » impossible : ton Finisher a déjà été lancé ce match (1 seul par partie).`);
         return cur;
+      }
+      // REDONDANCE d'effet binaire sur une même lane (Alex 2026-06-13 : "si
+      // déjà Bastion, pas pouvoir ajouter Aegis/Anchor — sinon cheaté"). Les
+      // effets BINAIRES (bouclier / ancre / ne-peut-pas-attaquer) ne se
+      // cumulent pas : une carte qui re-applique un effet déjà couvert par une
+      // autre planifiée sur la MÊME lane est refusée. (Les buffs ADDITIFS
+      // comme Précision/Surge ne sont PAS concernés — ils s'empilent.)
+      if (spell.kind === "lane") {
+        const newTags = BINARY_EFFECT_TAGS[spell.id] ?? [];
+        if (newTags.length > 0) {
+          const conflict = cur.spells.find(
+            (s) => s.kind === "lane" && s.lane === spell.lane &&
+              (BINARY_EFFECT_TAGS[s.id] ?? []).some((tg) => newTags.includes(tg)),
+          );
+          if (conflict) {
+            alog("hand", `🚫 « ${cardFr(spell.id)} » impossible : « ${cardFr(conflict.id)} » couvre déjà cet effet sur cette lane (redondant).`);
+            return cur;
+          }
+        }
       }
       return { ...cur, spells: [...cur.spells, spell] };
     });
@@ -452,7 +622,7 @@ export function ArenaGame({
   function handleLockTurn() {
     if (resolving) return;
     if (board.phase !== "planning") return;
-    if (intentCost(intent) > board.a.mana) return;
+    if (intentCost(intent) > board.a.mana + intentManaGrant(intent)) return;
     hapticLock();
     setResolving(true);
 
@@ -472,10 +642,22 @@ export function ArenaGame({
     const safeCpuIntent = truncateIntentByCaps(cpuIntent);
     const aSpent = removeSpentCardsDetailed(board.a.hand, safeIntent);
     const bSpent = removeSpentCardsDetailed(board.b.hand, safeCpuIntent);
+    // ÉCONOMIE expert (Alex 2026-06-13) : les LÉGENDAIRES jouées sont EXILÉES
+    // (jamais reshufflées → 1 usage/partie, elles redeviennent des MOMENTS).
+    // Le reste recycle via la défausse comme avant. L'exil sanctionne le CAST
+    // — une légendaire défaussée sans être jouée (Juge) recycle normalement.
+    const splitSpent = (spent: CardId[]) => ({
+      toDiscard: spent.filter((c) => CARDS[c]?.rarity !== "legendary"),
+      toExile: spent.filter((c) => CARDS[c]?.rarity === "legendary"),
+    });
+    const aSplit = splitSpent(aSpent.spent);
+    const bSplit = splitSpent(bSpent.spent);
+    if (aSplit.toExile.length > 0) alog("hand", `a EXIL légendaire : [${aSplit.toExile.join(",")}] (1 usage par partie)`);
+    if (bSplit.toExile.length > 0) alog("hand", `b EXIL légendaire : [${bSplit.toExile.join(",")}] (1 usage par partie)`);
     const startBoard: BoardState = {
       ...board,
-      a: { ...board.a, hand: aSpent.hand, discard: [...board.a.discard, ...aSpent.spent] },
-      b: { ...board.b, hand: bSpent.hand, discard: [...board.b.discard, ...bSpent.spent] },
+      a: { ...board.a, hand: aSpent.hand, discard: [...board.a.discard, ...aSplit.toDiscard], exiled: [...board.a.exiled, ...aSplit.toExile] },
+      b: { ...board.b, hand: bSpent.hand, discard: [...board.b.discard, ...bSplit.toDiscard], exiled: [...board.b.exiled, ...bSplit.toExile] },
     };
 
     runResolverFlow({
@@ -490,6 +672,8 @@ export function ArenaGame({
       setHeroHit,
       setTauntBlock,
       setAntiTaunt,
+      setSpellFX,
+      setImpactFX,
       onSettle: () => setIntent({ spells: [], summons: [] }),
       onAdvanceTurn: () => {
         setResolving(false);
@@ -505,7 +689,7 @@ export function ArenaGame({
   /* ──────────── Render ──────────── */
 
   if (matchSplash) {
-    return <ArenaMatchSplash playerName={player.nickname || "Toi"} playerAvatar={player.avatar} />;
+    return <ArenaMatchSplash playerName={player.nickname || "Toi"} playerAvatar={player.avatar} cpuName={oppName} cpuAvatar={oppAvatar} />;
   }
 
   if (board.phase === "sudden-death") {
@@ -537,6 +721,8 @@ export function ArenaGame({
           // handler, fall back to a local soft-reset.
           if (onRematch) { onRematch(); return; }
           matchEndedRef.current = false;
+          setMulliganOpen(true);
+          setMulliganSwapsLeft(2);
           setBoard(makeInitialBoard(playerDeck.current, buildCpuDeckMirroring(playerDeck.current), playerAffinity.current, cpuAffinity.current, cpuPersona.current));
           setIntent({ spells: [], summons: [] });
           setOppPreview(null);
@@ -553,7 +739,17 @@ export function ArenaGame({
   }
 
   return (
-    <div className="relative flex-1 flex flex-col min-h-0 gap-1">
+    <motion.div animate={screenShake} className="relative flex-1 flex flex-col min-h-0 gap-1">
+      {/* 💥 IMPACT FX plein-écran (coup puissant/fatal) — entaille Ciseaux,
+       *  ébranlement Pierre… + tremblement de cette racine (Alex 2026-06-13). */}
+      <ArenaImpactFX fx={impactFX} />
+      {/* ⚡ Cartes « à la pioche » (Cast When Drawn) — éclair + carte + effet,
+       *  jouées une par une (Alex 2026-06-13). One-shot, démonte via onDone. */}
+      <AnimatePresence>
+        {castDraw.head && (
+          <ArenaCastOnDrawFX key={castDraw.head.key} event={castDraw.head} onDone={castDraw.shift} />
+        )}
+      </AnimatePresence>
       {/* Floating back / forfeit — same component every other match surface
        *  uses (Classic, Ranked, Lanes). The confirm modal pops first; on
        *  confirm we record a LOSS on arenaStats and bounce out. Hidden on
@@ -595,10 +791,24 @@ export function ArenaGame({
             heroHit={heroHit}
             tauntBlock={tauntBlock}
             antiTaunt={antiTaunt}
+            spellFX={spellFX}
+            oppName={oppName}
+            oppAvatar={oppAvatar}
             targeting={targeting}
             onLaneTap={handleBoardLaneTap}
             onRemoveSpell={removeSpell}
             onRemoveSummon={removeSummon}
+            forgeYou={board.forgeA ?? null}
+            forgeOpp={board.forgeB ?? null}
+            onForgeTap={handleForgeTap}
+            forgeFlashKey={forgeFlash}
+            forgeHighlight={
+              targeting?.kind === "spell"
+                ? board.forgeA
+                  ? (findFusionResult(targeting.id, board.forgeA) ? "fuse" : null)
+                  : "deposit"
+                : null
+            }
           />
         )}
       </BoardFillSlot>
@@ -614,10 +824,24 @@ export function ArenaGame({
         onAddSummon={addSummon}
         onRemoveSummon={removeSummon}
         onLock={handleLockTurn}
+        onForgeTap={handleForgeTap}
+        onForgeDeposit={handleForgeDeposit}
         incomingAttackKey={heroHit?.side === "you" ? heroHit.key : null}
         playerName={player.nickname || "Toi"}
         playerAvatar={player.avatar}
       />
+      {/* ── MULLIGAN T1 — modale extraite (ArenaMulligan) : empilage des
+       *  doublons + remplacement IMMÉDIAT en place (Alex 2026-06-13). ── */}
+      <AnimatePresence>
+        {mulliganOpen && board.turn === 1 && !resolving && (
+          <ArenaMulligan
+            hand={board.a.hand}
+            swapsLeft={mulliganSwapsLeft}
+            onRejectOne={handleMulliganReject}
+            onClose={handleMulliganClose}
+          />
+        )}
+      </AnimatePresence>
       <AnimatePresence>
         {heistAnim && (
           <ArenaHeistAnim
@@ -653,7 +877,7 @@ export function ArenaGame({
        *  that shows live arena events. Replaces adb logcat (which
        *  dropped lines under load) with an in-app live feed. */}
       <ArenaDebugOverlay />
-    </div>
+    </motion.div>
   );
 }
 
