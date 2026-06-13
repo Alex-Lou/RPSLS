@@ -7,11 +7,13 @@
  * collection. Locked cards stay greyed with a hint.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
 import { ALL_CARD_IDS, CARDS, isPassiveCard, RARITY_COLOR, RARITY_ORDER } from "./cards";
+import { isFusible } from "../arena/arenaFusionCards";
+import { isCastOnDraw } from "../arena/arenaCastOnDraw";
 import { CardImage } from "./CardImage";
 import { masteryLevel, MASTERY_MAX_LEVEL } from "../engine/economy";
 import type { CardId, CardRarity } from "./rankedTypes";
@@ -19,10 +21,12 @@ import { useT } from "../i18n";
 import { useNoMenuFx } from "../fx/menuFx";
 import { CurrencyBadges } from "./CurrencyBadges";
 import { hapticTap } from "../haptic";
+import { setBurgerHidden } from "../Sidebar";
 
-const MAIN_SLOTS = 3;
-const RESERVE_SLOTS = 3;
-const TOTAL = MAIN_SLOTS + RESERVE_SLOTS;
+// Taille du deck PAR MODE (Alex 2026-06-13) : Classé = 6, Pro = 8. Decks
+// SÉPARÉS dans le store (rankedDeck / arenaDeck) → éditer l'un n'écrase pas
+// l'autre. Calculée dans le composant à partir de la prop `mode`.
+const SLOTS_BY_MODE = { ranked: 6, arena: 10 } as const;
 
 /** Compact French labels per rarity for the filter tabs. */
 const RARITY_FR: Record<CardRarity, string> = {
@@ -96,15 +100,29 @@ const UNLOCK_HINTS: Partial<Record<CardId, string>> = {
   genese: "Pack rare ou forge légendaire",
 };
 
-export function DeckManager({ onClose }: { onClose: () => void }) {
+export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void; mode?: "ranked" | "arena" }) {
   useNoMenuFx(); // deck editor → no menu touch particles
+  const TOTAL = SLOTS_BY_MODE[mode];
+  // Burger flottant MASQUÉ (Alex 2026-06-13) : le DeckManager a sa propre
+  // flèche Retour dans l'en-tête → le burger top-left chevauchait + laissait
+  // un vide. On le cache tant que l'éditeur est ouvert (Arena ET Classé, vu
+  // que le composant est partagé → la "jolie mise en forme" bénéficie aux
+  // deux modes d'un seul coup). Restauré au unmount.
+  useEffect(() => {
+    setBurgerHidden(true);
+    return () => setBurgerHidden(false);
+  }, []);
   const t = useT();
   const player = useStore((s) => s.player);
   const setRankedDeck = useStore((s) => s.setRankedDeck);
+  const setArenaDeck = useStore((s) => s.setArenaDeck);
+  // Source + setter selon le mode. Pro retombe sur le deck Classé si pas
+  // encore d'arenaDeck (migration douce des joueurs existants).
+  const savedDeck = mode === "arena" ? (player.arenaDeck ?? player.rankedDeck ?? []) : (player.rankedDeck ?? []);
+  const saveDeck = mode === "arena" ? setArenaDeck : setRankedDeck;
   const collection = player.cardCollection ?? STARTER_CARDS;
   const [deck, setDeck] = useState<(CardId | null)[]>(() => {
-    const saved = player.rankedDeck ?? [];
-    const padded = [...saved];
+    const padded = [...savedDeck];
     while (padded.length < TOTAL) padded.push(null as unknown as string);
     return padded.slice(0, TOTAL) as (CardId | null)[];
   });
@@ -123,8 +141,7 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
   const [passiveOnly, setPassiveOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const mainSlots = deck.slice(0, MAIN_SLOTS) as (CardId | null)[];
-  const reserveSlots = deck.slice(MAIN_SLOTS, TOTAL) as (CardId | null)[];
+  const equipped = deck.filter(Boolean).length;
 
   // Tap a card → open detail modal AND set as selected. The modal has a
   // "Mettre dans mon deck" button that closes the modal WHILE keeping the
@@ -132,32 +149,82 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
   // ouvert empêchait l'assignation). X / backdrop closes WITHOUT
   // assigning (selected resets too).
   const [modalOpen, setModalOpen] = useState(false);
+  // Toast (Alex 2026-06-13) : message court + visible SANS scroller, pour
+  // dire pourquoi une carte n'a pas pu être ajoutée (deck plein…) ou
+  // confirmer l'ajout/retrait. Auto-dismiss.
+  const [deckMsg, setDeckMsg] = useState<{ text: string; tone: "good" | "warn" | "info"; key: number } | null>(null);
+  useEffect(() => {
+    if (!deckMsg) return;
+    const id = window.setTimeout(() => setDeckMsg(null), 2400);
+    return () => window.clearTimeout(id);
+  }, [deckMsg?.key]);
+
   function handleCardTap(id: CardId) {
     if (!collection.includes(id)) return;
     setSelected(id);
     setModalOpen(true);
   }
 
-  function handleSlotTap(slotIdx: number) {
-    if (!selected) {
-      // Clear the slot
-      const next = [...deck];
-      next[slotIdx] = null;
-      setDeck(next);
+  // Bouton "Mettre dans mon deck" (Alex 2026-06-13) : place DIRECTEMENT la
+  // carte dans le 1er emplacement libre, ou affiche pourquoi c'est impossible
+  // — le joueur ne remonte plus le deck pour comprendre. Si la carte est déjà
+  // dans le deck, le bouton la RETIRE (toggle intuitif).
+  function handlePickForDeck() {
+    if (!selected) return;
+    const card = CARDS[selected];
+    const name = t(card.nameKey);
+    const existingIdx = deck.indexOf(selected);
+    if (existingIdx >= 0) {
+      const next = [...deck]; next[existingIdx] = null; setDeck(next);
+      setDeckMsg({ text: `« ${name} » retirée du deck`, tone: "info", key: Date.now() });
+      setModalOpen(false); setSelected(null);
       return;
     }
-    // Check if card is already in another slot → swap
+    const freeIdx = deck.indexOf(null);
+    if (freeIdx < 0) {
+      // Deck plein : pas de cul-de-sac. On GARDE la carte sélectionnée, on
+      // ferme la fiche, et on invite à taper l'emplacement à remplacer (les
+      // slots pulsent déjà via `highlight={!!selected}`). Le tap suivant sur
+      // un slot fait le swap (handleSlotTap). Alex 2026-06-13.
+      setModalOpen(false);
+      setDeckMsg({ text: `Deck plein (${TOTAL}/${TOTAL}) — tape la carte à remplacer ↑`, tone: "warn", key: Date.now() });
+      return; // `selected` reste set
+    }
+    const next = [...deck]; next[freeIdx] = selected; setDeck(next);
+    setDeckMsg({ text: `« ${name} » ajoutée (emplacement ${freeIdx + 1})`, tone: "good", key: Date.now() });
+    setModalOpen(false); setSelected(null);
+  }
+
+  function handleSlotTap(slotIdx: number) {
+    const slotCard = deck[slotIdx];
+    if (!selected) {
+      // Pas de carte choisie : taper un slot REMPLI ouvre sa FICHE (avec le
+      // bouton « Retirer ») au lieu de le vider sèchement sans confirmation
+      // (Alex 2026-06-13). Un slot vide ne fait rien.
+      if (slotCard) {
+        setSelected(slotCard);
+        setModalOpen(true);
+      }
+      return;
+    }
+    // Carte choisie → place / remplace (swap si elle est déjà ailleurs).
     const existingIdx = deck.indexOf(selected);
     const next = [...deck];
-    if (existingIdx >= 0) next[existingIdx] = deck[slotIdx]; // swap
+    if (existingIdx >= 0) next[existingIdx] = slotCard; // swap
     next[slotIdx] = selected;
     setDeck(next);
+    setDeckMsg({
+      text: slotCard
+        ? `« ${t(CARDS[selected].nameKey)} » remplace l'emplacement ${slotIdx + 1}`
+        : `« ${t(CARDS[selected].nameKey)} » placée (emplacement ${slotIdx + 1})`,
+      tone: "good", key: Date.now(),
+    });
     setSelected(null);
   }
 
   function handleSave() {
     const validDeck = deck.filter((c): c is CardId => c !== null);
-    setRankedDeck(validDeck);
+    saveDeck(validDeck);
     onClose();
   }
 
@@ -239,50 +306,60 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
       // Root no longer scrolls: a fixed header + a scroll region + a docked
       // Save footer means the Save button is ALWAYS visible (the player no
       // longer has to discover a hidden scroll to find it).
-      className="flex flex-col flex-1 min-h-0 py-2 px-2 max-w-lg mx-auto w-full"
+      // -mt-10 (Alex 2026-06-13) : remonte le panneau dans l'espace mort
+      // laissé par le pt-12 global (burger maintenant masqué) → la nav
+      // respire en haut au lieu de flotter sous un vide.
+      className="flex flex-col flex-1 min-h-0 -mt-10 pt-1 pb-2 px-2 max-w-lg mx-auto w-full"
     >
-      {/* Header — two rows so the title doesn't get squeezed between a
-          full-width currency strip and the close button (which used to wrap
-          "Mon Deck" onto two lines on narrow phones). Row 1: title + close
-          target. Row 2: the read-only currency strip, full width. */}
-      <div className="shrink-0 flex flex-col gap-2 pb-3">
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="text-xl font-extrabold text-themed tracking-tight truncate">
-            Mon Deck
-          </h1>
-          <button
+      {/* Header — cadrage TEMPLATE Pro (Alex 2026-06-13) : retour 40px à
+          gauche, titre gradient centré, spacer symétrique à droite. Monnaies
+          en ligne compacte dessous. */}
+      <div className="shrink-0 flex flex-col gap-2 pb-2">
+        <div className="flex items-center gap-2">
+          <motion.button
+            whileTap={{ scale: 0.92 }}
             onClick={onClose}
-            aria-label="Fermer"
-            className="shrink-0 w-9 h-9 -mr-1 rounded-full text-ink-muted hover:text-white hover:bg-hairline text-xl leading-none flex items-center justify-center transition"
-          >✕</button>
+            aria-label="Retour"
+            className="shrink-0 w-10 h-10 rounded-xl border border-hairline bg-black/45 backdrop-blur flex items-center justify-center text-ink active:scale-95 transition"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 6l-6 6 6 6" />
+            </svg>
+          </motion.button>
+          <div className="flex-1 min-w-0 text-center">
+            <h1
+              className="text-lg sm:text-2xl font-extrabold tracking-tight leading-tight bg-gradient-to-br from-fuchsia-300 to-violet-300 bg-clip-text text-transparent truncate"
+              style={{ fontFamily: "var(--font-headline)" }}
+            >
+              Mon Deck
+            </h1>
+            <p className="text-[10px] text-ink-muted leading-tight">
+              {mode === "arena"
+                ? "8 cartes · chaque choix devient 3/2/2/1 copies selon la rareté"
+                : "6 cartes · Constellation Classée"}
+            </p>
+          </div>
+          <div className="shrink-0 w-10 h-10" aria-hidden />
         </div>
-        <CurrencyBadges inert />
+        <div className="flex items-center justify-center">
+          <CurrencyBadges inert />
+        </div>
       </div>
 
       {/* Scroll region — only this middle band scrolls. */}
-      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 px-1">
-        {/* Main hand */}
+      {/* pl-2 (Alex 2026-06-13 #2) : ~2px de marge gauche en plus → les
+       *  rings des filtres/cartes ne se font plus rogner d'1px par le bord. */}
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 pl-2 pr-1">
+        {/* Deck — grille selon le mode (Alex 2026-06-13 #1) : 6 cartes = 3×2
+         *  propre, 8 cartes = 4×2 ; plus de slots vides en bout de ligne. */}
         <div>
-          <h2 className="text-[10px] uppercase tracking-[0.25em] font-bold text-emerald-400 mb-2">
-            Main ({mainSlots.filter(Boolean).length}/{MAIN_SLOTS})
+          <h2 className="text-[11px] uppercase tracking-[0.25em] font-bold text-emerald-400 mb-2">
+            Mon deck ({equipped}/{TOTAL})
           </h2>
-          <div className="grid grid-cols-3 gap-2">
-            {mainSlots.map((cardId, i) => (
-              <DeckSlot key={`main-${i}`} cardId={cardId} slotLabel={`${i + 1}`}
+          <div className={"grid gap-2 " + (TOTAL === 6 ? "grid-cols-3" : TOTAL === 10 ? "grid-cols-5" : "grid-cols-4")}>
+            {(deck as (CardId | null)[]).map((cardId, i) => (
+              <DeckSlot key={`slot-${i}`} cardId={cardId} slotLabel={`${i + 1}`}
                 onClick={() => handleSlotTap(i)} highlight={!!selected} />
-            ))}
-          </div>
-        </div>
-
-        {/* Reserve */}
-        <div>
-          <h2 className="text-[10px] uppercase tracking-[0.25em] font-bold text-amber-400 mb-2">
-            Réserve ({reserveSlots.filter(Boolean).length}/{RESERVE_SLOTS})
-          </h2>
-          <div className="grid grid-cols-3 gap-2">
-            {reserveSlots.map((cardId, i) => (
-              <DeckSlot key={`res-${i}`} cardId={cardId} slotLabel={`R${i + 1}`}
-                onClick={() => handleSlotTap(MAIN_SLOTS + i)} highlight={!!selected} />
             ))}
           </div>
         </div>
@@ -352,7 +429,7 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
                   {/* Rarity tabs — horizontal pills with owned/total per rarity.
                       Vertical padding (py-1.5) prevents the active pill's ring
                       from clipping against the overflow container's edges. */}
-                  <div className="flex items-center gap-1.5 overflow-x-auto py-1.5 -mx-1 px-1 no-scrollbar">
+                  <div className="flex items-center gap-1.5 overflow-x-auto py-1.5 px-1 no-scrollbar">
                     <RarityTab
                       active={rarityFilter === "all"}
                       onClick={() => { hapticTap(); setRarityFilter("all"); }}
@@ -430,6 +507,7 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
                             usedInDeck={usedInDeck}
                             selected={selected}
                             onCardTap={handleCardTap}
+                            showFusion={mode === "arena"}
                             t={t}
                           />
                         ))
@@ -463,10 +541,37 @@ export function DeckManager({ onClose }: { onClose: () => void }) {
         masteryXp={(player.cardMastery ?? {})[selected ?? ""] ?? 0}
         owned={selected ? collection.includes(selected) : false}
         inDeck={selected ? usedInDeck.has(selected) : false}
+        deckFull={deck.indexOf(null) < 0}
         onClose={() => { setModalOpen(false); setSelected(null); }}
-        onPickForDeck={() => setModalOpen(false)}
+        onPickForDeck={handlePickForDeck}
         t={t}
       />
+
+      {/* Toast (Alex 2026-06-13) — message d'ajout/retrait/refus, TOUJOURS
+       *  visible (fixed, sous l'en-tête) : plus besoin de remonter le deck. */}
+      <AnimatePresence>
+        {deckMsg && (
+          <motion.div
+            key={deckMsg.key}
+            initial={{ opacity: 0, y: -14, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ type: "spring", stiffness: 320, damping: 24 }}
+            className={
+              "fixed left-1/2 -translate-x-1/2 z-[9998] px-4 py-2 rounded-2xl text-[12.5px] font-bold shadow-2xl backdrop-blur border whitespace-nowrap max-w-[90vw] truncate " +
+              (deckMsg.tone === "good"
+                ? "bg-emerald-500/25 border-emerald-400/60 text-emerald-100"
+                : deckMsg.tone === "warn"
+                ? "bg-amber-500/25 border-amber-400/60 text-amber-100"
+                : "bg-zinc-700/60 border-zinc-500/60 text-zinc-100")
+            }
+            style={{ top: "calc(env(safe-area-inset-top, 0px) + 3.5rem)" }}
+          >
+            {deckMsg.tone === "good" ? "✓ " : deckMsg.tone === "warn" ? "⚠ " : "↺ "}
+            {deckMsg.text}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
@@ -516,12 +621,14 @@ function DeckSlot({
  *  to scroll back to the top to read details. Click backdrop or X to close.
  *  Inside, CardDetailContent is reused as-is. */
 function CardDetailModal({
-  id, masteryXp, owned, inDeck, onClose, onPickForDeck, t,
+  id, masteryXp, owned, inDeck, deckFull, onClose, onPickForDeck, t,
 }: {
   id: CardId | null;
   masteryXp: number;
   owned: boolean;
   inDeck: boolean;
+  /** Deck plein (0 slot libre) — change le CTA en "Remplacer une carte". */
+  deckFull: boolean;
   /** Called by the backdrop / ✕ button : closes the modal AND clears
    *  the selection. The card is "forgotten". */
   onClose: () => void;
@@ -568,7 +675,7 @@ function CardDetailModal({
                 className="mt-2 w-full py-2.5 rounded-2xl bg-themed shadow-lg font-black text-white text-sm transition active:scale-[0.97]"
                 style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.08em" }}
               >
-                {inDeck ? "↺ Réassigner cette carte" : "✓ Mettre dans mon deck"}
+                {inDeck ? "✕ Retirer du deck" : deckFull ? "🔁 Remplacer une carte…" : "✓ Mettre dans mon deck"}
               </button>
             )}
             <button
@@ -736,7 +843,7 @@ function FilterChip({
 /** Section divider + grid for one mana-cost bucket. Header shows the mana
  *  cost as visual pips so the player reads the curve graphically, not as text. */
 function ManaGroup({
-  cost, ids, collection, usedInDeck, selected, onCardTap, t,
+  cost, ids, collection, usedInDeck, selected, onCardTap, showFusion, t,
 }: {
   cost: number;
   ids: CardId[];
@@ -746,6 +853,9 @@ function ManaGroup({
   usedInDeck: Set<string | CardId | null>;
   selected: CardId | null;
   onCardTap: (id: CardId) => void;
+  /** Affiche le badge ⚗ fusion (mode Arena seulement — la fusion n'existe
+   *  pas en Classé). Alex 2026-06-13. */
+  showFusion: boolean;
   t: (key: string) => string;
 }) {
   return (
@@ -774,6 +884,7 @@ function ManaGroup({
             inDeck={usedInDeck.has(id)}
             isSelected={selected === id}
             onClick={() => onCardTap(id)}
+            showFusion={showFusion}
             t={t}
           />
         ))}
@@ -786,7 +897,7 @@ function ManaGroup({
  *  rendering so the new layout reuses it inside each mana group AND so a
  *  per-cell staggered fade animation is possible (index-based delay). */
 function CardCell({
-  id, index, unlocked, inDeck, isSelected, onClick, t,
+  id, index, unlocked, inDeck, isSelected, onClick, showFusion = false, t,
 }: {
   id: CardId;
   index: number;
@@ -794,9 +905,17 @@ function CardCell({
   inDeck: boolean;
   isSelected: boolean;
   onClick: () => void;
+  showFusion?: boolean;
   t: (key: string) => string;
 }) {
   const card = CARDS[id];
+  // ⚗ Fusionnable (Arena) : marqueur DISTINCT du point de rareté — Alex
+  // confondait le point « rose » (= rareté ÉPIQUE violet) avec la fusion.
+  const fusible = showFusion && isFusible(id);
+  // ⚡ Cartes « à la pioche » (Cast When Drawn, Arena) : badge bleu DISTINCT du
+  // ⚗ fusion — le joueur repère d'un coup d'œil les cartes qui s'activent au
+  // tirage. Alex 2026-06-13.
+  const castDraw = showFusion && isCastOnDraw(id);
   return (
     <motion.button
       onClick={onClick}
@@ -823,11 +942,30 @@ function CardCell({
           <span key={k} className="w-1 h-1 rounded-full bg-sky-300" />
         ))}
       </div>
-      {/* Rarity micro-dot — top-right so it doesn't fight the mana pips. */}
-      <div
-        className={"absolute top-1 right-1 z-10 w-1.5 h-1.5 rounded-full " + RARITY_DOT[card.rarity]}
-        aria-hidden
-      />
+      {/* Coin sup-droit — Alex 2026-06-13 : en ARENA, ⚗ = FUSIONNABLE (et
+       *  RIEN sinon → fini les « points roses » ambigus ; la rareté reste
+       *  lisible via le texte coloré du bas). En CLASSÉ (pas de fusion), le
+       *  micro-point de rareté comme avant. */}
+      {fusible ? (
+        <div
+          className="absolute top-0.5 right-0.5 z-10 px-1 h-3.5 rounded-full bg-amber-400/95 flex items-center justify-center shadow ring-1 ring-amber-200/60"
+          title="Fusionnable sur la Forge (Arena)"
+        >
+          <span className="text-[8px] leading-none">⚗</span>
+        </div>
+      ) : castDraw ? (
+        <div
+          className="absolute top-0.5 right-0.5 z-10 px-1 h-3.5 rounded-full bg-sky-400/95 flex items-center justify-center shadow ring-1 ring-sky-200/70"
+          title="Se déclenche À LA PIOCHE (Cast When Drawn)"
+        >
+          <span className="text-[8px] leading-none">⚡</span>
+        </div>
+      ) : !showFusion ? (
+        <div
+          className={"absolute top-1 right-1 z-10 w-1.5 h-1.5 rounded-full " + RARITY_DOT[card.rarity]}
+          aria-hidden
+        />
+      ) : null}
       {/* Name + rarity at the bottom — no duplicate glyph here (CardImage already
        *  renders the glyph as a fallback when card.art is null; superimposing
        *  another glyph on top of the actual art read as visual clutter). */}

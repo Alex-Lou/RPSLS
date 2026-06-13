@@ -92,23 +92,26 @@ export function tournamentStandings(t: TournamentState): Standing[] {
 
 /* ──────────── Data factory ──────────── */
 
+// Portraits CPU = hero_*.png (Alex 2026-06-13 : « tous les CPU des arbres de
+// tournoi doivent avoir leur propre icône, plus d'émoticônes pourries »).
+const CPU_HERO = (n: string): string => `/Profile miniatures/${n}.png`;
 const CPU_POOL: Omit<BracketPlayer, "id">[] = [
-  { name: "Nova", avatar: "🤖", level: 3 },
-  { name: "Blitz", avatar: "⚡", level: 5 },
-  { name: "Shadow", avatar: "🌑", level: 2 },
-  { name: "Vortex", avatar: "🌀", level: 7 },
-  { name: "Phantom", avatar: "👻", level: 4 },
-  { name: "Cipher", avatar: "🔮", level: 6 },
-  { name: "Zenith", avatar: "💫", level: 8 },
-  { name: "Ember", avatar: "🔥", level: 5 },
-  { name: "Frost", avatar: "❄️", level: 4 },
-  { name: "Echo", avatar: "🛰️", level: 6 },
-  { name: "Onyx", avatar: "⬛", level: 3 },
-  { name: "Quasar", avatar: "🌟", level: 9 },
-  { name: "Riot", avatar: "💥", level: 7 },
-  { name: "Saber", avatar: "⚔️", level: 6 },
-  { name: "Talon", avatar: "🦅", level: 5 },
-  { name: "Wraith", avatar: "💀", level: 8 },
+  { name: "Nova", avatar: CPU_HERO("hero_oracle"), level: 3 },
+  { name: "Blitz", avatar: CPU_HERO("hero_knight"), level: 5 },
+  { name: "Shadow", avatar: CPU_HERO("hero_serpent"), level: 2 },
+  { name: "Vortex", avatar: CPU_HERO("hero_shard"), level: 7 },
+  { name: "Phantom", avatar: CPU_HERO("hero_zen"), level: 4 },
+  { name: "Cipher", avatar: CPU_HERO("hero_sage"), level: 6 },
+  { name: "Zenith", avatar: CPU_HERO("hero_king"), level: 8 },
+  { name: "Ember", avatar: CPU_HERO("hero_guardian"), level: 5 },
+  { name: "Frost", avatar: CPU_HERO("hero_frost"), level: 4 },
+  { name: "Echo", avatar: CPU_HERO("hero_fox"), level: 6 },
+  { name: "Onyx", avatar: CPU_HERO("hero_elf"), level: 3 },
+  { name: "Quasar", avatar: CPU_HERO("hero_royal"), level: 9 },
+  { name: "Riot", avatar: CPU_HERO("hero_jester"), level: 7 },
+  { name: "Saber", avatar: CPU_HERO("hero_knight"), level: 6 },
+  { name: "Talon", avatar: CPU_HERO("hero_oracle"), level: 5 },
+  { name: "Wraith", avatar: CPU_HERO("hero_zen"), level: 8 },
 ];
 
 function emptyMatch(): MatchSlot {

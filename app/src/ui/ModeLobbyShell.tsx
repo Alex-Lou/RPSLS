@@ -97,7 +97,7 @@ export function LobbyChip({ children, tone = "neutral" }: { children: ReactNode;
 
 export function ModeLobbyShell({
   title, tagline, titleGradient = "from-fuchsia-300 to-violet-300",
-  onBack, identity, children, cta, secondary,
+  onBack, identity, children, cta, secondary, dockCta = true,
 }: {
   title: string;
   /** 1 ligne max — l'esprit du mode. */
@@ -113,6 +113,11 @@ export function ModeLobbyShell({
   cta?: ReactNode;
   /** Rangée secondaire sous le CTA (grid de petits boutons). */
   secondary?: ReactNode;
+  /** Docker le CTA en bas (défaut) OU le laisser couler DANS la zone scroll
+   *  (dockCta=false) — utile quand une section dépliable doit POUSSER le CTA
+   *  vers le bas et défiler pour le lire, sans recentrer le haut de l'écran
+   *  (Alex 2026-06-13, fiche Voie Pro). */
+  dockCta?: boolean;
 }) {
   // Burger flottant global OFF tant qu'un lobby est monté (le header a le
   // burger inline). Même mécanique que le menu principal.
@@ -162,14 +167,17 @@ export function ModeLobbyShell({
 
       {identity}
 
-      {/* Zone contenu — flex-1, scroll INTERNE seulement si ça déborde
-       *  (le CTA reste docké visible quoi qu'il arrive). */}
+      {/* Zone contenu — flex-1, scroll INTERNE seulement si ça déborde. Le CTA
+       *  reste docké (défaut) OU coule ici en bas (dockCta=false) → poussé vers
+       *  le bas par une section dépliée, atteignable au scroll. */}
       <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2">
         {children}
+        {!dockCta && cta && <div className="shrink-0">{cta}</div>}
+        {!dockCta && secondary && <div className="shrink-0">{secondary}</div>}
       </div>
 
-      {cta && <div className="shrink-0">{cta}</div>}
-      {secondary && <div className="shrink-0">{secondary}</div>}
+      {dockCta && cta && <div className="shrink-0">{cta}</div>}
+      {dockCta && secondary && <div className="shrink-0">{secondary}</div>}
     </motion.div>
   );
 }

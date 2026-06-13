@@ -44,7 +44,7 @@ export function CurrencyBadges({ onClick, size = "compact", inert, showStars }: 
   return (
     <div className={"flex items-stretch gap-2 " + (isFull ? "" : "w-full")}>
       <CurrencyChip
-        icon="💎"
+        icon="/MenuIcons/IconConstellationPro/monnaie-eclats.png"
         value={eclats}
         toneFrom="from-cyan-500/30"
         toneTo="to-sky-500/15"
@@ -57,7 +57,7 @@ export function CurrencyBadges({ onClick, size = "compact", inert, showStars }: 
         label="Éclats"
       />
       <CurrencyChip
-        icon="✨"
+        icon="/MenuIcons/IconConstellationPro/monnaie-poussiere.png"
         value={dust}
         toneFrom="from-violet-500/30"
         toneTo="to-fuchsia-500/15"
@@ -71,7 +71,7 @@ export function CurrencyBadges({ onClick, size = "compact", inert, showStars }: 
       />
       {renderStars && (
         <CurrencyChip
-          icon="✦"
+          icon="/MenuIcons/IconConstellationPro/monnaie-etoiles.png"
           value={stars}
           toneFrom="from-amber-400/30"
           toneTo="to-orange-500/15"
@@ -124,7 +124,20 @@ function CurrencyChip({
         (interactive ? "cursor-pointer hover:brightness-110" : "")
       }
     >
-      <span className={big ? "text-base" : "text-sm leading-none"}>{icon}</span>
+      {/* Icônes PNG custom (Alex 2026-06-13, zéro émoticône) : un path "/..."
+       *  rend une image, un emoji legacy rend le span (back-compat). */}
+      {icon.startsWith("/") ? (
+        <img
+          src={icon}
+          alt=""
+          draggable={false}
+          // Agrandies (Alex 2026-06-13) : poussière/étoile paraissaient
+          // minuscules (PNG très "padés"). +50% pour qu'elles respirent.
+          className={(big ? "w-7 h-7" : "w-6 h-6") + " object-contain drop-shadow-[0_1px_3px_rgba(0,0,0,0.55)] shrink-0 -my-1"}
+        />
+      ) : (
+        <span className={big ? "text-base" : "text-sm leading-none"}>{icon}</span>
+      )}
       <span className={"font-black tabular-nums " + text + " " + (big ? "text-sm" : "text-[13px] leading-none")}>
         {formatCompact(value)}
       </span>

@@ -238,6 +238,32 @@ export function applyCardEffects(
     gaiaSavedB = true;
   }
 
+  // 4-bis. MASCARADE — DÉGUISEMENT (Alex 2026-06-13, aligné sur le Pro :
+  // avant, en Classé, la carte n'avait AUCUN effet visible). Tu déguises un
+  // de tes coups pour battre l'adversaire → UNE lane PERDUE devient GAGNÉE
+  // ce round ; à défaut, une lane NULLE devient gagnée. Comptage symétrique
+  // au flip Gaia (1 point/lane). Joueur ET CPU (parité).
+  const applyMascaradeFlip = (mine: boolean) => {
+    const winSelf: "a" | "b" = mine ? "a" : "b";
+    const winOpp: "a" | "b" = mine ? "b" : "a";
+    for (let i = 0; i < lanes.length; i++) {
+      if (lanes[i]?.winner === winOpp) {
+        lanes[i] = { ...lanes[i], winner: winSelf, points: 1 };
+        if (mine) { bPoints -= 1; aPoints += 1; } else { aPoints -= 1; bPoints += 1; }
+        return;
+      }
+    }
+    for (let i = 0; i < lanes.length; i++) {
+      if (lanes[i]?.winner === "draw") {
+        lanes[i] = { ...lanes[i], winner: winSelf, points: 1 };
+        if (mine) aPoints += 1; else bPoints += 1;
+        return;
+      }
+    }
+  };
+  if (myCard?.id === "mascarade") applyMascaradeFlip(true);
+  if (oppCard?.id === "mascarade") applyMascaradeFlip(false);
+
   // 5. Tide: if you win 2+ lanes, ALL your wins give +1
   const aWinCount = lanes.filter((l) => l.winner === "a").length;
   const bWinCount = lanes.filter((l) => l.winner === "b").length;
