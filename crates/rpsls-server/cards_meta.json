@@ -1,0 +1,524 @@
+[
+  {
+    "id": "aegis",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "anchor",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "ancre-temporelle",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "apocalypse",
+    "cost": 4,
+    "rarity": "legendary",
+    "kind": "fusion"
+  },
+  {
+    "id": "augur",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "avalanche",
+    "cost": 1,
+    "rarity": "rare",
+    "kind": "fusion"
+  },
+  {
+    "id": "bastion",
+    "cost": 1,
+    "rarity": "rare",
+    "kind": "fusion"
+  },
+  {
+    "id": "benediction",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "bouffee-air",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "boussole",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "braise",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "cadence",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "passive"
+  },
+  {
+    "id": "cafeine",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "cascade",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "chronomancien",
+    "cost": 2,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "cocon",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "fusion"
+  },
+  {
+    "id": "conduit",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "passive"
+  },
+  {
+    "id": "coup-de-bol",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "coup-oeil",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "crepuscule",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "curse",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "doppelganger",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "double-mot",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "echappee",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "echo",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "echo-temporel",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "eclair-genie",
+    "cost": 1,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "fardeau",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "finisher-calcul",
+    "cost": 4,
+    "rarity": "legendary",
+    "kind": "active"
+  },
+  {
+    "id": "finisher-forteresse",
+    "cost": 4,
+    "rarity": "legendary",
+    "kind": "active"
+  },
+  {
+    "id": "finisher-lame",
+    "cost": 4,
+    "rarity": "legendary",
+    "kind": "active"
+  },
+  {
+    "id": "finisher-metamorphose",
+    "cost": 4,
+    "rarity": "legendary",
+    "kind": "active"
+  },
+  {
+    "id": "finisher-verger",
+    "cost": 4,
+    "rarity": "legendary",
+    "kind": "active"
+  },
+  {
+    "id": "frappe-parfaite",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "fusion"
+  },
+  {
+    "id": "gaia",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "passive"
+  },
+  {
+    "id": "gambit",
+    "cost": 2,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "genese",
+    "cost": 4,
+    "rarity": "legendary",
+    "kind": "active"
+  },
+  {
+    "id": "gravite",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "heist",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "imposteur",
+    "cost": 3,
+    "rarity": "legendary",
+    "kind": "fusion"
+  },
+  {
+    "id": "jet-caillou",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "juge",
+    "cost": 4,
+    "rarity": "legendary",
+    "kind": "active"
+  },
+  {
+    "id": "marchand-ames",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "mascarade",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "metamorphose",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "mirror",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "offre",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "omniscience",
+    "cost": 2,
+    "rarity": "epic",
+    "kind": "fusion"
+  },
+  {
+    "id": "oracle",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "oracle-inverse",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "paradoxe",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "patate-chaude",
+    "cost": 1,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "permutation",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "phenix",
+    "cost": 4,
+    "rarity": "legendary",
+    "kind": "active"
+  },
+  {
+    "id": "pile-ou-face",
+    "cost": 1,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "pillage",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "passive"
+  },
+  {
+    "id": "precision",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "prescience",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "prophetie",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "passive"
+  },
+  {
+    "id": "purge",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "rappel",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "razzia",
+    "cost": 2,
+    "rarity": "legendary",
+    "kind": "active"
+  },
+  {
+    "id": "remanence",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "rempart",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "reverberation",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "riposte",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "roue-destin",
+    "cost": 4,
+    "rarity": "legendary",
+    "kind": "active"
+  },
+  {
+    "id": "sablier",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "sangsue",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "schrodinger",
+    "cost": 4,
+    "rarity": "legendary",
+    "kind": "active"
+  },
+  {
+    "id": "second-wind",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "seve",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "singularite",
+    "cost": 4,
+    "rarity": "legendary",
+    "kind": "active"
+  },
+  {
+    "id": "source-vitale",
+    "cost": 1,
+    "rarity": "rare",
+    "kind": "fusion"
+  },
+  {
+    "id": "supernova",
+    "cost": 4,
+    "rarity": "legendary",
+    "kind": "active"
+  },
+  {
+    "id": "surcharge",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "surge",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "sursaut",
+    "cost": 1,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "telepathie",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "tide",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "toile-gluante",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "toxine",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "trefle-chance",
+    "cost": 1,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "trinite",
+    "cost": 4,
+    "rarity": "legendary",
+    "kind": "active"
+  },
+  {
+    "id": "trou-noir",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "tuile",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "vortex",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "active"
+  }
+]

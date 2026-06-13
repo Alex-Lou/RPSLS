@@ -34,6 +34,11 @@ use crate::security::{cors_layer, governor_layer, LobbyAttemptTracker, MsgRateLi
 use crate::session::Session;
 
 mod auth;
+// Économie serveur-autoritaire (Alex 2026-06-13) — fondation pure pour l'instant
+// (règles + méta cartes). Pas encore câblée → dead_code toléré le temps des
+// incréments (endpoints validés à venir).
+#[allow(dead_code)]
+mod economy;
 mod lanes_engine;
 mod leaderboard;
 mod lobby;
