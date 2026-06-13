@@ -20,6 +20,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { arenaLogSnapshot, arenaLogSubscribe, arenaLogReset, type ArenaLogEntry } from "./arenaLog";
+import { friendlyArenaLog } from "./arenaLogFriendly";
 
 const CATEGORY_COLOR: Record<string, string> = {
   turn:   "bg-violet-500/30 text-violet-100 border-violet-400/60",
@@ -37,6 +38,10 @@ export function ArenaDebugOverlay() {
   const [logs, setLogs] = useState<ArenaLogEntry[]>(() => arenaLogSnapshot());
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<string | null>(null);
+  // 2 onglets (Alex 2026-06-13) : "Simple" = phrases vulgarisées pour tous
+  // (via friendlyArenaLog, les lignes techniques sont omises) ; "Complet" =
+  // le flux brut actuel avec filtres par catégorie. Défaut : Simple.
+  const [tab, setTab] = useState<"simple" | "full">("simple");
   // Subscribe to log mutations — re-snapshot on every push so the panel
   // stays live without polling.
   useEffect(() => {
@@ -49,13 +54,13 @@ export function ArenaDebugOverlay() {
 
   return (
     <>
-      {/* Floating bug button — déplacé EN BAS À DROITE au-dessus des nav
-       *  Android (Alex 2026-06-11 : "ne pas empiéter sur l'UI/UX"). Utilise
-       *  safe-area-inset-bottom + 3rem de clearance. */}
+      {/* Floating bug button — TOUT EN HAUT À DROITE (Alex 2026-06-12 : en
+       *  bas il chevauchait le bouton FIN rond). Coin réservé : le strip opp
+       *  s'arrête à right-12 pour lui laisser la place. */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="fixed right-2.5 z-[9998] inline-flex items-center gap-1 px-2 py-1 rounded-full bg-zinc-900/90 border border-zinc-700 text-emerald-200 text-[10px] font-black shadow-lg backdrop-blur active:scale-95"
-        style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 3.5rem)" }}
+        className="fixed right-2 z-[9998] inline-flex items-center gap-1 px-2 py-1 rounded-full bg-zinc-900/90 border border-zinc-700 text-emerald-200 text-[10px] font-black shadow-lg backdrop-blur active:scale-95"
+        style={{ top: "max(env(safe-area-inset-top, 0px), 32px)" }}
         aria-label="Logs match"
       >
         🐛 <span className="tabular-nums">{logs.length}</span>
@@ -93,45 +98,99 @@ export function ArenaDebugOverlay() {
               </div>
             </div>
 
-            {/* Category filter row */}
-            <div className="shrink-0 flex flex-wrap gap-1 px-3 py-1.5 border-b border-zinc-800">
-              <FilterChip active={filter === null} onClick={() => setFilter(null)} label="Tous" tone="_" />
-              {ALL_CATEGORIES.map((cat) => (
-                <FilterChip
-                  key={cat}
-                  active={filter === cat}
-                  onClick={() => setFilter(cat)}
-                  label={cat}
-                  tone={cat}
-                />
-              ))}
+            {/* Onglets Simple / Complet (Alex 2026-06-13). */}
+            <div className="shrink-0 flex gap-1 px-3 py-1.5 border-b border-zinc-800">
+              <button
+                onClick={() => setTab("simple")}
+                className={
+                  "flex-1 py-1 rounded-lg text-[11px] font-black uppercase tracking-wider border transition " +
+                  (tab === "simple"
+                    ? "bg-emerald-500/25 text-emerald-100 border-emerald-400/60 ring-1 ring-emerald-300/40"
+                    : "bg-zinc-800/60 text-zinc-400 border-zinc-700")
+                }
+              >
+                📖 Simple
+              </button>
+              <button
+                onClick={() => setTab("full")}
+                className={
+                  "flex-1 py-1 rounded-lg text-[11px] font-black uppercase tracking-wider border transition " +
+                  (tab === "full"
+                    ? "bg-violet-500/25 text-violet-100 border-violet-400/60 ring-1 ring-violet-300/40"
+                    : "bg-zinc-800/60 text-zinc-400 border-zinc-700")
+                }
+              >
+                🔬 Complet
+              </button>
             </div>
+
+            {/* Category filter row — mode Complet uniquement. */}
+            {tab === "full" && (
+              <div className="shrink-0 flex flex-wrap gap-1 px-3 py-1.5 border-b border-zinc-800">
+                <FilterChip active={filter === null} onClick={() => setFilter(null)} label="Tous" tone="_" />
+                {ALL_CATEGORIES.map((cat) => (
+                  <FilterChip
+                    key={cat}
+                    active={filter === cat}
+                    onClick={() => setFilter(cat)}
+                    label={cat}
+                    tone={cat}
+                  />
+                ))}
+              </div>
+            )}
 
             {/* Log list — scrollable, newest first */}
             <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2 space-y-1">
-              {display.length === 0 && (
-                <div className="text-center text-[11px] text-zinc-500 italic py-6">
-                  Pas encore d'events {filter ? `dans la catégorie "${filter}"` : ""}.
-                </div>
+              {tab === "simple" ? (
+                (() => {
+                  // Onglet SIMPLE : phrases vulgarisées, lignes techniques omises.
+                  const friendly = display
+                    .map((e) => ({ e, txt: friendlyArenaLog(e) }))
+                    .filter((f): f is { e: ArenaLogEntry; txt: string } => f.txt !== null);
+                  if (friendly.length === 0) {
+                    return (
+                      <div className="text-center text-[11px] text-zinc-500 italic py-6">
+                        Rien à raconter pour l'instant — joue un tour !
+                      </div>
+                    );
+                  }
+                  return friendly.map(({ e, txt }, i) => (
+                    <div key={i} className="flex items-baseline gap-2 text-[12px] leading-snug">
+                      <span className="shrink-0 px-1 rounded bg-zinc-800 text-zinc-400 text-[9px] font-black tabular-nums">
+                        T{e.turn}
+                      </span>
+                      <span className="text-zinc-100">{txt}</span>
+                    </div>
+                  ));
+                })()
+              ) : (
+                <>
+                  {display.length === 0 && (
+                    <div className="text-center text-[11px] text-zinc-500 italic py-6">
+                      Pas encore d'events {filter ? `dans la catégorie "${filter}"` : ""}.
+                    </div>
+                  )}
+                  {display.map((e, i) => {
+                    const t = ((e.ts - matchStart) / 1000).toFixed(1);
+                    const color = CATEGORY_COLOR[e.category] ?? CATEGORY_COLOR._;
+                    return (
+                      <div key={i} className="flex items-baseline gap-1.5 text-[11px] leading-snug font-mono">
+                        <span className="text-zinc-500 tabular-nums shrink-0 w-12 text-right">
+                          {t}s
+                        </span>
+                        <span className="text-zinc-500 tabular-nums shrink-0 w-7">
+                          T{e.turn}
+                        </span>
+                        <span className={"shrink-0 px-1 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border " + color}>
+                          {e.category}
+                        </span>
+                        <span className="text-zinc-100 break-all">{e.msg}</span>
+                      </div>
+                    );
+                  })}
+                </>
               )}
-              {display.map((e, i) => {
-                const t = ((e.ts - matchStart) / 1000).toFixed(1);
-                const color = CATEGORY_COLOR[e.category] ?? CATEGORY_COLOR._;
-                return (
-                  <div key={i} className="flex items-baseline gap-1.5 text-[11px] leading-snug font-mono">
-                    <span className="text-zinc-500 tabular-nums shrink-0 w-12 text-right">
-                      {t}s
-                    </span>
-                    <span className="text-zinc-500 tabular-nums shrink-0 w-7">
-                      T{e.turn}
-                    </span>
-                    <span className={"shrink-0 px-1 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border " + color}>
-                      {e.category}
-                    </span>
-                    <span className="text-zinc-100 break-all">{e.msg}</span>
-                  </div>
-                );
-              })}
             </div>
           </motion.div>
         )}

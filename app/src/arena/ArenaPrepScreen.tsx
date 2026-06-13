@@ -21,20 +21,12 @@ import { useStore } from "../store/store";
 import { hapticTap, hapticMatchStart } from "../haptic";
 import { ArenaHowItWorks } from "./ArenaHowItWorks";
 import { THEMES } from "../theme/theme";
-import type { PadId, ThemeId } from "../types";
+import { oppPersona } from "../ranked/personaSeed";
+import type { BackgroundId, PadId, ThemeId } from "../types";
 
-/** Reasonable pool of themes the CPU can roll. Trimmed to the visually
- *  distinct ones so a coin-lost match feels different from your usual. */
-const CPU_THEME_POOL: ThemeId[] = [
-  "violet", "neon", "sunset", "ember", "aurora", "gold",
-  "cyber", "rose", "quartz", "eclipse", "phantom",
-  "emberforge", "tempus", "storm",
-];
-const CPU_PAD_POOL: PadId[] = [
-  "cosmos", "galaxy", "neon", "cyberpunk", "casino",
-  "nebula", "aurora_borealis", "casino_noir", "quantum",
-  "volcanic", "eclipse", "phantom", "emberforge", "storm",
-];
+// CPU apparence : bundle COHÉRENT pad+fond+thème (oppPersona) — Alex
+// 2026-06-13 "1 pad = son apparence, pas de mélange pour les CPU". Les
+// anciens pools indépendants (thème ET pad décorrélés) sont supprimés.
 
 const CPU_PERSONA_NAMES = [
   "Sentinelle", "Oracle", "Nyx", "Spectre", "Vortex",
@@ -45,7 +37,10 @@ export interface ArenaPrepResult {
   coinWinner: "you" | "opp";
   themeId: ThemeId;
   padId: PadId;
+  backgroundId: BackgroundId;
   cpuName: string;
+  /** Portrait CPU (hero_*.png) — affiché aussi en match (strip adverse). */
+  cpuAvatar: string;
 }
 
 export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
@@ -62,14 +57,14 @@ export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
   const playerThemeId = player.themeId ?? "violet";
   const playerPadId = player.padId;
 
-  // CPU identity — locked once per mount so the coin flip is fair.
-  const cpuRef = useRef<{ name: string; themeId: ThemeId; padId: PadId } | null>(null);
+  // CPU identity — locked once per mount so the coin flip is fair. L'apparence
+  // (pad+fond+thème) est un BUNDLE cohérent dérivé du nom via oppPersona →
+  // jamais de mélange pad/fond/thème côté CPU.
+  const cpuRef = useRef<{ name: string; themeId: ThemeId; padId: PadId; backgroundId: BackgroundId; avatar: string } | null>(null);
   if (!cpuRef.current) {
-    cpuRef.current = {
-      name: CPU_PERSONA_NAMES[Math.floor(Math.random() * CPU_PERSONA_NAMES.length)],
-      themeId: CPU_THEME_POOL[Math.floor(Math.random() * CPU_THEME_POOL.length)],
-      padId: CPU_PAD_POOL[Math.floor(Math.random() * CPU_PAD_POOL.length)],
-    };
+    const name = CPU_PERSONA_NAMES[Math.floor(Math.random() * CPU_PERSONA_NAMES.length)];
+    const persona = oppPersona(name);
+    cpuRef.current = { name, themeId: persona.themeId, padId: persona.padId, backgroundId: persona.backgroundId, avatar: persona.avatar };
   }
   const cpu = cpuRef.current;
 
@@ -92,9 +87,13 @@ export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
     hapticMatchStart();
     onConfirm({
       coinWinner: winner,
+      // Gagnant = SON apparence COMPLÈTE (thème + pad + fond). Joueur =
+      // exactement ses choix (Alex 2026-06-13 "doit se refléter parfaitement").
       themeId: winner === "you" ? playerThemeId : cpu.themeId,
-      padId: winner === "you" ? playerPadId : cpu.padId,
+      padId: winner === "you" ? (playerPadId ?? cpu.padId) : cpu.padId,
+      backgroundId: winner === "you" ? (player.backgroundId ?? "default") : cpu.backgroundId,
       cpuName: cpu.name,
+      cpuAvatar: cpu.avatar,
     });
   }
 
@@ -115,7 +114,7 @@ export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
       <div className="flex items-center justify-center gap-4 sm:gap-6">
         <Portrait name={playerName} avatar={playerAvatar} side="you" themeColor={youTheme?.primary ?? "#a78bfa"} highlight={phase === "landed" && winner === "you"} />
         <SimpleCoin phase={phase} winner={winner} youColor={youTheme?.primary ?? "#a78bfa"} oppColor={oppTheme?.primary ?? "#f43f5e"} onTap={flip} />
-        <Portrait name={cpu.name} avatar={undefined} side="opp" themeColor={oppTheme?.primary ?? "#f43f5e"} highlight={phase === "landed" && winner === "opp"} />
+        <Portrait name={cpu.name} avatar={cpu.avatar} side="opp" themeColor={oppTheme?.primary ?? "#f43f5e"} highlight={phase === "landed" && winner === "opp"} />
       </div>
 
       {/* Idle hint — tells the player to tap the coin (or read the rules first). */}

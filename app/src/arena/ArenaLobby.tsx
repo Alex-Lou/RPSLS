@@ -20,7 +20,7 @@ import { useStore } from "../store/store";
 import { levelFromXp } from "../engine/leveling";
 import { ModeLobbyShell, LobbyIdentityRow, LobbyChip } from "../ui/ModeLobbyShell";
 import { CurrencyBadges } from "../ranked/CurrencyBadges";
-import { MoveGlyph, MOVE_PALETTE, moveRim } from "../icons";
+import { MOVE_PALETTE, moveRim } from "../icons";
 import type { Move } from "../engine/game";
 import { CREATURE_PASSIVES, CREATURE_STATS } from "./arenaTypes";
 import { ArenaHowItWorks } from "./ArenaHowItWorks";
@@ -42,6 +42,17 @@ const VOIE_LABEL: Record<Move, string> = {
   lizard:   "Voie du Mirage",
   spock:    "Voie du Cosmos",
 };
+/** Icônes custom des Voies (Alex 2026-06-13, générées depuis
+ *  PROMPTS_ICONES_PRO.md) — identité visuelle du lobby, zéro émoticône.
+ *  En match les MoveGlyph restent (cohérence du board). */
+const VOIE_ICON: Record<Move, string> = {
+  rock:     "/MenuIcons/IconConstellationPro/voie-montagne.png",
+  paper:    "/MenuIcons/IconConstellationPro/voie-foret.png",
+  scissors: "/MenuIcons/IconConstellationPro/voie-tranchant.png",
+  lizard:   "/MenuIcons/IconConstellationPro/voie-mirage.png",
+  spock:    "/MenuIcons/IconConstellationPro/voie-cosmos.png",
+};
+const PRO_ICON = (name: string): string => `/MenuIcons/IconConstellationPro/${name}.png`;
 /** Fiche descriptive d'une Voie (Alex 2026-06-11) — affichée au long-press,
  *  comme pour les cartes. Simple et compréhensible. */
 const VOIE_FICHE: Record<Move, { but: string; plus: string; moins: string; perso: string }> = {
@@ -111,6 +122,10 @@ export function ArenaLobby({
     : 0;
   const lvl = levelFromXp(player.xp);
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
+  // Fiche Voie DÉPLIABLE inline (Alex 2026-06-13) — en plus du long-press :
+  // une flèche dans le cadre déroule la description complète de la Voie
+  // choisie. Plus intuitif/découvrable que le maintien du doigt.
+  const [voieExpanded, setVoieExpanded] = useState(false);
   // Fiche Voie au long-press (Alex 2026-06-11) — même UX que l'inspect carte.
   const [ficheVoie, setFicheVoie] = useState<Move | null>(null);
   const pressTimer = useRef<number | null>(null);
@@ -136,6 +151,9 @@ export function ArenaLobby({
       tagline="3 lanes · Créatures persistantes · RPSLS + Cartes + Mana"
       titleGradient="from-fuchsia-300 to-violet-300"
       onBack={onBack}
+      /* Fiche Voie dépliée → CTA poussé dans le scroll (vers le bas), le haut
+       * (monnaie) ne bouge plus. Replié → CTA redocké, layout normal. */
+      dockCta={!voieExpanded}
       identity={
         <LobbyIdentityRow
           avatar={player.avatar}
@@ -163,7 +181,7 @@ export function ArenaLobby({
           }}
         >
           <div className="flex items-center gap-2.5">
-            <div className="text-2xl">⚔️</div>
+            <img src={PRO_ICON("pro-entrainement")} alt="" draggable={false} className="w-9 h-9 object-contain drop-shadow" />
             <div className="text-left">
               <div className="text-sm sm:text-base">ENTRAÎNEMENT vs CPU</div>
               <div className="text-[10px] font-medium opacity-85 normal-case tracking-normal">
@@ -180,7 +198,7 @@ export function ArenaLobby({
             disabled
             className="bg-surface rounded-2xl px-2 py-2 flex flex-col items-center gap-0.5 opacity-55 cursor-not-allowed border border-hairline"
           >
-            <span className="text-base leading-none">🌐</span>
+            <img src={PRO_ICON("pro-match-rapide")} alt="" draggable={false} className="w-7 h-7 object-contain" />
             <span className="font-bold text-[10px]">Match rapide</span>
             <span className="text-[8px] uppercase tracking-wider text-ink-faint">Bientôt</span>
           </button>
@@ -188,7 +206,7 @@ export function ArenaLobby({
             disabled
             className="bg-surface rounded-2xl px-2 py-2 flex flex-col items-center gap-0.5 opacity-55 cursor-not-allowed border border-hairline"
           >
-            <span className="text-base leading-none">🏆</span>
+            <img src={PRO_ICON("pro-tournoi")} alt="" draggable={false} className="w-7 h-7 object-contain" />
             <span className="font-bold text-[10px]">Tournoi Pro</span>
             <span className="text-[8px] uppercase tracking-wider text-ink-faint">Bientôt</span>
           </button>
@@ -196,7 +214,7 @@ export function ArenaLobby({
             onClick={() => setHowItWorksOpen(true)}
             className="bg-surface rounded-2xl px-2 py-2 flex flex-col items-center gap-0.5 border border-hairline hover:bg-hairline transition"
           >
-            <span className="text-base leading-none">📖</span>
+            <img src={PRO_ICON("pro-regles")} alt="" draggable={false} className="w-7 h-7 object-contain" />
             <span className="font-bold text-[10px] text-ink">Règles</span>
             <span className="text-[8px] uppercase tracking-wider text-ink-faint">+ symboles</span>
           </button>
@@ -209,7 +227,7 @@ export function ArenaLobby({
        *  répartit automatiquement entre les blocs — et si un petit écran
        *  déborde, les marges auto retombent à 0 → scroll normal, rien de
        *  clippé (piège du justify-evenly + overflow évité). */}
-      <div className="shrink-0 my-auto flex items-center justify-center">
+      <div className={"shrink-0 flex items-center justify-center " + (voieExpanded ? "" : "my-auto")}>
         <CurrencyBadges size="full" onClick={onGoShop} />
       </div>
 
@@ -217,21 +235,21 @@ export function ArenaLobby({
        *  v2 Couche 1 : le symbole choisi donne un bonus passif aux créatures
        *  de ce type ET avance la constellation 3 étoiles vers le Finisher. */}
       <div
-        className="bg-surface rounded-2xl px-4 py-3.5 flex flex-col gap-2.5 my-auto"
+        className={"bg-surface rounded-2xl px-4 py-3.5 flex flex-col gap-2.5 " + (voieExpanded ? "" : "my-auto")}
         style={{ border: "1px solid color-mix(in oklab, var(--theme-primary) 35%, transparent)" }}
       >
         <div className="flex items-center justify-between gap-2">
-          <div>
+          <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-[0.25em] font-bold text-fuchsia-200">
               ✦ Ma Voie RPSLS
             </div>
-            <div className="text-[15px] font-extrabold mt-0.5 text-zinc-100">
+            <div className="text-[15px] font-extrabold mt-0.5 text-zinc-100 truncate">
               {VOIE_LABEL[affinity]}
             </div>
           </div>
-          <div className="text-[11px] uppercase tracking-wider text-ink-muted">
+          <span className="shrink-0 text-[11px] uppercase tracking-wider text-ink-muted whitespace-nowrap">
             ⚔ {CREATURE_STATS[affinity].atk} · ❤ {CREATURE_STATS[affinity].hp}
-          </div>
+          </span>
         </div>
         <div className="grid grid-cols-5 gap-2">
           {VOIES.map((m) => {
@@ -259,35 +277,74 @@ export function ArenaLobby({
                     : "inset 0 1px 0 rgba(255,255,255,0.08)",
                 }}
               >
-                <MoveGlyph move={m} className="w-8 h-8 drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)]" />
+                <img src={VOIE_ICON[m]} alt={VOIE_LABEL[m]} draggable={false} className="w-9 h-9 object-contain drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)]" />
               </button>
             );
           })}
         </div>
-        <div className="rounded-lg bg-fuchsia-950/40 border border-fuchsia-700/30 px-3 py-2.5">
-          <div className="flex items-baseline gap-1.5">
+        {/* Cadre BONUS VOIE = bouton dépliable (Alex 2026-06-13) : la flèche
+         *  vit ICI, collée à « Bonus Voie » → plus visible/clair que dans
+         *  l'en-tête. Tape n'importe où dans le cadre pour déplier la fiche. */}
+        <button
+          onClick={() => setVoieExpanded((v) => !v)}
+          aria-expanded={voieExpanded}
+          className="w-full text-left rounded-lg bg-fuchsia-950/40 border border-fuchsia-700/30 px-3 py-2.5 hover:bg-fuchsia-950/55 transition"
+        >
+          <div className="flex items-center gap-1.5">
             <span className="text-[16px]">{CREATURE_PASSIVES[affinity].glyph}</span>
             <span className="text-[13.5px] font-black text-fuchsia-100">{CREATURE_PASSIVES[affinity].name}</span>
-            <span className="text-[10px] uppercase tracking-wider text-fuchsia-300 ml-auto">Bonus Voie</span>
+            <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-fuchsia-300 ml-auto">
+              <img src={PRO_ICON("pro-bonus-voie")} alt="" draggable={false} className="w-4 h-4 object-contain" />
+              Bonus Voie
+              <motion.span
+                animate={{ rotate: voieExpanded ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+                className="shrink-0 w-5 h-5 rounded-full bg-fuchsia-500/25 border border-fuchsia-400/45 text-fuchsia-100 text-[11px] flex items-center justify-center"
+                aria-hidden
+              >
+                ▾
+              </motion.span>
+            </span>
           </div>
           <p className="text-[12.5px] leading-snug text-fuchsia-100/90 mt-1">
             {VOIE_BONUS[affinity]}
           </p>
-        </div>
-        {/* Hint italique retiré (Alex 2026-06-12 compaction) : info dupliquée
-         *  dans la fiche Voie (long-press) + "Comment ça marche", et le
-         *  "(Lot C/D à venir)" était obsolète — les Finishers sont livrés. */}
+          {!voieExpanded && (
+            <p className="text-[10px] text-fuchsia-300/70 mt-1 italic">Détails complets ▾</p>
+          )}
+        </button>
+        {/* Fiche complète DÉPLIABLE (flèche du cadre Bonus Voie) — même
+         *  contenu que le long-press, mais découvrable. Collapse animé. */}
+        <AnimatePresence initial={false}>
+          {voieExpanded && (
+            <motion.div
+              key="voie-fiche-inline"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+              className="overflow-hidden"
+            >
+              <div className="rounded-lg bg-black/30 border border-fuchsia-700/25 px-3 pt-2.5 pb-1 mt-0.5">
+                <FicheRow icon={PRO_ICON("fiche-but")} label="But" text={VOIE_FICHE[affinity].but} />
+                <FicheRow icon={PRO_ICON("fiche-force")} label="Force" text={VOIE_FICHE[affinity].plus} />
+                <FicheRow icon={PRO_ICON("fiche-faiblesse")} label="Faiblesse" text={VOIE_FICHE[affinity].moins} />
+                <FicheRow icon={PRO_ICON("fiche-particularite")} label="Particularité" text={VOIE_FICHE[affinity].perso} />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Deck manager */}
       <motion.button
         whileTap={{ scale: 0.98 }}
         onClick={onManageDeck}
-        className="bg-surface rounded-2xl px-4 py-3 flex items-center justify-between hover:bg-hairline transition my-auto"
+        className={"bg-surface rounded-2xl px-4 py-3 flex items-center justify-between hover:bg-hairline transition " + (voieExpanded ? "" : "my-auto")}
         style={{ border: "1px solid color-mix(in oklab, var(--theme-primary) 35%, transparent)" }}
       >
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-fuchsia-500/40 to-violet-500/40 flex items-center justify-center text-base">🎴</div>
+          <img src={PRO_ICON("pro-deck")} alt="" draggable={false} className="w-8 h-8 object-contain drop-shadow" />
           <div className="text-left">
             <div className="font-bold text-[15px] text-ink">Gérer mon Deck Pro</div>
             <div className="text-[11px] text-ink-faint">Compose tes 8 cartes (filtre Arena)</div>
@@ -331,16 +388,16 @@ export function ArenaLobby({
                 }}
               >
                 <div className="flex items-center gap-2.5 mb-3">
-                  <MoveGlyph move={ficheVoie} className="w-9 h-9 drop-shadow" />
+                  <img src={VOIE_ICON[ficheVoie]} alt="" draggable={false} className="w-10 h-10 object-contain drop-shadow" />
                   <div>
                     <div className="text-base font-black text-white">{VOIE_LABEL[ficheVoie]}</div>
                     <div className="text-[10px] uppercase tracking-wider" style={{ color: pal.hex }}>{CREATURE_PASSIVES[ficheVoie].name}</div>
                   </div>
                 </div>
-                <FicheRow icon="🎯" label="But" text={f.but} />
-                <FicheRow icon="✅" label="Force" text={f.plus} />
-                <FicheRow icon="⚠️" label="Faiblesse" text={f.moins} />
-                <FicheRow icon="🌟" label="Particularité" text={f.perso} />
+                <FicheRow icon={PRO_ICON("fiche-but")} label="But" text={f.but} />
+                <FicheRow icon={PRO_ICON("fiche-force")} label="Force" text={f.plus} />
+                <FicheRow icon={PRO_ICON("fiche-faiblesse")} label="Faiblesse" text={f.moins} />
+                <FicheRow icon={PRO_ICON("fiche-particularite")} label="Particularité" text={f.perso} />
                 <button
                   onClick={() => setFicheVoie(null)}
                   className="mt-4 w-full py-2.5 rounded-2xl font-bold text-sm text-white"
@@ -358,9 +415,15 @@ export function ArenaLobby({
 }
 
 function FicheRow({ icon, label, text }: { icon: string; label: string; text: string }) {
+  // icon = chemin PNG (/MenuIcons/…) → <img> ; sinon emoji legacy (fallback).
+  const isImg = icon.startsWith("/");
   return (
-    <div className="flex gap-2 mb-2.5">
-      <span className="text-sm shrink-0">{icon}</span>
+    <div className="flex gap-2 mb-2.5 items-start">
+      {isImg ? (
+        <img src={icon} alt="" draggable={false} className="w-5 h-5 shrink-0 object-contain mt-0.5" />
+      ) : (
+        <span className="text-sm shrink-0">{icon}</span>
+      )}
       <div>
         <div className="text-[10px] uppercase tracking-wider text-ink-faint font-bold">{label}</div>
         <p className="text-[12px] leading-snug text-ink">{text}</p>
