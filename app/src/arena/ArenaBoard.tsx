@@ -98,6 +98,8 @@ export interface ArenaBoardProps {
   onForgeTap?: () => void;
   /** Bump à chaque fusion réussie — déclenche le flash ⚗️. */
   forgeFlashKey?: number | null;
+  /** Bump quand on récupère la carte fusionnée — poussière d'or de rappel. */
+  forgeRecoverKey?: number | null;
   /** Étát visuel de TA forge selon la sélection : "deposit" (pulse dépôt),
    *  "fuse" (pulse OR partenaire prêt), null. */
   forgeHighlight?: "deposit" | "fuse" | null;
@@ -107,7 +109,7 @@ export interface ArenaBoardProps {
   fillHeight?: number;
 }
 
-export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPreview, resolveStep, combatLane = null, heroHit = null, tauntBlock = null, antiTaunt = null, spellFX = null, oppName, oppAvatar, targeting, onLaneTap, onRemoveSpell, onRemoveSummon, forgeYou = null, forgeOpp = null, onForgeTap, forgeFlashKey = null, forgeHighlight = null, fillHeight }: ArenaBoardProps) {
+export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPreview, resolveStep, combatLane = null, heroHit = null, tauntBlock = null, antiTaunt = null, spellFX = null, oppName, oppAvatar, targeting, onLaneTap, onRemoveSpell, onRemoveSummon, forgeYou = null, forgeOpp = null, onForgeTap, forgeFlashKey = null, forgeRecoverKey = null, forgeHighlight = null, fillHeight }: ArenaBoardProps) {
   // SECOUSSE D'IMPACT (Alex 2026-06-12) : à chaque tick de combat (combatLane
   // change), le pad tremble brièvement, calé sur l'apex du slam (~0.3s après
   // le départ de la charge). Animation controls = pas de remount des lanes.
@@ -515,6 +517,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
             onTap={onForgeTap}
             highlight={forgeHighlight}
             flashKey={forgeFlashKey}
+            recoverKey={forgeRecoverKey}
             forged={!!forgeYou && CARDS[forgeYou]?.kind === "fusion"}
           />
         </div>

@@ -23,13 +23,16 @@ import type { CardId } from "../ranked/rankedTypes";
  *  quand la carte sélectionnée en main est un partenaire de fusion.
  *  Flash blanc→ambre à la fusion (flashKey). Transform/opacity only. */
 export function ForgeSlot({
-  card, mine, onTap, highlight = null, flashKey = null, forged = false,
+  card, mine, onTap, highlight = null, flashKey = null, recoverKey = null, forged = false,
 }: {
   card: CardId | null;
   mine: boolean;
   onTap?: () => void;
   highlight?: "deposit" | "fuse" | null;
   flashKey?: number | null;
+  /** Bump quand on RÉCUPÈRE la carte fusionnée → poussière d'or de rappel
+   *  (la case est déjà vide à ce moment, le burst joue donc en overlay). */
+  recoverKey?: number | null;
   /** La carte présente est une FUSION terminée (à récupérer) → halo or +
    *  libellé « ✨ Récupérer ». Statique (aucune boucle infinie). */
   forged?: boolean;
@@ -96,6 +99,10 @@ export function ForgeSlot({
       <AnimatePresence>
         {flashKey && <FusionBurst key={`forge-burst-${flashKey}`} />}
       </AnimatePresence>
+      {/* Poussière d'or de RÉCUP — la carte fusionnée « rappelée » vers ta main. */}
+      <AnimatePresence>
+        {recoverKey && <RecoverBurst key={`forge-recover-${recoverKey}`} />}
+      </AnimatePresence>
       {/* Étiquette DYNAMIQUE (Alex 2026-06-13) — la forge « pas claire du
        *  tout » devient lisible sans tuto : elle ANNONCE l'action possible.
        *   • partenaire sélectionné  → « Fusion ✦ »
@@ -124,6 +131,53 @@ export function ForgeSlot({
         );
       })()}
     </Tag>
+  );
+}
+
+/** ✨ RECOVER BURST — petite poussière d'or quand on RÉCUPÈRE la carte
+ *  FUSIONNÉE de la forge (Alex 2026-06-13 « une petite anim de particules au
+ *  clic Récupérer »). La carte est RAPPELÉE vers ta main (en bas) : un anneau
+ *  d'or s'évase + un cœur bref + ~12 motes dorées qui jaillissent AVEC un biais
+ *  vers le bas (= ça revient à toi). Même langage visuel que la poussière d'or
+ *  des chips utilitaires. ONE-SHOT (AnimatePresence démonte) — zéro idle.
+ *  100% transform/opacity + screen → fluide WebView. */
+function RecoverBurst() {
+  const MOTES = Array.from({ length: 12 }, (_, i) => i);
+  const ang = (i: number) => ((360 / 12) * i + (i % 2) * 11) * (Math.PI / 180);
+  return (
+    <div className="absolute -inset-3 pointer-events-none" aria-hidden>
+      {/* Anneau d'or qui s'évase (pulse de « reprise ») */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.3 }}
+        animate={{ opacity: [0, 0.85, 0], scale: [0.3, 1.7, 2.2] }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="absolute inset-0 rounded-full border-2 border-amber-200/90"
+      />
+      {/* Cœur or bref */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.2 }}
+        animate={{ opacity: [0, 0.9, 0], scale: [0.2, 1.1, 1.5] }}
+        transition={{ duration: 0.42, ease: "easeOut" }}
+        className="absolute inset-0 rounded-full"
+        style={{ background: "radial-gradient(circle, rgba(252,211,77,0.85), transparent 65%)", mixBlendMode: "screen" }}
+      />
+      {/* Motes d'or — jaillissent avec un biais vers le BAS (rappel vers la main) */}
+      {MOTES.map((i) => {
+        const a = ang(i);
+        const r = 26 + (i % 3) * 7;
+        const pull = 10 + (i % 4) * 5; // aspiration vers le bas (= revient à toi)
+        return (
+          <motion.span
+            key={`rc${i}`}
+            initial={{ opacity: 0, x: 0, y: 0, scale: 0 }}
+            animate={{ opacity: [0, 1, 0], x: [0, Math.cos(a) * r], y: [0, Math.sin(a) * r + pull], scale: [0, 1, 0.2] }}
+            transition={{ duration: 0.55, ease: "easeOut", delay: (i % 4) * 0.012 }}
+            className="absolute left-1/2 top-1/2 w-[3px] h-[3px] -ml-[1.5px] -mt-[1.5px] rounded-full bg-amber-50"
+            style={{ boxShadow: "0 0 5px rgba(252,211,77,0.95)" }}
+          />
+        );
+      })}
+    </div>
   );
 }
 
