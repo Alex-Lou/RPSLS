@@ -217,7 +217,7 @@ const fr: Record<string, string> = {
   "ranked.cards.prescience.desc": "Pioche une carte supplémentaire immédiatement — avantage de cartes pur.",
   "ranked.cards.prescience.targetHint": "Effet immédiat.",
   "ranked.cards.cadence.name": "Cadence",
-  "ranked.cards.cadence.desc": "Passif : ton plafond de mana passe de 4 à 5 tout le match.",
+  "ranked.cards.cadence.desc": "Passif : +1 à ton plafond de mana tout le match.",
   "ranked.cards.cadence.targetHint": "Passif — toujours actif.",
   "ranked.cards.mascarade.name": "Mascarade",
   "ranked.cards.mascarade.desc": "Déguisement : une de tes lanes perdue ce round est transformée pour battre l'adversaire (elle devient gagnée). Sinon, une lane nulle devient gagnée.",

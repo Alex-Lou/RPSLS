@@ -391,9 +391,10 @@ export function RankedGame({
     // +1 base mana so the curve is round1:2 → round3:4. The old `nextNo`
     // curve locked the 4-cost Supernova until round 4, by which point most
     // Bo3 matches are already over — it was effectively a dead card.
-    // Cadence (passive) lifts the cap from 4 to 5 so 4-cost cards arc earlier.
-    // Marchand d'Âmes adds a permanent +3 ceiling on top.
-    const manaCap = (battle.passives.includes("cadence") ? 5 : MAX_MANA) + manaMaxBoostRef.current;
+    // Cadence (passive) lifts the cap by +1 (MAX_MANA → MAX_MANA+1) so 4-cost
+    // cards arc earlier — RELATIF à MAX_MANA (Alex 2026-06-13 « Max → Max+1 »),
+    // plus de « 5 » en dur. Marchand d'Âmes adds a permanent +3 ceiling on top.
+    const manaCap = (battle.passives.includes("cadence") ? MAX_MANA + 1 : MAX_MANA) + manaMaxBoostRef.current;
     const bonusMana = bonusManaNextRoundRef.current;
     setBonusManaNext(0);
     const newMana = Math.min(manaCap, nextNo + 1 + bonusMana);

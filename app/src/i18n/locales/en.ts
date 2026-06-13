@@ -217,7 +217,7 @@ const en: Record<string, string> = {
   "ranked.cards.prescience.desc": "Draw one extra card immediately — pure card advantage.",
   "ranked.cards.prescience.targetHint": "Immediate effect.",
   "ranked.cards.cadence.name": "Cadence",
-  "ranked.cards.cadence.desc": "Passive: your mana cap rises from 4 to 5 all match.",
+  "ranked.cards.cadence.desc": "Passive: +1 to your mana cap for the whole match.",
   "ranked.cards.cadence.targetHint": "Passive — always active.",
   "ranked.cards.mascarade.name": "Masquerade",
   "ranked.cards.mascarade.desc": "Disguise: one lane you lost this round is flipped to a WIN. Otherwise, a tied lane becomes a win.",
