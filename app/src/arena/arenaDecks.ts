@@ -16,6 +16,7 @@
  */
 
 import { arenaSupported } from "./arenaCardEffects";
+import { isCastOnDraw } from "./arenaCastOnDraw";
 import { cpuCanPlay } from "./arenaAI";
 import { isFinisherCard } from "./arenaFinishers";
 import { CARDS } from "../ranked/cards";
@@ -26,7 +27,13 @@ import type { CardId } from "../ranked/rankedTypes";
  *  Les Finishers Constellation Pro sont injectés UNIQUEMENT à 3⭐ via
  *  arenaRules.applySummons — pas drawables, pas draftables. */
 export function isDeckable(id: CardId): boolean {
-  return arenaSupported(id) && !isFinisherCard(id);
+  // Cartes « à la pioche » (Cast When Drawn) : DECKABLES mais PAS des sorts —
+  // arenaSupported reste false (→ playCard les bloque comme sorts), donc on les
+  // autorise explicitement ici. Cf. arenaCastOnDraw.
+  if (isCastOnDraw(id)) return true;
+  // kind:"fusion" (Forge 2026-06-13) : créées en partie uniquement — jamais
+  // draftables ni deckables.
+  return arenaSupported(id) && !isFinisherCard(id) && CARDS[id]?.kind !== "fusion";
 }
 
 /** CPU's curated Arena deck — fallback static deck if buildCpuDeckMirroring
@@ -66,17 +73,16 @@ export function buildCpuDeckMirroring(playerDeck: CardId[]): CardId[] {
     const card = CARDS[id];
     pools[card.rarity].push(id);
   }
-  // Pour chaque rareté du joueur, pige N cartes (doublon autorisé jusqu'à 2).
-  // Cartes plafonnées à 1 copie : cf. SINGLE_COPY_CARDS (parité player/CPU).
-  // oracle (pioche 3) + heist (vol) ajoutés (Alex 2026-06-12 "reviennent trop
-  // souvent, un peu cheaté") : 2 copies dans un deck de 14 + reshuffle = récurrence
-  // trop forte de ces 2 cartes à fort impact.
-  const SINGLE_COPY_CARDS = new Set<CardId>(["supernova", "oracle", "heist"]);
+  // Pour chaque rareté du joueur, pige N cartes. PARITÉ ÉCONOMIE 2026-06-13 :
+  // plafonds de copies par rareté identiques au joueur (RARITY_COPIES 3/2/2/1),
+  // + overrides 1 copie oracle/heist (récurrence, Alex 2026-06-12).
+  const SINGLE_COPY_CARDS = new Set<CardId>(["oracle", "heist"]);
   const out: CardId[] = [];
   const inOut = new Map<CardId, number>();
   const tryAdd = (id: CardId, max: number): boolean => {
     const cur = inOut.get(id) ?? 0;
-    const cap = SINGLE_COPY_CARDS.has(id) ? Math.min(max, 1) : max;
+    const rarityCap = SINGLE_COPY_CARDS.has(id) ? 1 : (RARITY_COPIES[CARDS[id]?.rarity ?? "common"] ?? 1);
+    const cap = Math.min(max, rarityCap);
     if (cur >= cap) return false;
     out.push(id);
     inOut.set(id, cur + 1);
@@ -100,6 +106,11 @@ export function buildCpuDeckMirroring(playerDeck: CardId[]): CardId[] {
     for (const c of pool) {
       if (added >= need) break;
       if (tryAdd(c, 2)) added++;
+    }
+    // 3e passe : 3e copie (communes uniquement via rarityCap) si besoin
+    for (const c of pool) {
+      if (added >= need) break;
+      if (tryAdd(c, 3)) added++;
     }
     // 3e passe : downgrade depuis une rareté supérieure si pool épuisée
     if (added < need) {
@@ -131,43 +142,49 @@ export function buildCpuDeckMirroring(playerDeck: CardId[]): CardId[] {
  *  the CPU's "always-summon" fill of all 3 lanes leaves the player with
  *  ZERO way to damage the opp hero (Alex's "opp ne perd jamais de vie"
  *  symptom). Direct-damage spells fix that. */
+/** Copies par RARETÉ (Alex 2026-06-13 économie expert, validée) : standard
+ *  CCG — les communes portent la consistance, les légendaires sont des
+ *  MOMENTS (1 copie + exil au cast, cf. HeroState.exiled). */
+export const RARITY_COPIES: Record<string, number> = {
+  common: 3, rare: 2, epic: 2, legendary: 1,
+};
+
 export function buildPlayerDeck(saved: CardId[] | undefined): CardId[] {
-  // REFONTE Alex 2026-06-12 "j'ai des cartes que je n'ai PAS DU TOUT choisies
-  // (grave erreur)". Avant : on bourrait jusqu'à 14 avec un gros FILLER +
-  // force heist/supernova/augur → ~6 cartes parasites non choisies. Désormais
-  // le deck RESPECTE les choix du joueur :
-  //   1) deck = SES cartes (Arena-supportées) de son deck Ranked.
-  //   2) on garantit UNE SEULE carte de "portée" (reach) s'il n'en a aucune —
-  //      sinon impossible d'entamer le héros adverse quand le board est plein
-  //      ("opp ne perd jamais de PV").
-  //   3) filler MINIMAL seulement si le deck filtré est sous le plancher
-  //      jouable (joueur sans deck Arena, ou cartes non adaptées). Un vrai
-  //      deck Arena ne montre QUE ses choix.
-  const MIN_PLAYABLE = 8; // plancher anti-pénurie (≈ taille d'un deck Ranked)
-  const MAX_COPIES = 2;
-  // oracle/heist/supernova à 1 copie (récurrence + lethal — cf. Alex 2026-06-12).
-  const SINGLE_COPY_CARDS = new Set<CardId>(["supernova", "oracle", "heist"]);
+  // REFONTE Alex 2026-06-12 : le deck RESPECTE les choix du joueur (zéro
+  // carte parasite). ÉCONOMIE 2026-06-13 : chaque carte choisie est étendue
+  // en N copies selon sa rareté (3/2/2/1) → un deck de 8 choix ≈ 16-20
+  // cartes ; la stratégie vit dans le RATIO de raretés choisi.
+  // oracle/heist : override 1 copie (récurrence "cheaté", Alex 2026-06-12).
+  const SINGLE_COPY_CARDS = new Set<CardId>(["oracle", "heist"]);
   // Cartes capables d'entamer le HÉROS adverse même board plein.
-  const REACH_CARDS = new Set<CardId>(["supernova", "heist"]);
+  const REACH_CARDS = new Set<CardId>(["supernova", "heist", "singularite"]);
   const counts = new Map<CardId, number>();
   const out: CardId[] = [];
+  const copiesFor = (c: CardId): number =>
+    SINGLE_COPY_CARDS.has(c) ? 1 : (RARITY_COPIES[CARDS[c]?.rarity ?? "common"] ?? 1);
   const tryPush = (c: CardId): boolean => {
     const cur = counts.get(c) ?? 0;
-    const cap = SINGLE_COPY_CARDS.has(c) ? 1 : MAX_COPIES;
-    if (cur >= cap) return false;
+    if (cur >= copiesFor(c)) return false;
     out.push(c);
     counts.set(c, cur + 1);
     return true;
   };
-  // 1) Les CHOIX du joueur (cartes Arena-supportées de son deck).
-  const chosen = (saved ?? []).filter(isDeckable);
-  for (const c of chosen) tryPush(c);
+  // 1) Les CHOIX du joueur, étendus en copies-par-rareté.
+  const chosen = [...new Set((saved ?? []).filter(isDeckable))];
+  for (const c of chosen) {
+    for (let k = 0; k < copiesFor(c); k++) tryPush(c);
+  }
   // 2) Filet de portée : 1 carte reach garantie SEULEMENT si aucune présente.
   if (!out.some((c) => REACH_CARDS.has(c))) tryPush("supernova");
-  // 3) Plancher : filler minimal uniquement si le deck est trop maigre.
+  // 3) ANTI-POINT-MORT (Alex : "aucun point mort, coincé") : l'exil des
+  //    légendaires retire des cartes du cycle — si le deck choisi est trop
+  //    légendaire-lourd, le pool recyclable peut s'assécher. Garantie : au
+  //    moins 6 cartes NON-légendaires dans le deck, complétées en communes
+  //    neutres si besoin (filler NÉCESSAIRE, donc légitime).
   const FILLER: CardId[] = ["aegis", "precision", "second-wind", "surge", "augur", "anchor", "tide", "curse", "mirror"];
+  const nonLegendary = () => out.filter((c) => CARDS[c]?.rarity !== "legendary").length;
   for (const f of FILLER) {
-    if (out.length >= MIN_PLAYABLE) break;
+    if (nonLegendary() >= 6) break;
     tryPush(f);
   }
   return out;

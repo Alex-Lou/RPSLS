@@ -133,6 +133,128 @@ export const CARDS: Record<CardId, RankedCard> = {
     targetHintKey: "ranked.cards.heist.targetHint",
     art: "/Cards Bonus/heist.png",
   },
+  razzia: {
+    // RAZZIA (Alex 2026-06-13) — vole la carte sur la FORGE adverse (déjà
+    // forgée/déposée et non récupérée). Légendaire → EXILÉE après usage
+    // (1×/partie, c'est un MOMENT). Effet immédiat, pas de cible (auto sur la
+    // forge adverse). Sans forge adverse remplie : sans effet. (« pillage » est
+    // déjà pris par un PASSIF — d'où « razzia ».)
+    id: "razzia", cost: 2, rarity: "legendary",
+    target: "none", palette: "fuchsia", glyph: "🗝️",
+    nameKey: "ranked.cards.razzia.name", descKey: "ranked.cards.razzia.desc",
+    targetHintKey: "ranked.cards.razzia.targetHint",
+    art: null,
+  },
+  // ── 6 arts orphelins câblés (Alex 2026-06-13) — usages inventés depuis le
+  //    nom + l'image, validés "OUI GO". Effets Arena ; sans effet en Classé. ──
+  surcharge: {
+    id: "surcharge", cost: 2, rarity: "rare",
+    target: "lane", palette: "amber", glyph: "⚡",
+    nameKey: "ranked.cards.surcharge.name", descKey: "ranked.cards.surcharge.desc",
+    targetHintKey: "ranked.cards.surcharge.targetHint",
+    art: "/Cards Bonus/Surcharge.png",
+  },
+  toxine: {
+    id: "toxine", cost: 2, rarity: "rare",
+    target: "lane", palette: "lime", glyph: "☠️",
+    nameKey: "ranked.cards.toxine.name", descKey: "ranked.cards.toxine.desc",
+    targetHintKey: "ranked.cards.toxine.targetHint",
+    art: "/Cards Bonus/Toxine.png",
+  },
+  echo: {
+    id: "echo", cost: 2, rarity: "rare",
+    target: "none", palette: "cyan", glyph: "🔊",
+    nameKey: "ranked.cards.echo.name", descKey: "ranked.cards.echo.desc",
+    targetHintKey: "ranked.cards.echo.targetHint",
+    art: "/Cards Bonus/Echo.png",
+  },
+  rappel: {
+    id: "rappel", cost: 3, rarity: "epic",
+    target: "lane", palette: "violet", glyph: "↩️",
+    nameKey: "ranked.cards.rappel.name", descKey: "ranked.cards.rappel.desc",
+    targetHintKey: "ranked.cards.rappel.targetHint",
+    art: "/Cards Bonus/Rappel.png",
+  },
+  "double-mot": {
+    id: "double-mot", cost: 3, rarity: "epic",
+    target: "lane", palette: "sky", glyph: "📜",
+    nameKey: "ranked.cards.double-mot.name", descKey: "ranked.cards.double-mot.desc",
+    targetHintKey: "ranked.cards.double-mot.targetHint",
+    art: "/Cards Bonus/Double Mot.png",
+  },
+  chronomancien: {
+    id: "chronomancien", cost: 2, rarity: "epic",
+    target: "self", palette: "indigo", glyph: "⏳",
+    nameKey: "ranked.cards.chronomancien.name", descKey: "ranked.cards.chronomancien.desc",
+    targetHintKey: "ranked.cards.chronomancien.targetHint",
+    art: "/Cards Bonus/Chronomancien.png",
+  },
+  // ── ⚡ Cartes « À LA PIOCHE » (Cast When Drawn, Alex 2026-06-13) — se
+  //    déclenchent au TIRAGE (cf. arenaCastOnDraw). cost 1 = cosmétique
+  //    (GRATUITES, jamais jouées comme sorts) ; target "none" ; art glyph. ──
+  "coup-de-bol": {
+    id: "coup-de-bol", cost: 1, rarity: "common",
+    target: "none", palette: "amber", glyph: "🎰",
+    nameKey: "ranked.cards.coup-de-bol.name", descKey: "ranked.cards.coup-de-bol.desc",
+    targetHintKey: "ranked.cards.coup-de-bol.targetHint",
+    art: null,
+  },
+  "bouffee-air": {
+    id: "bouffee-air", cost: 1, rarity: "common",
+    target: "none", palette: "emerald", glyph: "💨",
+    nameKey: "ranked.cards.bouffee-air.name", descKey: "ranked.cards.bouffee-air.desc",
+    targetHintKey: "ranked.cards.bouffee-air.targetHint",
+    art: null,
+  },
+  cafeine: {
+    id: "cafeine", cost: 1, rarity: "common",
+    target: "none", palette: "amber", glyph: "☕",
+    nameKey: "ranked.cards.cafeine.name", descKey: "ranked.cards.cafeine.desc",
+    targetHintKey: "ranked.cards.cafeine.targetHint",
+    art: null,
+  },
+  tuile: {
+    id: "tuile", cost: 1, rarity: "common",
+    target: "none", palette: "zinc", glyph: "🌧️",
+    nameKey: "ranked.cards.tuile.name", descKey: "ranked.cards.tuile.desc",
+    targetHintKey: "ranked.cards.tuile.targetHint",
+    art: null,
+  },
+  "eclair-genie": {
+    id: "eclair-genie", cost: 1, rarity: "rare",
+    target: "none", palette: "cyan", glyph: "💡",
+    nameKey: "ranked.cards.eclair-genie.name", descKey: "ranked.cards.eclair-genie.desc",
+    targetHintKey: "ranked.cards.eclair-genie.targetHint",
+    art: null,
+  },
+  "patate-chaude": {
+    id: "patate-chaude", cost: 1, rarity: "rare",
+    target: "none", palette: "orange", glyph: "🥔",
+    nameKey: "ranked.cards.patate-chaude.name", descKey: "ranked.cards.patate-chaude.desc",
+    targetHintKey: "ranked.cards.patate-chaude.targetHint",
+    art: null,
+  },
+  "pile-ou-face": {
+    id: "pile-ou-face", cost: 1, rarity: "rare",
+    target: "none", palette: "fuchsia", glyph: "🪙",
+    nameKey: "ranked.cards.pile-ou-face.name", descKey: "ranked.cards.pile-ou-face.desc",
+    targetHintKey: "ranked.cards.pile-ou-face.targetHint",
+    art: null,
+  },
+  "trefle-chance": {
+    id: "trefle-chance", cost: 1, rarity: "epic",
+    target: "none", palette: "lime", glyph: "🍀",
+    nameKey: "ranked.cards.trefle-chance.name", descKey: "ranked.cards.trefle-chance.desc",
+    targetHintKey: "ranked.cards.trefle-chance.targetHint",
+    art: null,
+  },
+  sursaut: {
+    id: "sursaut", cost: 1, rarity: "epic",
+    target: "none", palette: "rose", glyph: "💪",
+    nameKey: "ranked.cards.sursaut.name", descKey: "ranked.cards.sursaut.desc",
+    targetHintKey: "ranked.cards.sursaut.targetHint",
+    art: null,
+  },
   tide: {
     id: "tide", cost: 3, rarity: "epic",
     target: "self", palette: "cyan", glyph: "🌊",
@@ -416,7 +538,7 @@ export const CARDS: Record<CardId, RankedCard> = {
     id: "permutation", cost: 2, rarity: "rare",
     target: "lane", palette: "indigo", glyph: "🔄",
     nameKey: "ranked.cards.permutation.name", descKey: "ranked.cards.permutation.desc",
-    targetHintKey: "ranked.cards.permutation.targetHint", art: null,
+    targetHintKey: "ranked.cards.permutation.targetHint", art: "/Cards Bonus/Permutation.png",
   },
   "toile-gluante": {
     id: "toile-gluante", cost: 2, rarity: "rare",
@@ -434,41 +556,99 @@ export const CARDS: Record<CardId, RankedCard> = {
     id: "gravite", cost: 3, rarity: "epic",
     target: "none", palette: "indigo", glyph: "🌑",
     nameKey: "ranked.cards.gravite.name", descKey: "ranked.cards.gravite.desc",
-    targetHintKey: "ranked.cards.gravite.targetHint", art: null,
+    targetHintKey: "ranked.cards.gravite.targetHint", art: "/Cards Bonus/Gravité.png",
   },
   "doppelganger": {
     id: "doppelganger", cost: 3, rarity: "epic",
     target: "none", palette: "sky", glyph: "👥",
     nameKey: "ranked.cards.doppelganger.name", descKey: "ranked.cards.doppelganger.desc",
-    targetHintKey: "ranked.cards.doppelganger.targetHint", art: null,
+    targetHintKey: "ranked.cards.doppelganger.targetHint", art: "/Cards Bonus/Doppelgänger.png",
   },
   "purge": {
     id: "purge", cost: 3, rarity: "epic",
     target: "none", palette: "amber", glyph: "🧹",
     nameKey: "ranked.cards.purge.name", descKey: "ranked.cards.purge.desc",
-    targetHintKey: "ranked.cards.purge.targetHint", art: null,
+    targetHintKey: "ranked.cards.purge.targetHint", art: "/Cards Bonus/Purge.png",
   },
   "roue-destin": {
     id: "roue-destin", cost: 4, rarity: "legendary",
     target: "gamble", palette: "rose", glyph: "🎡",
     nameKey: "ranked.cards.roue-destin.name", descKey: "ranked.cards.roue-destin.desc",
-    targetHintKey: "ranked.cards.roue-destin.targetHint", art: null,
+    targetHintKey: "ranked.cards.roue-destin.targetHint", art: "/Cards Bonus/Roue du destin.png",
   },
   "phenix": {
     id: "phenix", cost: 4, rarity: "legendary",
     target: "none", palette: "orange", glyph: "🔥",
     nameKey: "ranked.cards.phenix.name", descKey: "ranked.cards.phenix.desc",
-    targetHintKey: "ranked.cards.phenix.targetHint", art: null,
+    targetHintKey: "ranked.cards.phenix.targetHint", art: "/Cards Bonus/Fénix.png",
   },
   "singularite": {
     id: "singularite", cost: 4, rarity: "legendary",
     target: "none", palette: "indigo", glyph: "🌀",
     nameKey: "ranked.cards.singularite.name", descKey: "ranked.cards.singularite.desc",
-    targetHintKey: "ranked.cards.singularite.targetHint", art: null,
+    targetHintKey: "ranked.cards.singularite.targetHint", art: "/Cards Bonus/Singularité.png",
+  },
+
+  /* ── ⚗️ Cartes de FUSION (Forge Arena 2026-06-13) — kind:"fusion" :
+   *    créées par la Forge uniquement, exclues collection/decks/packs.
+   *    Coût = somme des 2 ingrédients − 1 (capé à 4). ── */
+  "frappe-parfaite": {
+    id: "frappe-parfaite", cost: 2, rarity: "rare", kind: "fusion",
+    target: "lane", palette: "amber", glyph: "🎯",
+    nameKey: "ranked.cards.frappe-parfaite.name", descKey: "ranked.cards.frappe-parfaite.desc",
+    targetHintKey: "ranked.cards.frappe-parfaite.targetHint", art: "/Cards Bonus/Frappe parfaite.png",
+  },
+  "bastion": {
+    id: "bastion", cost: 1, rarity: "rare", kind: "fusion",
+    target: "lane", palette: "sky", glyph: "🏰",
+    nameKey: "ranked.cards.bastion.name", descKey: "ranked.cards.bastion.desc",
+    targetHintKey: "ranked.cards.bastion.targetHint", art: null,
+  },
+  "avalanche": {
+    id: "avalanche", cost: 1, rarity: "rare", kind: "fusion",
+    target: "none", palette: "zinc", glyph: "🏔️",
+    nameKey: "ranked.cards.avalanche.name", descKey: "ranked.cards.avalanche.desc",
+    targetHintKey: "ranked.cards.avalanche.targetHint", art: null,
+  },
+  "source-vitale": {
+    id: "source-vitale", cost: 1, rarity: "rare", kind: "fusion",
+    target: "lane", palette: "emerald", glyph: "⛲",
+    nameKey: "ranked.cards.source-vitale.name", descKey: "ranked.cards.source-vitale.desc",
+    targetHintKey: "ranked.cards.source-vitale.targetHint", art: null,
+  },
+  "omniscience": {
+    id: "omniscience", cost: 2, rarity: "epic", kind: "fusion",
+    target: "none", palette: "cyan", glyph: "👁️",
+    nameKey: "ranked.cards.omniscience.name", descKey: "ranked.cards.omniscience.desc",
+    targetHintKey: "ranked.cards.omniscience.targetHint", art: null,
+  },
+  "cocon": {
+    id: "cocon", cost: 3, rarity: "epic", kind: "fusion",
+    target: "lane", palette: "lime", glyph: "🛡",
+    nameKey: "ranked.cards.cocon.name", descKey: "ranked.cards.cocon.desc",
+    targetHintKey: "ranked.cards.cocon.targetHint", art: null,
+  },
+  "apocalypse": {
+    id: "apocalypse", cost: 4, rarity: "legendary", kind: "fusion",
+    target: "none", palette: "rose", glyph: "☄️",
+    nameKey: "ranked.cards.apocalypse.name", descKey: "ranked.cards.apocalypse.desc",
+    targetHintKey: "ranked.cards.apocalypse.targetHint", art: null,
+  },
+  "imposteur": {
+    id: "imposteur", cost: 3, rarity: "legendary", kind: "fusion",
+    target: "none", palette: "violet", glyph: "🎭",
+    nameKey: "ranked.cards.imposteur.name", descKey: "ranked.cards.imposteur.desc",
+    targetHintKey: "ranked.cards.imposteur.targetHint", art: null,
   },
 };
 
-export const ALL_CARD_IDS: CardId[] = Object.keys(CARDS) as CardId[];
+/** Toutes les cartes COLLECTIONNABLES. kind:"fusion" exclu À LA SOURCE
+ *  (Forge 2026-06-13) : un seul filtre couvre packs (economy), boutique,
+ *  collection, DeckManager, Codex — les cartes fusionnées n'existent
+ *  qu'EN PARTIE, via la Forge. */
+export const ALL_CARD_IDS: CardId[] = (Object.keys(CARDS) as CardId[]).filter(
+  (id) => CARDS[id].kind !== "fusion",
+);
 
 /** True for cards whose effect is permanently active while equipped — they are
  *  never drawn into the hand (see makeBattle / RankedBattleState.passives). */

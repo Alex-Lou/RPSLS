@@ -59,6 +59,7 @@ export function defaultPlayer(): Player {
     hapticIntensity: "med",
     cardCollection: ["aegis", "precision", "anchor", "second-wind", "surge", "augur"],
     rankedDeck: ["aegis", "precision", "surge", "augur", "anchor", "second-wind"],
+    arenaDeck: ["aegis", "precision", "surge", "augur", "anchor", "second-wind", "heist", "supernova", "seve", "jet-caillou"],
     eclats: 0,
     dust: 0,
     stars: 0,
@@ -109,6 +110,7 @@ interface AppState {
   /** Ranked card collection */
   unlockCard: (id: string) => void;
   setRankedDeck: (deck: string[]) => void;
+  setArenaDeck: (deck: string[]) => void;
   /** Record a finished Constellation Pro (arena) match — increments the
    *  appropriate field of player.arenaStats. The sync subscriber pushes
    *  the change to the cloud via the existing playerSync pipeline. */
@@ -208,6 +210,24 @@ function applyRankedUnlocks(
   // New mechanics cards.
   if (constellWins >= 3) set.add("mirror");   // early rare — anti-counter tool
   if (rankLp >= 1200) set.add("gambit");      // mid-tier high-roll epic
+  // Outil de Forge (Arena 2026-06-13) — débloqué tôt pour jouer le bras de fer
+  // forge (vole la carte forgée non récupérée de l'adversaire).
+  if (constellWins >= 1) set.add("razzia");
+  // 6 arts orphelins Pro (2026-06-13) — débloqués dès 1 victoire pour les jouer.
+  if (constellWins >= 1) {
+    for (const c of ["surcharge", "toxine", "echo", "rappel", "double-mot", "chronomancien"]) set.add(c);
+  }
+  // ⚡ Cartes « à la pioche » (Cast When Drawn, 2026-06-13) — progression douce :
+  // communes dès la 1re victoire, rares à la 2e, épiques à la 4e.
+  if (constellWins >= 1) {
+    for (const c of ["coup-de-bol", "bouffee-air", "cafeine", "tuile"]) set.add(c);
+  }
+  if (constellWins >= 2) {
+    for (const c of ["eclair-genie", "patate-chaude", "pile-ou-face"]) set.add(c);
+  }
+  if (constellWins >= 4) {
+    for (const c of ["trefle-chance", "sursaut"]) set.add(c);
+  }
   return set.size === collection.length ? collection : Array.from(set);
 }
 
@@ -368,6 +388,9 @@ export const useStore = create<AppState>()(
       }),
       setRankedDeck: (deck) => set((s) => ({
         player: { ...s.player, rankedDeck: deck },
+      })),
+      setArenaDeck: (deck) => set((s) => ({
+        player: { ...s.player, arenaDeck: deck },
       })),
       setArenaAffinity: (affinity) => set((s) => ({
         player: { ...s.player, arenaAffinity: affinity },
