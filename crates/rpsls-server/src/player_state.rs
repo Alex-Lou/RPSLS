@@ -176,7 +176,11 @@ impl PlayerProgress {
         self.season_number = self.season_number.min(100_000);
         self.win_streak = self.win_streak.min(100_000);
 
-        cap_vec(&mut self.card_collection, 64, 64);
+        // 256 = bien au-dessus des ~79 cartes collectionnables (Alex 2026-06-13 :
+        // 64 TRONQUAIT la collection d'un joueur avancé → cartes PERDUES au sync /
+        // réinstall). Marge confortable pour les cartes futures ; les ids sont
+        // courts (≤64 char) → coût Redis négligeable.
+        cap_vec(&mut self.card_collection, 256, 64);
         cap_vec(&mut self.ranked_deck, 16, 64);
         cap_vec(&mut self.arena_deck, 16, 64);
         // History: bound the COUNT so the Redis blob stays small (each
@@ -188,9 +192,9 @@ impl PlayerProgress {
         // letting a tampered client blow up Redis storage.
         cap_vec(&mut self.claimed_quests, 128, 64);
         self.codex_claimed.truncate(32);
-        if self.card_mastery.len() > 64 {
+        if self.card_mastery.len() > 256 {
             let keep: std::collections::HashSet<String> =
-                self.card_mastery.keys().take(64).cloned().collect();
+                self.card_mastery.keys().take(256).cloned().collect();
             self.card_mastery.retain(|k, _| keep.contains(k));
         }
         for v in self.card_mastery.values_mut() {
