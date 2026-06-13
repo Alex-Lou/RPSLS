@@ -81,7 +81,7 @@ export function ArenaSpellQueueChip({
         "relative rounded-md overflow-visible ring-2 shadow shrink-0 " +
         (onRemove ? "active:scale-95 " : "pointer-events-none ") +
         RING_BY_RARITY[rarity] + " " +
-        (isOpp ? "shadow-rose-900/55 " : "shadow-emerald-900/55 ")
+        (isOpp ? "shadow-rose-900/55 " : "shadow-sky-900/55 ")
       }
       style={{
         width: w,

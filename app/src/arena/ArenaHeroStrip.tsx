@@ -4,7 +4,8 @@
  * Extracted from ArenaBoard.tsx to keep that file under the project's
  * 400-line ceiling. Used twice per board (opp on top, player on bottom).
  *
- * Visual ownership: emerald accents for "you", rose for "opp". The portrait
+ * Visual ownership: BLUE (sky) accents for "you" (moi), RED (rose) for "opp"
+ * (Alex 2026-06-13). The portrait
  * pulses + tints red when the hero just took damage (driven by the
  * useEffect that compares prev/next HP), and floats a "-N" damage popup
  * out of the portrait at the same time.
@@ -71,8 +72,10 @@ export function ArenaHeroStrip({
   const cancelInspect = () => {
     if (inspectTimer.current) { window.clearTimeout(inspectTimer.current); inspectTimer.current = null; }
   };
-  const accent = side === "you" ? "text-emerald-300" : "text-rose-300";
-  const ringColor = side === "you" ? "ring-emerald-400/70" : "ring-rose-400/70";
+  // Identité couleur par camp (Alex 2026-06-13) : MOI = BLEU (sky), ADVERSAIRE
+  // = ROUGE (rose). Avant le joueur était emerald (vert).
+  const accent = side === "you" ? "text-sky-300" : "text-rose-300";
+  const ringColor = side === "you" ? "ring-sky-400/70" : "ring-rose-400/70";
   const hpPct = Math.max(0, Math.min(100, (hero.hp / hero.maxHp) * 100));
   const lowHp = hero.hp <= 5;
   // Track previous HP pour spawn popup damage/heal au-dessus du portrait.
