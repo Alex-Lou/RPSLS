@@ -17,6 +17,8 @@ import {
   resolveLaneCombatAt,
 } from "./arenaRules";
 import { CREATURE_STATS, TURN_HARD_CAP, moveCountersMove, type BoardState, type LaneIndex, type TurnIntent } from "./arenaTypes";
+import type { Move } from "../engine/game";
+import type { CardId } from "../ranked/rankedTypes";
 import { alog } from "./arenaLog";
 
 /** Snapshot helper — log compact d'une lane avec flags. Réutilise le même
@@ -74,6 +76,15 @@ export interface ResolverFlowArgs {
    *  Pierre, because the attacker carries Étouffe (Paper) / Logique (Spock)
    *  which cancel Provocation. `bypassedSide` owns the bypassed Pierre. */
   setAntiTaunt: (b: { bypassedSide: "a" | "b"; rockLane: LaneIndex; cause: "paper" | "spock"; key: number } | null) => void;
+  /** Signature FX plein-board (Genèse, Supernova…) — déclenché au step SPELLS
+   *  avec les ids de TOUS les sorts joués ce tour. ArenaSpellFX ne joue que
+   *  ceux qui ont une signature ; le reste s'appuie sur les réactions
+   *  par-créature (ArenaLaneSlot). Optionnel (tests/headless). */
+  setSpellFX?: (fx: { ids: CardId[]; key: number } | null) => void;
+  /** IMPACT FX plein-écran (Alex 2026-06-13) — déclenché sur un coup PUISSANT
+   *  ou FATAL au héros, typé par le MOVE de l'attaquant (Ciseaux → entaille,
+   *  Pierre → ébranlement…). Cf. ArenaImpactFX. */
+  setImpactFX?: (fx: { move: Move; power: "strong" | "fatal"; key: number } | null) => void;
   /** Called BEFORE the resolver advances to the next turn — clears the
    *  player's pending intent and stops the "resolving" lock. */
   onSettle: (finalBoard: BoardState) => void;
@@ -106,7 +117,7 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
   const {
     startBoard, playerIntent, cpuIntent,
     setBoard, setOppPreview, setPlayerPreview, setResolveStep,
-    setCombatLane, setHeroHit, setTauntBlock, setAntiTaunt,
+    setCombatLane, setHeroHit, setTauntBlock, setAntiTaunt, setSpellFX, setImpactFX,
     onSettle, onAdvanceTurn, onMatchEnd,
   } = args;
 
@@ -121,6 +132,13 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
     b = applyAllSpells(b, playerIntent, cpuIntent);
     setBoard(b);
     setResolveStep("spells");
+    // Signatures plein-board (Genèse, Supernova, Trou Noir…) — au moment où les
+    // sorts FONT effet. ArenaSpellFX filtre ceux sans signature. ArenaGame
+    // purge l'état après l'anim (timer nettoyé → pas de fuite).
+    if (setSpellFX) {
+      const castIds = [...playerIntent.spells, ...cpuIntent.spells].map((s) => s.id);
+      if (castIds.length > 0) setSpellFX({ ids: castIds, key: Date.now() });
+    }
     // Snapshot post-spells pour traçage (Alex flag : "je peux pas
     // surveiller assez, faut les logs côté toi"). Voir aussi l'arenaLog
     // qui consomme ce log via la catégorie state.
@@ -230,6 +248,10 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
               const bypass = findAntiTauntBypass("b");
               if (bypass) setAntiTaunt({ bypassedSide: "b", rockLane: bypass.rockLane, cause: bypass.cause, key: Date.now() });
               setHeroHit({ side: "opp", lane: laneIdx, key: Date.now() });
+              // IMPACT FX si coup PUISSANT (≥4) ou FATAL au héros adverse.
+              const dmgB = splashAtoB > 0 ? splashAtoB : atkA;
+              const powB = b.b.hp - dmgB <= 0 ? "fatal" : dmgB >= 4 ? "strong" : null;
+              if (powB && lane.a && setImpactFX) setImpactFX({ move: lane.a.move, power: powB, key: Date.now() });
             }
             if (aDeflectorLane !== null) {
               setTauntBlock({ defenderSide: "a", rockLane: aDeflectorLane, key: Date.now() + 1 });
@@ -237,6 +259,9 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
               const bypass = findAntiTauntBypass("a");
               if (bypass) setAntiTaunt({ bypassedSide: "a", rockLane: bypass.rockLane, cause: bypass.cause, key: Date.now() + 1 });
               setHeroHit({ side: "you", lane: laneIdx, key: Date.now() + 1 });
+              const dmgA = splashBtoA > 0 ? splashBtoA : atkB;
+              const powA = b.a.hp - dmgA <= 0 ? "fatal" : dmgA >= 4 ? "strong" : null;
+              if (powA && lane.b && setImpactFX) setImpactFX({ move: lane.b.move, power: powA, key: Date.now() + 1 });
             }
           }, LANE_CHARGE_MS * 0.55);
           window.setTimeout(() => {

@@ -34,6 +34,7 @@ import {
   STARTING_HAND_SIZE,
   type ArenaMatchResult,
   type BoardState,
+  type CastOnDrawEvent,
   type Creature,
   type HeroState,
   type LaneIndex,
@@ -47,6 +48,7 @@ import {
   spellPriority,
   type ArenaSpellContext,
 } from "./arenaCardEffects";
+import { CAST_ON_DRAW_IDS, isCastOnDraw, resolveCastOnDraw } from "./arenaCastOnDraw";
 import { arenaSpellCost } from "./arenaSpellHelpers";
 import { CARDS } from "../ranked/cards";
 import type { CardId } from "../ranked/rankedTypes";
@@ -63,8 +65,19 @@ export function makeHero(deckIds: CardId[], affinity?: Move, cpuPersona?: import
     (id): id is CardId => Object.prototype.hasOwnProperty.call(CARDS, id),
   );
   const shuffled = shuffle(cleaned);
-  const startingHand = shuffled.slice(0, STARTING_HAND_SIZE);
-  const remaining = shuffled.slice(STARTING_HAND_SIZE);
+  // Main de départ ANTI-DOUBLON (Alex 2026-06-13) : on tire en évitant les
+  // doublons → fini les « 2 Ancres » à l'ouverture / au mulligan.
+  let pool = shuffled.slice();
+  const startingHand: CardId[] = [];
+  for (let k = 0; k < STARTING_HAND_SIZE; k++) {
+    // ⚡ Exclut les cartes « à la pioche » de la MAIN DE DÉPART (elles ne
+    // s'activent qu'EN JEU via drawCards, jamais à l'ouverture).
+    const res = drawOneAvoidingHand([...startingHand, ...CAST_ON_DRAW_IDS], pool, []);
+    if (!res) break;
+    pool = res.deck;
+    startingHand.push(res.card);
+  }
+  const remaining = pool;
   return {
     hp: HERO_MAX_HP,
     maxHp: HERO_MAX_HP,
@@ -73,11 +86,55 @@ export function makeHero(deckIds: CardId[], affinity?: Move, cpuPersona?: import
     hand: startingHand,
     deck: remaining,
     discard: [],
+    exiled: [],
     divineShield: false,
     affinity,
     constellationCount: 0,
     cpuPersona,
   };
+}
+
+/** Mulligan T1 (Alex 2026-06-13 économie expert) : remet les cartes choisies
+ *  dans le deck, shuffle, repioche autant. Une seule fois par match (géré
+ *  côté UI). Les indices invalides sont ignorés. */
+export function mulliganSwap(hero: HeroState, handIndices: number[]): HeroState {
+  const idx = [...new Set(handIndices)].filter((i) => i >= 0 && i < hero.hand.length);
+  if (idx.length === 0) return hero;
+  const kept = hero.hand.filter((_, i) => !idx.includes(i));
+  const returned = idx.map((i) => hero.hand[i]);
+  // Redraw ANTI-DOUBLON (Alex 2026-06-13) : on évite les doublons de la main
+  // gardée, les cartes rejetées (ne pas les re-servir) et les déjà-repiochées.
+  let deck = shuffle([...hero.deck, ...returned]);
+  let discard = hero.discard.slice();
+  const redrawn: CardId[] = [];
+  for (let k = 0; k < idx.length; k++) {
+    const res = drawOneAvoidingHand([...kept, ...returned, ...redrawn, ...CAST_ON_DRAW_IDS], deck, discard);
+    if (!res) break;
+    deck = res.deck;
+    discard = res.discard;
+    redrawn.push(res.card);
+  }
+  alog("hand", `mulligan : ${returned.join(",")} remplacées par ${redrawn.join(",")}`);
+  return { ...hero, hand: [...kept, ...redrawn], deck, discard };
+}
+
+/** Mulligan IMMÉDIAT, EN PLACE (Alex 2026-06-13) : rejette la carte à l'index
+ *  `i` et tire UNE remplaçante qui prend EXACTEMENT le même emplacement (pas de
+ *  décalage → le joueur VOIT clairement la nouvelle carte arriver). La rejetée
+ *  est remélangée dans le deck. Taille de main préservée. */
+export function mulliganReplaceInPlace(hero: HeroState, i: number): HeroState {
+  if (i < 0 || i >= hero.hand.length) return hero;
+  const rejected = hero.hand[i];
+  const handWithout = [...hero.hand.slice(0, i), ...hero.hand.slice(i + 1)];
+  // La rejetée retourne au deck (remélangée). On tire en évitant les doublons
+  // du RESTE de la main ET la rejetée elle-même (ne pas re-servir ce qu'on vient
+  // de jeter). Anti-doublon Alex 2026-06-13.
+  const deck = shuffle([...hero.deck, rejected]);
+  const res = drawOneAvoidingHand([...handWithout, rejected, ...CAST_ON_DRAW_IDS], deck, hero.discard);
+  if (!res) return hero;
+  const newHand = [...hero.hand.slice(0, i), res.card, ...hero.hand.slice(i + 1)];
+  alog("hand", `mulligan en place : ${rejected} → ${res.card}`);
+  return { ...hero, hand: newHand, deck: res.deck, discard: res.discard };
 }
 
 export function makeInitialBoard(
@@ -95,6 +152,8 @@ export function makeInitialBoard(
     phase: "planning",
     augurRevealedA: [],
     augurRevealedB: [],
+    forgeA: null,
+    forgeB: null,
   };
 }
 
@@ -124,56 +183,80 @@ export function healHero(hero: HeroState, amount: number): HeroState {
   return { ...hero, hp: Math.min(hero.maxHp, hero.hp + amount) };
 }
 
-/** Alex feedback 2026-06-09 Round 7 — limites de copies par rareté en main :
- *  common 3, rare 2, epic 1, legendary 1. Empêche le spam d'une seule carte
- *  puissante. Plus la carte est rare, plus son cap en main est restrictif. */
-const HAND_RARITY_CAP: Record<string, number> = {
-  common: 3,
-  rare: 2,
-  epic: 1,
-  legendary: 1,
-};
+// HAND_RARITY_CAP (cap 3/2/1/1 par rareté) RETIRÉ (Alex 2026-06-13) : remplacé
+// par la règle ANTI-DOUBLON stricte (max 1 copie en main) dans drawCards.
+
+/** Pioche UNE carte du deck en ÉVITANT les doublons de `avoid` (typiquement
+ *  la main) — RÈGLE ANTI-DOUBLON (Alex 2026-06-13) : « tant qu'une carte est en
+ *  main, on ne peut pas la repiocher ; si elle n'y est plus, la pioche aléatoire
+ *  PEUT la ramener ». Reshuffle la défausse au besoin. FILET ANTI-TOUR-MORT : si
+ *  TOUT le pool (deck+défausse) est en doublon de `avoid`, on pioche quand même
+ *  (sinon pioche vide = pire). Retourne null seulement si plus AUCUNE carte.
+ *
+ *  L'exception « Larcin / pioche au hasard chez l'adversaire » (et Écho) n'est
+ *  PAS concernée : ces effets ajoutent à la main SANS passer par ici. */
+export function drawOneAvoidingHand(
+  avoid: readonly CardId[], deck: readonly CardId[], discard: readonly CardId[],
+): { card: CardId; deck: CardId[]; discard: CardId[] } | null {
+  let d = deck.slice();
+  let disc = discard.slice();
+  if (d.length === 0) {
+    if (disc.length === 0) return null;
+    d = shuffle(disc); disc = [];
+  }
+  // Préfère une carte PAS déjà dans `avoid`.
+  let idx = d.findIndex((c) => !avoid.includes(c));
+  if (idx < 0 && disc.length > 0) {
+    // Rien de neuf dans le deck → injecte la défausse mélangée et re-cherche.
+    d = d.concat(shuffle(disc)); disc = [];
+    idx = d.findIndex((c) => !avoid.includes(c));
+  }
+  if (idx < 0) idx = 0; // tout le pool est doublon → filet : pioche la tête
+  const [card] = d.splice(idx, 1);
+  return { card, deck: d, discard: disc };
+}
 
 /** Pull `n` cards from the deck → hand (reshuffles discard into deck if the
  *  deck runs dry mid-draw). Returns the new HeroState. Cap at HAND_CAP — extra
  *  cards sont "burned" (lost to the void — classic overdraw rule).
  *
- *  Alex feedback Round 7 : si une pioche violerait le cap rareté en main
- *  (3 commons / 2 rares / 1 epic / 1 leg), retry une autre carte (option A
- *  "replace") jusqu'à 3 tentatives par slot avant burn. Préserve la curve
- *  CCG : le joueur garde un mix de raretés équilibré. */
+ *  RÈGLE ANTI-DOUBLON (Alex 2026-06-13) : on ne pioche jamais une carte DÉJÀ en
+ *  main tant qu'elle y est (remplace l'ancien cap par rareté 3/2/1/1, plus
+ *  permissif). Évite le flood de doublons / passifs. Cf. drawOneAvoidingHand. */
 export function drawCards(hero: HeroState, n: number): HeroState {
-  let { hand, deck, discard } = hero;
-  hand = hand.slice();
-  deck = deck.slice();
-  discard = discard.slice();
-  for (let i = 0; i < n; i++) {
-    // 3 tentatives par slot pour respecter le cap rareté (option A replace).
-    let drawn: CardId | null = null;
-    for (let attempt = 0; attempt < 3 && drawn === null; attempt++) {
-      if (deck.length === 0) {
-        if (discard.length === 0) break;
-        deck = shuffle(discard);
-        discard = [];
+  let hand = hero.hand.slice();
+  let deck = hero.deck.slice();
+  let discard = hero.discard.slice();
+  let h = hero; // porte les mutations PV/mana des cartes « à la pioche »
+  const castEvents: CastOnDrawEvent[] = [];
+  let toDraw = n;
+  let guard = 0; // filet anti-boucle (deck 100% à-la-pioche / pioches en chaîne)
+  while (toDraw > 0 && guard < 64) {
+    guard++;
+    toDraw--;
+    const res = drawOneAvoidingHand(hand, deck, discard);
+    if (!res) break; // plus aucune carte (deck + défausse vides)
+    deck = res.deck;
+    discard = res.discard;
+    // ⚡ Carte « À LA PIOCHE » (Cast When Drawn, Alex 2026-06-13) : ne va PAS en
+    // main — elle résout son effet IMMÉDIATEMENT au tirage. Peut piocher plus
+    // (extraDraws) → la boucle enchaîne naturellement (toDraw +=).
+    if (isCastOnDraw(res.card)) {
+      const fired = resolveCastOnDraw({ ...h, hand, deck, discard }, res.card);
+      if (fired) {
+        h = fired.hero;
+        hand = fired.hero.hand;       // un effet « défausse » peut modifier la main
+        deck = fired.hero.deck;
+        discard = fired.hero.discard;
+        castEvents.push(fired.event);
+        toDraw += fired.extraDraws;
       }
-      const card = deck.shift()!;
-      const rarity = CARDS[card]?.rarity;
-      const cap = rarity ? HAND_RARITY_CAP[rarity] : 99;
-      const inHand = hand.filter((id) => id === card).length;
-      if (inHand >= cap) {
-        // Replace : retire cette carte au discard et retry une autre du deck.
-        discard.push(card);
-        continue;
-      }
-      drawn = card;
+      continue;
     }
-    if (drawn === null) break; // 3 retries fail ou deck vide
-    // Cap de main = HAND_CAP (7, décision Alex). Était un `< 8` codé en dur
-    // (résidu du cap 10→7) qui autorisait une 8e carte hors-contrat.
-    if (hand.length < HAND_CAP) hand.push(drawn);
-    // else: burn (overdraw — design choice to discourage over-stuffing the hand)
+    // Cap de main = HAND_CAP (7). Au-delà → burn (overdraw assumé).
+    if (hand.length < HAND_CAP) hand.push(res.card);
   }
-  return { ...hero, hand, deck, discard };
+  return { ...h, hand, deck, discard, castOnDrawEvents: castEvents };
 }
 
 /* ───────────────────────── Creature helpers ───────────────────────── */

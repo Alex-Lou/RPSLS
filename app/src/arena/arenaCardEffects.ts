@@ -36,10 +36,14 @@ import {
   applyTrouNoir, applyMarchandAmes, applyParadoxe, applyJuge, applyGenese,
 } from "./arenaPhase2Spells";
 import {
+  applyFrappeParfaite, applyBastion, applyAvalanche, applySourceVitale,
+  applyOmniscience, applyCocon, applyApocalypse, applyImposteur,
+} from "./arenaFusionCards";
+import {
   applyJetCaillou, applySeve, applyCoupOeil, applyPermutation, applyToileGluante,
   applyGravite, applyDoppelganger, applyPurge, applyRoueDestin, applyPhenix, applySingularite,
 } from "./arenaPhase3Spells";
-import { type BoardState, type Creature, type LaneState, type PlayedSpell, type Side } from "./arenaTypes";
+import { CREATURE_STATS, MANA_CAP, type BoardState, type Creature, type LaneState, type PlayedSpell, type Side } from "./arenaTypes";
 import type { CardId } from "../ranked/rankedTypes";
 
 export interface ArenaSpellContext {
@@ -55,10 +59,13 @@ const PRIORITY_TABLE: Partial<Record<CardId, number>> = {
   aegis:        100,
   anchor:       110,
   riposte:      120,
-  // Healing / hp recovery (140) — lands BEFORE buffs so a healed creature
-  // benefits from a same-turn ATK boost.
-  "second-wind": 140,
-  gaia:         145,
+  // Soins du HÉROS (470) — RESOLUS APRÈS les dégâts directs (Alex 2026-06-13) :
+  // sinon le joueur voyait son PV MONTER (soin) PUIS DESCENDRE (Supernova) =
+  // confus. Maintenant l'anim est dégât D'ABORD, soin ENSUITE. (Le verdict de
+  // mort est calculé après TOUS les sorts → second souffle sauve toujours d'un
+  // Supernova létal le même tour, le clamp à 0 est rattrapé par le soin.)
+  "second-wind": 470,
+  gaia:         475,
   // Mana / tempo (160) — fires early so the extra mana can be spent on
   // the same turn.
   sablier:      160,
@@ -81,6 +88,14 @@ const PRIORITY_TABLE: Partial<Record<CardId, number>> = {
   mascarade:    345,
   // Direct damage / removal (400)
   heist:        400,
+  razzia:       408, // vol de la forge adverse (disruption setup)
+  // ── 6 arts orphelins (2026-06-13) — alignés sur leur famille ──
+  chronomancien: 165, // mana/tempo (tôt)
+  surcharge:    215, // buff
+  "double-mot": 218, // buff
+  toxine:       236, // debuff
+  echo:         322, // utility/pioche
+  rappel:       412, // removal
   sangsue:      405,
   supernova:    410,
   vortex:       420,
@@ -90,6 +105,16 @@ const PRIORITY_TABLE: Partial<Record<CardId, number>> = {
   // Hand / board wipes (500) — fire LAST so prior effects are accounted for.
   juge:         500,
   genese:       510,
+  // ⚗️ Cartes de FUSION (Forge 2026-06-13) — priorités alignées sur leur
+  // famille (défense tôt, dégâts tard).
+  bastion:           105,
+  "source-vitale":   142,
+  "frappe-parfaite": 212,
+  cocon:             232,
+  omniscience:       305,
+  imposteur:         402,
+  avalanche:         415,
+  apocalypse:        460,
   // Finishers Lot D — fire EARLY (priority 60) so leur effet est en place
   // avant les autres sorts du tour (buff/debuff/dmg). C'est le climax du
   // hero, l'effet "écrase" la résolution.
@@ -159,6 +184,13 @@ export function applyArenaSpell(ctx: ArenaSpellContext): BoardState {
     case "mascarade":   return applyMascarade(board, side, spell);
     // ── Direct damage / removal ──
     case "heist":       return applyHeist(board, side);
+    case "razzia":      return applyRazzia(board, side);
+    case "surcharge":    return applySurcharge(board, side, spell);
+    case "toxine":       return applyToxine(board, side, spell);
+    case "rappel":       return applyRappel(board, side, spell);
+    case "double-mot":   return applyDoubleMot(board, side, spell);
+    case "echo":         return applyEcho(board, side);
+    case "chronomancien": return applyChronomancien(board, side);
     case "sangsue":     return applySangsue(board, side, spell);
     case "supernova":   return applySupernova(board, side, spell);
     case "vortex":      return applyVortex(board, side);
@@ -192,6 +224,15 @@ export function applyArenaSpell(ctx: ArenaSpellContext): BoardState {
       alog("spell", `${side} RÉVERBÉRATION → rejoue [${last.id}]`);
       return applyArenaSpell({ board, side, spell: last });
     }
+    // ── ⚗️ Cartes de fusion (Forge) ──
+    case "frappe-parfaite": return applyFrappeParfaite(board, side, spell);
+    case "bastion":         return applyBastion(board, side, spell);
+    case "avalanche":       return applyAvalanche(board, side);
+    case "source-vitale":   return applySourceVitale(board, side, spell);
+    case "omniscience":     return applyOmniscience(board, side);
+    case "cocon":           return applyCocon(board, side, spell);
+    case "apocalypse":      return applyApocalypse(board, side);
+    case "imposteur":       return applyImposteur(board, side);
     // ── Finishers Lot D — Constellation Pro ──
     case "finisher-forteresse":
     case "finisher-verger":
@@ -366,6 +407,86 @@ function applyHeist(board: BoardState, side: Side): BoardState {
   after = withSideHero(after, side, { ...mine, hand: newMyHand });
   return { ...after, lastHeistStolenA: side === "a" ? stolen : after.lastHeistStolenA,
                      lastHeistStolenB: side === "b" ? stolen : after.lastHeistStolenB };
+}
+
+/** Razzia — vole la carte posée sur la FORGE adverse (dépôt ou carte forgée
+ *  non récupérée) → arrive dans TA main. Forge adverse vide : sans effet. */
+function applyRazzia(board: BoardState, side: Side): BoardState {
+  const oppS = oppSide(side);
+  const oppForge = oppS === "a" ? board.forgeA : board.forgeB;
+  if (!oppForge) {
+    alog("spell", `${side} RAZZIA → forge ${oppS} vide, sans effet`);
+    return board;
+  }
+  const mine = side === "a" ? board.a : board.b;
+  const after = withSideHero(board, side, { ...mine, hand: [...mine.hand, oppForge] });
+  alog("spell", `${side} RAZZIA → vole [${oppForge}] sur la forge ${oppS} → main`);
+  return oppS === "a" ? { ...after, forgeA: null } : { ...after, forgeB: null };
+}
+
+/* ─── 6 arts orphelins câblés (Alex 2026-06-13) ─────────────────────────── */
+
+/** Surcharge — overcharge : +4 ATK ce tour à TA créature, mais −1 PV (coût,
+ *  clampé à 1 → ne se suicide pas). Spock Détaché ignore le buff. */
+function applySurcharge(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
+  if (spell.kind !== "lane") return board;
+  const c = getMyCreatureOnLane(board, side, spell.lane);
+  if (!c || isDetached(c)) return board;
+  const hp = Math.max(1, c.hp - 1);
+  alog("spell", `${side} SURCHARGE L${spell.lane} : +4 ATK, ${c.hp}→${hp} PV`);
+  return withMyCreatureOnLane(board, side, spell.lane, { ...c, atkBuff: c.atkBuff + 4, hp });
+}
+
+/** Toxine — frappe toxique : −3 PV ET −2 ATK à une créature ennemie (tue si ≤0). */
+function applyToxine(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
+  if (spell.kind !== "lane") return board;
+  const opp = getOppCreatureOnLane(board, side, spell.lane);
+  if (!opp) return board;
+  const hp = opp.hp - 3;
+  if (hp <= 0) {
+    alog("spell", `${side} TOXINE L${spell.lane} : créature ennemie empoisonnée à mort`);
+    return withOppCreatureOnLane(board, side, spell.lane, null);
+  }
+  alog("spell", `${side} TOXINE L${spell.lane} : ${opp.hp}→${hp} PV, −2 ATK`);
+  return withOppCreatureOnLane(board, side, spell.lane, { ...opp, hp, atkBuff: opp.atkBuff - 2 });
+}
+
+/** Rappel — retire (rappelle du champ) une créature ennemie. */
+function applyRappel(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
+  if (spell.kind !== "lane") return board;
+  const opp = getOppCreatureOnLane(board, side, spell.lane);
+  if (!opp) return board;
+  alog("spell", `${side} RAPPEL L${spell.lane} : créature ennemie ${opp.move} rappelée (retirée)`);
+  return withOppCreatureOnLane(board, side, spell.lane, null);
+}
+
+/** Double Mot — DOUBLE l'ATK effective d'une de tes créatures ce tour (ajoute
+ *  base+buff au buff). Spock Détaché ignore. */
+function applyDoubleMot(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
+  if (spell.kind !== "lane") return board;
+  const c = getMyCreatureOnLane(board, side, spell.lane);
+  if (!c || isDetached(c)) return board;
+  const eff = CREATURE_STATS[c.move].atk + c.atkBuff;
+  alog("spell", `${side} DOUBLE MOT L${spell.lane} : ATK ×2 (+${eff})`);
+  return withMyCreatureOnLane(board, side, spell.lane, { ...c, atkBuff: c.atkBuff + eff });
+}
+
+/** Echo — duplique une carte AU HASARD de ta main (résonance). */
+function applyEcho(board: BoardState, side: Side): BoardState {
+  const me = side === "a" ? board.a : board.b;
+  if (me.hand.length === 0) return board;
+  const idx = Math.floor(Math.random() * me.hand.length);
+  const copy = me.hand[idx];
+  alog("spell", `${side} ECHO : duplique [${copy}] en main`);
+  return withSideHero(board, side, { ...me, hand: [...me.hand, copy] });
+}
+
+/** Chronomancien — accélération temporelle : +3 mana ce tour (clampé MANA_CAP). */
+function applyChronomancien(board: BoardState, side: Side): BoardState {
+  const me = side === "a" ? board.a : board.b;
+  const mana = Math.min(MANA_CAP, me.mana + 3);
+  alog("spell", `${side} CHRONOMANCIEN : ${me.mana}→${mana} mana`);
+  return withSideHero(board, side, { ...me, mana });
 }
 
 /** Supernova — 6 damage to a target (lane creature OR opp hero). */

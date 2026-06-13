@@ -29,15 +29,13 @@ export const LANE_COUNT = 3;
 // donc 7 cartes max est confortable sans débordement.
 export const HAND_CAP = 7;
 export const STARTING_HAND_SIZE = 5;
-// Alex feedback 2026-06-09 F : "controler usage et nombre de cartes par
-// main/manche" → max 2 sorts intent par tour. Empêche les tours dump-tout
-// quand on a beaucoup de mana, force à étaler les plays.
-export const MAX_SPELLS_PER_TURN = 3; // 2 → 3 (Alex 2026-06-12) : 1 sort-lane par lane possible (le board a 3 lanes). Le mana limite déjà le spam.
-// Cap des sorts UTILITY (hero/self/global) par tour. SOURCE UNIQUE partagée
-// entre ArenaGame.addSpell (UI) ET truncateIntentByCaps (engine) — sinon les
-// 2 divergent et une carte planifiée se fait brûler à la résolution (bug
-// Alex 2026-06-12, watch live). 1 → 2.
-export const UTILITY_SPELLS_PER_TURN = 2;
+// CAPS LEVÉS (Alex 2026-06-13 "CCG expert — pas de limites quand pas
+// nécessaires") : le MANA est désormais L'UNIQUE limite du tour, comme dans
+// tout CCG mature (Hearthstone n'a aucun cap de sorts/tour). 99 = inerte ;
+// la plomberie (addSpell + truncateIntentByCaps, SOURCE UNIQUE partagée
+// UI/engine/IA) est conservée — re-serrer ici suffit si un abus émerge.
+export const MAX_SPELLS_PER_TURN = 99;
+export const UTILITY_SPELLS_PER_TURN = 99;
 /** Soft cap on turns — if neither hero is dead by then, the lower-HP loses
  *  (sudden-death fail-safe so an over-defensive match still ends). */
 export const TURN_HARD_CAP = 30;
@@ -58,6 +56,21 @@ export const CPU_PERSONA_LABEL: Record<CpuPersona, string> = {
   builder:   "Bâtisseur",
   defender:  "Gardien",
 };
+
+/* ───────────────────────── Cast When Drawn ⚡ ───────────────────────── */
+
+/** Famille visuelle d'une carte « à la pioche » (Cast When Drawn) → pilote la
+ *  couleur + l'animation de ArenaCastOnDrawFX. */
+export type CastFxKind = "mana" | "heal" | "draw" | "risk" | "chaos";
+
+/** Événement émis quand une carte Cast-When-Drawn se déclenche AU TIRAGE
+ *  (cf. arenaCastOnDraw.ts). `label` = résumé lisible de l'effet réellement
+ *  appliqué (« +2 MANA », « PIOCHE 2 · −2 PV », « PILE → +3 MANA »…). */
+export interface CastOnDrawEvent {
+  id: CardId;
+  fxKind: CastFxKind;
+  label: string;
+}
 
 export interface HeroState {
   hp: number;
@@ -115,8 +128,18 @@ export interface HeroState {
   deck: CardId[];
   /** Used cards waiting to be reshuffled when the deck empties. */
   discard: CardId[];
+  /** Cartes LÉGENDAIRES jouées — EXILÉES (Alex 2026-06-13 économie expert) :
+   *  jamais reshufflées, 1 usage par partie. Une légendaire défaussée SANS
+   *  être jouée (Juge, Cascade) recycle normalement — l'exil sanctionne le
+   *  CAST, pas la défausse. */
+  exiled: CardId[];
   /** Aegis "divine shield" — next damage source is absorbed (then this drops to 0). */
   divineShield: boolean;
+  /** ⚡ Cartes « à la pioche » (Cast When Drawn) déclenchées par le DERNIER
+   *  drawCards (pioche de tour / pioche d'effet). Transient : lu par l'UI pour
+   *  jouer l'anim ⚡, ré-écrit à chaque drawCards. JAMAIS persisté (le board
+   *  Arena est match-local). Alex 2026-06-13. */
+  castOnDrawEvents?: CastOnDrawEvent[];
 }
 
 /* ───────────────────────── Creatures ───────────────────────── */
@@ -387,6 +410,11 @@ export interface BoardState {
    *  applyHeist au cast. Pas besoin de clear : écrasée au cast suivant. */
   lastHeistStolenA?: CardId;
   lastHeistStolenB?: CardId;
+  /** ⚗️ FORGE (2026-06-13) — la carte déposée sur la case Forge de chaque
+   *  joueur (visible des deux camps, reprenable, persiste entre les tours).
+   *  Fusion : carte partenaire de la main + Forge → carte fusionnée en main. */
+  forgeA?: CardId | null;
+  forgeB?: CardId | null;
   /** Réverbération (2026-06-12) : dernier sort NON-réverbération appliqué par
    *  chaque côté ce tour (tracké dans applyAllSpells). Réverbération le rejoue.
    *  Reset chaque tour (advanceToNextTurn). */
@@ -440,6 +468,13 @@ export const CARD_TARGET_KIND: Partial<Record<CardId, SpellTargetKind>> = {
   riposte:      "lane",
   augur:        "global",
   heist:        "self",
+  razzia:       "global",
+  surcharge:    "lane",
+  toxine:       "lane",
+  rappel:       "lane",
+  "double-mot": "lane",
+  echo:         "global",
+  chronomancien: "self",
   tide:         "global",
   oracle:       "self",
   vortex:       "global",
@@ -473,6 +508,15 @@ export const CARD_TARGET_KIND: Partial<Record<CardId, SpellTargetKind>> = {
   "roue-destin":   "self",
   phenix:          "self",
   singularite:     "hero",
+  // ── ⚗️ Cartes de fusion (Forge 2026-06-13) ──
+  "frappe-parfaite": "lane",
+  bastion:           "lane",
+  avalanche:         "global",
+  "source-vitale":   "lane",
+  omniscience:       "global",
+  cocon:             "lane",
+  apocalypse:        "global",
+  imposteur:         "global",
 };
 
 /** Active targeting state shared across the board + plan phase so that
@@ -510,8 +554,33 @@ export const LANE_SPELL_TARGET_SIDE: Partial<Record<CardId, LaneTargetSide>> = {
   "jet-caillou":   "opp-creature",
   seve:            "my-creature",
   "toile-gluante": "opp-creature",
+  // ── 6 arts orphelins (2026-06-13) ──
+  surcharge:       "my-creature",
+  "double-mot":    "my-creature",
+  rappel:          "opp-creature",
+  toxine:          "opp-creature",
   permutation:     "both-occupied", // lane où MOI ET l'adversaire avons une créature
+  // ── ⚗️ Cartes de fusion ──
+  "frappe-parfaite": "my-creature",
+  bastion:           "my-creature",
+  "source-vitale":   "my-creature",
+  cocon:             "opp-creature",
 };
+
+/** Mana GAGNÉ IMMÉDIATEMENT ce tour par une carte « tempo » (façon Pièce de
+ *  Hearthstone) — Alex 2026-06-13. Disponible pour la PLANIFICATION du même
+ *  tour (sinon Sablier ne servait à rien : son +2 atterrissait à la résolution
+ *  PUIS était écrasé par le refill du tour suivant). */
+export const MANA_GRANTS: Partial<Record<CardId, number>> = {
+  sablier: 2,
+  offre: 2, // (+ monte aussi maxMana de façon permanente, géré à la résolution)
+};
+
+/** Total de mana « tempo » offert par les cartes déjà planifiées dans l'intent
+ *  → s'ajoute au budget de mana du tour. */
+export function intentManaGrant(intent: TurnIntent): number {
+  return intent.spells.reduce((sum, s) => sum + (MANA_GRANTS[s.id] ?? 0), 0);
+}
 
 /** Returns whether `lane` on `side` is a valid drop target for the active
  *  ArenaTargeting. Used by ArenaLaneSlot's clickable + label so each card
