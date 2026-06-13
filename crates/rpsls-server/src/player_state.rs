@@ -52,6 +52,14 @@ pub struct PlayerProgress {
     pub claimed_quests: Vec<String>,
     #[serde(default)]
     pub ranked_deck: Vec<String>,
+    /// Arena (Constellation Pro) deck — separate from Classé. Synced so it
+    /// survives a reinstall exactly like `ranked_deck`. Alex 2026-06-13: Arena
+    /// data was being SILENTLY DROPPED server-side because this field (and the
+    /// arena_* record below) were missing from the struct — serde ignores the
+    /// `arenaDeck` the client sends, so the deck only ever lived in localStorage
+    /// and was lost on every reinstall.
+    #[serde(default)]
+    pub arena_deck: Vec<String>,
     /// Premium cosmetic sets the player has purchased. Synced (union) so a
     /// reinstall never loses paid sets — same durability guarantee as cards.
     #[serde(default)]
@@ -73,6 +81,15 @@ pub struct PlayerProgress {
     pub classe_losses: u64,
     #[serde(default)]
     pub classe_draws: u64,
+    /// Constellation Pro (arena) record — cloud-saved like classe_* so the
+    /// Arena win/loss/draw tally survives a reinstall. Was dropped server-side
+    /// (field missing) → Arena stats never persisted (Alex 2026-06-13).
+    #[serde(default)]
+    pub arena_wins: u64,
+    #[serde(default)]
+    pub arena_losses: u64,
+    #[serde(default)]
+    pub arena_draws: u64,
     /// Epoch millis of last sync — used for last-write-wins on cosmetics.
     #[serde(default)]
     pub updated_at: u64,
@@ -100,6 +117,14 @@ pub struct PlayerProgress {
     /// chooser from popping back on a re-install.
     #[serde(default)]
     pub pad_chosen: bool,
+
+    /// Recent match history (opaque JSON `MatchRecord`s, capped to 60 in
+    /// sanitize). Synced so the player's match LOG + the chosen Voies survive a
+    /// reinstall (Alex 2026-06-13: history was localStorage-only → lost on
+    /// every reinstall). The server only stores/returns it — it never inspects
+    /// the records.
+    #[serde(default)]
+    pub history: Vec<serde_json::Value>,
 }
 
 /// Hard ceiling for any single numeric progression field — well above any
@@ -145,11 +170,19 @@ impl PlayerProgress {
         self.classe_wins = self.classe_wins.min(MAX_NUM);
         self.classe_losses = self.classe_losses.min(MAX_NUM);
         self.classe_draws = self.classe_draws.min(MAX_NUM);
+        self.arena_wins = self.arena_wins.min(MAX_NUM);
+        self.arena_losses = self.arena_losses.min(MAX_NUM);
+        self.arena_draws = self.arena_draws.min(MAX_NUM);
         self.season_number = self.season_number.min(100_000);
         self.win_streak = self.win_streak.min(100_000);
 
         cap_vec(&mut self.card_collection, 64, 64);
         cap_vec(&mut self.ranked_deck, 16, 64);
+        cap_vec(&mut self.arena_deck, 16, 64);
+        // History: bound the COUNT so the Redis blob stays small (each
+        // MatchRecord is a few hundred bytes; 60 is plenty for a match log).
+        // Opaque JSON — records are client-authored; the count cap is the guard.
+        self.history.truncate(60);
         cap_vec(&mut self.owned_premium_sets, 32, 32);
         // Quests accumulate over seasons of play — 128 ids is plenty without
         // letting a tampered client blow up Redis storage.

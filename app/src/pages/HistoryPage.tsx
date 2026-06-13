@@ -121,6 +121,19 @@ function Row({
             <span className="text-xs text-ink-muted">{MODE_META[match.mode].label}</span>
             <span className="text-ink-faint text-xs">·</span>
             <span className="text-xs text-ink-muted">vs {oppLabel}</span>
+            {/* VOIE jouée (Constellation Pro) — Alex 2026-06-13 « voies jouées
+             *  dans l'historique ». N'apparaît que pour les matchs Arena. */}
+            {match.playerVoie && (
+              <>
+                <span className="text-ink-faint text-xs">·</span>
+                <span
+                  className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-200"
+                  title={match.oppVoie ? `Ta Voie : ${MOVE_META[match.playerVoie].label} — adv : ${MOVE_META[match.oppVoie].label}` : "Voie jouée"}
+                >
+                  ✦ {MOVE_META[match.playerVoie].label}
+                </span>
+              </>
+            )}
           </div>
           <div className="text-xs text-ink-faint mt-0.5">
             {match.scorePlayer} — {match.scoreOpponent} · BO{match.bestOf} · {ago(match.timestamp)}

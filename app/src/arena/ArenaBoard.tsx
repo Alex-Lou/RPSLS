@@ -831,7 +831,12 @@ function LaneRow({
                       style={{
                         transform: `rotate(${fanAngle}deg) translateX(${fanShiftX}px) scale(0.72)`,
                         transformOrigin: s.position.includes("b") ? "bottom center" : "top center",
-                        zIndex: 5 + idx,
+                        // z AU-DESSUS du fantôme d'invocation planifiée (z-20 dans
+                        // ArenaLaneSlot) — Alex 2026-06-13 « sur L3 le sticker passe
+                        // DERRIÈRE la carte jouée » : quand on invoque ET on lance un
+                        // sort sur la MÊME lane, le ghost masquait le sticker. 22+idx
+                        // le repasse devant ; < charge (30) pour ne pas couvrir l'attaque.
+                        zIndex: 22 + idx,
                       }}
                       onClick={removable ? (e) => { e.stopPropagation(); onRemoveSticker!(s.idx); } : undefined}
                     >

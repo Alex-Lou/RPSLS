@@ -18,7 +18,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
   hapticLock, hapticMatchStart, hapticMatchWin, hapticMatchLoss,
-  hapticTap, hapticWin, hapticLoss,
+  hapticTap, hapticWin, hapticLoss, hapticAlert,
 } from "../haptic";
 import { useStore } from "../store/store";
 import { CARDS } from "../ranked/cards";
@@ -50,6 +50,7 @@ import {
   MAX_SPELLS_PER_TURN,
   UTILITY_SPELLS_PER_TURN,
   intentManaGrant,
+  FORGE_RECOVER_COST,
   type HeroState,
   type ArenaTargeting,
   type BoardState,
@@ -261,7 +262,7 @@ export function ArenaGame({
     alog("hand", `🚫 « ${cardFr(id)} » ne fusionne pas avec « ${cardFr(forge)} » — voir Règles ⚗️.`);
   }
 
-  // Tap sur la forge : dépôt/fusion de la carte ARMÉE, sinon REPRISE.
+  // Tap sur la forge : dépôt/fusion de la carte ARMÉE, sinon RÉCUP (coûte mana).
   function handleForgeTap() {
     if (resolving) return;
     if (targeting?.kind === "spell") {
@@ -271,9 +272,19 @@ export function ArenaGame({
     }
     const forge = board.forgeA ?? null;
     if (forge) {
-      // REPRISE — la carte revient en main (aucune sélection active).
-      setBoard((cur) => ({ ...cur, a: { ...cur.a, hand: [...cur.a.hand, forge] }, forgeA: null }));
-      alog("hand", `a FORGE reprise : ${forge}`);
+      // RÉCUP : SEULE une carte FUSIONNÉE (le payoff, kind:"fusion") coûte
+      // FORGE_RECOVER_COST mana (Alex 2026-06-13, option B « plus legit ») →
+      // EMPÊCHEMENT (mana serré → fusion coincée sur la forge) + fenêtre de VOL
+      // Razzia sur la vraie récompense. Reprendre un simple DÉPÔT (setup,
+      // misclic) reste GRATUIT → la forge reste agréable à manipuler.
+      const cost = CARDS[forge]?.kind === "fusion" ? FORGE_RECOVER_COST : 0;
+      if (board.a.mana < cost) {
+        alog("hand", `🚫 Récupérer « ${cardFr(forge)} » coûte ${cost} mana — pas assez. La fusion reste exposée (Razzia adverse peut la voler).`);
+        hapticAlert();
+        return;
+      }
+      setBoard((cur) => ({ ...cur, a: { ...cur.a, hand: [...cur.a.hand, forge], mana: cur.a.mana - cost }, forgeA: null }));
+      alog("hand", `a FORGE récup : ${forge}${cost ? ` (−${cost} mana)` : " (gratuit)"}`);
       hapticTap();
     }
   }
@@ -398,7 +409,7 @@ export function ArenaGame({
     if (matchEndedRef.current) { onQuit(); return; }
     matchEndedRef.current = true;
     hapticMatchLoss();
-    recordArenaMatch("loss");
+    recordArenaMatch("loss", { playerVoie: board.a.affinity, oppVoie: board.b.affinity, forfeit: true });
     onQuit();
   }
 
@@ -502,7 +513,9 @@ export function ArenaGame({
       aDead && bDead ? "draw" : bDead ? "win" : "loss";
     if (outcome === "win") hapticMatchWin();
     else if (outcome === "loss") hapticMatchLoss();
-    recordArenaMatch(outcome);
+    // VOIE jouée (joueur + adversaire) journalisée dans l'historique (Alex
+    // 2026-06-13). board.a/b.affinity = la Voie choisie par chaque camp.
+    recordArenaMatch(outcome, { playerVoie: board.a.affinity, oppVoie: board.b.affinity });
   }, [board.phase, board.a.hp, board.b.hp, recordArenaMatch]);
 
   /* ──────────── Intent builders ──────────── */

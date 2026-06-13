@@ -200,6 +200,13 @@ function runBootSyncImmediate(player: { id: string; nickname: string; claimToken
         void saveAnchor(finalId, finalToken);
       }
 
+      // Restaure l'historique du cloud sur une install FRAÎCHE (local vide) —
+      // AVANT le push-back, sinon on réécraserait le cloud avec un historique
+      // vide. Restore-only : jamais d'écrasement d'un local NON vide.
+      if (useStore.getState().history.length === 0 && msg.state.history && msg.state.history.length > 0) {
+        useStore.getState().restoreHistory(msg.state.history);
+      }
+
       // Push merged state back
       const merged = { ...currentPlayer, ...patch };
       const progress = buildProgressFromPlayer(merged);

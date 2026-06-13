@@ -114,7 +114,13 @@ interface AppState {
   /** Record a finished Constellation Pro (arena) match — increments the
    *  appropriate field of player.arenaStats. The sync subscriber pushes
    *  the change to the cloud via the existing playerSync pipeline. */
-  recordArenaMatch: (outcome: "win" | "loss" | "draw") => void;
+  recordArenaMatch: (
+    outcome: "win" | "loss" | "draw",
+    meta?: { playerVoie?: Move; oppVoie?: Move; forfeit?: boolean },
+  ) => void;
+  /** Remplace l'historique local (restauration cloud sur install fraîche —
+   *  appelé UNIQUEMENT quand le local est vide, donc jamais d'écrasement). */
+  restoreHistory: (h: MatchRecord[]) => void;
   /** Set the player's chosen Voie / affinity (Constellation Pro v2). */
   setArenaAffinity: (affinity: Move) => void;
   /** Spend {@link PACK_COST} éclats to open a pack of 3 cards. Duplicates
@@ -366,7 +372,7 @@ export const useStore = create<AppState>()(
         if (col.includes(id)) return s;
         return { player: { ...s.player, cardCollection: [...col, id] } };
       }),
-      recordArenaMatch: (outcome) => set((s) => {
+      recordArenaMatch: (outcome, meta) => set((s) => {
         const cur = s.player.arenaStats ?? { wins: 0, losses: 0, draws: 0 };
         const next = {
           wins:   cur.wins + (outcome === "win" ? 1 : 0),
@@ -378,14 +384,43 @@ export const useStore = create<AppState>()(
         // matches, deeper strategy) so it pays slightly above Constellation
         // Ranked: win 20, draw 10, loss 5.
         const reward = outcome === "win" ? 20 : outcome === "draw" ? 10 : 5;
+        // HISTORIQUE (Alex 2026-06-13 « voies jouées dans l'historique ») : on
+        // journalise AUSSI le match vs-CPU (avant : SEULS les compteurs
+        // arenaStats, aucune entrée dans `history` → log vide + voie perdue). La
+        // VOIE jouée (joueur + adversaire) est conservée → consultable ET
+        // synchronisable au cloud (cf. buildProgressFromPlayer).
+        const rec: MatchRecord = {
+          id: `arena-${Date.now()}`,
+          mode: "constellation",
+          bestOf: 1,
+          opponent: { kind: "cpu", mood: "logical" },
+          scorePlayer: outcome === "win" ? 1 : 0,
+          scoreOpponent: outcome === "loss" ? 1 : 0,
+          outcome,
+          rounds: [],
+          xpDelta: 0,
+          lpDelta: 0,
+          timestamp: Date.now(),
+          forfeit: meta?.forfeit || undefined,
+          playerVoie: meta?.playerVoie,
+          oppVoie: meta?.oppVoie,
+        };
+        const newHistory = [rec, ...s.history].slice(0, HISTORY_LIMIT);
+        // Débloque les cartes Arena selon constellWins : l'history vs-CPU compte
+        // ENFIN (avant, ces victoires n'étaient pas journalisées → 0 unlock).
+        const cardCollection = applyRankedUnlocks(s.player.cardCollection ?? [], s.player.rankLp, newHistory);
         return {
           player: {
             ...s.player,
             arenaStats: next,
             eclats: (s.player.eclats ?? 0) + reward,
+            cardCollection,
           },
+          history: newHistory,
         };
       }),
+
+      restoreHistory: (h) => set({ history: h }),
       setRankedDeck: (deck) => set((s) => ({
         player: { ...s.player, rankedDeck: deck },
       })),

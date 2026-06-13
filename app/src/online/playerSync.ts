@@ -59,6 +59,11 @@ export function buildProgressFromPlayer(player: Player): PlayerProgress {
     difficulty: player.difficulty,
     fontScale: player.fontScale,
     padChosen: player.padChosen,
+    // Historique récent (capé 50) — synchronisé pour survivre au réinstall
+    // (Alex 2026-06-13). Lu du STORE (global, pas sur `player`). Restauré
+    // uniquement sur install fraîche côté merge → jamais d'écrasement d'un
+    // historique local non vide.
+    history: useStore.getState().history?.slice(0, 50) ?? [],
   };
 }
 
@@ -135,12 +140,20 @@ export function mergeServerState(
   }
   if (questsChanged) patch.claimedQuests = Array.from(localQuests);
 
-  // Ranked deck — take server's if local is default and server has one
-  if (server.rankedDeck?.length > 0 && (!local.rankedDeck || local.rankedDeck.length === 0)) {
+  // Decks (Classé + Pro) — restaurés du cloud quand le profil LOCAL est FRAIS
+  // (`!local.syncedAt` = jamais sync sur cette install = neuve/wipée) OU vide.
+  // 🔴 BUG Alex 2026-06-13 (« je vois mon ancien deck, pas le nouveau ») : avant,
+  // on ne restaurait QUE si le deck local était VIDE — or après un wipe
+  // localStorage (chaque réinstall d'APK), le deck local est le DÉFAUT (10
+  // cartes, NON vide) → le deck sauvegardé au cloud n'était JAMAIS restauré, le
+  // joueur retombait sur le deck par défaut. La porte « fraîche » corrige ça.
+  // Dès qu'un deck est édité localement (syncedAt posé au 1er push), le LOCAL
+  // gagne et est poussé — on n'écrase jamais un choix actif.
+  const freshInstall = !local.syncedAt;
+  if (server.rankedDeck?.length > 0 && (freshInstall || !local.rankedDeck || local.rankedDeck.length === 0)) {
     patch.rankedDeck = server.rankedDeck;
   }
-  // Arena deck — idem (séparé du Classé).
-  if (server.arenaDeck && server.arenaDeck.length > 0 && (!local.arenaDeck || local.arenaDeck.length === 0)) {
+  if (server.arenaDeck && server.arenaDeck.length > 0 && (freshInstall || !local.arenaDeck || local.arenaDeck.length === 0)) {
     patch.arenaDeck = server.arenaDeck;
   }
 
@@ -241,6 +254,13 @@ export function handleStateLoaded(server: PlayerProgress, client: OnlineClient, 
   // Apply patch to local store if anything changed
   if (Object.keys(patch).length > 0) {
     store.applyServerSync(patch);
+  }
+
+  // Restaure l'historique du cloud sur une install FRAÎCHE (local vide) — AVANT
+  // le push-back, sinon on réécraserait le cloud avec un historique vide.
+  // Restore-only : jamais d'écrasement d'un historique local NON vide.
+  if (useStore.getState().history.length === 0 && server.history && server.history.length > 0) {
+    useStore.getState().restoreHistory(server.history);
   }
 
   // Push merged state back to server so it has the union, and anchor our

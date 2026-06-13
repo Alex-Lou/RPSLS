@@ -2,6 +2,7 @@
 //! Keep both in sync.
 
 import type { Move, Outcome } from "../engine/game";
+import type { MatchRecord } from "../types";
 
 /* ──────────── Wire types ──────────── */
 
@@ -84,6 +85,10 @@ export interface PlayerProgress {
   difficulty?: string;
   fontScale?: number;
   padChosen?: boolean;
+  /** Historique récent (capé) — synchronisé pour que le journal des matchs +
+   *  les VOIES jouées survivent à un réinstall (Alex 2026-06-13). Optionnel
+   *  (back-compat avec un serveur qui ne renvoie pas encore le champ). */
+  history?: MatchRecord[];
 }
 
 /* Client → Server */
