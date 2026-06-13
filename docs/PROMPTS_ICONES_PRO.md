@@ -68,7 +68,7 @@ Two crossed training swords with golden (#fcd34d) blades and dark hilts, small i
 
 ### 10. `pro-deck.png` — Gérer mon Deck (🎴 actuel)
 ```
-A fanned stack of three trading cards seen at an angle, top card glowing fuchsia-violet (#c084fc) with a tiny constellation pattern on its back, crisp card edges. Deck-building feel.
+    A fanned stack of three trading cards seen at an angle, top card glowing fuchsia-violet (#c084fc) with a tiny constellation pattern on its back, crisp card edges. Deck-building feel.
 ```
 
 ### 11. `pro-match-rapide.png` — Match rapide (🌐 actuel)
@@ -94,3 +94,31 @@ A compact heater shield with a four-pointed star cut out of its center glowing f
 ---
 
 **Cohérence du set :** mêmes proportions (l'objet remplit ~80 % du canvas), même éclairage (key light haut-gauche), même intensité de glow — générer idéalement dans une seule session pour garder le style uniforme.
+
+---
+
+## D. Détails de la Voie — 4 icônes de fiche (Alex 2026-06-13)
+
+Remplacent les émojis 🎯 ✅ ⚠️ 🌟 dans le panneau dépliable « Ma Voie ». **Rendues TRÈS petites (16–22 px)** → motif UNIQUE, ultra-lisible, code couleur sémantique. Déposer dans `app/public/MenuIcons/IconConstellationPro/` (avec les autres). Format commun à coller en fin, MAIS remplacer la ligne taille par : `Bold single-motif silhouette designed to stay perfectly readable at 16–22 px (very small UI chip).`
+
+### 1. `fiche-but.png` — But / Objectif (remplace 🎯) · cyan
+```
+A clean target reticle with a single arrow striking dead-center, three concentric rings glowing cyan (#22d3ee), a bright white impact spark at the bullseye. Reads instantly as "goal / objective".
+```
+
+### 2. `fiche-force.png` — Force (remplace ✅) · émeraude
+```
+A bold upward-thrusting chevron made of emerald (#34d399) energy, like a rising blade, with a small power-spark at its base. Confident, ascending. Reads as "strength / advantage".
+```
+
+### 3. `fiche-faiblesse.png` — Faiblesse (remplace ⚠️) · ambre
+```
+A cracked shield fragment split by a jagged downward fracture, warning amber-orange (#f59e0b) light seeping from the crack. Reads as "weakness / vulnerability".
+```
+
+### 4. `fiche-particularite.png` — Particularité (remplace 🌟) · violet→or
+```
+A four-pointed starburst with one smaller orbiting spark, radiant gradient from violet (#a78bfa) to gold (#fcd34d), magical shimmer. Reads as "unique signature / special trait".
+```
+
+Une fois déposées, je câble les 4 dans `FicheRow` (Voie dépliée) — un prop `iconSrc` remplace l'émoji, fallback émoji conservé si le PNG manque.
