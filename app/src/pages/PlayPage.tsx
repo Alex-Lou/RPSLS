@@ -220,6 +220,7 @@ export function PlayPage({
         {view.kind === "ranked_deck" && (
           <DeckManager
             key="ranked-deck"
+            mode={view.from === "arena" ? "arena" : "ranked"}
             onClose={() => setView({
               kind: view.from === "arena" ? "arena_lobby" : "ranked_lobby",
             })}

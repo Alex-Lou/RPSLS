@@ -96,8 +96,11 @@ export interface Player {
   hapticIntensity?: "low" | "med" | "high";
   /** Ranked card collection — IDs of cards the player has unlocked. */
   cardCollection?: string[];
-  /** Ranked deck — ordered list of 6 card IDs (3 main + 3 reserve). */
+  /** Ranked deck (Constellation Classée) — 6 cartes. */
   rankedDeck?: string[];
+  /** Arena deck (Constellation Pro) — 8 cartes, format SÉPARÉ du Classé
+   *  (chaque choix est étendu par rareté 3/2/2/1 au début du match). */
+  arenaDeck?: string[];
   /** Soft currency earned on every finished match. Spent at the boutique
    *  to buy a pack. */
   eclats?: number;

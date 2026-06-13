@@ -34,6 +34,7 @@ export function buildProgressFromPlayer(player: Player): PlayerProgress {
     codexClaimed: player.codexClaimed ?? [],
     claimedQuests: player.claimedQuests ?? [],
     rankedDeck: player.rankedDeck ?? [],
+    arenaDeck: player.arenaDeck ?? [],
     ownedPremiumSets: player.ownedPremiumSets ?? [],
     seasonNumber: player.season?.number ?? 1,
     seasonStartedAt: player.season?.startedAt ?? Date.now(),
@@ -137,6 +138,10 @@ export function mergeServerState(
   // Ranked deck — take server's if local is default and server has one
   if (server.rankedDeck?.length > 0 && (!local.rankedDeck || local.rankedDeck.length === 0)) {
     patch.rankedDeck = server.rankedDeck;
+  }
+  // Arena deck — idem (séparé du Classé).
+  if (server.arenaDeck && server.arenaDeck.length > 0 && (!local.arenaDeck || local.arenaDeck.length === 0)) {
+    patch.arenaDeck = server.arenaDeck;
   }
 
   // Owned premium sets — UNION (paid content only ever grows; never lost on a
@@ -329,6 +334,10 @@ function syncFingerprint(p: Player): string {
     // Cosmetics + prefs — so picking a theme/background/pad/avatar/difficulty pushes too.
     p.themeId, p.backgroundId, p.padId, p.avatar, p.nickname,
     p.difficulty, p.fontScale ?? 1, p.padChosen ?? false,
+    // Decks (Classé + Pro) — pour qu'une édition de deck pousse au cloud
+    // (Alex 2026-06-13 ; n'étaient PAS dans le fingerprint avant → un edit
+    // de deck ne se sync'ait qu'au prochain autre changement).
+    (p.rankedDeck ?? []).join(","), (p.arenaDeck ?? []).join(","),
   ].join("|");
 }
 
