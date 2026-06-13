@@ -261,6 +261,11 @@ export interface MatchRecord {
   timestamp: number;
   /** True when the player abandoned the match mid-way (counted as a loss). */
   forfeit?: boolean;
+  /** Constellation Pro (arena) — la VOIE (affinité RPSLS) jouée par le joueur
+   *  et par l'adversaire ce match. Optionnel : seuls les matchs Arena la
+   *  portent (Alex 2026-06-13 « voies choisies et jouées dans l'historique »). */
+  playerVoie?: Move;
+  oppVoie?: Move;
 }
 
 /** XP/LP rewards table per mode. */
