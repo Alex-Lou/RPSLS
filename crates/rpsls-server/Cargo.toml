@@ -46,3 +46,8 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 # We only need base64 here; full RS256 signature verification will pull
 # `jsonwebtoken` once the JWKS plumbing lands (see auth.rs TODO_VERIFY).
 base64 = "0.22"
+
+# Password hashing for the email/password accounts (§9-A). Argon2id with a
+# random per-password salt — pure Rust, no system/OpenSSL deps so the Docker
+# build stays clean. Salt bytes come from the existing `rand` dependency.
+argon2 = "0.5"

@@ -6,6 +6,7 @@
 //! these helpers and never deals with `tower_governor` or CORS detail.
 
 use std::collections::VecDeque;
+use std::hash::Hash;
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -150,80 +151,88 @@ impl Default for MsgRateLimit {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// Lobby brute-force tracker
+// Generic sliding-window attempt tracker (lobby brute-force + auth throttle)
 // ──────────────────────────────────────────────────────────────────────────
 
-/// Per-IP record of failed lobby-join attempts in the last [`WINDOW`].
-///
-/// After [`MAX_ATTEMPTS`] failed `JoinLobby` calls inside the window the
-/// IP is blocked for the rest of the window. Combined with the 32^6
-/// (≈ 1.07 B) keyspace, this caps an attacker to ~5 codes/min ≈ 7 200
-/// codes/day — effectively unattackable.
-const WINDOW: Duration = Duration::from_secs(60);
-const MAX_ATTEMPTS: usize = 5;
-
-#[derive(Default)]
-pub struct LobbyAttemptTracker {
-    by_ip: DashMap<IpAddr, VecDeque<Instant>>,
+/// Per-key record of failed attempts in the last `window`. After `max` failures
+/// inside the window the key is blocked for the rest of it. Generic over the key
+/// type so the same battle-tested sliding-window logic serves both the lobby
+/// brute-force gate (keyed by IP) and the account auth throttle (keyed by an
+/// `email|ip` / `signup|ip` string). See [`LobbyAttemptTracker`] /
+/// [`AuthAttemptTracker`] for the concrete policies.
+pub struct AttemptTracker<K: Eq + Hash + Clone> {
+    by_key: DashMap<K, VecDeque<Instant>>,
+    window: Duration,
+    max: usize,
 }
 
-impl LobbyAttemptTracker {
-    /// Record a *failed* attempt for `ip` and return how many failures
-    /// have piled up in the active window after this one.
-    pub fn record_failed(&self, ip: IpAddr) -> usize {
+impl<K: Eq + Hash + Clone> AttemptTracker<K> {
+    pub fn new(window: Duration, max: usize) -> Self {
+        Self {
+            by_key: DashMap::new(),
+            window,
+            max,
+        }
+    }
+
+    /// Record a *failed* attempt for `key` and return how many failures have
+    /// piled up in the active window after this one.
+    pub fn record_failed(&self, key: K) -> usize {
         let now = Instant::now();
-        let mut entry = self.by_ip.entry(ip).or_default();
-        prune_old(&mut entry, now);
+        let mut entry = self.by_key.entry(key).or_default();
+        prune_old(&mut entry, now, self.window);
         entry.push_back(now);
         entry.len()
     }
 
-    /// Is `ip` currently locked out?
-    pub fn is_blocked(&self, ip: IpAddr) -> bool {
+    /// Is `key` currently locked out?
+    pub fn is_blocked(&self, key: K) -> bool {
         let now = Instant::now();
-        let Some(mut entry) = self.by_ip.get_mut(&ip) else {
+        let Some(mut entry) = self.by_key.get_mut(&key) else {
             return false;
         };
-        prune_old(&mut entry, now);
-        entry.len() >= MAX_ATTEMPTS
+        prune_old(&mut entry, now, self.window);
+        entry.len() >= self.max
     }
 
-    /// A successful join clears the counter — assume the attacker isn't
-    /// also legitimately playing.
-    pub fn record_success(&self, ip: IpAddr) {
-        self.by_ip.remove(&ip);
+    /// A success clears the counter for `key` — assume the attacker isn't also
+    /// the one legitimately succeeding.
+    pub fn record_success(&self, key: K) {
+        self.by_key.remove(&key);
     }
 
-    /// Drop entries whose deques are stale (all timestamps older than WINDOW).
+    /// Drop entries whose deques are stale (all timestamps older than window).
     /// Returns the count removed. Called from the background janitor below.
     fn sweep(&self) -> usize {
         let now = Instant::now();
-        let stale: Vec<IpAddr> = self
-            .by_ip
+        let stale: Vec<K> = self
+            .by_key
             .iter()
             .filter_map(|e| {
                 let back = e.value().back().copied()?;
-                if now.duration_since(back) >= WINDOW {
-                    Some(*e.key())
+                if now.duration_since(back) >= self.window {
+                    Some(e.key().clone())
                 } else {
                     None
                 }
             })
             .collect();
         let n = stale.len();
-        for ip in stale {
-            // Re-check under write-lock: don't drop an IP that hit a fresh
+        for key in stale {
+            // Re-check under write-lock: don't drop a key that hit a fresh
             // failure between our scan and the remove.
-            self.by_ip.remove_if(&ip, |_, v| {
-                v.back().is_some_and(|t| now.duration_since(*t) >= WINDOW)
+            self.by_key.remove_if(&key, |_, v| {
+                v.back().is_some_and(|t| now.duration_since(*t) >= self.window)
             });
         }
         n
     }
+}
 
-    /// Spawn a background task that periodically prunes stale entries so the
-    /// map can't accumulate one perpetual entry per unique IP that ever tried
-    /// a lobby join. Cheap: scans the map every 5 minutes.
+impl<K: Eq + Hash + Clone + Send + Sync + 'static> AttemptTracker<K> {
+    /// Spawn a background task that periodically prunes stale entries so the map
+    /// can't accumulate one perpetual entry per unique key that ever failed.
+    /// Cheap: scans the map every 5 minutes.
     pub fn spawn_janitor(self: Arc<Self>) {
         tokio::spawn(async move {
             let mut tick = tokio::time::interval(Duration::from_secs(300));
@@ -233,15 +242,31 @@ impl LobbyAttemptTracker {
                 tick.tick().await;
                 let n = self.sweep();
                 if n > 0 {
-                    tracing::debug!(removed = n, "lobby attempt tracker swept");
+                    tracing::debug!(removed = n, "attempt tracker swept");
                 }
             }
         });
     }
 }
 
-fn prune_old(entry: &mut VecDeque<Instant>, now: Instant) {
-    while entry.front().is_some_and(|t| now.duration_since(*t) >= WINDOW) {
+/// Lobby brute-force gate, keyed by IP. After [`LOBBY_MAX_ATTEMPTS`] failed
+/// `JoinLobby` calls inside [`LOBBY_WINDOW`] the IP is blocked. Combined with the
+/// 32^6 (≈ 1.07 B) code keyspace, this caps an attacker to ~5 codes/min ≈ 7 200
+/// codes/day — effectively unattackable.
+pub type LobbyAttemptTracker = AttemptTracker<IpAddr>;
+pub const LOBBY_WINDOW: Duration = Duration::from_secs(60);
+pub const LOBBY_MAX_ATTEMPTS: usize = 5;
+
+/// Account auth throttle, keyed by an `email|ip` (login) / `signup|ip` string.
+/// Tuned looser than the lobby gate so a fumbling legit user isn't locked out,
+/// but tight enough — combined with Argon2id's per-verify cost — to make online
+/// password brute-force / mass-signup impractical.
+pub type AuthAttemptTracker = AttemptTracker<String>;
+pub const AUTH_WINDOW: Duration = Duration::from_secs(300);
+pub const AUTH_MAX_ATTEMPTS: usize = 10;
+
+fn prune_old(entry: &mut VecDeque<Instant>, now: Instant, window: Duration) {
+    while entry.front().is_some_and(|t| now.duration_since(*t) >= window) {
         entry.pop_front();
     }
 }
@@ -261,10 +286,10 @@ mod tests {
     }
 
     #[test]
-    fn lobby_tracker_blocks_after_max() {
-        let t = LobbyAttemptTracker::default();
+    fn attempt_tracker_blocks_after_max() {
+        let t = AttemptTracker::new(LOBBY_WINDOW, LOBBY_MAX_ATTEMPTS);
         let ip = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
-        for _ in 0..MAX_ATTEMPTS - 1 {
+        for _ in 0..LOBBY_MAX_ATTEMPTS - 1 {
             assert!(!t.is_blocked(ip));
             t.record_failed(ip);
         }
@@ -272,5 +297,20 @@ mod tests {
         assert!(t.is_blocked(ip));
         t.record_success(ip);
         assert!(!t.is_blocked(ip));
+    }
+
+    #[test]
+    fn attempt_tracker_works_with_string_keys() {
+        let t = AttemptTracker::new(AUTH_WINDOW, 3);
+        let k = "login|a@b.co|127.0.0.1".to_string();
+        assert!(!t.is_blocked(k.clone()));
+        t.record_failed(k.clone());
+        t.record_failed(k.clone());
+        t.record_failed(k.clone());
+        assert!(t.is_blocked(k.clone()));
+        // A different key is unaffected.
+        assert!(!t.is_blocked("signup|10.0.0.1".to_string()));
+        t.record_success(k.clone());
+        assert!(!t.is_blocked(k));
     }
 }

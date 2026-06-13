@@ -30,9 +30,10 @@ use crate::lanes_engine::{start_lanes_match, LanesCommand};
 use crate::lobby::LobbyManager;
 use crate::match_engine::{start_match, MatchCommand};
 use crate::protocol::{ClientMessage, PlayerSlot, ServerMessage};
-use crate::security::{cors_layer, governor_layer, LobbyAttemptTracker, MsgRateLimit};
+use crate::security::{cors_layer, governor_layer, AuthAttemptTracker, LobbyAttemptTracker, MsgRateLimit};
 use crate::session::Session;
 
+mod account;
 mod auth;
 // Économie serveur-autoritaire (Alex 2026-06-13) — fondation pure pour l'instant
 // (règles + méta cartes). Pas encore câblée → dead_code toléré le temps des
@@ -76,6 +77,10 @@ struct AppState {
     lobbies: Arc<LobbyManager>,
     /// Brute-force protection on JoinLobby — tracks failed attempts per IP.
     lobby_attempts: Arc<LobbyAttemptTracker>,
+    /// Throttle on Signup/Login — failed/abusive auth attempts keyed by
+    /// `login|email|ip` and `signup|ip`. Blocks online password brute-force and
+    /// mass-signup; pruned by the same janitor pattern as `lobby_attempts`.
+    auth_attempts: Arc<AuthAttemptTracker>,
     /// session_id → (match_tx, our_slot) — classic 1v1 mode.
     in_match: DashMap<String, (mpsc::UnboundedSender<MatchCommand>, PlayerSlot)>,
     /// session_id → (lanes_tx, our_slot) — Constellation Lanes mode (Phase 1+).
@@ -98,7 +103,14 @@ async fn main() {
         max_matches: cap_from_env("MAX_CONCURRENT_MATCHES", DEFAULT_MAX_MATCHES),
         max_lobbies: cap_from_env("MAX_CONCURRENT_LOBBIES", DEFAULT_MAX_LOBBIES),
         lobbies: Arc::new(LobbyManager::new()),
-        lobby_attempts: Arc::new(LobbyAttemptTracker::default()),
+        lobby_attempts: Arc::new(LobbyAttemptTracker::new(
+            security::LOBBY_WINDOW,
+            security::LOBBY_MAX_ATTEMPTS,
+        )),
+        auth_attempts: Arc::new(AuthAttemptTracker::new(
+            security::AUTH_WINDOW,
+            security::AUTH_MAX_ATTEMPTS,
+        )),
         in_match: DashMap::new(),
         in_lanes: DashMap::new(),
         sync_throttle: DashMap::new(),
@@ -108,6 +120,7 @@ async fn main() {
     // doesn't accumulate one perpetual entry per unique IP that ever tried
     // a lobby join. Runs every 5 min, no-op when nothing to prune.
     state.lobby_attempts.clone().spawn_janitor();
+    state.auth_attempts.clone().spawn_janitor();
 
     // Inactive-user sweeper: every 24h, SCAN `player:*`, read each row's
     // `updatedAt`, and DELETE both `player:{id}` and `claim:{id}` when the
@@ -506,6 +519,14 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
                 // Used for casual play, LAN matches, and old clients pre-TOFU.
                 session.set_nickname(n);
             }
+        }
+
+        ClientMessage::Signup { email, password } => {
+            account::handle_signup(&state.auth_attempts, session, email, password);
+        }
+
+        ClientMessage::Login { email, password } => {
+            account::handle_login(&state.auth_attempts, session, email, password);
         }
 
         ClientMessage::CreateLobby { best_of } => {

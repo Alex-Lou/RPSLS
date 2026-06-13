@@ -31,6 +31,16 @@ pub enum ClientMessage {
         auth_token: String,
     },
 
+    /// Create an email+password account. Links the current (guest) session's
+    /// progression to it and grants the one-time welcome bonus. Server replies
+    /// with `AuthOk` or `AuthError`. Mirrored in `app/src/online/online.ts`.
+    Signup { email: String, password: String },
+
+    /// Log into an existing email+password account. On success the session
+    /// adopts the account's stable `player_id` (cross-device) and its saved
+    /// progression. Replies with `AuthOk` / `AuthError`.
+    Login { email: String, password: String },
+
     /// Create a private lobby. Server replies with a 6-char code.
     CreateLobby { best_of: u8 },
 
@@ -166,6 +176,21 @@ pub enum ServerMessage {
 
     /// Server-side error or rule violation.
     Error { code: String, message: String },
+
+    /// Auth (signup/login) succeeded. The client adopts `player_id` +
+    /// `claim_token` (for subsequent TOFU Hellos) and replaces its local
+    /// progression with `state`.
+    AuthOk {
+        player_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        claim_token: Option<String>,
+        state: PlayerProgress,
+    },
+
+    /// Auth failed. `code` is intentionally generic (`invalid_credentials`,
+    /// `email_taken`, `weak_password`, `rate_limited`, `auth_needed`,
+    /// `server_error`) — it never reveals whether an email exists.
+    AuthError { code: String },
 
     /// Heartbeat reply.
     Pong,

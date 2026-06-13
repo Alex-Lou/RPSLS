@@ -376,6 +376,60 @@ pub fn player_id_from_key(key: &str) -> Option<&str> {
     key.strip_prefix(KEY_PREFIX)
 }
 
+/// Low-level Redis GET via the pipeline POST form (`[["GET", key]]`). Unlike the
+/// URL-path `/get/{key}` form used elsewhere, the key travels in the JSON body —
+/// so it's safe for keys containing characters that would need URL encoding
+/// (e.g. an email in `account:{email}`). Returns the stored string, or None when
+/// the key is missing / on any backend error. Crate-internal primitive reused by
+/// the account module.
+pub(crate) async fn get_raw(key: &str) -> Option<String> {
+    let (url, token) = config()?;
+    let endpoint = format!("{url}/pipeline");
+    let cmds: Vec<Vec<String>> = vec![vec!["GET".into(), key.to_string()]];
+    let resp = http().post(&endpoint).bearer_auth(token).json(&cmds).send().await.ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let body: serde_json::Value = resp.json().await.ok()?;
+    // Pipeline form → [{"result": <value-or-null>}].
+    let result = body.as_array()?.first()?.get("result")?;
+    if result.is_null() {
+        return None;
+    }
+    result.as_str().map(|s| s.to_string())
+}
+
+/// Atomic `SET key val NX` via the pipeline POST form. Returns:
+///   `Ok(true)`  — the key was created (it did not exist)
+///   `Ok(false)` — the key already existed (NX rejected the write)
+///   `Err(())`   — Redis unreachable / config missing / malformed reply
+/// The key travels in the JSON body, so arbitrary keys (e.g. `account:{email}`)
+/// are safe. Single create-if-absent primitive shared by the claim-token,
+/// account, and welcome-bonus flows.
+pub(crate) async fn set_nx(key: &str, val: &str) -> Result<bool, ()> {
+    let Some((url, token)) = config() else { return Err(()) };
+    let endpoint = format!("{url}/pipeline");
+    let cmds: Vec<Vec<String>> = vec![vec!["SET".into(), key.to_string(), val.to_string(), "NX".into()]];
+    match http().post(&endpoint).bearer_auth(token).json(&cmds).send().await {
+        Ok(resp) if resp.status().is_success() => {
+            let body: serde_json::Value = resp.json().await.map_err(|_| ())?;
+            // Upstash returns [{"result":"OK"}] when set, [{"result":null}] when NX rejected.
+            let entry = body.as_array().and_then(|a| a.first()).ok_or(())?;
+            let result = entry.get("result").ok_or(())?;
+            Ok(result.as_str() == Some("OK"))
+        }
+        Ok(resp) => {
+            let status = resp.status();
+            warn!(%status, "set_nx rejected");
+            Err(())
+        }
+        Err(e) => {
+            warn!(error = %e, "set_nx failed");
+            Err(())
+        }
+    }
+}
+
 /// Atomically claim a player_id by issuing a fresh TOFU token IFF the key
 /// doesn't already exist (Redis `SET … NX`). Returns:
 ///   `Ok(Some(token))` — the token we just minted (this is the first connection)
@@ -389,37 +443,15 @@ pub fn player_id_from_key(key: &str) -> Option<&str> {
 /// token; the second one to write would silently overwrite the first and
 /// thereby steal the identity). `SET NX` makes the create atomic.
 pub async fn try_create_claim_token(player_id: &str) -> Result<Option<String>, ()> {
-    let Some((url, token)) = config() else { return Err(()) };
     if player_id.trim().is_empty() {
         return Err(());
     }
     let new_token = uuid::Uuid::new_v4().to_string();
     let key = format!("{CLAIM_PREFIX}{player_id}");
-    // Pipeline form: [["SET", key, value, "NX"]]. Upstash returns "OK" when
-    // it set the key, nil when NX rejected because the key already existed.
-    let endpoint = format!("{url}/pipeline");
-    let cmds: Vec<Vec<String>> = vec![vec!["SET".into(), key, new_token.clone(), "NX".into()]];
-    match http().post(&endpoint).bearer_auth(token).json(&cmds).send().await {
-        Ok(resp) if resp.status().is_success() => {
-            let body: serde_json::Value = resp.json().await.map_err(|_| ())?;
-            // Upstash pipeline returns either [{"result":"OK"}] or [{"result":null}].
-            let entry = body.as_array().and_then(|a| a.first()).ok_or(())?;
-            let result = entry.get("result").ok_or(())?;
-            if result.as_str() == Some("OK") {
-                Ok(Some(new_token))
-            } else {
-                Ok(None)
-            }
-        }
-        Ok(resp) => {
-            let status = resp.status();
-            warn!(player_id, %status, "claim token NX-create rejected");
-            Err(())
-        }
-        Err(e) => {
-            warn!(player_id, error = %e, "claim token NX-create failed");
-            Err(())
-        }
+    if set_nx(&key, &new_token).await? {
+        Ok(Some(new_token))
+    } else {
+        Ok(None)
     }
 }
 
