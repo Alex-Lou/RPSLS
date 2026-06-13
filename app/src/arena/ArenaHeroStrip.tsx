@@ -16,9 +16,12 @@ import { CARDS } from "../ranked/cards";
 import { CardImage } from "../ranked/CardImage";
 import { useT } from "../i18n";
 import type { CardId } from "../ranked/rankedTypes";
-import type { BoardState, HeroState } from "./arenaTypes";
+import { arenaCardDescKey } from "./arenaTypes";
+import type { BoardState, HeroState, PlayedSpell } from "./arenaTypes";
+import { arenaSpellCost } from "./arenaSpellHelpers";
 import { ArenaConstellationBar } from "./ArenaConstellationBar";
-import { countAliveAffinity } from "./arenaRules";
+import { ArenaSpellQueueChip } from "./ArenaSpellQueueChip";
+import { VoieAura } from "./ArenaVoieAura";
 
 export interface ArenaHeroStripProps {
   hero: HeroState;
@@ -42,12 +45,32 @@ export interface ArenaHeroStripProps {
    *  shows the hero's hand (up to 4 cards) as small chips for this turn.
    *  Cleared by `advanceToNextTurn` (arenaRules) so it auto-disappears. */
   augurRevealed?: CardId[];
+  /** Sorts utility planifiés sur CE héros (kind ≠ "lane"). Affichés en
+   *  rangée mini-cartes sous le portrait — pendant le step de planning pour
+   *  "you", pendant le reveal pour "opp". (Alex 2026-06-11) */
+  pendingUtility?: PlayedSpell[];
+  /** Retire le sort utility à l'index local `localIdx` dans pendingUtility
+   *  (seulement côté you, en planning). Si absent, chips read-only. */
+  onRemoveUtility?: (localIdx: number) => void;
+  /** Long-press sur une carte ADVERSE révélée (Augure) → ouvre sa fiche
+   *  (lecture seule). Alex 2026-06-13 : apprendre ce que l'adversaire joue. */
+  onInspectCard?: (id: CardId) => void;
 }
 
 export function ArenaHeroStrip({
-  hero, board, side, turn, name, avatar, incomingAttackKey, augurRevealed,
+  hero, side, turn, name, avatar, incomingAttackKey, augurRevealed, pendingUtility, onRemoveUtility, onInspectCard,
 }: ArenaHeroStripProps) {
   const t = useT();
+  // Long-press sur une carte adverse révélée (Augure) → fiche lecture seule.
+  const inspectTimer = useRef<number | null>(null);
+  const startInspect = (id: CardId) => {
+    if (!onInspectCard) return;
+    if (inspectTimer.current) window.clearTimeout(inspectTimer.current);
+    inspectTimer.current = window.setTimeout(() => onInspectCard(id), 420);
+  };
+  const cancelInspect = () => {
+    if (inspectTimer.current) { window.clearTimeout(inspectTimer.current); inspectTimer.current = null; }
+  };
   const accent = side === "you" ? "text-emerald-300" : "text-rose-300";
   const ringColor = side === "you" ? "ring-emerald-400/70" : "ring-rose-400/70";
   const hpPct = Math.max(0, Math.min(100, (hero.hp / hero.maxHp) * 100));
@@ -59,10 +82,19 @@ export function ArenaHeroStrip({
   const prevHpRef = useRef(hero.hp);
   const [dmgPop, setDmgPop] = useState<{ n: number; key: number } | null>(null);
   const [healPop, setHealPop] = useState<{ n: number; key: number } | null>(null);
+  // Goutte de sang sous la barre de vie quand le héros est BAS (≤5 PV) et vient
+  // de prendre un coup (Alex 2026-06-13). One-shot, timer nettoyé → leak-free.
+  const [bloodDrip, setBloodDrip] = useState<{ key: number } | null>(null);
+  useEffect(() => {
+    if (!bloodDrip) return;
+    const id = window.setTimeout(() => setBloodDrip(null), 1500);
+    return () => window.clearTimeout(id);
+  }, [bloodDrip?.key]);
   useEffect(() => {
     const prev = prevHpRef.current;
     if (hero.hp < prev) {
       setDmgPop({ n: prev - hero.hp, key: Date.now() });
+      if (hero.hp > 0 && hero.hp <= 5) setBloodDrip({ key: Date.now() });
       const id = window.setTimeout(() => setDmgPop(null), 1100);
       prevHpRef.current = hero.hp;
       return () => window.clearTimeout(id);
@@ -76,14 +108,69 @@ export function ArenaHeroStrip({
     prevHpRef.current = hero.hp;
   }, [hero.hp]);
   return (
-    <div className="relative flex items-center gap-2 px-1">
+    <div className={"relative flex items-center gap-1 " + (side === "you" ? "pl-0 pr-1" : "px-1")}>
+      {/* 🎨 Identité visuelle PERSO de la Voie — calque animé derrière le HUD,
+       *  UNIQUEMENT côté joueur (jamais l'adversaire). z-0 ; le contenu passe
+       *  en relative z-10 pour rester au-dessus. (Alex 2026-06-12) */}
+      {/* Aura de Voie pour LES DEUX camps (Alex 2026-06-13 : « le strip de
+       *  chacun doit être robuste et vivant ») — chacun dans SON univers (sa
+       *  propre affinité). L'adversaire n'est plus « à poil ». */}
+      {hero.affinity && <VoieAura affinity={hero.affinity} />}
+      {/* Augur peek — overlay FULL WIDTH du strip outer (Alex 2026-06-11) :
+       *  le rendu était dans le portrait div w-16 → cartes invisibles car
+       *  l'overlay débordait. Ici on a tout l'espace du strip. */}
+      {augurRevealed && augurRevealed.length > 0 && side === "opp" && (
+        <motion.div
+          key={"augur-" + augurRevealed.join("|")}
+          initial={{ opacity: 0, y: -6, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: "spring", stiffness: 280, damping: 22 }}
+          className={"absolute left-2 right-2 -bottom-3 flex items-center gap-1.5 px-2 py-1 rounded-lg bg-amber-500/15 border border-amber-400/65 z-40 " + (onInspectCard ? "" : "pointer-events-none")}
+          style={{ boxShadow: "0 0 14px -2px rgba(252,211,77,0.6), inset 0 1px 0 rgba(252,211,77,0.22)" }}
+        >
+          <motion.span
+            animate={{ opacity: [0.85, 1, 0.85] }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+            className="text-[10px] uppercase tracking-wider font-black text-amber-200 drop-shadow shrink-0"
+          >
+            👁
+          </motion.span>
+          <div className="flex items-center gap-1 flex-wrap">
+            {augurRevealed.map((id, i) => {
+              const card = CARDS[id];
+              if (!card) return null;
+              return (
+                <motion.div
+                  key={`${id}-${i}`}
+                  initial={{ opacity: 0, scale: 0.6, y: -6, rotate: -8 }}
+                  animate={{ opacity: 1, scale: 1, y: 0, rotate: 0 }}
+                  transition={{ delay: 0.05 + i * 0.08, type: "spring", stiffness: 280, damping: 20 }}
+                  onPointerDown={onInspectCard ? () => startInspect(id) : undefined}
+                  onPointerUp={onInspectCard ? cancelInspect : undefined}
+                  onPointerLeave={onInspectCard ? cancelInspect : undefined}
+                  onPointerCancel={onInspectCard ? cancelInspect : undefined}
+                  className={"relative w-9 h-12 sm:w-10 sm:h-[3.4rem] rounded-md overflow-hidden ring-2 ring-amber-300/75 shadow-md shadow-amber-500/30 " + (onInspectCard ? "cursor-pointer active:scale-95" : "")}
+                  title={onInspectCard ? "Maintiens pour la fiche" : t(card.nameKey) + " — " + t(arenaCardDescKey(id))}
+                >
+                  <CardImage id={id} glyphSize="text-base" />
+                  <div className="absolute top-0.5 left-0.5 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-black/80 text-sky-200 text-[8px] font-black tabular-nums">
+                    {card.cost}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
       {/* Portrait — avatar + name in a circle so each side has a face.
-       *  Floating damage popup pops out of the portrait on HP loss. */}
-      <div className="flex flex-col items-center shrink-0 w-16 relative">
+       *  Floating damage popup pops out of the portrait on HP loss. Opp =
+       *  scale-95 (-5%). w-14 (au lieu de w-16) pour rapprocher les infos. */}
+      <div className={"flex flex-col items-center shrink-0 w-14 relative z-10 " + (side === "opp" ? "scale-95 origin-top" : "")}>
         <HeroPortrait avatar={avatar} ringColor={ringColor} divineShield={hero.divineShield} damaged={!!dmgPop} />
         <span className={"text-[9px] uppercase tracking-wider font-black truncate max-w-[64px] mt-0.5 " + accent}>
           {name}
         </span>
+        {/* (chip queue utility est positionné au niveau du strip parent, plus haut) */}
         <AnimatePresence>
           {dmgPop && (
             <motion.div
@@ -113,8 +200,24 @@ export function ArenaHeroStrip({
           )}
         </AnimatePresence>
       </div>
-      {/* HP + mana stacked vertically — the player reads them in one column. */}
-      <div className="flex-1 flex flex-col gap-1 min-w-0">
+      {/* HP + mana — largeur naturelle, collée à l'avatar (Alex 2026-06-11) :
+       *  shrink-0 (plus flex-1) pour ne PAS s'étirer → l'espace à droite est
+       *  libéré pour le slot des cartes utility lancées. */}
+      <div className="relative z-10 shrink-0 flex flex-col justify-center gap-0.5 min-h-[3.4rem]">
+        {/* Ligne 1 — VOIE / constellation AU-DESSUS (Alex 2026-06-12) : passée
+         *  sur sa propre ligne. Les 3 lignes (voie / vie / mana) sont
+         *  distribuées sur la hauteur de l'avatar via justify-center +
+         *  gap serré, SANS agrandir le strip (sinon la main se fait expulser
+         *  hors écran). */}
+        {hero.affinity && (
+          <ArenaConstellationBar
+            count={hero.constellationCount ?? 0}
+            affinity={hero.affinity}
+            side={side}
+            finisherUnlocked={hero.finisherUnlocked}
+          />
+        )}
+        {/* Ligne 2 — barre de vie. */}
         {/* HP bar — taller, segmented every 5 HP, glow on the filled portion,
          *  pulse at low HP. Wrapped in a motion.div that SHAKES + flashes
          *  ring rose each time an attack lands on this hero. */}
@@ -123,20 +226,26 @@ export function ArenaHeroStrip({
           initial={incomingAttackKey ? { x: 0 } : undefined}
           animate={incomingAttackKey ? { x: [0, -6, 7, -5, 3, 0] } : undefined}
           transition={incomingAttackKey ? { duration: 0.55, ease: "easeOut" } : undefined}
-          className="flex items-center gap-1.5"
+          className="relative flex items-center gap-1.5"
         >
+          {/* Typo retravaillée (Alex 2026-06-13 "trop codée/austère") : PV
+           *  courant en gros chiffre (font headline), max en petit/atténué,
+           *  cœur teinté. Plus de monospace "code". */}
           <motion.span
             key={hero.hp}
-            initial={{ scale: 1.35, color: "#fda4af" }}
-            animate={{ scale: 1, color: lowHp ? "#fb7185" : "#ffffff" }}
+            initial={{ scale: 1.35 }}
+            animate={{ scale: 1 }}
             transition={{ duration: 0.3 }}
-            className="text-[13px] font-black tabular-nums w-12 text-right"
+            className="flex items-baseline gap-0.5 shrink-0 leading-none"
+            style={{ fontFamily: "var(--font-headline)" }}
           >
-            ❤ {hero.hp}/{hero.maxHp}
+            <span className="text-[13px] mr-0.5" style={{ color: lowHp ? "#fb7185" : "#f87171" }}>❤</span>
+            <span className="text-[18px] font-black" style={{ color: lowHp ? "#fb7185" : "#ffffff" }}>{hero.hp}</span>
+            <span className="text-[10px] font-bold text-white/45">/{hero.maxHp}</span>
           </motion.span>
           <div
             className={
-              "relative flex-1 h-3 rounded-full bg-zinc-900/80 overflow-hidden ring-1 ring-black/50 " +
+              "relative w-28 sm:w-32 h-3 rounded-full bg-zinc-900/80 overflow-hidden ring-1 ring-black/50 " +
               (lowHp ? "animate-pulse" : "")
             }
           >
@@ -196,83 +305,52 @@ export function ArenaHeroStrip({
               )}
             </AnimatePresence>
           </div>
-        </motion.div>
-        {/* Mana + hand size + turn — compact secondary row. */}
-        <div className="flex items-center gap-1 text-[9px]">
-          <span className="font-bold text-sky-300 tabular-nums w-12 text-right">⋙ {hero.mana}/{hero.maxMana}</span>
-          <div className="flex items-center gap-0.5">
-            {Array.from({ length: hero.maxMana }, (_, i) => (
-              <span
-                key={i}
-                className={
-                  "w-1.5 h-1.5 rounded-full ring-1 ring-black/40 " +
-                  (i < hero.mana ? "bg-sky-300 shadow-[0_0_4px_rgba(125,211,252,0.7)]" : "bg-zinc-700")
-                }
+          {/* 🩸 Gouttes de sang sous la barre quand PV ≤ 5 + coup encaissé. */}
+          <AnimatePresence>
+            {bloodDrip && [0, 1, 2].map((i) => (
+              <motion.span
+                key={`blood-${bloodDrip.key}-${i}`}
+                className="absolute bottom-0 w-1 rounded-b-full pointer-events-none"
+                style={{ right: 8 + i * 16, background: "linear-gradient(to bottom, #ef4444, #7f1d1d)", boxShadow: "0 0 4px rgba(127,29,29,0.8)" }}
+                initial={{ height: 1, opacity: 0.95, y: 0 }}
+                animate={{ height: [1, 7, 9], opacity: [0.95, 0.95, 0], y: [0, 8, 16] }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 1.1, delay: i * 0.13, ease: "easeIn" }}
               />
             ))}
-          </div>
-          <span className="ml-auto font-bold text-ink-muted">🂠 {hero.hand.length}</span>
-          {side === "you" && <span className="font-bold text-themed">T{turn}</span>}
-        </div>
-        {/* Lot C v2 — Constellation 3⭐ SIMULTANÉE (Alex feedback 2026-06-09).
-         *  Count live recomputed depuis board.lanes pour refléter immédiatement
-         *  les morts au combat. Si board pas dispo (cas edge), fallback sur le
-         *  count stocké. */}
-        {hero.affinity && (
-          <ArenaConstellationBar
-            count={board ? countAliveAffinity(board.lanes, side === "you" ? "a" : "b", hero.affinity) : (hero.constellationCount ?? 0)}
-            affinity={hero.affinity}
-            side={side}
-            finisherUnlocked={hero.finisherUnlocked}
-          />
-        )}
-        {/* Augur peek — when this side is the OPP (i.e. the player cast
-         *  Augur and is spying on opp's hand), show the actual mini-cards
-         *  OVERLAYED in absolute position so the strip's measured height
-         *  stays stable (Alex flag #8 pad instable). When this side is
-         *  the PLAYER (opp cast Augur on me — I'm being peeked at), do
-         *  NOT show the mini-cards (Alex flag #7 : "Augure de l'opp doit
-         *  PAS bouleverser mon hud") — a small chip indicator near the
-         *  portrait suffices to warn that opp is reading my hand. */}
-        {augurRevealed && augurRevealed.length > 0 && side === "opp" && (
-          <motion.div
-            key={"augur-" + augurRevealed.join("|")}
-            initial={{ opacity: 0, y: -6, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ type: "spring", stiffness: 280, damping: 22 }}
-            className="absolute left-2 right-2 -bottom-2 flex items-center gap-1.5 px-2 py-1 rounded-lg bg-amber-500/15 border border-amber-400/65 z-30 pointer-events-none"
-            style={{ boxShadow: "0 0 14px -2px rgba(252,211,77,0.6), inset 0 1px 0 rgba(252,211,77,0.22)" }}
-          >
-            <motion.span
-              animate={{ opacity: [0.85, 1, 0.85] }}
-              transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-              className="text-[10px] uppercase tracking-wider font-black text-amber-200 drop-shadow shrink-0"
-            >
-              👁
-            </motion.span>
-            <div className="flex items-center gap-1 flex-wrap">
-              {augurRevealed.slice(0, 4).map((id, i) => {
-                const card = CARDS[id];
-                if (!card) return null;
-                return (
-                  <motion.div
-                    key={`${id}-${i}`}
-                    initial={{ opacity: 0, scale: 0.6, y: -6, rotate: -8 }}
-                    animate={{ opacity: 1, scale: 1, y: 0, rotate: 0 }}
-                    transition={{ delay: 0.05 + i * 0.08, type: "spring", stiffness: 280, damping: 20 }}
-                    className="relative w-9 h-12 sm:w-10 sm:h-[3.4rem] rounded-md overflow-hidden ring-2 ring-amber-300/75 shadow-md shadow-amber-500/30"
-                    title={t(card.nameKey) + " — " + t(card.descKey)}
-                  >
-                    <CardImage id={id} glyphSize="text-base" />
-                    <div className="absolute top-0.5 left-0.5 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-black/80 text-sky-200 text-[8px] font-black tabular-nums">
-                      {card.cost}
-                    </div>
-                  </motion.div>
-                );
-              })}
+          </AnimatePresence>
+        </motion.div>
+        {/* Ligne 3 — mana + main + tour (constellation déplacée en ligne 1). */}
+        <div className="flex items-center gap-2 text-[11px]">
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Mana : ◆ propre + gros chiffre (au lieu du ⋙ austère). */}
+            <span className="flex items-baseline gap-0.5 shrink-0 leading-none" style={{ fontFamily: "var(--font-headline)" }}>
+              <span className="text-sky-400 text-[12px] mr-0.5">◆</span>
+              <span className="text-[15px] font-black text-sky-200">{hero.mana}</span>
+              <span className="text-[10px] font-bold text-sky-200/45">/{hero.maxMana}</span>
+            </span>
+            <div className="flex items-center gap-0.5">
+              {Array.from({ length: hero.maxMana }, (_, i) => (
+                <span
+                  key={i}
+                  className={
+                    "w-1.5 h-1.5 rounded-full ring-1 ring-black/40 " +
+                    (i < hero.mana ? "bg-sky-300 shadow-[0_0_4px_rgba(125,211,252,0.7)]" : "bg-zinc-700")
+                  }
+                />
+              ))}
             </div>
-          </motion.div>
-        )}
+            <span className="font-bold text-ink-muted">🂠 {hero.hand.length}</span>
+            {side === "you" && <span className="font-bold text-themed">T{turn}</span>}
+          </div>
+        </div>
+        {/* La rangée pendingUtility est maintenant en overlay absolute sur
+         *  le portrait (cf. plus haut) — hors du flow pour ne pas modifier
+         *  la hauteur du strip et garder le pad stable. */}
+        {/* Augur peek — déplacé HORS du portrait div (Alex 2026-06-11 : ne
+         *  s'affichait plus parce que le portrait div fait w-16=64px de
+         *  large, insuffisant pour 4 mini-cartes). Maintenant rendu dans le
+         *  strip outer plus bas → full width disponible. */}
         {/* Indicator chip — when MY hand has been peeked at by opp Augur,
          *  show a discrete pulsing 👁 chip next to the portrait so I know
          *  without my strip getting reshuffled. */}
@@ -288,6 +366,42 @@ export function ArenaHeroStrip({
           </motion.div>
         )}
       </div>
+      {/* Slot cartes UTILITY lancées (hero/self/global) — dans le flow, à DROITE,
+       *  dans l'espace libéré par les infos collées à gauche (Alex 2026-06-11).
+       *  flex-1 prend tout le reste. Les sorts LANE-target ne viennent PAS ici
+       *  (ils sont en éventail coin sup-gauche de leur lane). Tappables = retire. */}
+      {/* ⚠ AnimatePresence TOUJOURS monté tant que pendingUtility est un tableau
+       *  (≥0 chips) — Alex 2026-06-13 « les miniatures consommées ne se
+       *  désintègrent pas ». Le guard `length > 0` démontait l'AnimatePresence
+       *  AVEC son dernier enfant à la consommation (intent vidé → 0 chip) → exit
+       *  JAMAIS jouée (elles « disparaissaient » sec). Mounted en continu → la
+       *  désintégration dorée du chip consommé joue enfin. */}
+      {pendingUtility && (
+        <div
+          className={
+            // overflow-visible (Alex 2026-06-11) : la croix ✕ déborde du chip,
+            // overflow-auto la clippait. pl-1 pr-2 pour que la 1re carte et la
+            // croix de la dernière ne touchent pas les bords. Éventail overlap.
+            "relative z-10 flex-1 flex items-center min-w-0 overflow-visible justify-start pl-1 pr-2 " +
+            (onRemoveUtility ? "" : "pointer-events-none")
+          }
+          aria-label="Sorts utility planifiés"
+        >
+          <AnimatePresence>
+            {pendingUtility.map((s, idx) => (
+              <ArenaSpellQueueChip
+                key={`util-${side}-${idx}-${s.id}`}
+                id={s.id}
+                cost={arenaSpellCost(hero, s.id)}
+                side={side}
+                compact
+                fanIndex={idx}
+                onRemove={onRemoveUtility ? () => onRemoveUtility(idx) : undefined}
+              />
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 }

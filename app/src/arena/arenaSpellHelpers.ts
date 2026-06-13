@@ -6,7 +6,21 @@
  * as the spell roster grows toward the full 46 cards).
  */
 
+import { CARDS } from "../ranked/cards";
+import type { CardId } from "../ranked/rankedTypes";
 import type { BoardState, Creature, HeroState, LaneState, Side } from "./arenaTypes";
+
+/** Coût mana effectif d'un sort pour CE héros — applique le Finisher CALCUL
+ *  QUANTIQUE (Voie Spock : tous les sorts −1m, min 0). SOURCE UNIQUE partagée
+ *  par l'engine (applyAllSpells), l'UI (intentCost, affordability plan phase)
+ *  et l'IA (budget mana). Avant, le discount n'existait qu'à la résolution :
+ *  l'UI bloquait au coût plein → le Finisher Spock était injouable en pratique. */
+export function arenaSpellCost(
+  hero: Pick<HeroState, "calculActive">, id: CardId,
+): number {
+  const base = CARDS[id].cost;
+  return hero.calculActive ? Math.max(0, base - 1) : base;
+}
 
 /** Read the creature on `lane` owned by `side`. Null if empty. */
 export function getMyCreatureOnLane(

@@ -28,14 +28,35 @@ export type CardId =
   | "schrodinger" | "juge" | "genese"                                     // legendary (4 mana)
   // ── Constellation Pro Finishers (Lot D) — Pro-only, 1× par match, unlocked à 3⭐ ──
   | "finisher-forteresse" | "finisher-verger" | "finisher-lame"
-  | "finisher-metamorphose" | "finisher-calcul";                          // legendary (4 mana)
+  | "finisher-metamorphose" | "finisher-calcul"                           // legendary (4 mana)
+  // ── Nouvelles cartes Constellation Pro (Lot 2026-06-12) ──
+  | "jet-caillou" | "seve" | "coup-oeil"                                  // commons (1)
+  | "permutation" | "toile-gluante" | "reverberation"                    // rares (2)
+  | "gravite" | "doppelganger" | "purge"                                 // epics (3)
+  | "roue-destin" | "phenix" | "singularite"                            // legendaries (4-5)
+  // ── Outils de Forge (Arena 2026-06-13) ──
+  | "razzia"                                                             // legendary (2) — vol de la forge adverse
+  // ── Arts orphelins câblés (Arena 2026-06-13) — 6 cartes ──
+  | "surcharge" | "toxine" | "echo"                                      // rares (2)
+  | "rappel" | "double-mot" | "chronomancien"                            // epics (3 / chrono 2)
+  // ── Cartes « À LA PIOCHE » (Cast When Drawn, Arena 2026-06-13) — résolvent
+  //    leur effet AU TIRAGE, jamais jouées comme sorts (cf. arenaCastOnDraw) ──
+  | "coup-de-bol" | "bouffee-air" | "cafeine" | "tuile"                  // commons (à la pioche)
+  | "eclair-genie" | "patate-chaude" | "pile-ou-face"                    // rares (à la pioche)
+  | "trefle-chance" | "sursaut"                                          // epics (à la pioche)
+  // ── Cartes de FUSION (Forge Arena 2026-06-13) — créées par la Forge
+  //    uniquement, jamais dans collection/decks/packs/pioche ──
+  | "frappe-parfaite" | "bastion" | "avalanche" | "source-vitale"
+  | "omniscience" | "cocon" | "apocalypse" | "imposteur";
 
 export type CardRarity = "common" | "rare" | "epic" | "legendary";
 
 /** "active" cards are drawn into the hand and played from it (the default).
  *  "passive" cards are never drawn: equipping one in the deck makes its effect
  *  permanently active for the whole match (see {@link RankedBattleState.passives}). */
-export type CardKind = "active" | "passive";
+/** "fusion" (2026-06-13) : cartes créées UNIQUEMENT par la Forge Arena —
+ *  jamais dans la collection, les decks, les packs ni la pioche. */
+export type CardKind = "active" | "passive" | "fusion";
 
 export type LaneTarget = 0 | 1 | 2;
 

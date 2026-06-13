@@ -1,5 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { setBurgerHidden } from "../../Sidebar";
+import { InlineBurger } from "../../ui/ModeLobbyShell";
 import { useStore } from "../../store/store";
 import { GameMode, MODE_META, REWARDS, type Difficulty } from "../../types";
 import { THEMES, gradientFromTheme } from "../../theme/theme";
@@ -26,10 +28,12 @@ import {
 // recorded matches.
 type ModeCardId = GameMode | "online" | "constellation" | "ranked_constellation" | "arena_pro";
 
-// Order: Training, Online (live), Constellation (vs CPU),
-// Constellation Ranked (cards+mana), Ranked. (Détendu + Hot-seat removed.)
+// Ordre 3×2 (Alex 2026-06-12) — familles + complexité croissante :
+//   Entraînement      | En ligne
+//   Classé            | Constellation Classique
+//   Constellation Cl. | Constellation Pro
 const ALL_CARDS: ModeCardId[] = [
-  "training", "online", "constellation", "ranked_constellation", "arena_pro", "ranked",
+  "training", "online", "ranked", "constellation", "ranked_constellation", "arena_pro",
 ];
 
 // Hand-drawn icons that replace the emoji on each mode tile. Lives in
@@ -82,6 +86,10 @@ const TILE_ACCENT: Partial<Record<ModeCardId, string>> = {
  *  non-negotiable on device. */
 const TILE_BASE = "bg-surface-raised bg-gradient-to-br";
 
+/** Scroll du menu principal BLOQUÉ (Alex 2026-06-12) : tout doit tenir sur
+ *  une page sans scroller. Repasser à false pour ré-autoriser le scroll. */
+const MENU_SCROLL_LOCKED = true;
+
 /** Renders the mode tile icon — a PNG from /MenuIcons, sized to match the
  *  emoji it replaced (~36px, with breathing margins for the tile). */
 function ModeIcon({ mode }: { mode: ModeCardId }) {
@@ -89,7 +97,7 @@ function ModeIcon({ mode }: { mode: ModeCardId }) {
     <img
       src={MODE_ICONS[mode]}
       alt=""
-      className="shrink-0 w-12 h-12 object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
+      className="shrink-0 w-10 h-10 sm:w-12 sm:h-12 object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
     />
   );
 }
@@ -118,6 +126,23 @@ export function ModeSelect({
   const [pendingMode, setPendingMode] = useState<GameMode | null>(null);
   const t = useT();
 
+  // Burger flottant MASQUÉ sur cet écran (Alex 2026-06-12 "le burger fout
+  // tout en l'air") : le menu principal rend son propre burger themed INLINE
+  // à gauche du Défi du jour → la carte joueur reprend toute la largeur en
+  // haut. Restauré au unmount (autres pages / match gardent le flottant).
+  // + SCROLL LOCK (Alex 2026-06-12 #2) : le menu doit tenir sur une page,
+  // scroll bloqué. Repasser MENU_SCROLL_LOCKED à false si on doit ré-autoriser.
+  useEffect(() => {
+    setBurgerHidden(true);
+    const main = MENU_SCROLL_LOCKED ? document.querySelector("main") : null;
+    const prevOverflow = main?.style.overflowY ?? "";
+    if (main) main.style.overflowY = "hidden";
+    return () => {
+      setBurgerHidden(false);
+      if (main) main.style.overflowY = prevOverflow;
+    };
+  }, []);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -127,7 +152,12 @@ export function ModeSelect({
       className="flex flex-col gap-2 sm:gap-4 flex-1 justify-center py-1"
     >
       <div className="text-center">
-        <h1
+        {/* Respiration TRÈS douce du titre (Alex 2026-06-12 #4) : scale-only
+         *  → composité GPU (aucun repaint), coût perf ≈ nul. On n'anime
+         *  JAMAIS filter/box-shadow en continu (repaint chaque frame). */}
+        <motion.h1
+          animate={{ scale: [1, 1.014, 1] }}
+          transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
           // AAA title treatment — heavy weight + uppercase + theme tracking, a
           // punchy 3-stop theme gradient, and a theme-COLOURED glow halo so the
           // title belongs to the active bundle (default theme = violet until the
@@ -149,19 +179,23 @@ export function ModeSelect({
           }}
         >
           {t("play.title")}
-        </h1>
-        <p
-          className="mt-1.5 sm:mt-2.5 text-ink text-xs sm:text-sm leading-snug tracking-[0.18em] uppercase"
+        </motion.h1>
+        {/* Flottement léger du sous-titre, déphasé du titre — transform-only. */}
+        <motion.p
+          animate={{ y: [0, -2, 0], opacity: [0.92, 1, 0.92] }}
+          transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut", delay: 0.8 }}
+          className="mt-1 sm:mt-2.5 text-ink text-xs sm:text-sm leading-snug tracking-[0.18em] uppercase"
           style={{ fontFamily: "var(--font-body)", textShadow: "0 1px 6px rgba(0,0,0,0.7)" }}
         >
           {t("splash.tagline")}
-        </p>
+        </motion.p>
       </div>
 
       <DailyChallengesPanel onStart={onStart} onGoOnline={onGoOnline} onGoConstellation={onGoConstellation} />
 
-      {/* Mode tiles — 2 columns even on mobile so the 6 tiles fit one viewport. */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* Mode tiles — 2 columns even on mobile so the 6 tiles fit one viewport.
+       *  Compacté (Alex 2026-06-12) : tout le menu doit tenir SANS scroll. */}
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
         {ALL_CARDS.map((m, i) => {
           if (m === "online") {
             return (
@@ -175,7 +209,7 @@ export function ModeSelect({
                 onClick={() => onGoOnline?.()}
                 disabled={!onGoOnline}
                 className={
-                  "text-left p-2.5 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1.5 relative overflow-hidden min-h-[124px] " +
+                  "text-left p-2 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1 relative overflow-hidden min-h-[100px] " +
                   TILE_BASE + " border-violet-400/30 from-violet-500/22 via-fuchsia-500/14 to-cyan-500/22 " +
                   "hover:from-violet-500/32 hover:via-fuchsia-500/26 hover:to-cyan-500/32 hover:border-violet-400/60 " +
                   "shadow-lg shadow-violet-500/10"
@@ -206,7 +240,7 @@ export function ModeSelect({
                 onClick={() => onGoConstellationMenu?.()}
                 disabled={!onGoConstellationMenu}
                 className={
-                  "text-left p-2.5 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1.5 relative overflow-hidden min-h-[124px] " +
+                  "text-left p-2 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1 relative overflow-hidden min-h-[100px] " +
                   TILE_BASE + " border-fuchsia-400/30 from-fuchsia-500/22 via-violet-500/14 to-amber-500/22 " +
                   "hover:from-fuchsia-500/32 hover:via-violet-500/26 hover:to-amber-500/32 hover:border-fuchsia-400/60 " +
                   "shadow-lg shadow-fuchsia-500/10"
@@ -239,7 +273,7 @@ export function ModeSelect({
                 onClick={() => onGoRanked?.()}
                 disabled={!onGoRanked}
                 className={
-                  "text-left p-2.5 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1.5 relative overflow-hidden min-h-[124px] " +
+                  "text-left p-2 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1 relative overflow-hidden min-h-[100px] " +
                   TILE_BASE + " border-amber-400/40 from-amber-500/22 via-rose-500/14 to-fuchsia-500/22 " +
                   "hover:from-amber-500/32 hover:via-rose-500/26 hover:to-fuchsia-500/32 hover:border-amber-400/70 " +
                   "shadow-lg shadow-amber-500/10"
@@ -272,7 +306,7 @@ export function ModeSelect({
                 onClick={() => onGoArenaPro?.()}
                 disabled={!onGoArenaPro}
                 className={
-                  "text-left p-2.5 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1.5 relative overflow-hidden min-h-[124px] " +
+                  "text-left p-2 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1 relative overflow-hidden min-h-[100px] " +
                   TILE_BASE + " border-fuchsia-400/40 from-fuchsia-500/22 via-violet-500/14 to-indigo-500/22 " +
                   "hover:from-fuchsia-500/32 hover:via-violet-500/26 hover:to-indigo-500/32 hover:border-fuchsia-400/70 " +
                   "shadow-lg shadow-fuchsia-500/10"
@@ -920,30 +954,41 @@ function DailyChallengesPanel({
 
   return (
     <>
-      <motion.button
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        whileTap={{ scale: 0.99 }}
-        onClick={() => setOpen(true)}
-        className="rounded-xl p-2.5 sm:p-4 border flex items-center gap-3 text-left bg-surface-raised bg-gradient-to-br from-amber-500/25 via-orange-500/14 to-transparent border-amber-400/50 shadow-md shadow-amber-900/20"
-      >
-        <div className="text-xl sm:text-3xl shrink-0">🎯</div>
-        <div className="flex-1 min-w-0">
-          <div className="text-[9px] sm:text-[10px] uppercase tracking-widest font-bold text-amber-300 leading-tight">
-            {t("play.daily.title")}
+      {/* Rangée Défi du jour = [burger themed inline] + [bulle flex-1].
+       *  Le burger flottant global est masqué sur cet écran (ModeSelect →
+       *  setBurgerHidden) : ici il vit DANS le flux, aux couleurs du thème
+       *  (color-mix var(--theme-*), OK WebView), et ouvre le même drawer.
+       *  La carte joueur reprend ainsi TOUTE la largeur en haut. */}
+      <div className="flex items-stretch gap-2">
+        {/* Burger themed PARTAGÉ (ui/ModeLobbyShell) — même composant que les
+         *  lobbies de mode, zéro redondance. */}
+        <InlineBurger className="md:hidden w-12" />
+        <motion.button
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileTap={{ scale: 0.99 }}
+          onClick={() => setOpen(true)}
+          className="flex-1 min-w-0 rounded-xl p-2.5 sm:p-4 border flex items-center gap-3 text-left bg-surface-raised bg-gradient-to-br from-amber-500/25 via-orange-500/14 to-transparent border-amber-400/50 shadow-md shadow-amber-900/20"
+        >
+          <div className="text-xl sm:text-3xl shrink-0">🎯</div>
+          <div className="flex-1 min-w-0">
+            {/* Texte agrandi (Alex 2026-06-12 #3). */}
+            <div className="text-[11px] sm:text-xs uppercase tracking-widest font-bold text-amber-300 leading-tight">
+              {t("play.daily.title")}
+            </div>
+            <div className="text-sm sm:text-lg font-bold leading-tight">
+              {claimedCount}/{quests.length} ✓
+            </div>
           </div>
-          <div className="text-[12px] sm:text-base font-bold leading-tight">
-            {claimedCount}/{quests.length} ✓
-          </div>
-        </div>
-        {claimable > 0 ? (
-          <span className="shrink-0 px-2 py-1 rounded-full bg-amber-400 text-zinc-900 text-[10px] sm:text-xs font-black">
-            {t("quests.toClaim", { n: claimable })}
-          </span>
-        ) : (
-          <span className="shrink-0 text-amber-300 text-lg">›</span>
-        )}
-      </motion.button>
+          {claimable > 0 ? (
+            <span className="shrink-0 px-2 py-1 rounded-full bg-amber-400 text-zinc-900 text-[10px] sm:text-xs font-black">
+              {t("quests.toClaim", { n: claimable })}
+            </span>
+          ) : (
+            <span className="shrink-0 text-amber-300 text-lg">›</span>
+          )}
+        </motion.button>
+      </div>
 
       <AnimatePresence>
         {open && (

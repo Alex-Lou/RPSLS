@@ -51,6 +51,8 @@ export interface PlayerProgress {
    *  a reinstall. Optional for back-compat. */
   claimedQuests?: string[];
   rankedDeck: string[];
+  /** Arena (Constellation Pro) deck — 8 cartes, séparé du Classé. */
+  arenaDeck?: string[];
   /** Purchased premium sets — synced (union) so paid sets survive a reinstall. */
   ownedPremiumSets?: string[];
   seasonNumber: number;

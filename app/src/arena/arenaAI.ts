@@ -23,10 +23,10 @@
  *            creature that will be killed by the highest opp ATK)
  */
 
-import { CARDS } from "../ranked/cards";
-import { CREATURE_STATS, MAX_SPELLS_PER_TURN, moveCountersMove } from "./arenaTypes";
+import { CREATURE_STATS, MANA_CAP, moveCountersMove } from "./arenaTypes";
 import type {
   BoardState,
+  CpuPersona,
   PlayedSpell,
   Side,
   TurnIntent,
@@ -34,11 +34,70 @@ import type {
   Creature,
 } from "./arenaTypes";
 import { arenaSupported, spellPriority } from "./arenaCardEffects";
+import { truncateIntentByCaps } from "./arenaRules";
+import { arenaSpellCost } from "./arenaSpellHelpers";
 import type { CardId } from "../ranked/rankedTypes";
 import type { Move } from "../engine/game";
 import type { Difficulty } from "../types";
 
 const MOVES: Move[] = ["rock", "paper", "scissors", "lizard", "spock"];
+
+/** Biais d'IA par persona (Alex 2026-06-11). Chaque persona penche pour un
+ *  axe gameplay distinct → matches feel différents selon qui te tombe dessus.
+ *  - tactician : counter optimal + bloque la Voie joueur intensément
+ *  - aggressor : push lethal asap (sorts damage, peu de défense)
+ *  - builder   : focus SA Voie pour build 3⭐ rapidement
+ *  - defender  : Aegis/Anchor + Pierre Provoc, prudent */
+interface PersonaBias {
+  /** % de chance de poser SA Voie sur une lane vide. */
+  affinityBuildChance: number;
+  /** % de chance de prioriser le counter de la Voie joueur (créature qui
+   *  match l'affinity joueur) vs le counter de n'importe quelle créature. */
+  blockPlayerVoieChance: number;
+  /** Skip chance multiplier (1 = normal, >1 plus passif). */
+  spellSkipMult: number;
+  /** Si true, le CPU pousse lethal damage agressivement (heist/supernova
+   *  cast plus tôt même si player a > 6 HP). */
+  prioritizeLethal: boolean;
+}
+
+// Bias adoucis (Alex 2026-06-11) : pas de "lecteur parfait", l'IA reste une
+// stratégie crédible avec des chances honnêtes — jamais 100%, jamais d'info
+// privée. Les valeurs sont volontairement basses pour laisser de la place
+// au plan du joueur ; un humain qui joue prudent fait des choix similaires.
+const PERSONA_BIAS: Record<CpuPersona, PersonaBias> = {
+  tactician: { affinityBuildChance: 0.45, blockPlayerVoieChance: 0.50, spellSkipMult: 1.0, prioritizeLethal: true  },
+  aggressor: { affinityBuildChance: 0.30, blockPlayerVoieChance: 0.25, spellSkipMult: 0.8, prioritizeLethal: true  },
+  builder:   { affinityBuildChance: 0.60, blockPlayerVoieChance: 0.15, spellSkipMult: 1.2, prioritizeLethal: false },
+  defender:  { affinityBuildChance: 0.40, blockPlayerVoieChance: 0.40, spellSkipMult: 1.3, prioritizeLethal: false },
+};
+const DEFAULT_BIAS: PersonaBias = { affinityBuildChance: 0.45, blockPlayerVoieChance: 0.25, spellSkipMult: 1.0, prioritizeLethal: false };
+
+function biasFor(persona: CpuPersona | undefined): PersonaBias {
+  return persona ? PERSONA_BIAS[persona] : DEFAULT_BIAS;
+}
+
+/** Cartes que le cerveau CPU sait réellement jouer (cases de buildSpellTarget).
+ *  Le deck CPU (buildCpuDeckMirroring) ne pioche QUE dedans : avant, le pool
+ *  incluait toutes les cartes Arena-supportées et le CPU piochait des cartes
+ *  qu'il ne castait JAMAIS (oracle-inverse, échappée, juge, genèse…) → cartes
+ *  mortes en main et tours passifs (asymétrie vs joueur). Ces cartes restent
+ *  jouables par le JOUEUR — simplement hors deck CPU tant que l'IA n'a pas
+ *  d'heuristique sensée pour elles. */
+const CPU_PLAYABLE = new Set<CardId>([
+  "aegis", "anchor", "riposte", "precision", "surge", "curse", "supernova",
+  "heist", "tide", "prescience", "oracle", "augur", "second-wind", "mirror",
+  "vortex",
+  "gaia", "sablier", "offre", "rempart", "benediction", "cascade",
+  "marchand-ames", "mascarade", "sangsue", "trou-noir", "paradoxe",
+  // ── Nouvelles cartes Pro (2026-06-12) — permutation + reverberation
+  //    laissées au JOUEUR (ciblage trop spécifique pour l'IA). ──
+  "jet-caillou", "seve", "coup-oeil", "toile-gluante", "gravite",
+  "doppelganger", "purge", "roue-destin", "phenix", "singularite",
+]);
+export function cpuCanPlay(id: CardId): boolean {
+  return CPU_PLAYABLE.has(id);
+}
 
 export function cpuArenaDecision(
   board: BoardState,
@@ -49,14 +108,22 @@ export function cpuArenaDecision(
   let mana = side === "a" ? board.a.mana : board.b.mana;
   const hero = side === "a" ? board.a : board.b;
   const oppSide: Side = side === "a" ? "b" : "a";
+  const oppHeroState = side === "a" ? board.b : board.a;
+  const bias = biasFor(hero.cpuPersona);
   // oppHero (the hero we're attacking) is now computed inside the lethal
   // block as `playerHero` — keep this local out so we don't shadow it.
 
   // Hand of playable spells (filter out cards we haven't adapted to Arena yet).
   const playableHand = hero.hand.filter(arenaSupported);
 
+  // Coût effectif (Finisher CALCUL QUANTIQUE −1m) — même source que l'engine
+  // et l'UI, sinon le CPU budgète faux dès que son Finisher Spock est actif.
+  const costOf = (id: CardId): number => arenaSpellCost(hero, id);
+
   // Easy CPU: skip ~40% of optional plays so the player has breathing room.
-  const skipChance = difficulty === "easy" ? 0.4 : difficulty === "hard" ? 0 : 0.1;
+  // Persona module via spellSkipMult.
+  const baseSkip = difficulty === "easy" ? 0.4 : difficulty === "hard" ? 0 : 0.1;
+  const skipChance = Math.min(0.6, baseSkip * bias.spellSkipMult);
 
   /* ─── 1. Defensive emergencies — save a creature about to die ─── */
   if (difficulty !== "easy") {
@@ -72,19 +139,20 @@ export function cpuArenaDecision(
       const counterMO = moveCountersMove(mine.move, opp.move);
       let wouldDie: boolean;
       if (counterOM && !counterMO) {
-        wouldDie = !mine.divineShield && !mine.dodgeCharge;
+        wouldDie = !mine.divineShield && mine.dodgeCharges === 0;
       } else if (counterMO && !counterOM) {
         wouldDie = false;
       } else {
         const incoming = CREATURE_STATS[opp.move].atk + opp.atkBuff;
-        wouldDie = mine.hp <= incoming && !mine.divineShield && !mine.dodgeCharge;
+        wouldDie = mine.hp <= incoming && !mine.divineShield && mine.dodgeCharges === 0;
       }
       if (!wouldDie) continue;
-      // Try Aegis (1m) first — divine shield absorbs ALL the incoming dmg.
-      if (mana >= 1 && playableHand.includes("aegis")) {
+      // Try Aegis first — divine shield absorbs ALL the incoming dmg.
+      // Lock 1×/match levé : "1 copie en main = 1 cast" via consume gère seul.
+      if (mana >= costOf("aegis") && playableHand.includes("aegis")) {
         intent.spells.push({ id: "aegis", kind: "lane", lane });
         consume(playableHand, "aegis");
-        mana -= 1;
+        mana -= costOf("aegis");
         continue;
       }
       // Else Anchor (1m) — doesn't help vs combat but at least blocks Curse/etc.
@@ -123,21 +191,23 @@ export function cpuArenaDecision(
       lethalDmg += CREATURE_STATS[myC.move].atk + myC.atkBuff;
     }
   }
-  const couldLethal = lethalDmg + (playableHand.includes("supernova") && mana >= 4 ? 6 : 0)
-                                + (playableHand.includes("heist") && mana >= 3 ? 3 : 0)
+  const couldLethal = lethalDmg + (playableHand.includes("supernova") && mana >= costOf("supernova") ? 6 : 0)
+                                + (playableHand.includes("heist") && mana >= costOf("heist") ? 3 : 0)
                                 >= playerHero.hp;
 
-  /* ─── 2b. Burst lethal vs an exposed hero — push spells if lethal is on. */
-  if ((playerHero.hp <= 6 || couldLethal) && Math.random() >= skipChance) {
-    if (mana >= 4 && playableHand.includes("supernova")) {
+  /* ─── 2b. Burst lethal vs an exposed hero — push spells if lethal is on.
+   *      Persona "aggressor"/"tactician" qui prioritizeLethal pousse à 8 HP. */
+  const lethalThreshold = bias.prioritizeLethal ? 8 : 6;
+  if ((playerHero.hp <= lethalThreshold || couldLethal) && Math.random() >= skipChance) {
+    if (mana >= costOf("supernova") && playableHand.includes("supernova")) {
       intent.spells.push({ id: "supernova", kind: "hero" });
       consume(playableHand, "supernova");
-      mana -= 4;
+      mana -= costOf("supernova");
     }
-    if (mana >= 3 && playableHand.includes("heist")) {
+    if (mana >= costOf("heist") && playableHand.includes("heist")) {
       intent.spells.push({ id: "heist", kind: "self" }); // self because it draws + hits hero
       consume(playableHand, "heist");
-      mana -= 3;
+      mana -= costOf("heist");
     }
   }
 
@@ -185,7 +255,7 @@ export function cpuArenaDecision(
     if (sideCreature(board, side, lane)) continue;
     if (Math.random() < summonSkip) continue;
     const opp = sideCreature(board, oppSide, lane);
-    const choice = pickBestMove(opp);
+    const choice = pickBestMove(opp, hero.affinity, oppHeroState.affinity, bias);
     intent.summons.push({ lane, move: choice });
     mana -= 1;
     summonsThisTurn += 1;
@@ -197,7 +267,7 @@ export function cpuArenaDecision(
     for (const lane of laneOrder) {
       if (sideCreature(board, side, lane)) continue;
       const opp = sideCreature(board, oppSide, lane);
-      intent.summons.push({ lane, move: pickBestMove(opp) });
+      intent.summons.push({ lane, move: pickBestMove(opp, hero.affinity, oppHeroState.affinity, bias) });
       mana -= 1;
       break;
     }
@@ -205,28 +275,28 @@ export function cpuArenaDecision(
 
   /* ─── 4. Spend remaining mana — biggest spells first ─── */
   // Sort remaining hand by cost desc; play whatever fits.
-  const queue = playableHand.slice().sort((a, b) => CARDS[b].cost - CARDS[a].cost);
+  const queue = playableHand.slice().sort((a, b) => costOf(b) - costOf(a));
   for (const id of queue) {
-    const cost = CARDS[id].cost;
+    const cost = costOf(id);
     if (cost > mana) continue;
     if (Math.random() < skipChance) continue;
     const spell = buildSpellTarget(id, board, side);
     if (!spell) continue;
     intent.spells.push(spell);
     mana -= cost;
+    // Sablier rend +2 mana à la résolution (priorité 160 : il fire AVANT les
+    // sorts plus chers) — le budget de plan peut donc compter le gain.
+    if (id === "sablier") mana += 2;
   }
 
   // Final priority sort — caller (resolver) will re-sort, but doing it here
   // keeps the intent legible if anyone inspects it for tests.
   intent.spells.sort((s1, s2) => spellPriority(s1.id) - spellPriority(s2.id));
-  // Alex feedback F : symétrie joueur — CPU aussi gated à MAX_SPELLS_PER_TURN.
-  // Truncate à la fin pour garder les sorts les plus prioritaires (haut de
-  // la liste après le tri). Sinon CPU avait avantage avec spam illimité.
-  if (intent.spells.length > MAX_SPELLS_PER_TURN) {
-    intent.spells.length = MAX_SPELLS_PER_TURN;
-  }
-
-  return intent;
+  // Symétrie joueur : MÊMES caps que l'UI/engine (MAX_SPELLS lane + 1 utility)
+  // via truncateIntentByCaps. L'ancien cap "2 sorts TOTAL" privait le CPU de
+  // son sort utility alors que le joueur y a droit (2 lane + 1 utility = 3).
+  // Le tri par priorité ci-dessus garantit qu'on garde les plus importants.
+  return truncateIntentByCaps(intent);
 }
 
 /* ───────────────────────── Helpers ───────────────────────── */
@@ -240,30 +310,51 @@ function consume(hand: CardId[], id: CardId): void {
   if (i >= 0) hand.splice(i, 1);
 }
 
-/** Pick the best RPSLS move to summon against `opp`. If opp is null (empty
- *  lane), use a WEIGHTED RANDOM bag so the CPU varies its openings instead
- *  of spamming Scissors every time (Alex's "ia ne joue que ciseaux" bug).
+/** Pick the best RPSLS move to summon against `opp`. Voie-aware (Alex
+ *  2026-06-11) : si l'IA peut construire SA Constellation (affinityBuildChance)
+ *  elle pose son symbole sur lane vide. Face à une créature opp qui MATCH la
+ *  Voie joueur, elle priorise la counter (blockPlayerVoieChance) — c'est la
+ *  vraie raison d'avoir choisi une Voie : ton plan se voit et se contre.
  *  Pierre is favored slightly (defensive opener, cheap and tanks attacks);
  *  Ciseaux and Lézard are the offensive flavors. */
-function pickBestMove(opp: Creature | null): Move {
+function pickBestMove(
+  opp: Creature | null,
+  myAffinity: Move | undefined,
+  oppAffinity: Move | undefined,
+  bias: PersonaBias,
+): Move {
+  // Cas lane VIDE : opportunité de poser SA Voie pour build sa Constellation.
   if (!opp) {
-    // Bag of length 9 — pulls roughly: Pierre 33%, Spock 22%, Ciseaux 22%,
-    // Lézard 11%, Feuille 11%. Defensive-leaning so the CPU isn't a glass
-    // cannon that dies turn 2 + the player sees a varied roster early on.
-    const bag: Move[] = [
-      "rock", "rock", "rock",
-      "spock", "spock",
-      "scissors", "scissors",
-      "lizard",
-      "paper",
-    ];
+    if (myAffinity && Math.random() < bias.affinityBuildChance) {
+      return myAffinity;
+    }
+    // Sinon bag défensif (mêmes proportions qu'avant) — varié.
+    const bag: Move[] = ["rock", "rock", "rock", "spock", "spock", "scissors", "scissors", "lizard", "paper"];
+    return bag[Math.floor(Math.random() * bag.length)];
+  }
+  // Face à une créature opp qui MATCH la Voie joueur → priorité blocage
+  // (le CPU "lit" ton plan et le contre).
+  if (oppAffinity && opp.move === oppAffinity && Math.random() < bias.blockPlayerVoieChance) {
+    let best: Move | null = null;
+    for (const mv of MOVES) {
+      if (!moveCountersMove(mv, opp.move)) continue;
+      if (best === null) { best = mv; continue; }
+      const s = CREATURE_STATS[mv];
+      const bs = CREATURE_STATS[best];
+      if (s.atk * 10 + s.hp > bs.atk * 10 + bs.hp) best = mv;
+    }
+    if (best) return best;
+  }
+  // Variance vs counter parfait (Round 9) — 30% bag random pour pas que le
+  // joueur sente "CPU triche". Builder persona varie plus (1.3× skip implique
+  // moins d'agression brute) — déjà calibré par bias.
+  if (Math.random() < 0.30) {
+    const bag: Move[] = ["rock", "rock", "rock", "spock", "spock", "scissors", "scissors", "lizard", "paper"];
     return bag[Math.floor(Math.random() * bag.length)];
   }
   for (const mv of MOVES) {
     if (moveCountersMove(mv, opp.move)) {
       // Among counters, pick the one with the best ATK/HP for this trade.
-      // E.g. if opp is Rock, both Paper (3/1) and Spock (2/3) counter — pick
-      // by composite score so Feuille's ATK is rewarded.
       let best: Move = mv;
       for (const candidate of MOVES) {
         if (!moveCountersMove(candidate, opp.move)) continue;
@@ -296,13 +387,12 @@ function buildSpellTarget(
     case "precision": return targetMyBestCreature(board, side, "lane", id);
     case "surge":     return targetMyBestCreature(board, side, "lane", id);
     case "curse":     return targetOppBestCreature(board, oppSide, id);
-    case "supernova": {
-      // Prefer hero if exposed enough, else biggest threat creature.
-      const oppHero = oppSide === "a" ? board.a : board.b;
-      if (oppHero.hp <= 6) return { id, kind: "hero" };
-      const threat = targetOppBestCreature(board, oppSide, id);
-      return threat ?? { id, kind: "hero" };
-    }
+    case "supernova":
+      // TOUJOURS le héros (Alex 2026-06-11) : la carte dit "6 dégâts au héros
+      // adverse", et le joueur ne peut la cast que sur le héros. L'IA visait
+      // une créature si hero > 6 HP → incohérent + "la supernova ne m'a pas
+      // touché". Parité player/CPU = hero only.
+      return { id, kind: "hero" };
     case "heist":     return { id, kind: "self" };
     case "tide":      return { id, kind: "global" };
     case "prescience": return { id, kind: "self" };
@@ -311,6 +401,95 @@ function buildSpellTarget(
     case "second-wind": return { id, kind: "self" };
     case "mirror":    return targetEmptyMyLaneOppOccupied(board, side, id);
     case "vortex":    return { id, kind: "global" };
+    // ── Phase-2 — sans ces cases le CPU piochait ces cartes (deck mirroring)
+    //    mais ne les castait JAMAIS : cartes mortes en main, tours passifs. ──
+    case "gaia": {
+      // Heal 6 — ne pas gaspiller à pleine vie.
+      const me = side === "a" ? board.a : board.b;
+      return me.hp <= me.maxHp - 4 ? { id, kind: "self" } : null;
+    }
+    case "sablier":   return { id, kind: "self" };
+    case "offre": {
+      // +2 mana max permanent — inutile une fois le plafond atteint.
+      const me = side === "a" ? board.a : board.b;
+      return me.maxMana < MANA_CAP ? { id, kind: "self" } : null;
+    }
+    case "rempart":
+    case "benediction": {
+      // Buffs board-wide : utile seulement avec ≥1 créature buffable
+      // (Spock Détaché est ignoré par l'effet).
+      const hasBuffable = ([0, 1, 2] as LaneIndex[]).some((l) => {
+        const c = sideCreature(board, side, l);
+        return !!c && c.move !== "spock";
+      });
+      return hasBuffable ? { id, kind: "self" } : null;
+    }
+    case "cascade":   return { id, kind: "self" };
+    case "marchand-ames": {
+      // Paye 2 HP → pioche 3 : interdit en zone létale.
+      const me = side === "a" ? board.a : board.b;
+      return me.hp > 5 ? { id, kind: "self" } : null;
+    }
+    case "mascarade":
+      // Refonte déguisement (Alex 2026-06-11) : cible une de mes créatures
+      // (elle se transforme pour counter l'adversaire en face).
+      return targetMyBestCreature(board, side, "lane", id);
+    case "sangsue": {
+      // Heal = ATK de ma créature — gaspillé à pleine vie ou board vide.
+      const me = side === "a" ? board.a : board.b;
+      return me.hp < me.maxHp ? targetMyBestCreature(board, side, "lane", id) : null;
+    }
+    case "trou-noir": return targetOppBestCreature(board, oppSide, id);
+    case "paradoxe": {
+      // 5 dmg aux DEUX héros — uniquement en finisher létal sans suicide.
+      const me = side === "a" ? board.a : board.b;
+      const opp = oppSide === "a" ? board.a : board.b;
+      return opp.hp <= 5 && me.hp > 5 ? { id, kind: "global" } : null;
+    }
+    // ── Nouvelles cartes Pro (2026-06-12) ──
+    case "jet-caillou":   return targetOppBestCreature(board, oppSide, id);
+    case "toile-gluante": return targetOppBestCreature(board, oppSide, id);
+    case "seve": {
+      // Soin créature : utile seulement si une de mes créatures est blessée.
+      const hurt = ([0, 1, 2] as LaneIndex[]).some((l) => {
+        const c = sideCreature(board, side, l);
+        return !!c && c.hp < CREATURE_STATS[c.move].hp;
+      });
+      return hurt ? targetMyBestCreature(board, side, "lane", id) : null;
+    }
+    case "coup-oeil": return { id, kind: "self" };
+    case "gravite": {
+      // Dégât de zone : utile seulement s'il y a ≥1 créature adverse.
+      const hasOpp = ([0, 1, 2] as LaneIndex[]).some((l) => !!sideCreature(board, oppSide, l));
+      return hasOpp ? { id, kind: "global" } : null;
+    }
+    case "purge": {
+      // Dissipe : utile s'il y a ≥1 créature adverse buffée/protégée.
+      const worth = ([0, 1, 2] as LaneIndex[]).some((l) => {
+        const c = sideCreature(board, oppSide, l);
+        return !!c && (c.atkBuff > 0 || c.divineShield || c.anchored || c.ripostePrimed);
+      });
+      return worth ? { id, kind: "global" } : null;
+    }
+    case "doppelganger": {
+      // Copie : besoin d'≥1 créature ET d'une lane vide à moi.
+      const hasCreature = ([0, 1, 2] as LaneIndex[]).some((l) => !!sideCreature(board, side, l));
+      const hasEmpty = ([0, 1, 2] as LaneIndex[]).some((l) => !sideCreature(board, side, l));
+      return hasCreature && hasEmpty ? { id, kind: "self" } : null;
+    }
+    case "phenix": {
+      // Phénix : utile seulement si j'ai des créatures à protéger.
+      const hasCreature = ([0, 1, 2] as LaneIndex[]).some((l) => !!sideCreature(board, side, l));
+      return hasCreature ? { id, kind: "self" } : null;
+    }
+    case "roue-destin": return { id, kind: "self" };
+    case "singularite": {
+      // Burst héros qui scale avec le board : ne tente que s'il reste ≥1 créature.
+      const anyCreature = ([0, 1, 2] as LaneIndex[]).some(
+        (l) => !!sideCreature(board, side, l) || !!sideCreature(board, oppSide, l),
+      );
+      return anyCreature ? { id, kind: "hero" } : null;
+    }
     default:          return null;
   }
 }

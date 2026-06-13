@@ -59,7 +59,7 @@ export function ArenaConstellationBar({
   return (
     <div
       className={
-        "inline-flex items-center gap-1.5 px-2 py-1 rounded-full backdrop-blur " +
+        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full backdrop-blur shrink-0 " +
         (side === "you" ? "self-start" : "self-end")
       }
       style={{
@@ -73,8 +73,21 @@ export function ArenaConstellationBar({
     >
       <MoveGlyph
         move={affinity}
-        className="w-4 h-4 shrink-0 opacity-90 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
+        className="w-3 h-3 shrink-0 opacity-90 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
       />
+      {/* Round 9 fix Alex point #2 : label texte "Voie de X" pour que le
+       *  joueur SACHE quel style l'autre a choisi (et donc quels bonus
+       *  s'appliquent aux créatures opp). */}
+      <span
+        className="text-[8px] uppercase tracking-wide font-bold leading-none"
+        style={{ color: accentColor }}
+      >
+        {affinity === "rock" ? "Montagne" :
+         affinity === "paper" ? "Forêt" :
+         affinity === "scissors" ? "Tranchant" :
+         affinity === "lizard" ? "Mirage" :
+         "Cosmos"}
+      </span>
       <div className="flex items-center gap-0.5">
         {Array.from({ length: STAR_COUNT }).map((_, i) => {
           const filled = i < filledCount;
@@ -109,7 +122,7 @@ export function ArenaConstellationBar({
               }
               className={
                 "leading-none " +
-                (isComplete ? "text-[17px] font-black" : filledCount === 2 ? "text-[15px] font-bold" : "text-[14px]") + " " +
+                (isComplete ? "text-[13px] font-black" : filledCount === 2 ? "text-[12px] font-bold" : "text-[11px]") + " " +
                 (filled ? "" : "opacity-25")
               }
               style={{ color: filled ? accentColor : "#71717a" }}
@@ -127,10 +140,10 @@ export function ArenaConstellationBar({
             scale: [1, 1.05, 1],
           }}
           transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-          className="text-[10px] uppercase tracking-wider font-black text-amber-200"
+          className="text-[8px] uppercase tracking-wide font-black text-amber-200"
           style={{ textShadow: `0 0 8px ${accentColor}, 0 0 4px #fbbf24` }}
         >
-          FINISHER ✦
+          ✦
         </motion.span>
       )}
     </div>

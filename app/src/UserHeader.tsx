@@ -11,9 +11,20 @@ import type { Page } from "./Sidebar";
  * same badge — so the SAME PlayerBadge renders at the IDENTICAL inner width
  * on both surfaces, the inconsistency Alex flagged.
  */
-export function UserHeader({ onNavigate }: { onNavigate: (p: Page) => void }) {
+export function UserHeader({
+  onNavigate,
+  // Classes du conteneur. Défaut = `px-2` (pages autres que Play : le burger
+  // ET le bouton "retour Play" occupent déjà le coin → on NE remonte PAS).
+  // La page Play passe une variante "remontée + décalée à droite du burger"
+  // (Alex 2026-06-12 : carte joueur au MÊME niveau que le burger, pas abaissée)
+  // — sûr là-bas car la page Play n'a PAS de bouton retour à côté du burger.
+  className = "px-2",
+}: {
+  onNavigate: (p: Page) => void;
+  className?: string;
+}) {
   return (
-    <div className="md:hidden w-full max-w-3xl mx-auto px-2">
+    <div className={"md:hidden w-full max-w-3xl mx-auto " + className}>
       <PlayerBadge
         onTap={() => onNavigate("profile")}
         onCurrencyTap={() => onNavigate("shop")}

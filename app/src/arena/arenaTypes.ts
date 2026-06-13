@@ -29,24 +29,56 @@ export const LANE_COUNT = 3;
 // donc 7 cartes max est confortable sans débordement.
 export const HAND_CAP = 7;
 export const STARTING_HAND_SIZE = 5;
-// Alex feedback 2026-06-09 F : "controler usage et nombre de cartes par
-// main/manche" → max 2 sorts intent par tour. Empêche les tours dump-tout
-// quand on a beaucoup de mana, force à étaler les plays.
-export const MAX_SPELLS_PER_TURN = 2;
+// CAPS LEVÉS (Alex 2026-06-13 "CCG expert — pas de limites quand pas
+// nécessaires") : le MANA est désormais L'UNIQUE limite du tour, comme dans
+// tout CCG mature (Hearthstone n'a aucun cap de sorts/tour). 99 = inerte ;
+// la plomberie (addSpell + truncateIntentByCaps, SOURCE UNIQUE partagée
+// UI/engine/IA) est conservée — re-serrer ici suffit si un abus émerge.
+export const MAX_SPELLS_PER_TURN = 99;
+export const UTILITY_SPELLS_PER_TURN = 99;
 /** Soft cap on turns — if neither hero is dead by then, the lower-HP loses
  *  (sudden-death fail-safe so an over-defensive match still ends). */
 export const TURN_HARD_CAP = 30;
 
 export type Side = "a" | "b";
 
+/** Persona CPU — pick aléatoire au match start, garde la cohérence tout le
+ *  match (Alex 2026-06-11 "varier les niveaux et mentalités"). Chaque persona
+ *  module les choix de l'IA : focus Voie, agression, blocage de la Voie
+ *  adverse, etc. */
+export type CpuPersona = "tactician" | "aggressor" | "builder" | "defender";
+
+export const CPU_PERSONAS: CpuPersona[] = ["tactician", "aggressor", "builder", "defender"];
+
+export const CPU_PERSONA_LABEL: Record<CpuPersona, string> = {
+  tactician: "Tacticien",
+  aggressor: "Agresseur",
+  builder:   "Bâtisseur",
+  defender:  "Gardien",
+};
+
+/* ───────────────────────── Cast When Drawn ⚡ ───────────────────────── */
+
+/** Famille visuelle d'une carte « à la pioche » (Cast When Drawn) → pilote la
+ *  couleur + l'animation de ArenaCastOnDrawFX. */
+export type CastFxKind = "mana" | "heal" | "draw" | "risk" | "chaos";
+
+/** Événement émis quand une carte Cast-When-Drawn se déclenche AU TIRAGE
+ *  (cf. arenaCastOnDraw.ts). `label` = résumé lisible de l'effet réellement
+ *  appliqué (« +2 MANA », « PIOCHE 2 · −2 PV », « PILE → +3 MANA »…). */
+export interface CastOnDrawEvent {
+  id: CardId;
+  fxKind: CastFxKind;
+  label: string;
+}
+
 export interface HeroState {
   hp: number;
   maxHp: number;
   affinity?: import("../engine/game").Move;
-  /** Alex feedback A 2026-06-09 : "Aegis 1 cast par hero par match" pour
-   *  casser les stalemates où l'opp re-cast Aegis sur la même créature à
-   *  chaque tour. Set à true à la première cast d'Aegis (lane ou self) ;
-   *  applyAegis fizzle silencieusement si déjà true. Reset au match start. */
+  /** Aegis : lock 1×/match RETIRÉ (Alex 2026-06-11). Le champ reste optional
+   *  pour la back-compat des saves persistées ; jamais set ni lu côté code
+   *  vivant. À nettoyer du save schema dans une migration future. */
   aegisCastThisMatch?: boolean;
   /** Alex feedback D 2026-06-09 : "récompenser l'agression" → si ce hero
    *  a tué une créature opp ce tour, il pioche +1 carte bonus au prochain
@@ -82,6 +114,10 @@ export interface HeroState {
   /** Lot D — flag CALCUL QUANTIQUE : tous mes sorts coûtent −1m (min 0).
    *  Vérifié dans applyAllSpells.cost. */
   calculActive?: boolean;
+  /** Persona du CPU (Alex 2026-06-11) — choisie au match start côté CPU.
+   *  Module les heuristiques de l'IA : agression, focus sur sa Voie, focus
+   *  sur contrer la Voie joueur, défensivité. undefined côté joueur. */
+  cpuPersona?: CpuPersona;
   /** Mana available THIS turn. Refreshes to maxMana at the start of each turn. */
   mana: number;
   /** Mana ceiling — increments by 1 every turn up to MANA_CAP. */
@@ -92,8 +128,18 @@ export interface HeroState {
   deck: CardId[];
   /** Used cards waiting to be reshuffled when the deck empties. */
   discard: CardId[];
+  /** Cartes LÉGENDAIRES jouées — EXILÉES (Alex 2026-06-13 économie expert) :
+   *  jamais reshufflées, 1 usage par partie. Une légendaire défaussée SANS
+   *  être jouée (Juge, Cascade) recycle normalement — l'exil sanctionne le
+   *  CAST, pas la défausse. */
+  exiled: CardId[];
   /** Aegis "divine shield" — next damage source is absorbed (then this drops to 0). */
   divineShield: boolean;
+  /** ⚡ Cartes « à la pioche » (Cast When Drawn) déclenchées par le DERNIER
+   *  drawCards (pioche de tour / pioche d'effet). Transient : lu par l'UI pour
+   *  jouer l'anim ⚡, ré-écrit à chaque drawCards. JAMAIS persisté (le board
+   *  Arena est match-local). Alex 2026-06-13. */
+  castOnDrawEvents?: CastOnDrawEvent[];
 }
 
 /* ───────────────────────── Creatures ───────────────────────── */
@@ -156,7 +202,7 @@ export const MOVE_DESIGN_NOTES: Record<Move, MoveDesignNote> = {
     counters: "Ciseaux OU Lézard opp en lane = one-shot la Feuille.",
   },
   scissors: {
-    good: "Tranchant — perce les Aegis adverses. ATK 4 (le plus haut du roster).",
+    good: "Tranchant — perce un Aegis adverse UNE seule fois (charge unique). ATK 4 (le plus haut du roster).",
     bad: "Émoussé — −1 ATK permanent après son 1er combat (4→3). HP 1, fragile.",
     counters: "Pierre OU Spock opp en lane = one-shot le Ciseau.",
   },
@@ -191,7 +237,7 @@ export const CREATURE_PASSIVES: Record<Move, CreaturePassive> = {
     id: "tranchant",
     glyph: "⚔",
     name: "Tranchant",
-    desc: "Au combat de lane, perce les boucliers divins (Aegis) adverses.",
+    desc: "Charge unique : perce le 1er bouclier divin (Aegis) adverse rencontré, puis disparaît.",
     tone: "rose",
   },
   lizard: {
@@ -220,6 +266,10 @@ export interface Creature {
   hp: number;
   /** Per-turn ATK modifier (Surge +3, Precision +2, Tide +1 to all, Curse -2). */
   atkBuff: number;
+  /** Toile Gluante (2026-06-12) : la créature ne peut pas attaquer ce tour —
+   *  ATK effectif forcé à 0 ET son counter est annulé en combat (elle survit
+   *  mais n'inflige rien). Per-turn (reset par endOfTurnReset). */
+  cannotAttack?: boolean;
   /** Per-turn flags. */
   divineShield: boolean;
   /** Anchor: this creature is immune to ENEMY spell effects this turn. */
@@ -231,15 +281,23 @@ export interface Creature {
    *  (they hit nothing instead — opp must clear my taunt-bearer first).
    *  Set inherently on Rock creatures at summon. */
   taunt: boolean;
-  /** Lézard's "Esquive" innate passive — the next damage source is ignored
-   *  and this flag drops. Different from divineShield because it's INTRINSIC
-   *  (not granted by a spell), and takes priority over divineShield when both
-   *  are present. */
-  dodgeCharge: boolean;
+  /** Lézard's "Esquive" innate passive — chaque charge ignore 1 damage source.
+   *  Lézard base : 1 charge. Voie Lézard (affinity match) : 2 charges initiales.
+   *  Métamorphose finisher : refill 1 charge fin de tour.
+   *
+   *  Round 8 refactor : était `dodgeCharge: boolean`, maintenant un compteur.
+   *  > 0 = peut esquiver (consume 1 par save). 0 = plus de save Esquive. */
+  dodgeCharges: number;
   /** Ciseaux' "Tranchant" — when this creature attacks in lane combat, the
    *  defender's divineShield is bypassed (full damage lands). Set inherently
    *  on Scissors at summon, never granted by spells. */
   pierces: boolean;
+  /** Tranchant CHARGE (Alex 2026-06-11) : true tant que le Tranchant n'a
+   *  pas encore percé une Aegis. Au 1er bypass, set true → les attaques
+   *  suivantes respectent la divineShield comme tout le monde. La Lame
+   *  Finisher (lameActive sur le hero) IGNORE cette charge — pierce
+   *  permanent pour le reste du match. */
+  pierceUsed: boolean;
   /** Spock's "Logique" — opponent's spells that target THIS creature fizzle
    *  silently. Doesn't affect combat damage or summons replacement. Set
    *  inherently on Spock at summon. */
@@ -258,6 +316,14 @@ export interface Creature {
    *  Drives the "Fanaison" malus: Feuille loses 1 ATK per turn elapsed,
    *  floor 1 (so 3 → 2 → 1 → 1 → 1). Stays at 0 on all other moves. */
   wiltedSteps: number;
+  /** Voie Feuille (affinity match) — Round 8 : Fanaison RALENTIE. La Feuille
+   *  Voie wilt tous les 2 tours au lieu de chaque tour. Persistant — set true
+   *  au summon si makeCreature(paper, affinity=paper). */
+  voieFeuille: boolean;
+  /** Toggle pour Voie Feuille uniquement : démarre true → endOfTurnReset SKIP
+   *  ce tour et flip false → next tour wilt et flip true → next SKIP, etc.
+   *  Pour non-Voie Feuille : reste false, wilt à chaque tour normalement. */
+  wiltSkipNext: boolean;
   /** Set true on Scissors creatures AFTER their first combat exchange
    *  (whether they survive or not — kept for symmetry though only matters
    *  if they survive). Drives the "Émoussé" malus: −1 ATK permanent. */
@@ -265,7 +331,9 @@ export interface Creature {
   /** Pierre's Provocation is now a CHARGE-LIMITED resource: 1 charge at
    *  summon, consumed by the first deflection. Once at 0, the Pierre stops
    *  redirecting attacks (badge + halo hide). Aegis (spell) cast on a Pierre
-   *  refills +1 charge. Always 0 on non-Rock moves.
+   *  recharge la Provocation À 1 si elle est épuisée (max(charges, 1) — cf.
+   *  applyAegis ; comportement validé live, ce n'est PAS un "+1" cumulable).
+   *  Always 0 on non-Rock moves.
    *
    *  Voie de la Pierre (affinity match) : 2 charges initiales au lieu d'1.
    *
@@ -331,12 +399,39 @@ export interface BoardState {
    *  see of side B's hand). Cleared each turn. */
   augurRevealedB: CardId[];
   augurRevealedA: CardId[];
+  /** Compteur de tours restants avant clear du peek (Alex 2026-06-11 : "ne
+   *  pas retirer la main trop vite"). 2 tours = tour de cast + tour suivant.
+   *  Decrement dans advanceToNextTurn ; clear cards à 0. */
+  augurTurnsLeftA?: number;
+  augurTurnsLeftB?: number;
+  /** ID de la dernière carte volée par chaque côté (Alex 2026-06-11). Lu par
+   *  l'UI pour que l'anim Larcin reveal la VRAIE carte volée (sinon affichait
+   *  une heuristique "première carte de la main adverse"). Mis à jour par
+   *  applyHeist au cast. Pas besoin de clear : écrasée au cast suivant. */
+  lastHeistStolenA?: CardId;
+  lastHeistStolenB?: CardId;
+  /** ⚗️ FORGE (2026-06-13) — la carte déposée sur la case Forge de chaque
+   *  joueur (visible des deux camps, reprenable, persiste entre les tours).
+   *  Fusion : carte partenaire de la main + Forge → carte fusionnée en main. */
+  forgeA?: CardId | null;
+  forgeB?: CardId | null;
+  /** Réverbération (2026-06-12) : dernier sort NON-réverbération appliqué par
+   *  chaque côté ce tour (tracké dans applyAllSpells). Réverbération le rejoue.
+   *  Reset chaque tour (advanceToNextTurn). */
+  lastSpellAppliedA?: PlayedSpell;
+  lastSpellAppliedB?: PlayedSpell;
+  /** Phénix (2026-06-12) : snapshot des créatures de chaque côté au moment du
+   *  cast — celles qui meurent ce tour renaissent à 1 PV en fin de tour (sur
+   *  leur lane si libre). Posé par applyPhenix, consommé par endOfTurnCleanup. */
+  phenixReviveA?: { lane: LaneIndex; move: Move }[];
+  phenixReviveB?: { lane: LaneIndex; move: Move }[];
 }
 
 export type ArenaPhase =
   | "draw"        // turn start, mana up, draw a card
   | "planning"    // both sides plan in parallel
   | "resolving"   // resolver running (spells → summons → combat)
+  | "sudden-death" // Round 10 VRAI BUT D'OR : égalité parfaite → 1 lane RPSLS aveugle
   | "match-end";  // hero hit 0 HP
 
 /* ───────────────────────── Match result ───────────────────────── */
@@ -373,6 +468,13 @@ export const CARD_TARGET_KIND: Partial<Record<CardId, SpellTargetKind>> = {
   riposte:      "lane",
   augur:        "global",
   heist:        "self",
+  razzia:       "global",
+  surcharge:    "lane",
+  toxine:       "lane",
+  rappel:       "lane",
+  "double-mot": "lane",
+  echo:         "global",
+  chronomancien: "self",
   tide:         "global",
   oracle:       "self",
   vortex:       "global",
@@ -386,13 +488,35 @@ export const CARD_TARGET_KIND: Partial<Record<CardId, SpellTargetKind>> = {
   "oracle-inverse": "global",
   cascade:      "self",
   echappee:     "lane",
-  mascarade:    "global",
+  mascarade:    "lane",
   sangsue:      "lane",
   "trou-noir":  "lane",
   "marchand-ames": "self",
   paradoxe:     "global",
   juge:         "global",
   genese:       "global",
+  // ── Nouvelles cartes Pro (2026-06-12) ──
+  "jet-caillou":   "lane",
+  seve:            "lane",
+  "coup-oeil":     "self",
+  permutation:     "lane",
+  "toile-gluante": "lane",
+  reverberation:   "self",
+  gravite:         "global",
+  doppelganger:    "self",
+  purge:           "global",
+  "roue-destin":   "self",
+  phenix:          "self",
+  singularite:     "hero",
+  // ── ⚗️ Cartes de fusion (Forge 2026-06-13) ──
+  "frappe-parfaite": "lane",
+  bastion:           "lane",
+  avalanche:         "global",
+  "source-vitale":   "lane",
+  omniscience:       "global",
+  cocon:             "lane",
+  apocalypse:        "global",
+  imposteur:         "global",
 };
 
 /** Active targeting state shared across the board + plan phase so that
@@ -412,7 +536,7 @@ export type ArenaTargeting =
  *  - "opp-creature"            → highlight OPP lanes that have a creature
  *  - "my-empty-opp-occupied"   → highlight MY lanes that are empty AND opp has a creature
  *  - "my-empty"                → highlight MY empty lanes (used by summons) */
-export type LaneTargetSide = "my-creature" | "opp-creature" | "my-empty-opp-occupied" | "my-empty";
+export type LaneTargetSide = "my-creature" | "opp-creature" | "my-empty-opp-occupied" | "my-empty" | "both-occupied";
 
 export const LANE_SPELL_TARGET_SIDE: Partial<Record<CardId, LaneTargetSide>> = {
   aegis:      "my-creature",
@@ -421,11 +545,42 @@ export const LANE_SPELL_TARGET_SIDE: Partial<Record<CardId, LaneTargetSide>> = {
   surge:      "my-creature",
   riposte:    "my-creature",
   echappee:   "my-creature",
+  mascarade:  "my-creature",
   curse:      "opp-creature",
   sangsue:    "opp-creature",
   "trou-noir": "opp-creature",
   mirror:     "my-empty-opp-occupied",
+  // ── Nouvelles cartes Pro (2026-06-12) ──
+  "jet-caillou":   "opp-creature",
+  seve:            "my-creature",
+  "toile-gluante": "opp-creature",
+  // ── 6 arts orphelins (2026-06-13) ──
+  surcharge:       "my-creature",
+  "double-mot":    "my-creature",
+  rappel:          "opp-creature",
+  toxine:          "opp-creature",
+  permutation:     "both-occupied", // lane où MOI ET l'adversaire avons une créature
+  // ── ⚗️ Cartes de fusion ──
+  "frappe-parfaite": "my-creature",
+  bastion:           "my-creature",
+  "source-vitale":   "my-creature",
+  cocon:             "opp-creature",
 };
+
+/** Mana GAGNÉ IMMÉDIATEMENT ce tour par une carte « tempo » (façon Pièce de
+ *  Hearthstone) — Alex 2026-06-13. Disponible pour la PLANIFICATION du même
+ *  tour (sinon Sablier ne servait à rien : son +2 atterrissait à la résolution
+ *  PUIS était écrasé par le refill du tour suivant). */
+export const MANA_GRANTS: Partial<Record<CardId, number>> = {
+  sablier: 2,
+  offre: 2, // (+ monte aussi maxMana de façon permanente, géré à la résolution)
+};
+
+/** Total de mana « tempo » offert par les cartes déjà planifiées dans l'intent
+ *  → s'ajoute au budget de mana du tour. */
+export function intentManaGrant(intent: TurnIntent): number {
+  return intent.spells.reduce((sum, s) => sum + (MANA_GRANTS[s.id] ?? 0), 0);
+}
 
 /** Returns whether `lane` on `side` is a valid drop target for the active
  *  ArenaTargeting. Used by ArenaLaneSlot's clickable + label so each card
@@ -455,6 +610,7 @@ export function isValidLaneTarget(
     if (tgtSide === "opp-creature") return !isPlayerRow && !!opp;
     if (tgtSide === "my-empty-opp-occupied") return isPlayerRow && !mine && !!opp;
     if (tgtSide === "my-empty") return isPlayerRow && !mine;
+    if (tgtSide === "both-occupied") return isPlayerRow && !!mine && !!opp;
   }
   return false;
 }
@@ -471,8 +627,19 @@ export function targetLabelFor(targeting: ArenaTargeting, slotHasCreature = fals
     if (tgtSide === "opp-creature") return "✦ Cible cette créature";
     if (tgtSide === "my-empty-opp-occupied") return "✦ Mirror ici";
     if (tgtSide === "my-empty") return "✦ Ici";
+    if (tgtSide === "both-occupied") return "✦ Échanger";
   }
   return "✦";
+}
+
+/** Clé i18n de la description ARENA d'une carte. Les textes `ranked.cards.
+ *  <id>.desc` décrivent les effets du mode CLASSÉ ; en Arena les mêmes cartes
+ *  ont des effets DIFFÉRENTS (arenaCardEffects) — afficher le texte Classé
+ *  induisait le joueur en erreur (ex. Trou Noir : "annule la carte adverse"
+ *  vs effet Arena réel "détruit une créature"). FR+EN fournis dans les
+ *  locales ; les autres langues retombent sur EN (fallback i18n standard). */
+export function arenaCardDescKey(id: CardId): string {
+  return `arena.cards.${id}.desc`;
 }
 
 /* ───────────────────────── RPSLS counter table ───────────────────────── */

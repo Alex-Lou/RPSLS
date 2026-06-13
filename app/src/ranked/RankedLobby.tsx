@@ -2,8 +2,9 @@
  * RankedLobby — home screen of Constellation Ranked.
  */
 
-import { useEffect, useState } from "react";
-import { motion } from "motion/react";
+import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "motion/react";
 import { useStore } from "../store/store";
 import { rankProgress } from "../engine/rank";
 import { LpBar } from "./LpBar";
@@ -13,9 +14,9 @@ import { CRAFT_COST } from "../engine/economy";
 import { CardImage } from "./CardImage";
 import { useT } from "../i18n";
 import { InfoBubble } from "../flavor/InfoBubble";
-import { avatarImgStyle } from "../theme/avatar";
-import { FloatingMatchBackButton } from "../match/sharedMatchUI";
 import { CurrencyBadges } from "./CurrencyBadges";
+import { avatarImgStyle } from "../theme/avatar";
+import { ModeLobbyShell, LobbyChip } from "../ui/ModeLobbyShell";
 // Tournament state now lives in PlayPage
 
 /** Custom illustrated icons for the "Comment ça marche ?" section (replace
@@ -37,213 +38,235 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack, onGoShop }: {
     ? Math.round((player.stats.wins / (player.stats.wins + player.stats.losses)) * 100)
     : 0;
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [cardsOpen, setCardsOpen] = useState(false);
   const countdown = useCountdown(30);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -16 }}
-      transition={{ duration: 0.3 }}
-      className="flex flex-col gap-3 sm:gap-5 flex-1 py-2 px-1 max-w-lg mx-auto w-full overflow-y-auto"
-    >
-      {/* Back to the main menu — docked next to the burger so the player never
-          has to rely on the Android back button (which could minimise the app). */}
-      {onBack && <FloatingMatchBackButton onClick={onBack} label={t("nav.backToPlay")} />}
-
-      {/* Title */}
-      <div className="text-center">
-        <h1
-          className="text-2xl sm:text-4xl font-extrabold tracking-tight text-themed leading-tight"
-          style={{ fontFamily: "var(--font-headline)" }}
+    <ModeLobbyShell
+      title="Constellation Classée"
+      tagline="3 lanes · Best of 5 · Mana & Cartes · LP & récompenses"
+      titleGradient="from-amber-300 to-violet-300"
+      onBack={onBack}
+      cta={
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={onViewBracket}
+          className="w-full rounded-2xl px-5 py-3 flex items-center justify-between font-black text-white shadow-2xl"
+          style={{
+            background: "linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))",
+            boxShadow: "0 12px 32px -6px color-mix(in oklab, var(--theme-primary) 55%, transparent), 0 0 24px color-mix(in oklab, var(--theme-secondary) 35%, transparent)",
+            fontFamily: "var(--font-headline)",
+            letterSpacing: "0.04em",
+          }}
         >
-          Constellation Ranked
-        </h1>
-        <p className="mt-1 text-ink-muted text-xs sm:text-sm">3 lanes · Best of 5 · Mana & Cartes</p>
-      </div>
-
-      {/* Profile card */}
-      <div className="bg-surface border border-hairline rounded-3xl p-4 sm:p-5 flex flex-col gap-3">
-        <div className="flex items-center gap-3">
-          <div
-            className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl border border-hairline flex items-center justify-center text-3xl overflow-hidden"
-            style={{
-              background:
-                "linear-gradient(135deg, color-mix(in oklab, var(--theme-primary) 32%, transparent), color-mix(in oklab, var(--theme-secondary) 32%, transparent))",
-            }}
-          >
-            {/^(data:|\/|https?:)/.test(player.avatar) ? (
-              <img
-                src={player.avatar}
-                alt=""
-                className="w-full h-full object-cover"
-                style={avatarImgStyle(player.avatar)}
-              />
-            ) : (
-              player.avatar
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="font-bold text-lg truncate">{player.nickname}</div>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className={
-                "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gradient-to-r " +
-                tier.gradient + " text-zinc-900"
-              }>
-                {tier.emoji} {tier.label}
-              </span>
-              <span className="text-xs text-ink-muted">Lv.{lvl.level}</span>
-            </div>
-          </div>
-        </div>
-        <div>
-          <div className="flex items-center justify-between text-[10px] text-ink-muted mb-1">
-            <div className="flex items-center gap-1.5">
-              <span className="uppercase tracking-wider font-semibold">LP</span>
-              <InfoBubble
-                size="sm"
-                title="LP — League Points"
-                body={
-                  <>
-                    Points de rang. Tu en gagnes quand tu gagnes des matchs Classés / Constellation Classés et tu en perds quand tu perds.
-                    Les paliers : <b>Bronze</b> (0+), <b>Silver</b> (1100+), <b>Gold</b> (1300+), <b>Platinum</b> (1500+), <b>Diamond</b> (1750+).
-                    Chaque palier débloque une carte ou un cosmétique.
-                  </>
-                }
-              />
-            </div>
-            <span className="tabular-nums">{player.rankLp} {tier.ceil !== Infinity && `/ ${tier.ceil}`}</span>
-          </div>
-          <LpBar progress={lpProgress} />
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          <StatCell label={t("profile.stat.games")} value={String(totalGames)} color="text-ink" />
-          <StatCell label={t("profile.stat.winrate")} value={`${winrate}%`} color="text-amber-300" />
-          <StatCell label={t("profile.stat.lp")} value={String(player.rankLp)} color="text-violet-300" />
-        </div>
-        {/* Wallet — clickable, jumps straight to the boutique so the player
-            can spend match earnings in one tap instead of unwinding back to
-            the home menu. */}
-        <div className="flex items-center justify-center pt-1">
-          <CurrencyBadges size="full" onClick={onGoShop} />
-        </div>
-      </div>
-
-      {/* Tournament — real countdown */}
-      {/* Deck manager */}
-      <motion.button
-        whileTap={{ scale: 0.98 }}
-        onClick={onManageDeck}
-        className="bg-surface rounded-2xl px-4 py-3 flex items-center justify-between hover:bg-hairline transition"
-        style={{ border: "1px solid color-mix(in oklab, var(--theme-primary) 35%, transparent)" }}
-      >
-        <div className="flex items-center gap-2.5">
-          <img src="/MenuIcons/DeckGestionIcone.png" alt="" className="w-7 h-7 object-contain drop-shadow-[0_1px_4px_rgba(0,0,0,0.5)]" draggable={false} />
-          <div className="text-left">
-            <div className="font-bold text-sm text-ink">Gérer mon Deck</div>
-            <div className="text-[10px] text-ink-faint">3 main + 3 réserve</div>
-          </div>
-        </div>
-        <span style={{ color: "var(--theme-secondary)" }}>›</span>
-      </motion.button>
-
-      {/* Main CTA — go to tournament bracket */}
-      <motion.button
-        whileTap={{ scale: 0.98 }}
-        onClick={onViewBracket}
-        className="w-full rounded-2xl px-4 py-4 flex items-center justify-between transition hover:brightness-110"
-        style={{
-          background:
-            "linear-gradient(135deg, color-mix(in oklab, var(--theme-primary) 55%, rgba(10,12,20,0.85)), color-mix(in oklab, var(--theme-secondary) 45%, rgba(10,12,20,0.85)))",
-          border: "1px solid color-mix(in oklab, var(--theme-primary) 60%, transparent)",
-          boxShadow: "0 6px 20px -6px color-mix(in oklab, var(--theme-primary) 45%, transparent)",
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">🏆</span>
-          <div className="text-left">
-            <div className="font-bold text-base text-ink">Voir le Tournoi</div>
-            <div className="text-[10px] text-ink-muted">8 adversaires CPU · Prochain dans {countdown}</div>
-          </div>
-        </div>
-        <span className="text-lg" style={{ color: "var(--theme-secondary)" }}>›</span>
-      </motion.button>
-
-      {/* How to play — simple toggle, no AnimatePresence */}
-      <button
-        onClick={() => setRulesOpen((o) => !o)}
-        className="bg-surface border border-hairline rounded-2xl px-4 py-2.5 flex items-center justify-between text-left hover:bg-white/[0.07] transition"
-      >
-        <span className="text-sm flex items-center gap-2">
-          <img src={HIW_ICONS.how} alt="" className="w-6 h-6 object-contain" draggable={false} />
-          <span className="font-semibold text-ink-muted">Comment ça marche ?</span>
-        </span>
-        <span className={"text-ink-faint text-sm transition-transform duration-200 " + (rulesOpen ? "rotate-180" : "")}>▾</span>
-      </button>
-      {rulesOpen && (
-        <div className="bg-surface border border-hairline rounded-3xl p-4 sm:p-5 -mt-1">
-          <div className="flex flex-col gap-2.5 text-[12px] text-ink-muted leading-relaxed">
-            <RuleBlock emoji="🎯" iconSrc={HIW_ICONS.principe} title="Le principe"
-              text="Pose 3 coups sur 3 lanes (FORCE / SAGESSE / RUSE). Révélation. Le plus de lanes gagnées = round gagné. Premier à 3 rounds." />
-            <RuleBlock emoji="💜" iconSrc={HIW_ICONS.mana} title="Mana"
-              text="1 mana au round 1, +1 par round (max 4). Sert à jouer des cartes." />
-            <RuleBlock emoji="🃏" iconSrc={HIW_ICONS.cartes} title="Cartes"
-              text="Main de 3 cartes. Tu pioches si tu GAGNES un round. Tu perds 1 carte si tu PERDS. 0 ou 1 carte par round." />
-            <RuleBlock emoji="✨" title="Bonus"
-              text="Lane favorisée = +1 pt. Combo (3× même coup) = +1. Sweep (3-0) = +2." />
-          </div>
-          <CardOverviewTable />
-        </div>
-      )}
-
-      {/* Full card list — names + descriptions + type symbols per card. The
-          general type legend lives in "Comment ça marche" above; here is the
-          detailed per-card reference (no duplication of the legend). */}
-      <div className="bg-surface border border-hairline rounded-3xl p-4 sm:p-5">
-        <h2 className="text-xs uppercase tracking-[0.25em] font-bold text-ink-muted mb-3">
-          Toutes les cartes
-        </h2>
-        <div className="flex flex-col gap-2">
-          {ALL_CARD_IDS.map((id) => {
-            const card = CARDS[id];
-            const usage = USAGE_LABEL[card.rarity];
-            const oneShot = card.rarity === "epic" || card.rarity === "legendary";
-            return (
-              <div key={id} className="flex items-center gap-3 rounded-xl bg-hairline border border-hairline p-2.5">
-                <div className="relative shrink-0 w-11 h-14 rounded-lg overflow-hidden bg-surface-raised">
-                  <CardImage id={id} glyphSize="text-xl" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {/* The card art preview on the left already carries the
-                        glyph fallback when no PNG ships, so duplicating the
-                        emoji next to the title reads as redundant — title +
-                        rarity dot are enough. */}
-                    <span className="font-bold text-sm">{t(card.nameKey)}</span>
-                    <span className={"inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide " + RARITY_COLOR[card.rarity]}>
-                      <span className={"w-2 h-2 rounded-full " + RARITY_DOT[card.rarity]} />
-                      {RARITY_LABEL_FR[card.rarity]}
-                    </span>
-                    <span className="text-[9px] text-ink-faint bg-black/25 px-1.5 py-0.5 rounded-full font-semibold">{card.cost} mana</span>
-                    <span className={"text-[9px] font-bold px-1.5 py-0.5 rounded-full " + (oneShot ? "bg-rose-500/15 text-rose-300" : "bg-emerald-500/15 text-emerald-300")}>
-                      {usage.label}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-ink-muted mt-1 leading-snug">{t(card.descKey)}</p>
-                </div>
+          <div className="flex items-center gap-2.5">
+            <span className="text-2xl">🏆</span>
+            <div className="text-left">
+              <div className="text-sm sm:text-base">VOIR LE TOURNOI</div>
+              <div className="text-[10px] font-medium opacity-85 normal-case tracking-normal">
+                8 adversaires CPU · prochain dans {countdown}
               </div>
-            );
-          })}
+            </div>
+          </div>
+          <span className="text-xl">›</span>
+        </motion.button>
+      }
+      secondary={
+        // Rangée secondaire — MÊME pattern que le Pro ([Match rapide][Tournoi]
+        // [Règles]) : ici Règles + Cartes ouvrent des MODALES (plus de
+        // scroll-wall). Comprehension + dispatch (Alex 2026-06-13).
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => setRulesOpen(true)}
+            className="bg-surface rounded-2xl px-2 py-2.5 flex items-center justify-center gap-1.5 border border-hairline hover:bg-hairline transition"
+          >
+            <img src={HIW_ICONS.how} alt="" className="w-6 h-6 object-contain" draggable={false} />
+            <span className="font-bold text-[12px] text-ink">Comment ça marche</span>
+          </button>
+          <button
+            onClick={() => setCardsOpen(true)}
+            className="bg-surface rounded-2xl px-2 py-2.5 flex items-center justify-center gap-1.5 border border-hairline hover:bg-hairline transition"
+          >
+            <span className="text-base leading-none">🎴</span>
+            <span className="font-bold text-[12px] text-ink">Toutes les cartes</span>
+          </button>
         </div>
+      }
+    >
+      {/* PROFIL = UN SEUL BLOC (Alex 2026-06-13 "faut pas déstructurer ce qui
+       *  est de base ensemble") : avatar + nom + chips + barre LP + monnaies
+       *  dans la MÊME carte. Le bouton Deck suit, le groupe est centré
+       *  (my-auto) comme le [Ma Voie] + [Deck] du Pro. */}
+      <div className="my-auto flex flex-col gap-2.5">
+        <div
+          className="bg-surface rounded-2xl px-4 py-3.5 flex flex-col gap-3"
+          style={{ border: "1px solid color-mix(in oklab, var(--theme-primary) 35%, transparent)" }}
+        >
+          {/* Avatar + nom + chips */}
+          <div className="flex items-center gap-3">
+            <div
+              className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center text-2xl shrink-0 ring-1 ring-white/15"
+              style={{
+                background:
+                  "linear-gradient(135deg, color-mix(in oklab, var(--theme-primary) 32%, transparent), color-mix(in oklab, var(--theme-secondary) 32%, transparent))",
+              }}
+            >
+              {/^(data:|\/|https?:)/.test(player.avatar) ? (
+                <img src={player.avatar} alt="" className="w-full h-full object-cover" style={avatarImgStyle(player.avatar)} draggable={false} />
+              ) : (
+                player.avatar
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-bold text-base truncate">{player.nickname}</div>
+              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                <LobbyChip tone="accent">{tier.emoji} {tier.label}</LobbyChip>
+                <LobbyChip>Lv.{lvl.level}</LobbyChip>
+                <LobbyChip tone="good">{winrate}% WR</LobbyChip>
+              </div>
+            </div>
+          </div>
+          {/* Barre LP */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-amber-200">Rang · {tier.label}</span>
+                <InfoBubble
+                  size="sm"
+                  title="LP — League Points"
+                  body={
+                    <>
+                      Points de rang. Gagnés en gagnant des matchs Classés / Constellation Classés, perdus en perdant.
+                      Paliers : <b>Bronze</b> (0+), <b>Silver</b> (1100+), <b>Gold</b> (1300+), <b>Platinum</b> (1500+), <b>Diamond</b> (1750+).
+                      Chaque palier débloque une carte ou un cosmétique.
+                    </>
+                  }
+                />
+              </div>
+              <span className="text-[10px] tabular-nums text-ink-muted">
+                {player.rankLp} {tier.ceil !== Infinity && `/ ${tier.ceil}`} LP
+              </span>
+            </div>
+            <LpBar progress={lpProgress} />
+            <div className="text-[10px] text-ink-faint mt-1">{totalGames} matchs · {winrate}% de victoires</div>
+          </div>
+          {/* Monnaies — dans la MÊME carte, séparées par un filet. */}
+          <div className="pt-2.5 border-t border-hairline flex items-center justify-center">
+            <CurrencyBadges size="full" onClick={onGoShop} />
+          </div>
+        </div>
+
+        {/* Deck — bouton IDENTIQUE au Pro (Alex 2026-06-13 : "mêmes boutons"). */}
+        <motion.button
+          whileTap={{ scale: 0.98 }}
+          onClick={onManageDeck}
+          className="bg-surface rounded-2xl px-4 py-3 flex items-center justify-between hover:bg-hairline transition"
+          style={{ border: "1px solid color-mix(in oklab, var(--theme-primary) 35%, transparent)" }}
+        >
+          <div className="flex items-center gap-2.5">
+            <img src="/MenuIcons/DeckGestionIcone.png" alt="" className="w-8 h-8 object-contain drop-shadow-[0_1px_4px_rgba(0,0,0,0.5)]" draggable={false} />
+            <div className="text-left">
+              <div className="font-bold text-[15px] text-ink">Gérer mon Deck</div>
+              <div className="text-[11px] text-ink-faint">Compose tes 6 cartes</div>
+            </div>
+          </div>
+          <span style={{ color: "var(--theme-secondary)" }}>›</span>
+        </motion.button>
       </div>
 
-      {/* spacer */}
-      <div className="h-2" />
-    </motion.div>
+      {/* ── MODALES (overlays) — fini le scroll-wall : Règles + Cartes ── */}
+      <AnimatePresence>
+        {rulesOpen && (
+          <ModalOverlay title="Comment ça marche" onClose={() => setRulesOpen(false)}>
+            <div className="flex flex-col gap-2.5 text-[12.5px] text-ink-muted leading-relaxed">
+              <RuleBlock emoji="🎯" iconSrc={HIW_ICONS.principe} title="Le principe"
+                text="Pose 3 coups sur 3 lanes (FORCE / SAGESSE / RUSE). Révélation. Le plus de lanes gagnées = round gagné. Premier à 3 rounds." />
+              <RuleBlock emoji="💜" iconSrc={HIW_ICONS.mana} title="Mana"
+                text="1 mana au round 1, +1 par round (max 4). Sert à jouer des cartes." />
+              <RuleBlock emoji="🃏" iconSrc={HIW_ICONS.cartes} title="Cartes"
+                text="Main de 3 cartes. Tu pioches si tu GAGNES un round. Tu perds 1 carte si tu PERDS. 0 ou 1 carte par round." />
+              <RuleBlock emoji="✨" title="Bonus"
+                text="Lane favorisée = +1 pt. Combo (3× même coup) = +1. Sweep (3-0) = +2." />
+            </div>
+            <CardOverviewTable />
+          </ModalOverlay>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {cardsOpen && (
+          <ModalOverlay title="Toutes les cartes" onClose={() => setCardsOpen(false)}>
+            <div className="flex flex-col gap-2">
+              {ALL_CARD_IDS.map((id) => {
+                const card = CARDS[id];
+                const usage = USAGE_LABEL[card.rarity];
+                const oneShot = card.rarity === "epic" || card.rarity === "legendary";
+                return (
+                  <div key={id} className="flex items-center gap-3 rounded-xl bg-hairline border border-hairline p-2.5">
+                    <div className="relative shrink-0 w-11 h-14 rounded-lg overflow-hidden bg-surface-raised">
+                      <CardImage id={id} glyphSize="text-xl" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-sm">{t(card.nameKey)}</span>
+                        <span className={"inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide " + RARITY_COLOR[card.rarity]}>
+                          <span className={"w-2 h-2 rounded-full " + RARITY_DOT[card.rarity]} />
+                          {RARITY_LABEL_FR[card.rarity]}
+                        </span>
+                        <span className="text-[9px] text-ink-faint bg-black/25 px-1.5 py-0.5 rounded-full font-semibold">{card.cost} mana</span>
+                        <span className={"text-[9px] font-bold px-1.5 py-0.5 rounded-full " + (oneShot ? "bg-rose-500/15 text-rose-300" : "bg-emerald-500/15 text-emerald-300")}>
+                          {usage.label}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-ink-muted mt-1 leading-snug">{t(card.descKey)}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </ModalOverlay>
+        )}
+      </AnimatePresence>
+    </ModeLobbyShell>
   );
 }
 
 /* ──────────── Small components ──────────── */
+
+/** Modale plein écran réutilisable (Règles / Toutes les cartes) — portal,
+ *  corps scrollable, en-tête + croix. Remplace les listes inline qui
+ *  faisaient du lobby un mur de scroll (Alex 2026-06-13). */
+function ModalOverlay({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  return createPortal(
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18 }}
+      onClick={onClose}
+      className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-3"
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 24, opacity: 0 }}
+        animate={{ scale: 1, y: 0, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 300, damping: 26 }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg max-h-[84vh] flex flex-col rounded-3xl border border-hairline bg-zinc-950/97 shadow-2xl overflow-hidden"
+      >
+        <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-hairline">
+          <h2 className="text-sm font-black uppercase tracking-wider text-themed">{title}</h2>
+          <button
+            onClick={onClose}
+            aria-label="Fermer"
+            className="w-8 h-8 rounded-full bg-hairline text-ink-muted hover:text-white text-base flex items-center justify-center transition"
+          >✕</button>
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-4">{children}</div>
+      </motion.div>
+    </motion.div>,
+    document.body,
+  );
+}
 
 function useCountdown(intervalMinutes: number) {
   const [remaining, setRemaining] = useState(() => {
@@ -343,15 +366,6 @@ function CardOverviewTable() {
         <span className="text-rose-400 font-semibold">Usage unique</span> : consommée définitivement après l'avoir jouée.{" "}
         <span className="text-ink-muted">Forge</span> = coût en ✨ pour la fabriquer.
       </p>
-    </div>
-  );
-}
-
-function StatCell({ label, value, color }: { label: string; value: string; color: string }) {
-  return (
-    <div className="bg-hairline border border-hairline rounded-xl p-2 text-center">
-      <div className={"text-lg font-bold tabular-nums " + color}>{value}</div>
-      <div className="text-[9px] uppercase tracking-wider text-ink-faint mt-0.5">{label}</div>
     </div>
   );
 }

@@ -1,0 +1,61 @@
+# .graphifyignore — périmètre du graphe de code graphify (graphify-out/graph.json)
+# ⚠️ Quand ce fichier existe, graphify le lit À LA PLACE de .gitignore (fallback) :
+#    les règles essentielles de .gitignore sont donc DUPLIQUÉES ici.
+# Périmètre voulu (= build d'origine, 241 fichiers) : code-only
+#    app/ + crates/ + scripts/ + loadtest/ — .ts .tsx .rs .json .mjs .ps1 .py
+# Ce fichier n'a AUCUN effet sur git.
+
+# ── Mirror .gitignore (build/deps) ──
+target/
+**/target/
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.pnpm-store/
+.vite/
+.idea/
+.vscode/
+.claude/
+*.iml
+*.apk
+*.aab
+.env
+.env.local
+
+# ── Sortie graphify elle-même ──
+graphify-out/
+
+# ── Artefacts / vestiges / backups ──
+_avatar_backup/
+app/src-tauri/gen/
+.github/
+app/.github/
+
+# ── Hors périmètre code-only ──
+docs/
+landing/
+raw/
+app/public/
+*.md
+*.markdown
+*.html
+*.yaml
+*.yml
+*.txt
+
+# ── Images / médias / polices ──
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+*.ico
+*.svg
+*.ttf
+*.otf
+*.woff
+*.woff2
+*.mp3
+*.mp4
+*.wav

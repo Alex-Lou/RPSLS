@@ -14,6 +14,7 @@
 import { motion } from "motion/react";
 import { CARDS, RARITY_COLOR } from "../ranked/cards";
 import { CardImage } from "../ranked/CardImage";
+import { arenaCardDescKey } from "./arenaTypes";
 import type { CardId } from "../ranked/rankedTypes";
 
 export type SpellTargetKind = "lane" | "self" | "hero" | "global";
@@ -24,10 +25,25 @@ export interface ArenaCardInspectProps {
   t: (key: string) => string;
   onCommit: () => void;
   onClose: () => void;
+  /** Libellé du bouton Forge (« ⚗ Déposer… » ou « ⚗ Fusionner → X »).
+   *  Fourni UNIQUEMENT si la carte est un ingrédient de fusion → la Forge
+   *  devient accessible de façon FIABLE pour TOUTES les cartes (y compris les
+   *  utilitaires qui s'auto-jouaient au tap). Alex 2026-06-13 « forge marche
+   *  pas, plus aucune fusion possible ». */
+  forgeHint?: string;
+  onForge?: () => void;
+  /** Recettes de fusion où cette carte est ingrédient (⚗) — pour AFFICHER
+   *  clairement avec quoi/en quoi elle fusionne (Alex 2026-06-13). Vide/absent
+   *  = carte non fusionnable. */
+  fusionRecipes?: { partner: CardId; result: CardId }[];
+  /** Mode LECTURE SEULE — carte ADVERSE révélée par Augure (Alex 2026-06-13 :
+   *  « long-press sur les cartes adverses révélées doit aussi ouvrir la
+   *  fiche »). Masque les actions (Lancer/Forge) et affiche un bandeau 👁. */
+  readOnly?: boolean;
 }
 
 export function ArenaCardInspect({
-  id, targetKind, t, onCommit, onClose,
+  id, targetKind, t, onCommit, onClose, forgeHint, onForge, fusionRecipes, readOnly = false,
 }: ArenaCardInspectProps) {
   const card = CARDS[id];
   const targetLabel =
@@ -48,7 +64,7 @@ export function ArenaCardInspect({
       exit={{ opacity: 0 }}
       transition={{ duration: 0.18 }}
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md px-4"
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/85 backdrop-blur-md px-4"
     >
       <motion.div
         initial={{ scale: 0.7, y: 30, opacity: 0 }}
@@ -87,18 +103,52 @@ export function ArenaCardInspect({
               {card.rarity}
             </span>
           </div>
+          {/* Description ARENA (pas la desc Classé : mêmes cartes, effets
+           *  différents — le texte Classé induisait le joueur en erreur). */}
           <p className="text-[12px] text-ink leading-relaxed">
-            {t(card.descKey)}
+            {t(arenaCardDescKey(id))}
           </p>
           <span className="text-[10px] uppercase tracking-wider text-amber-300/90 italic font-bold">
             {targetLabel}
           </span>
-          <button
-            onClick={onCommit}
-            className="mt-1 w-full py-2.5 rounded-xl font-black uppercase tracking-wider text-white text-sm bg-gradient-to-r from-emerald-500 to-teal-500 ring-2 ring-emerald-300/40 shadow-lg"
-          >
-            ✨ Lancer la carte
-          </button>
+          {/* ⚗ FUSIONNABLE — symbole + recettes (Alex 2026-06-13 « indiquer
+           *  clairement quand fusionnable »). Absent = non fusionnable. */}
+          {fusionRecipes && fusionRecipes.length > 0 && (
+            <div className="rounded-lg bg-fuchsia-950/40 border border-fuchsia-600/40 px-2.5 py-1.5">
+              <div className="text-[10px] uppercase tracking-wider font-black text-fuchsia-200">⚗ Fusionnable</div>
+              {fusionRecipes.map((r, k) => (
+                <div key={k} className="text-[11px] text-fuchsia-100/90 leading-snug">
+                  + {t(CARDS[r.partner].nameKey)} <span className="text-amber-300">→</span> <b>{t(CARDS[r.result].nameKey)}</b>
+                </div>
+              ))}
+            </div>
+          )}
+          {readOnly ? (
+            // Carte ADVERSE révélée (Augure) — aucune action, juste apprendre.
+            <div className="mt-1 w-full py-2 rounded-xl text-center text-[11px] font-black uppercase tracking-wider text-amber-200 bg-amber-500/15 border border-amber-400/50">
+              👁 Carte adverse révélée — fiche en lecture
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={onCommit}
+                className="mt-1 w-full py-2.5 rounded-xl font-black uppercase tracking-wider text-white text-sm bg-gradient-to-r from-emerald-500 to-teal-500 ring-2 ring-emerald-300/40 shadow-lg"
+              >
+                ✨ Lancer la carte
+              </button>
+              {/* Bouton FORGE — chemin FIABLE de dépôt/fusion pour toute carte
+               *  fusionnable (les utilitaires ne s'auto-jouent plus avant de
+               *  pouvoir être déposées). N'apparaît que si onForge fourni. */}
+              {onForge && (
+                <button
+                  onClick={onForge}
+                  className="w-full py-2.5 rounded-xl font-black uppercase tracking-wider text-amber-50 text-sm bg-gradient-to-r from-fuchsia-600 to-amber-500 ring-2 ring-amber-300/40 shadow-lg"
+                >
+                  {forgeHint ?? "⚗ Déposer sur la Forge"}
+                </button>
+              )}
+            </>
+          )}
         </div>
       </motion.div>
     </motion.div>

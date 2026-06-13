@@ -115,7 +115,15 @@ export function PlayPage({
     <div className="w-full max-w-6xl mx-auto px-3 sm:px-8 pt-0 pb-2 sm:py-4 flex-1 flex flex-col min-h-0">
       {/* Player header on the home / mode-select too (Alex likes it there) —
           but never once a match is running (view !== "select"). */}
-      {view.kind === "select" && <UserHeader onNavigate={onNavigate ?? (() => {})} />}
+      {view.kind === "select" && (
+        // Carte joueur PLEINE LARGEUR + remontée (Alex 2026-06-12 v2) : le
+        // burger flottant est MASQUÉ sur cet écran (ModeSelect setBurgerHidden,
+        // remplacé par le burger themed inline à gauche du Défi du jour) →
+        // plus rien à esquiver, la carte monte (-mt-10 sur le pt-12 global).
+        // px-0 : aligne la carte sur la largeur des tuiles du menu (qui n'ont
+        // pas de padding interne) ; -mt-11 : remontée presque au ras du haut.
+        <UserHeader onNavigate={onNavigate ?? (() => {})} className="px-0 -mt-11" />
+      )}
       <AnimatePresence mode="wait">
         {view.kind === "select" && (
           <ModeSelect
@@ -212,6 +220,7 @@ export function PlayPage({
         {view.kind === "ranked_deck" && (
           <DeckManager
             key="ranked-deck"
+            mode={view.from === "arena" ? "arena" : "ranked"}
             onClose={() => setView({
               kind: view.from === "arena" ? "arena_lobby" : "ranked_lobby",
             })}

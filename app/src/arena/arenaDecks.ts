@@ -16,6 +16,8 @@
  */
 
 import { arenaSupported } from "./arenaCardEffects";
+import { isCastOnDraw } from "./arenaCastOnDraw";
+import { cpuCanPlay } from "./arenaAI";
 import { isFinisherCard } from "./arenaFinishers";
 import { CARDS } from "../ranked/cards";
 import type { TurnIntent } from "./arenaTypes";
@@ -25,7 +27,13 @@ import type { CardId } from "../ranked/rankedTypes";
  *  Les Finishers Constellation Pro sont injectés UNIQUEMENT à 3⭐ via
  *  arenaRules.applySummons — pas drawables, pas draftables. */
 export function isDeckable(id: CardId): boolean {
-  return arenaSupported(id) && !isFinisherCard(id);
+  // Cartes « à la pioche » (Cast When Drawn) : DECKABLES mais PAS des sorts —
+  // arenaSupported reste false (→ playCard les bloque comme sorts), donc on les
+  // autorise explicitement ici. Cf. arenaCastOnDraw.
+  if (isCastOnDraw(id)) return true;
+  // kind:"fusion" (Forge 2026-06-13) : créées en partie uniquement — jamais
+  // draftables ni deckables.
+  return arenaSupported(id) && !isFinisherCard(id) && CARDS[id]?.kind !== "fusion";
 }
 
 /** CPU's curated Arena deck — fallback static deck if buildCpuDeckMirroring
@@ -56,19 +64,26 @@ export function buildCpuDeckMirroring(playerDeck: CardId[]): CardId[] {
     if (!card) continue;
     counts[card.rarity] = (counts[card.rarity] ?? 0) + 1;
   }
-  // Pool de cartes Arena-supported par rareté.
+  // Pool de cartes Arena-supported par rareté — restreint aux cartes que le
+  // cerveau CPU sait jouer (cpuCanPlay) : une carte que buildSpellTarget ne
+  // cible jamais serait une carte MORTE dans la main du CPU.
   const pools: Record<string, CardId[]> = { common: [], rare: [], epic: [], legendary: [] };
   for (const id of Object.keys(CARDS) as CardId[]) {
-    if (!isDeckable(id)) continue;
+    if (!isDeckable(id) || !cpuCanPlay(id)) continue;
     const card = CARDS[id];
     pools[card.rarity].push(id);
   }
-  // Pour chaque rareté du joueur, pige N cartes (doublon autorisé jusqu'à 2).
+  // Pour chaque rareté du joueur, pige N cartes. PARITÉ ÉCONOMIE 2026-06-13 :
+  // plafonds de copies par rareté identiques au joueur (RARITY_COPIES 3/2/2/1),
+  // + overrides 1 copie oracle/heist (récurrence, Alex 2026-06-12).
+  const SINGLE_COPY_CARDS = new Set<CardId>(["oracle", "heist"]);
   const out: CardId[] = [];
   const inOut = new Map<CardId, number>();
   const tryAdd = (id: CardId, max: number): boolean => {
     const cur = inOut.get(id) ?? 0;
-    if (cur >= max) return false;
+    const rarityCap = SINGLE_COPY_CARDS.has(id) ? 1 : (RARITY_COPIES[CARDS[id]?.rarity ?? "common"] ?? 1);
+    const cap = Math.min(max, rarityCap);
+    if (cur >= cap) return false;
     out.push(id);
     inOut.set(id, cur + 1);
     return true;
@@ -91,6 +106,11 @@ export function buildCpuDeckMirroring(playerDeck: CardId[]): CardId[] {
     for (const c of pool) {
       if (added >= need) break;
       if (tryAdd(c, 2)) added++;
+    }
+    // 3e passe : 3e copie (communes uniquement via rarityCap) si besoin
+    for (const c of pool) {
+      if (added >= need) break;
+      if (tryAdd(c, 3)) added++;
     }
     // 3e passe : downgrade depuis une rareté supérieure si pool épuisée
     if (added < need) {
@@ -122,42 +142,49 @@ export function buildCpuDeckMirroring(playerDeck: CardId[]): CardId[] {
  *  the CPU's "always-summon" fill of all 3 lanes leaves the player with
  *  ZERO way to damage the opp hero (Alex's "opp ne perd jamais de vie"
  *  symptom). Direct-damage spells fix that. */
+/** Copies par RARETÉ (Alex 2026-06-13 économie expert, validée) : standard
+ *  CCG — les communes portent la consistance, les légendaires sont des
+ *  MOMENTS (1 copie + exil au cast, cf. HeroState.exiled). */
+export const RARITY_COPIES: Record<string, number> = {
+  common: 3, rare: 2, epic: 2, legendary: 1,
+};
+
 export function buildPlayerDeck(saved: CardId[] | undefined): CardId[] {
-  const FILLER: CardId[] = [
-    // Defensive / buffs
-    "aegis", "precision", "anchor", "second-wind",
-    // Direct damage / reach (KEEP — without these the player can't push lethal)
-    "heist", "supernova",
-    // Tempo / draw / control
-    "surge", "curse", "mirror", "tide",
-  ];
-  // Alex feedback 2026-06-09 : "Précision en boucle infinie" — cause = le
-  // deck contenait plusieurs copies de la même carte (saved + FILLER non
-  // dédupliqués). Avec MAX_COPIES = 2, une carte ne peut être tirée que
-  // 2 fois par run (avec reshuffle après discard), pas en boucle infinie.
-  const DECK_SIZE = 12;
-  const MAX_COPIES = 2;
+  // REFONTE Alex 2026-06-12 : le deck RESPECTE les choix du joueur (zéro
+  // carte parasite). ÉCONOMIE 2026-06-13 : chaque carte choisie est étendue
+  // en N copies selon sa rareté (3/2/2/1) → un deck de 8 choix ≈ 16-20
+  // cartes ; la stratégie vit dans le RATIO de raretés choisi.
+  // oracle/heist : override 1 copie (récurrence "cheaté", Alex 2026-06-12).
+  const SINGLE_COPY_CARDS = new Set<CardId>(["oracle", "heist"]);
+  // Cartes capables d'entamer le HÉROS adverse même board plein.
+  const REACH_CARDS = new Set<CardId>(["supernova", "heist", "singularite"]);
   const counts = new Map<CardId, number>();
   const out: CardId[] = [];
-  const tryPush = (c: CardId): void => {
-    if (out.length >= DECK_SIZE) return;
+  const copiesFor = (c: CardId): number =>
+    SINGLE_COPY_CARDS.has(c) ? 1 : (RARITY_COPIES[CARDS[c]?.rarity ?? "common"] ?? 1);
+  const tryPush = (c: CardId): boolean => {
     const cur = counts.get(c) ?? 0;
-    if (cur >= MAX_COPIES) return;
+    if (cur >= copiesFor(c)) return false;
     out.push(c);
     counts.set(c, cur + 1);
+    return true;
   };
-  // Pass 1 : the saved Ranked deck (1 copy each at most).
-  const base = (saved ?? []).filter(isDeckable);
-  for (const c of base) tryPush(c);
-  // Force-include direct damage so the player can push lethal even when
-  // all lanes are creature-blocked.
-  tryPush("heist");
-  tryPush("supernova");
-  // Pass 2 : top up with FILLER (1 copy each).
-  for (const f of FILLER) tryPush(f);
-  // Pass 3 : if still under size, allow 2nd copies of FILLER.
+  // 1) Les CHOIX du joueur, étendus en copies-par-rareté.
+  const chosen = [...new Set((saved ?? []).filter(isDeckable))];
+  for (const c of chosen) {
+    for (let k = 0; k < copiesFor(c); k++) tryPush(c);
+  }
+  // 2) Filet de portée : 1 carte reach garantie SEULEMENT si aucune présente.
+  if (!out.some((c) => REACH_CARDS.has(c))) tryPush("supernova");
+  // 3) ANTI-POINT-MORT (Alex : "aucun point mort, coincé") : l'exil des
+  //    légendaires retire des cartes du cycle — si le deck choisi est trop
+  //    légendaire-lourd, le pool recyclable peut s'assécher. Garantie : au
+  //    moins 6 cartes NON-légendaires dans le deck, complétées en communes
+  //    neutres si besoin (filler NÉCESSAIRE, donc légitime).
+  const FILLER: CardId[] = ["aegis", "precision", "second-wind", "surge", "augur", "anchor", "tide", "curse", "mirror"];
+  const nonLegendary = () => out.filter((c) => CARDS[c]?.rarity !== "legendary").length;
   for (const f of FILLER) {
-    if (out.length >= DECK_SIZE) break;
+    if (nonLegendary() >= 6) break;
     tryPush(f);
   }
   return out;
@@ -165,12 +192,37 @@ export function buildPlayerDeck(saved: CardId[] | undefined): CardId[] {
 
 /** Strip cards the side committed (spells) from their hand BEFORE the
  *  resolver runs. Summons are RPSLS moves, not cards in hand — they
- *  don't need to be removed. */
+ *  don't need to be removed.
+ *
+ *  Alex feedback 2026-06-09 round 7 : log explicite des cartes consommées
+ *  pour debug "carte ne se retire pas de la main" — chaque cast doit
+ *  consommer 1 copie. Si l'intent contient N copies du même id, removeSpent
+ *  doit consommer N copies différentes. */
 export function removeSpentCards(hand: CardId[], intent: TurnIntent): CardId[] {
+  return removeSpentCardsDetailed(hand, intent).hand;
+}
+
+/** Variante qui retourne AUSSI les cartes réellement consommées (Alex
+ *  2026-06-11) — utilisé pour les recycler vers la défausse (la pioche
+ *  reshuffle la défausse quand le deck est vide → le deck cycle, plus de
+ *  "à court de cartes"). */
+export function removeSpentCardsDetailed(hand: CardId[], intent: TurnIntent): { hand: CardId[]; spent: CardId[] } {
   let out = hand.slice();
+  const consumed: CardId[] = [];
+  const spent: CardId[] = [];
   for (const s of intent.spells) {
     const i = out.indexOf(s.id);
-    if (i >= 0) out = [...out.slice(0, i), ...out.slice(i + 1)];
+    if (i >= 0) {
+      out = [...out.slice(0, i), ...out.slice(i + 1)];
+      consumed.push(s.id);
+      spent.push(s.id);
+    } else {
+      consumed.push(`MISSING:${s.id}` as CardId);
+    }
   }
-  return out;
+  if (consumed.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`[arena:hand] consumed cards=[${consumed.join(",")}] hand was=${hand.length} now=${out.length}`);
+  }
+  return { hand: out, spent };
 }

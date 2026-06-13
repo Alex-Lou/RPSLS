@@ -26,14 +26,18 @@ import { AFFINITY_TO_FINISHER } from "./arenaFinishers";
 import { resolveLaneCombatAt as _rlCombatAt, resolveCombat as _rCombat } from "./arenaCombat";
 import {
   CREATURE_STATS,
+  HAND_CAP,
   HERO_MAX_HP,
   MANA_CAP,
   MAX_SPELLS_PER_TURN,
+  UTILITY_SPELLS_PER_TURN,
   STARTING_HAND_SIZE,
   type ArenaMatchResult,
   type BoardState,
+  type CastOnDrawEvent,
   type Creature,
   type HeroState,
+  type LaneIndex,
   type LaneState,
   type PlayedSpell,
   type Side,
@@ -44,6 +48,8 @@ import {
   spellPriority,
   type ArenaSpellContext,
 } from "./arenaCardEffects";
+import { CAST_ON_DRAW_IDS, isCastOnDraw, resolveCastOnDraw } from "./arenaCastOnDraw";
+import { arenaSpellCost } from "./arenaSpellHelpers";
 import { CARDS } from "../ranked/cards";
 import type { CardId } from "../ranked/rankedTypes";
 import type { Move } from "../engine/game";
@@ -54,13 +60,24 @@ import type { Move } from "../engine/game";
  *  the 8 cards equipped in the player's saved deck; passives equipped in
  *  Ranked are IGNORED in Arena — they don't exist as concept here.
  *  `affinity` is the Constellation Pro v2 Voie picked by this player. */
-export function makeHero(deckIds: CardId[], affinity?: Move): HeroState {
+export function makeHero(deckIds: CardId[], affinity?: Move, cpuPersona?: import("./arenaTypes").CpuPersona): HeroState {
   const cleaned = deckIds.filter(
     (id): id is CardId => Object.prototype.hasOwnProperty.call(CARDS, id),
   );
   const shuffled = shuffle(cleaned);
-  const startingHand = shuffled.slice(0, STARTING_HAND_SIZE);
-  const remaining = shuffled.slice(STARTING_HAND_SIZE);
+  // Main de départ ANTI-DOUBLON (Alex 2026-06-13) : on tire en évitant les
+  // doublons → fini les « 2 Ancres » à l'ouverture / au mulligan.
+  let pool = shuffled.slice();
+  const startingHand: CardId[] = [];
+  for (let k = 0; k < STARTING_HAND_SIZE; k++) {
+    // ⚡ Exclut les cartes « à la pioche » de la MAIN DE DÉPART (elles ne
+    // s'activent qu'EN JEU via drawCards, jamais à l'ouverture).
+    const res = drawOneAvoidingHand([...startingHand, ...CAST_ON_DRAW_IDS], pool, []);
+    if (!res) break;
+    pool = res.deck;
+    startingHand.push(res.card);
+  }
+  const remaining = pool;
   return {
     hp: HERO_MAX_HP,
     maxHp: HERO_MAX_HP,
@@ -69,10 +86,55 @@ export function makeHero(deckIds: CardId[], affinity?: Move): HeroState {
     hand: startingHand,
     deck: remaining,
     discard: [],
+    exiled: [],
     divineShield: false,
     affinity,
     constellationCount: 0,
+    cpuPersona,
   };
+}
+
+/** Mulligan T1 (Alex 2026-06-13 économie expert) : remet les cartes choisies
+ *  dans le deck, shuffle, repioche autant. Une seule fois par match (géré
+ *  côté UI). Les indices invalides sont ignorés. */
+export function mulliganSwap(hero: HeroState, handIndices: number[]): HeroState {
+  const idx = [...new Set(handIndices)].filter((i) => i >= 0 && i < hero.hand.length);
+  if (idx.length === 0) return hero;
+  const kept = hero.hand.filter((_, i) => !idx.includes(i));
+  const returned = idx.map((i) => hero.hand[i]);
+  // Redraw ANTI-DOUBLON (Alex 2026-06-13) : on évite les doublons de la main
+  // gardée, les cartes rejetées (ne pas les re-servir) et les déjà-repiochées.
+  let deck = shuffle([...hero.deck, ...returned]);
+  let discard = hero.discard.slice();
+  const redrawn: CardId[] = [];
+  for (let k = 0; k < idx.length; k++) {
+    const res = drawOneAvoidingHand([...kept, ...returned, ...redrawn, ...CAST_ON_DRAW_IDS], deck, discard);
+    if (!res) break;
+    deck = res.deck;
+    discard = res.discard;
+    redrawn.push(res.card);
+  }
+  alog("hand", `mulligan : ${returned.join(",")} remplacées par ${redrawn.join(",")}`);
+  return { ...hero, hand: [...kept, ...redrawn], deck, discard };
+}
+
+/** Mulligan IMMÉDIAT, EN PLACE (Alex 2026-06-13) : rejette la carte à l'index
+ *  `i` et tire UNE remplaçante qui prend EXACTEMENT le même emplacement (pas de
+ *  décalage → le joueur VOIT clairement la nouvelle carte arriver). La rejetée
+ *  est remélangée dans le deck. Taille de main préservée. */
+export function mulliganReplaceInPlace(hero: HeroState, i: number): HeroState {
+  if (i < 0 || i >= hero.hand.length) return hero;
+  const rejected = hero.hand[i];
+  const handWithout = [...hero.hand.slice(0, i), ...hero.hand.slice(i + 1)];
+  // La rejetée retourne au deck (remélangée). On tire en évitant les doublons
+  // du RESTE de la main ET la rejetée elle-même (ne pas re-servir ce qu'on vient
+  // de jeter). Anti-doublon Alex 2026-06-13.
+  const deck = shuffle([...hero.deck, rejected]);
+  const res = drawOneAvoidingHand([...handWithout, rejected, ...CAST_ON_DRAW_IDS], deck, hero.discard);
+  if (!res) return hero;
+  const newHand = [...hero.hand.slice(0, i), res.card, ...hero.hand.slice(i + 1)];
+  alog("hand", `mulligan en place : ${rejected} → ${res.card}`);
+  return { ...hero, hand: newHand, deck: res.deck, discard: res.discard };
 }
 
 export function makeInitialBoard(
@@ -80,15 +142,18 @@ export function makeInitialBoard(
   deckB: CardId[],
   affinityA?: Move,
   affinityB?: Move,
+  cpuPersonaB?: import("./arenaTypes").CpuPersona,
 ): BoardState {
   return {
     a: makeHero(deckA, affinityA),
-    b: makeHero(deckB, affinityB),
+    b: makeHero(deckB, affinityB, cpuPersonaB),
     lanes: [makeEmptyLane(), makeEmptyLane(), makeEmptyLane()],
     turn: 1,
     phase: "planning",
     augurRevealedA: [],
     augurRevealedB: [],
+    forgeA: null,
+    forgeB: null,
   };
 }
 
@@ -118,25 +183,80 @@ export function healHero(hero: HeroState, amount: number): HeroState {
   return { ...hero, hp: Math.min(hero.maxHp, hero.hp + amount) };
 }
 
+// HAND_RARITY_CAP (cap 3/2/1/1 par rareté) RETIRÉ (Alex 2026-06-13) : remplacé
+// par la règle ANTI-DOUBLON stricte (max 1 copie en main) dans drawCards.
+
+/** Pioche UNE carte du deck en ÉVITANT les doublons de `avoid` (typiquement
+ *  la main) — RÈGLE ANTI-DOUBLON (Alex 2026-06-13) : « tant qu'une carte est en
+ *  main, on ne peut pas la repiocher ; si elle n'y est plus, la pioche aléatoire
+ *  PEUT la ramener ». Reshuffle la défausse au besoin. FILET ANTI-TOUR-MORT : si
+ *  TOUT le pool (deck+défausse) est en doublon de `avoid`, on pioche quand même
+ *  (sinon pioche vide = pire). Retourne null seulement si plus AUCUNE carte.
+ *
+ *  L'exception « Larcin / pioche au hasard chez l'adversaire » (et Écho) n'est
+ *  PAS concernée : ces effets ajoutent à la main SANS passer par ici. */
+export function drawOneAvoidingHand(
+  avoid: readonly CardId[], deck: readonly CardId[], discard: readonly CardId[],
+): { card: CardId; deck: CardId[]; discard: CardId[] } | null {
+  let d = deck.slice();
+  let disc = discard.slice();
+  if (d.length === 0) {
+    if (disc.length === 0) return null;
+    d = shuffle(disc); disc = [];
+  }
+  // Préfère une carte PAS déjà dans `avoid`.
+  let idx = d.findIndex((c) => !avoid.includes(c));
+  if (idx < 0 && disc.length > 0) {
+    // Rien de neuf dans le deck → injecte la défausse mélangée et re-cherche.
+    d = d.concat(shuffle(disc)); disc = [];
+    idx = d.findIndex((c) => !avoid.includes(c));
+  }
+  if (idx < 0) idx = 0; // tout le pool est doublon → filet : pioche la tête
+  const [card] = d.splice(idx, 1);
+  return { card, deck: d, discard: disc };
+}
+
 /** Pull `n` cards from the deck → hand (reshuffles discard into deck if the
  *  deck runs dry mid-draw). Returns the new HeroState. Cap at HAND_CAP — extra
- *  cards are "burned" (lost to the void — classic overdraw rule). */
+ *  cards sont "burned" (lost to the void — classic overdraw rule).
+ *
+ *  RÈGLE ANTI-DOUBLON (Alex 2026-06-13) : on ne pioche jamais une carte DÉJÀ en
+ *  main tant qu'elle y est (remplace l'ancien cap par rareté 3/2/1/1, plus
+ *  permissif). Évite le flood de doublons / passifs. Cf. drawOneAvoidingHand. */
 export function drawCards(hero: HeroState, n: number): HeroState {
-  let { hand, deck, discard } = hero;
-  hand = hand.slice();
-  deck = deck.slice();
-  discard = discard.slice();
-  for (let i = 0; i < n; i++) {
-    if (deck.length === 0) {
-      if (discard.length === 0) break;
-      deck = shuffle(discard);
-      discard = [];
+  let hand = hero.hand.slice();
+  let deck = hero.deck.slice();
+  let discard = hero.discard.slice();
+  let h = hero; // porte les mutations PV/mana des cartes « à la pioche »
+  const castEvents: CastOnDrawEvent[] = [];
+  let toDraw = n;
+  let guard = 0; // filet anti-boucle (deck 100% à-la-pioche / pioches en chaîne)
+  while (toDraw > 0 && guard < 64) {
+    guard++;
+    toDraw--;
+    const res = drawOneAvoidingHand(hand, deck, discard);
+    if (!res) break; // plus aucune carte (deck + défausse vides)
+    deck = res.deck;
+    discard = res.discard;
+    // ⚡ Carte « À LA PIOCHE » (Cast When Drawn, Alex 2026-06-13) : ne va PAS en
+    // main — elle résout son effet IMMÉDIATEMENT au tirage. Peut piocher plus
+    // (extraDraws) → la boucle enchaîne naturellement (toDraw +=).
+    if (isCastOnDraw(res.card)) {
+      const fired = resolveCastOnDraw({ ...h, hand, deck, discard }, res.card);
+      if (fired) {
+        h = fired.hero;
+        hand = fired.hero.hand;       // un effet « défausse » peut modifier la main
+        deck = fired.hero.deck;
+        discard = fired.hero.discard;
+        castEvents.push(fired.event);
+        toDraw += fired.extraDraws;
+      }
+      continue;
     }
-    const card = deck.shift()!;
-    if (hand.length < 8) hand.push(card);
-    // else: burn (overdraw — design choice to discourage over-stuffing the hand)
+    // Cap de main = HAND_CAP (7). Au-delà → burn (overdraw assumé).
+    if (hand.length < HAND_CAP) hand.push(res.card);
   }
-  return { ...hero, hand, deck, discard };
+  return { ...h, hand, deck, discard, castOnDrawEvents: castEvents };
 }
 
 /* ───────────────────────── Creature helpers ───────────────────────── */
@@ -150,11 +270,18 @@ export function makeCreature(move: Move, side: Side, affinity?: Move): Creature 
   //   Pierre  : provocationCharges 2 (au lieu de 1)
   //   Ciseaux : hp +1 (HP 2 au lieu de 1 — survit à un échange)
   //   Spock   : voieAtkBonus +1 (ATK perm 3 au lieu de 2)
-  //   Feuille / Lézard : à câbler dans une 2e passe (Fanaison ralentie +
-  //     Esquive 2 charges nécessitent de refactor wiltedSteps + dodgeCharge).
+  //   Feuille : wiltSkipNext true → Fanaison ralentie (wilt tous les 2 tours)
+  //   Lézard  : dodgeCharges 2 (au lieu de 1 — survit à 2 saves Esquive)
   const voieRockCharges = matchesAffinity && move === "rock" ? 2 : (move === "rock" ? 1 : 0);
   const voieScissorsHpBonus = matchesAffinity && move === "scissors" ? 1 : 0;
   const voieAtkBonus = matchesAffinity && move === "spock" ? 1 : 0;
+  // Lot B Round 8 : Lézard base 1 charge dodge, Voie Lézard 2 charges.
+  const dodgeCharges = move === "lizard" ? (matchesAffinity ? 2 : 1) : 0;
+  // Voie Feuille : flag persistent + toggle wiltSkipNext démarre à true.
+  // 1er endOfTurnReset SKIP (Feuille reste ATK 3 ce tour), 2e wilt à 1, 3e
+  // SKIP, 4e wilt à 2, 5e SKIP, etc. → Fanaison divisée par 2.
+  const voieFeuille = matchesAffinity && move === "paper";
+  const wiltSkipNext = voieFeuille;
   return {
     move,
     side,
@@ -168,10 +295,13 @@ export function makeCreature(move: Move, side: Side, affinity?: Move): Creature 
     stifles:     move === "paper",    // 🌿 Étouffe (UI badge only — actual
                                        //   check uses move === "paper" || "spock")
     pierces:     move === "scissors", // ⚔ Tranchant
-    dodgeCharge: move === "lizard",   // ✨ Esquive
+    pierceUsed:  false,                // Tranchant : 1 charge (consume au 1er bypass Aegis)
+    dodgeCharges,                      // ✨ Esquive (Lézard 1 ou 2 charges)
     spellImmune: move === "spock",    // 🧬 Logique
     summonedThisTurn: true,           // Lente (Pierre 0 ATK) / Lent (Lézard 1)
-    wiltedSteps: 0,                    // Fanaison (Feuille: -1/turn)
+    wiltedSteps: 0,                    // Fanaison (Feuille: -1/turn ou -1/2 turns Voie)
+    voieFeuille,                       // Lot B Round 8 — flag Voie Feuille
+    wiltSkipNext,                      // Voie Feuille slow wilt toggle
     combatBlunted: false,              // Émoussé (Ciseaux: -1 after 1st combat)
     provocationCharges: voieRockCharges,
     voieAtkBonus,
@@ -179,6 +309,10 @@ export function makeCreature(move: Move, side: Side, affinity?: Move): Creature 
 }
 
 export function creatureEffectiveAtk(c: Creature): number {
+  // Toile Gluante (2026-06-12) : la créature englutée ne peut pas attaquer ce
+  // tour → ATK effectif 0 (badge ⚔0). En combat son counter est aussi annulé
+  // (cf. arenaCombat) pour qu'elle ne gagne aucune lane.
+  if (c.cannotAttack) return 0;
   const base = CREATURE_STATS[c.move].atk + c.atkBuff + c.voieAtkBonus;
   // ── Lente / Lent : the turn a Pierre or Lézard is summoned, its ATK is
   //    suppressed (Pierre → 0, Lézard → 1). All other moves attack normally
@@ -201,16 +335,25 @@ export function creatureEffectiveAtk(c: Creature): number {
 }
 
 /** Apply damage to a creature, honoring its defenses in order:
- *   1. Esquive (Lézard 1-charge) — intrinsèque, prioritaire sur divineShield.
+ *   1. Esquive (Lézard dodgeCharges) — intrinsèque, prioritaire sur divineShield.
+ *      Consume 1 charge. Voie Lézard = 2 charges initiales.
  *   2. Divine Shield (Aegis spell) — consommé au 1er dégât.
  *  Returns the new creature, or null if it died. */
 export function damageCreature(c: Creature, dmg: number): Creature | null {
   if (dmg <= 0) return c;
-  if (c.dodgeCharge) return { ...c, dodgeCharge: false };
+  if (c.dodgeCharges > 0) return { ...c, dodgeCharges: c.dodgeCharges - 1 };
   if (c.divineShield) return { ...c, divineShield: false };
   const hp = c.hp - dmg;
   if (hp <= 0) return null;
   return { ...c, hp };
+}
+
+/** Soigne une créature (Sève). Plafonne à ses PV de base (CREATURE_STATS) MAIS
+ *  ne RÉDUIT jamais une créature déjà au-dessus (ex. boostée par Rempart). */
+export function healCreature(c: Creature, amount: number): Creature {
+  if (amount <= 0) return c;
+  const cap = Math.max(c.hp, CREATURE_STATS[c.move].hp);
+  return { ...c, hp: Math.min(cap, c.hp + amount) };
 }
 
 // bluntOnCombat / damageCreaturePierce → déplacés dans ./arenaCombat.ts
@@ -219,19 +362,46 @@ export function damageCreature(c: Creature, dmg: number): Creature | null {
 /** A creature's "per-turn" buffs (atkBuff, anchored, riposte) reset at the
  *  END of the turn so they don't snowball forever. Persistent damage stays.
  *  Innate passives (taunt, stifles, pierces, spellImmune) and consumed
- *  resources (dodgeCharge, combatBlunted) persist across turns.
+ *  resources (dodgeCharges, combatBlunted) persist across turns.
  *  - divineShield: persists across turns until consumed by damage.
  *  - summonedThisTurn: cleared (the "Lente/Lent" malus only bites turn 1).
- *  - wiltedSteps: incremented for Paper (drives Fanaison). */
-export function endOfTurnReset(c: Creature): Creature {
-  const wilted = c.move === "paper" ? c.wiltedSteps + 1 : c.wiltedSteps;
+ *  - wiltedSteps: incremented for Paper (drives Fanaison).
+ *  - wiltSkipNext: Voie Feuille toggle — skip wilt this turn et flip false.
+ *  - vergerActive (param) : Finisher VERGER ÉTERNEL du hero propriétaire —
+ *    Fanaison OFF en continu (le wilt ne s'incrémente plus du tout). Avant,
+ *    le finisher ne faisait qu'un reset one-shot et les Feuilles re-fanaient
+ *    dès le tour suivant, contrairement au texte de la carte. */
+export function endOfTurnReset(c: Creature, vergerActive = false): Creature {
+  // Lot B Round 8 — Voie Feuille slow wilt (Fanaison ÷ 2) :
+  //   voieFeuille=true + wiltSkipNext=true  → SKIP wilt ce tour, flip à false
+  //   voieFeuille=true + wiltSkipNext=false → wilt + flip à true (skip prochain)
+  //   voieFeuille=false (Feuille normale)   → wilt chaque tour, no toggle
+  let wilted = c.wiltedSteps;
+  let nextSkip = c.wiltSkipNext;
+  if (c.move === "paper" && !vergerActive) {
+    if (c.voieFeuille) {
+      if (c.wiltSkipNext) {
+        // Skip ce tour, prochain tour wilt.
+        nextSkip = false;
+      } else {
+        // Wilt ce tour, prochain tour skip.
+        wilted = c.wiltedSteps + 1;
+        nextSkip = true;
+      }
+    } else {
+      // Feuille normale (hors Voie) : wilt chaque tour.
+      wilted = c.wiltedSteps + 1;
+    }
+  }
   return {
     ...c,
     atkBuff: 0,
     anchored: false,
     ripostePrimed: false,
+    cannotAttack: false, // Toile Gluante expire en fin de tour
     summonedThisTurn: false,
     wiltedSteps: wilted,
+    wiltSkipNext: nextSkip,
   };
 }
 
@@ -239,7 +409,12 @@ export function endOfTurnReset(c: Creature): Creature {
 
 /** Top-level turn resolver. Called when both sides have locked their intents.
  *  Returns the post-resolution board. The caller renders the diff with
- *  animations (combat hits, deaths, hero damage). */
+ *  animations (combat hits, deaths, hero damage).
+ *
+ *  NOTE : le chemin LIVE de l'app est runResolverFlow (arenaResolverFlow.ts)
+ *  qui séquence ces mêmes étapes avec les timings d'anim + l'égalité parfaite
+ *  (sudden-death) + le TURN_HARD_CAP. Cette composition pure reste la
+ *  référence unit-testable du pipeline. */
 export function resolveTurn(
   board: BoardState,
   intentA: TurnIntent,
@@ -268,33 +443,25 @@ export function resolveTurn(
   return b;
 }
 
-/** Apply one side's spells, ordered by spellPriority asc (defensive first).
- *  Each spell consumes its mana cost from the side's pool. Spells that
- *  can't be paid for at the moment they'd fire are skipped silently.
- *
- *  NOTE — kept for backwards compatibility / single-side callers. The
- *  resolver should use applyAllSpells (below) which intercales the two
- *  sides by priority for fairness. See docs/CONSTELLATION_PRO_AUDIT.md
- *  bug #1 for the asymmetry this single-side helper would cause if used
- *  for both sides sequentially. */
-export function applySpellPhase(board: BoardState, intent: TurnIntent, side: Side): BoardState {
-  const ordered = intent.spells.slice().sort((s1, s2) => {
-    return spellPriority(s1.id) - spellPriority(s2.id);
-  });
-  let b = board;
-  for (const spell of ordered) {
-    const card = CARDS[spell.id];
-    const hero = side === "a" ? b.a : b.b;
-    if (hero.mana < card.cost) continue;
-    // Spend mana up-front so the same card can't be "fizzled" twice for cost.
-    b = {
-      ...b,
-      [side]: { ...hero, mana: hero.mana - card.cost },
-    } as BoardState;
-    const ctx: ArenaSpellContext = { board: b, side, spell };
-    b = applyArenaSpell(ctx);
+/** Caps de sorts partagés engine/UI/IA : max MAX_SPELLS_PER_TURN sorts
+ *  lane-target + 1 sort utility (self/hero/global) par tour. Exporté pour
+ *  que l'IA applique EXACTEMENT le même droit de jeu que le joueur (avant
+ *  elle se tronquait à 2 sorts TOTAL — désavantage CPU). */
+export function truncateIntentByCaps(intent: TurnIntent): TurnIntent {
+  let laneCount = 0;
+  let utilityCount = 0;
+  const kept: PlayedSpell[] = [];
+  for (const s of intent.spells) {
+    if (s.kind === "lane") {
+      if (laneCount >= MAX_SPELLS_PER_TURN) continue;
+      laneCount++;
+    } else {
+      if (utilityCount >= UTILITY_SPELLS_PER_TURN) continue;
+      utilityCount++;
+    }
+    kept.push(s);
   }
-  return b;
+  return kept.length === intent.spells.length ? intent : { ...intent, spells: kept };
 }
 
 /** Apply BOTH sides' spells, INTERCALATED by priority — fixes the audit
@@ -304,32 +471,15 @@ export function applySpellPhase(board: BoardState, intent: TurnIntent, side: Sid
  *  Same priority WITHIN a side : original tap order (intent.spells order). */
 export function applyAllSpells(board: BoardState, intentA: TurnIntent, intentB: TurnIntent): BoardState {
   // Alex feedback 2026-06-09 v2 : aligné sur les caps UI (ArenaGame.addSpell)
-  // — max MAX_SPELLS_PER_TURN sorts lane-target + 1 sort utility (self/hero)
-  // par tour. Total max 3 sorts/tour. Le filet engine truncate selon les
-  // mêmes règles pour rester cohérent avec ce que l'UI a laissé passer.
-  const truncateByCaps = (intent: TurnIntent): TurnIntent => {
-    let laneCount = 0;
-    let utilityCount = 0;
-    const kept: PlayedSpell[] = [];
-    for (const s of intent.spells) {
-      if (s.kind === "lane") {
-        if (laneCount >= MAX_SPELLS_PER_TURN) continue;
-        laneCount++;
-      } else {
-        if (utilityCount >= 1) continue;
-        utilityCount++;
-      }
-      kept.push(s);
-    }
-    return kept.length === intent.spells.length ? intent : { ...intent, spells: kept };
-  };
-  const safeIntentA = truncateByCaps(intentA);
-  const safeIntentB = truncateByCaps(intentB);
+  // — le filet engine truncate selon les mêmes règles que l'UI (cf.
+  // truncateIntentByCaps ci-dessus).
+  const safeIntentA = truncateIntentByCaps(intentA);
+  const safeIntentB = truncateIntentByCaps(intentB);
   if (safeIntentA !== intentA) {
-    alog("spell", `BYPASS BLOCKED a — intent had ${intentA.spells.length} spells (cap lane=${MAX_SPELLS_PER_TURN} + utility=1), truncated to ${safeIntentA.spells.length}`);
+    alog("spell", `BYPASS BLOCKED a — intent had ${intentA.spells.length} spells (cap lane=${MAX_SPELLS_PER_TURN} + utility=${UTILITY_SPELLS_PER_TURN}), truncated to ${safeIntentA.spells.length}`);
   }
   if (safeIntentB !== intentB) {
-    alog("spell", `BYPASS BLOCKED b — intent had ${intentB.spells.length} spells (cap lane=${MAX_SPELLS_PER_TURN} + utility=1), truncated to ${safeIntentB.spells.length}`);
+    alog("spell", `BYPASS BLOCKED b — intent had ${intentB.spells.length} spells (cap lane=${MAX_SPELLS_PER_TURN} + utility=${UTILITY_SPELLS_PER_TURN}), truncated to ${safeIntentB.spells.length}`);
   }
   const combined: Array<{ spell: PlayedSpell; side: Side; idx: number }> = [
     ...safeIntentA.spells.map((spell, idx) => ({ spell, side: "a" as Side, idx })),
@@ -345,10 +495,20 @@ export function applyAllSpells(board: BoardState, intentA: TurnIntent, intentB: 
   });
   let b = board;
   for (const { spell, side } of combined) {
-    const card = CARDS[spell.id as CardId];
     const hero = side === "a" ? b.a : b.b;
-    // Lot D — CALCUL QUANTIQUE : tous mes sorts coûtent −1m (min 0).
-    const effectiveCost = hero.calculActive ? Math.max(0, card.cost - 1) : card.cost;
+    // Finisher : 1×/match en dur côté engine. La carte peut revenir en main
+    // via Juge (reshuffle) ou Genèse alors qu'elle a déjà été utilisée
+    // (hero.finisherUsed=true). On fizzle silencieusement le cast pour ne
+    // pas brûler la carte en mana sans effet (le removeSpentCards en amont
+    // l'a déjà retirée de la main, on l'a juste perdue — c'est le prix du
+    // contrat "1×/match").
+    if (spell.id.startsWith("finisher-") && hero.finisherUsed) {
+      alog("spell", `${side} ${spell.id} FIZZLE (déjà utilisé ce match)`);
+      continue;
+    }
+    // Lot D — CALCUL QUANTIQUE : source unique arenaSpellCost (partagée avec
+    // l'UI plan/intent et l'IA, sinon le discount n'était dépensable nulle part).
+    const effectiveCost = arenaSpellCost(hero, spell.id as CardId);
     if (hero.mana < effectiveCost) continue;
     b = {
       ...b,
@@ -356,6 +516,12 @@ export function applyAllSpells(board: BoardState, intentA: TurnIntent, intentB: 
     } as BoardState;
     const ctx: ArenaSpellContext = { board: b, side, spell };
     b = applyArenaSpell(ctx);
+    // Réverbération (2026-06-12) : on mémorise le dernier sort NON-réverbération
+    // appliqué par CE côté ce tour, pour que Réverbération (priorité plus tardive)
+    // puisse le rejouer sur sa cible d'origine.
+    if (spell.id !== "reverberation") {
+      b = side === "a" ? { ...b, lastSpellAppliedA: spell } : { ...b, lastSpellAppliedB: spell };
+    }
   }
   return b;
 }
@@ -383,33 +549,14 @@ export function applySummons(board: BoardState, intent: TurnIntent, side: Side):
     } else {
       alog("summon", `${side} pose ${summon.move} L${summon.lane} affinity=${hero.affinity ?? "∅"}`);
     }
-    // Lot C — Constellation 3⭐ : Alex feedback 2026-06-09 — passage en mode
-    // SIMULTANÉ (vs cumulé). Le compteur compte les Voie-créatures VIVANTES
-    // sur le board, pas les poses cumulées. Force le joueur à garder ses 3
-    // Voies en vie pour atteindre 3⭐.
-    const aliveVoieCount = countAliveAffinity(lanes, side, hero.affinity);
-    const unlocked = aliveVoieCount >= 3 && !hero.finisherUnlocked;
-    if (hero.affinity && summon.move === hero.affinity) {
-      alog("summon", `${side} constellation ⭐ ${aliveVoieCount}/3 ${unlocked ? "→ FINISHER UNLOCKED" : ""}`);
-    }
-    // Lot D — Injection automatique de la carte Finisher dans la main au
-    // moment où on passe 3⭐ pour la 1ère fois. Choix selon l'Affinité.
-    let nextHand = hero.hand;
-    if (unlocked && hero.affinity) {
-      const finisherId = AFFINITY_TO_FINISHER[hero.affinity];
-      nextHand = [...hero.hand, finisherId];
-      alog("summon", `${side} → carte Finisher [${finisherId}] injectée en main`);
-    }
+    // Constellation 3⭐ : on ne PROMET PAS au summon (Alex 2026-06-11 "faux
+     // espoir"). L'unlock + l'injection du Finisher se font au settle-time
+     // dans endOfTurnCleanup, une fois la créature confirmée vivante après
+     // combat. Ici on touche au mana/board seulement.
     b = {
       ...b,
       lanes,
-      [side]: {
-        ...hero,
-        mana: hero.mana - 1,
-        hand: nextHand,
-        constellationCount: aliveVoieCount,
-        finisherUnlocked: hero.finisherUnlocked || unlocked,
-      },
+      [side]: { ...hero, mana: hero.mana - 1 },
     } as BoardState;
   }
   return b;
@@ -443,10 +590,57 @@ export { resolveCombat };
 
 export function endOfTurnCleanup(board: BoardState): BoardState {
   const lanes = board.lanes.map((lane) => ({
-    a: lane.a ? endOfTurnReset(lane.a) : null,
-    b: lane.b ? endOfTurnReset(lane.b) : null,
+    a: lane.a ? endOfTurnReset(lane.a, board.a.vergerActive) : null,
+    b: lane.b ? endOfTurnReset(lane.b, board.b.vergerActive) : null,
   })) as [LaneState, LaneState, LaneState];
-  return { ...board, lanes };
+  // 🔥 PHÉNIX (2026-06-12) : ressuscite à 1 PV les créatures snapshotées au
+  // cast (applyPhenix) qui sont mortes ce tour — lane désormais vide. Si la
+  // lane a été reprise par une autre créature (survivante / nouveau summon),
+  // pas de résurrection (on n'écrase rien).
+  const revive = (snap: { lane: LaneIndex; move: Move }[] | undefined, side: Side): void => {
+    if (!snap || snap.length === 0) return;
+    const aff = side === "a" ? board.a.affinity : board.b.affinity;
+    for (const { lane, move } of snap) {
+      const cur = side === "a" ? lanes[lane].a : lanes[lane].b;
+      if (!cur) {
+        const reborn: Creature = { ...makeCreature(move, side, aff), hp: 1, summonedThisTurn: false };
+        lanes[lane] = side === "a" ? { ...lanes[lane], a: reborn } : { ...lanes[lane], b: reborn };
+        alog("turn", `${side} 🔥 PHÉNIX → ${move} renaît à 1 PV (L${lane})`);
+      }
+    }
+  };
+  revive(board.phenixReviveA, "a");
+  revive(board.phenixReviveB, "b");
+  // Constellation 3⭐ SIMULTANÉE — resynchronise le compteur sur les Voies
+  // VIVANTES post-combat (une mort décompte, cf. design "simultané" Alex) et
+  // couvre les arrivées hors-summon (Mirror copie une créature d'Affinité :
+  // avant, la 3e étoile via Mirror ne débloquait le Finisher qu'au summon
+  // suivant). L'unlock + l'injection restent 1×/match (guard finisherUnlocked).
+  const refreshConstellation = (hero: HeroState, side: Side): HeroState => {
+    const alive = countAliveAffinity(lanes, side, hero.affinity);
+    const unlocked = alive >= 3 && !hero.finisherUnlocked;
+    if (alive === hero.constellationCount && !unlocked) return hero;
+    let hand = hero.hand;
+    if (unlocked && hero.affinity) {
+      const finisherId = AFFINITY_TO_FINISHER[hero.affinity];
+      hand = [...hero.hand, finisherId];
+      alog("turn", `${side} constellation ⭐ ${alive}/3 (post-combat) → FINISHER UNLOCKED — [${finisherId}] injecté en main`);
+    }
+    return {
+      ...hero,
+      constellationCount: alive,
+      finisherUnlocked: hero.finisherUnlocked || unlocked,
+      hand,
+    };
+  };
+  return {
+    ...board,
+    lanes,
+    a: refreshConstellation(board.a, "a"),
+    b: refreshConstellation(board.b, "b"),
+    phenixReviveA: undefined, // snapshot Phénix consommé
+    phenixReviveB: undefined,
+  };
 }
 
 /* ───────────────────────── Turn lifecycle ───────────────────────── */
@@ -472,7 +666,7 @@ export function advanceToNextTurn(board: BoardState): BoardState {
       const atk = creatureEffectiveAtk(c);
       const flags: string[] = [];
       if (c.divineShield) flags.push("🛡");
-      if (c.dodgeCharge) flags.push("✨");
+      if (c.dodgeCharges > 0) flags.push(c.dodgeCharges > 1 ? `✨${c.dodgeCharges}` : "✨");
       if (c.taunt && c.provocationCharges > 0) flags.push(`P${c.provocationCharges}`);
       if (c.summonedThisTurn && (c.move === "rock" || c.move === "lizard")) flags.push("L");
       if (c.move === "paper" && c.wiltedSteps > 0) flags.push(`F${c.wiltedSteps}`);
@@ -484,22 +678,69 @@ export function advanceToNextTurn(board: BoardState): BoardState {
   // Cartes dispos (Alex feedback : "ajouter les cartes de chacun dans les
   // logs pour voir ce que chacun aurait pu/du jouer"). Mains complètes
   // listées avec mana + flags (kill bonus pending, aegis lock).
-  alog("hand", `a hand=[${board.a.hand.join(",")}] deck=${board.a.deck.length} discard=${board.a.discard.length} mana=${board.a.mana}/${board.a.maxMana}${board.a.killBonusPending ? " +K" : ""}${board.a.aegisCastThisMatch ? " [AEGIS-LOCK]" : ""}`);
-  alog("hand", `b hand=[${board.b.hand.join(",")}] deck=${board.b.deck.length} discard=${board.b.discard.length} mana=${board.b.mana}/${board.b.maxMana}${board.b.killBonusPending ? " +K" : ""}${board.b.aegisCastThisMatch ? " [AEGIS-LOCK]" : ""}`);
+  alog("hand", `a hand=[${board.a.hand.join(",")}] deck=${board.a.deck.length} discard=${board.a.discard.length} mana=${board.a.mana}/${board.a.maxMana}${board.a.killBonusPending ? " +K" : ""}`);
+  alog("hand", `b hand=[${board.b.hand.join(",")}] deck=${board.b.deck.length} discard=${board.b.discard.length} mana=${board.b.mana}/${board.b.maxMana}${board.b.killBonusPending ? " +K" : ""}`);
   // Alex feedback 2026-06-09 D : "récompenser l'agression" → si tu as
   // tué une créature opp ce tour, tu pioches +1 carte bonus au tour
   // suivant. killBonusPending reset après la pioche bonus.
   const drawA = 2 + (board.a.killBonusPending ? 1 : 0);
   const drawB = 2 + (board.b.killBonusPending ? 1 : 0);
-  const a = refreshHero({ ...drawCards(board.a, drawA), killBonusPending: false });
-  const b = refreshHero({ ...drawCards(board.b, drawB), killBonusPending: false });
+  // Lot D-bis Round 10 — hooks runtime Finishers persistants :
+  // VERGER : si vergerActive, hero heal +1/tour (cumulé tant que actif)
+  // MÉTAMORPHOSE : si metamorphoseActive, tous mes Lézard refill dodgeCharges
+  // Note : LAME est traité in-combat (cf arenaCombat), pas ici.
+  let lanesAfterFinishers = board.lanes;
+  if (board.a.metamorphoseActive) {
+    lanesAfterFinishers = lanesAfterFinishers.map((l) => ({
+      ...l,
+      a: l.a && l.a.move === "lizard" ? { ...l.a, dodgeCharges: Math.max(l.a.dodgeCharges, 1) } : l.a,
+    })) as [LaneState, LaneState, LaneState];
+    alog("turn", `a MÉTAMORPHOSE → Lézard dodge refresh`);
+  }
+  if (board.b.metamorphoseActive) {
+    lanesAfterFinishers = lanesAfterFinishers.map((l) => ({
+      ...l,
+      b: l.b && l.b.move === "lizard" ? { ...l.b, dodgeCharges: Math.max(l.b.dodgeCharges, 1) } : l.b,
+    })) as [LaneState, LaneState, LaneState];
+    alog("turn", `b MÉTAMORPHOSE → Lézard dodge refresh`);
+  }
+  const heroAVerger = board.a.vergerActive ? { ...board.a, hp: Math.min(board.a.maxHp, board.a.hp + 1) } : board.a;
+  const heroBVerger = board.b.vergerActive ? { ...board.b, hp: Math.min(board.b.maxHp, board.b.hp + 1) } : board.b;
+  if (board.a.vergerActive) alog("turn", `a VERGER → +1 HP (${board.a.hp} → ${heroAVerger.hp})`);
+  if (board.b.vergerActive) alog("turn", `b VERGER → +1 HP (${board.b.hp} → ${heroBVerger.hp})`);
+  // Filet de sécurité (Alex 2026-06-11) : si après la pioche normale la main
+  // est VIDE, on pioche 1 carte de plus (la pioche reshuffle la défausse,
+  // alimentée par les cartes jouées → il y a presque toujours de quoi).
+  const drawnA = drawCards(heroAVerger, drawA);
+  const safeA = drawnA.hand.length === 0 ? drawCards(drawnA, 1) : drawnA;
+  const drawnB = drawCards(heroBVerger, drawB);
+  const safeB = drawnB.hand.length === 0 ? drawCards(drawnB, 1) : drawnB;
+  const a = refreshHero({ ...safeA, killBonusPending: false });
+  const b = refreshHero({ ...safeB, killBonusPending: false });
+  // Augur / Oracle Inverse : durée 2 tours (Alex 2026-06-11). Decrement à
+  // chaque advance, clear cards quand reach 0.
+  const nextATurns = Math.max(0, (board.augurTurnsLeftA ?? 0) - 1);
+  const nextBTurns = Math.max(0, (board.augurTurnsLeftB ?? 0) - 1);
   return {
     ...board,
+    lanes: lanesAfterFinishers,
     turn: nextTurn,
     phase: "planning",
     a, b,
-    augurRevealedA: [],
-    augurRevealedB: [],
+    augurRevealedA: nextATurns > 0 ? board.augurRevealedA : [],
+    augurRevealedB: nextBTurns > 0 ? board.augurRevealedB : [],
+    augurTurnsLeftA: nextATurns,
+    augurTurnsLeftB: nextBTurns,
+    // RESET du side-channel Larcin (Alex 2026-06-12 "Larcin n'a plus d'anim") :
+    // l'anim se déclenche sur le CHANGEMENT de lastHeistStolenA/B. Si on ne
+    // remet pas à undefined entre les tours, voler 2× la même carte ne change
+    // pas la valeur → l'effet React ne re-fire pas → pas d'anim. On nettoie
+    // chaque tour pour garantir une transition undefined→carte à chaque vol.
+    lastHeistStolenA: undefined,
+    lastHeistStolenB: undefined,
+    // Réverbération : le "dernier sort" est par-tour → reset à chaque tour.
+    lastSpellAppliedA: undefined,
+    lastSpellAppliedB: undefined,
   };
 }
 

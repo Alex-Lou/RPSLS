@@ -14,12 +14,18 @@ import { motion } from "motion/react";
 export interface ArenaMatchSplashProps {
   playerName: string;
   playerAvatar?: string;
+  /** Identité CPU (depuis le pile-ou-face) — portrait hero_*.png + nom réel
+   *  au lieu de 🤖 / « CPU » (Alex 2026-06-13). */
+  cpuName?: string;
+  cpuAvatar?: string;
 }
 
-export function ArenaMatchSplash({ playerName, playerAvatar }: ArenaMatchSplashProps) {
-  const isImg = playerAvatar && (
-    playerAvatar.startsWith("/") || playerAvatar.startsWith("http") || playerAvatar.startsWith("data:")
-  );
+const isAvatarImg = (a?: string) =>
+  !!a && (a.startsWith("/") || a.startsWith("http") || a.startsWith("data:"));
+
+export function ArenaMatchSplash({ playerName, playerAvatar, cpuName, cpuAvatar }: ArenaMatchSplashProps) {
+  const isImg = isAvatarImg(playerAvatar);
+  const cpuIsImg = isAvatarImg(cpuAvatar);
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-3 px-4 relative overflow-hidden">
       {/* Backdrop: violet/fuchsia radial that pulses once. */}
@@ -81,10 +87,16 @@ export function ArenaMatchSplash({ playerName, playerAvatar }: ArenaMatchSplashP
           className="flex flex-col items-center gap-1"
         >
           <div className="w-16 h-16 rounded-full overflow-hidden ring-2 ring-rose-400/70 bg-gradient-to-br from-zinc-700 to-zinc-900 flex items-center justify-center shadow-lg shadow-rose-500/30">
-            <span className="text-3xl">🤖</span>
+            {cpuIsImg ? (
+              <img src={cpuAvatar} alt="" className="w-full h-full object-cover" draggable={false} />
+            ) : cpuAvatar ? (
+              <span className="text-3xl">{cpuAvatar}</span>
+            ) : (
+              <span className="text-3xl">🤖</span>
+            )}
           </div>
-          <span className="text-[10px] uppercase tracking-wider font-black text-rose-300">
-            CPU
+          <span className="text-[10px] uppercase tracking-wider font-black text-rose-300 truncate max-w-[64px]">
+            {cpuName ?? "CPU"}
           </span>
         </motion.div>
       </div>

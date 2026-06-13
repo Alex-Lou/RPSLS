@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store/store";
 import { levelFromXp } from "./engine/leveling";
@@ -6,8 +7,36 @@ import { THEMES, gradientFromTheme } from "./theme/theme";
 import { useT } from "./i18n";
 import { LanguagePicker } from "./LanguagePicker";
 import { avatarImgStyle } from "./theme/avatar";
+import { getMatchExit, subscribeMatchExit } from "./matchExitStore";
 
 export type Page = "play" | "online" | "leaderboard" | "shop" | "quests" | "packs" | "profile" | "history" | "about" | "contact" | "privacy";
+
+/* ─────────── Burger inline (Alex 2026-06-12) ───────────
+ * Le burger flottant top-left "foutait tout en l'air" sur le menu principal :
+ * il forçait la carte joueur à se décaler/couper. Sur l'écran Choisis ton
+ * combat, le burger flottant est MASQUÉ (setBurgerHidden(true) posé par
+ * ModeSelect) et un burger themed INLINE (à gauche du Défi du jour) ouvre le
+ * même drawer via openMobileMenu(). Pattern mini-store identique à
+ * matchExitStore (module scope + useSyncExternalStore). */
+let burgerHidden = false;
+const burgerSubs = new Set<() => void>();
+let externalOpenDrawer: (() => void) | null = null;
+export function setBurgerHidden(h: boolean): void {
+  if (h === burgerHidden) return;
+  burgerHidden = h;
+  burgerSubs.forEach((f) => f());
+}
+/** Ouvre le drawer mobile depuis un bouton externe (burger inline du menu). */
+export function openMobileMenu(): void {
+  externalOpenDrawer?.();
+}
+function subscribeBurgerHidden(cb: () => void): () => void {
+  burgerSubs.add(cb);
+  return () => { burgerSubs.delete(cb); };
+}
+function getBurgerHidden(): boolean {
+  return burgerHidden;
+}
 
 interface NavItem {
   id: Page;
@@ -186,6 +215,18 @@ export function MobileShell({
   onNavigate: (p: Page) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // Callback de sortie d'un match en cours (Alex 2026-06-11) : rendu EN HAUT
+  // du drawer pour intégrer la sortie au burger plutôt qu'avoir un 2e bouton
+  // HUD. ArenaGame (et autres modes match) le register au mount.
+  const matchExit = useSyncExternalStore(subscribeMatchExit, getMatchExit, () => null);
+  // Burger flottant masqué quand un écran fournit son propre burger inline
+  // (menu principal — cf. setBurgerHidden ci-dessus).
+  const hideTrigger = useSyncExternalStore(subscribeBurgerHidden, getBurgerHidden, () => false);
+  // Register l'ouverture externe (burger inline → même drawer).
+  useEffect(() => {
+    externalOpenDrawer = () => setOpen(true);
+    return () => { externalOpenDrawer = null; };
+  }, []);
 
   // Lock body scroll when drawer is open
   useEffect(() => {
@@ -209,24 +250,31 @@ export function MobileShell({
 
   return (
     <>
-      {/* Hamburger trigger (mobile only) */}
-      <button
-        aria-label="Open menu"
-        data-no-touchfx
-        onClick={() => setOpen(true)}
-        // Position via Tailwind (not inline) so the short-viewport overrides
-        // actually apply. Smaller + tighter to the corner on landscape so it
-        // stops eating the play area; full size in portrait.
-        className="md:hidden [@media(max-height:600px)]:!flex fixed z-30 w-11 h-11 rounded-2xl bg-black/55 backdrop-blur border border-hairline flex items-center justify-center text-ink active:scale-95 transition shadow-lg top-[max(env(safe-area-inset-top),32px)] left-[max(env(safe-area-inset-left),12px)] [@media(max-height:540px)]:w-8 [@media(max-height:540px)]:h-8 [@media(max-height:540px)]:top-1 [@media(max-height:540px)]:left-1"
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-          <line x1="4" y1="7" x2="20" y2="7" />
-          <line x1="4" y1="12" x2="20" y2="12" />
-          <line x1="4" y1="17" x2="20" y2="17" />
-        </svg>
-      </button>
+      {/* Hamburger trigger (mobile only) — masqué quand l'écran courant rend
+       *  son propre burger inline (menu principal, Alex 2026-06-12). */}
+      {!hideTrigger && (
+        <button
+          aria-label="Open menu"
+          data-no-touchfx
+          onClick={() => setOpen(true)}
+          // Position via Tailwind (not inline) so the short-viewport overrides
+          // actually apply. Smaller + tighter to the corner on landscape so it
+          // stops eating the play area; full size in portrait.
+          className="md:hidden [@media(max-height:600px)]:!flex fixed z-30 w-11 h-11 rounded-2xl bg-black/55 backdrop-blur border border-hairline flex items-center justify-center text-ink active:scale-95 transition shadow-lg top-[max(env(safe-area-inset-top),32px)] left-[max(env(safe-area-inset-left),12px)] [@media(max-height:540px)]:w-8 [@media(max-height:540px)]:h-8 [@media(max-height:540px)]:top-1 [@media(max-height:540px)]:left-1"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+            <line x1="4" y1="7" x2="20" y2="7" />
+            <line x1="4" y1="12" x2="20" y2="12" />
+            <line x1="4" y1="17" x2="20" y2="17" />
+          </svg>
+        </button>
+      )}
 
-      {/* Drawer */}
+      {/* Drawer — PORTAL vers document.body (Alex 2026-06-11) : le drawer
+       *  était piégé dans le stacking context de l'app shell (z-10), donc
+       *  SOUS le strip opp qui est un portal body z-[55]. En portalant le
+       *  drawer à body avec z-[60]/[70], il passe DEVANT les strips. */}
+      {createPortal(
       <AnimatePresence>
         {open && (
           <>
@@ -239,7 +287,7 @@ export function MobileShell({
               transition={{ duration: 0.2 }}
               onClick={() => setOpen(false)}
               data-no-touchfx
-              className="md:hidden fixed inset-0 bg-black/60 z-40"
+              className="md:hidden fixed inset-0 bg-black/60 z-[60]"
             />
             {/* Panel */}
             <motion.aside
@@ -249,7 +297,7 @@ export function MobileShell({
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", stiffness: 320, damping: 32 }}
-              className="md:hidden fixed left-0 top-0 bottom-0 z-50 w-72 max-w-[85vw] bg-surface-raised backdrop-blur-md border-r border-hairline p-4 flex flex-col"
+              className="md:hidden fixed left-0 top-0 bottom-0 z-[70] w-72 max-w-[85vw] bg-surface-raised backdrop-blur-md border-r border-hairline p-4 flex flex-col"
               style={{
                 paddingTop:    "max(env(safe-area-inset-top),    32px)",
                 paddingBottom: "max(env(safe-area-inset-bottom), 56px)",
@@ -269,6 +317,21 @@ export function MobileShell({
                 </svg>
               </button>
 
+              {/* Match exit — premier item, rouge/ambre pour bien indiquer la
+               *  sortie (Alex 2026-06-11). Visible UNIQUEMENT pendant un match
+               *  (ArenaGame, RankedMatchView, etc. register leur handleForfeit). */}
+              {matchExit && (
+                <button
+                  onClick={() => { matchExit.onExit(); setOpen(false); }}
+                  className="mb-3 mt-1 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-rose-500/15 border border-rose-400/55 text-rose-100 font-bold active:scale-95 transition shadow-md hover:bg-rose-500/25"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M15 18l-6-6 6-6" />
+                  </svg>
+                  <span className="text-sm uppercase tracking-wider">{matchExit.label}</span>
+                </button>
+              )}
+
               <SidebarBody
                 page={page}
                 onNavigate={onNavigate}
@@ -277,7 +340,9 @@ export function MobileShell({
             </motion.aside>
           </>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body,
+      )}
     </>
   );
 }

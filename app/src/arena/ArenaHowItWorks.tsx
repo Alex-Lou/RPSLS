@@ -82,6 +82,16 @@ export function ArenaHowItWorks({ onClose }: { onClose: () => void }) {
             body="Quand l'attaque d'une créature adverse est annulée par TA Pierre (Provocation), tu vois pop la chip jaune 🪨 ATTAQUE DÉTOURNÉE ! au centre du board. C'est juste la confirmation visuelle que ton héros vient d'être sauvé. La pierre n'encaisse rien, l'attaque part simplement dans le vide. Pour casser cette protection: l'opp doit poser une Feuille (Étouffe) OU détruire ta Pierre en combat / par un sort."
           />
           <Section
+            title="🚨 Pourquoi MA Pierre ne défend pas ?"
+            body=""
+            sub={[
+              "Anti-taunt côté opp : si l'opp a une FEUILLE 📄 (Étouffe) ou un SPOCK 🖖 (Logique) vivant n'importe où sur son board, TA Pierre Provocation est CANCELLÉE. Toutes les attaques opp atteignent ton héros directement.",
+              "Pierre déjà consommée : chaque Provoc a 2 charges max (1 base + 1 Voie Pierre). Une fois consommées → Pierre devient passive, aucune deflection.",
+              "Pierre détruite : si ta Pierre est morte (combat counter ou Curse), pas de deflection (évidemment).",
+              "Ta Pierre TOUTES les défend tant que les conditions sont remplies — peu importe ta Voie. Le label 'Voie de la Pierre' sur l'opp signifie juste qu'il a +1 charge initiale.",
+            ]}
+          />
+          <Section
             title="🛡️ Sorts de défense (en plus des passifs)"
             body=""
             sub={[
@@ -101,7 +111,22 @@ export function ArenaHowItWorks({ onClose }: { onClose: () => void }) {
               "Tide / Oracle / Augur → effet GLOBAL, pas de cible à choisir",
             ]}
           />
-          <Section title="✨ Lecture des badges" body="⚔ = ATK · ❤ = HP · les chips +N (vert) ou -N (rouge) en bas-gauche montrent les buffs/debuffs actifs. Les icônes en haut-droit montrent les status." />
+          <Section
+            title="⚗️ LA FORGE — fusionner deux cartes"
+            body="La petite case « Forge » au centre-droite du pad est ta table d'alchimie. DÉPOSER (gratuit) : sélectionne une carte de ta main puis tape ta Forge — la carte y reste posée, visible des deux camps, reprenable d'un tap. FUSIONNER : sélectionne son PARTENAIRE en main (badge ⚗ qui devient OR) et tape la Forge → les deux cartes se consument et la carte fusionnée (plus puissante, coût = somme −1) arrive dans ta main. Aucun tour perdu, aucun mana au dépôt."
+            sub={[
+              "🎯 Précision + Surcharge = FRAPPE PARFAITE (+6 ATK)",
+              "🏰 Aegis + Ancre = BASTION (bouclier + ancre + provoc rechargée)",
+              "🏔️ Jet de Caillou ×2 = AVALANCHE (3 dégâts à 2 créatures)",
+              "⛲ Sève + Second Souffle = SOURCE VITALE (+3 créature ET +3 héros)",
+              "👁️ Oracle + Coup d'Œil = OMNISCIENCE (pioche 3 + main adverse révélée 2 tours)",
+              "🛡 Toile Gluante + Malédiction = COCON (n'attaque pas + −2 ATK)",
+              "☄️ Supernova + Gravité = APOCALYPSE (4 dégâts à toutes + 4 au héros)",
+              "🎭 Larcin + Mascarade = IMPOSTEUR (vole 1 carte + lit la main)",
+              "Badge ⚗ fuchsia = la carte a une recette · OR pulsant = son partenaire est sur ta Forge, fusion possible MAINTENANT.",
+            ]}
+          />
+          <Section title="✨ Lecture des badges" body="⚔ = ATK · ❤ = HP · les chips +N (vert) ou -N (rouge) en bas-gauche montrent les buffs/debuffs actifs. Les icônes en haut-droit montrent les status. ⚗ = carte fusionnable (Forge)." />
           <Section title="💡 Astuce" body="Le CPU ne peut JAMAIS occuper toutes les lanes (cap à 2 créatures max). Garde un sort de dégât direct (Heist/Supernova) pour finir l'opp quand son board est plein." />
         </div>
       </motion.div>

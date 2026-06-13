@@ -18,11 +18,16 @@ import { ArenaPrepScreen, type ArenaPrepResult } from "./ArenaPrepScreen";
 import { ArenaPadProvider } from "../ranked/arena";
 import { applyTheme } from "../theme/theme";
 import { useStore } from "../store/store";
+import { useArenaOverride } from "../ranked/arenaOverride";
 
 export function ArenaPage({ onBack }: { onBack: () => void }) {
   const [stage, setStage] = useState<"prep" | "game">("prep");
   const [prep, setPrep] = useState<ArenaPrepResult | null>(null);
   const playerThemeId = useStore((s) => s.player.themeId ?? "violet");
+  // Override du FOND (Alex 2026-06-13) : le coin flip applique le fond du
+  // gagnant (joueur = le sien, CPU = celui de son bundle). App.tsx lit
+  // arenaOverride.bg pour rendre la scène. null = fond global du joueur.
+  const setArenaBg = useArenaOverride((s) => s.setBg);
   // Snapshot the CSS-var theme at mount so we restore it on quit.
   const snapshotRef = useRef<{ theme: string; primary: string; secondary: string } | null>(null);
 
@@ -37,17 +42,20 @@ export function ArenaPage({ onBack }: { onBack: () => void }) {
       secondary: root.style.getPropertyValue("--theme-secondary"),
     };
     return () => {
-      // Restore the player's own theme on unmount.
+      // Restore the player's own theme + fond on unmount.
       applyTheme(playerThemeId);
+      setArenaBg(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // When the prep resolves, apply its theme to the document. ArenaGame's
-  // BattlePad reads the override via ArenaPadProvider below.
+  // When the prep resolves, apply the WINNER's full appearance : thème
+  // (CSS vars) + fond (arenaOverride). ArenaGame's BattlePad reads the pad
+  // override via ArenaPadProvider below.
   useEffect(() => {
     if (stage === "game" && prep) {
       applyTheme(prep.themeId);
+      setArenaBg(prep.backgroundId);
     }
   }, [stage, prep]);
 
@@ -57,16 +65,18 @@ export function ArenaPage({ onBack }: { onBack: () => void }) {
   }
 
   function handleQuitGame() {
-    // Quit the whole Arena — restore menu theme + bubble up to menu.
+    // Quit the whole Arena — restore menu theme + fond + bubble up to menu.
     applyTheme(playerThemeId);
+    setArenaBg(null);
     onBack();
   }
 
   function handleRematch() {
-    // Fresh match → fresh coin: clear prep, restore player's theme so the
-    // prep screen renders against the menu palette (then coin re-picks
-    // theme/pad), bounce back to prep stage.
+    // Fresh match → fresh coin: clear prep, restore player's theme + fond so
+    // the prep screen renders against the menu palette (then coin re-picks
+    // theme/pad/fond), bounce back to prep stage.
     applyTheme(playerThemeId);
+    setArenaBg(null);
     setPrep(null);
     setStage("prep");
   }
@@ -82,7 +92,7 @@ export function ArenaPage({ onBack }: { onBack: () => void }) {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <ArenaPadProvider value={prep?.padId ?? null}>
-        <ArenaGame onQuit={handleQuitGame} onRematch={handleRematch} />
+        <ArenaGame onQuit={handleQuitGame} onRematch={handleRematch} oppName={prep?.cpuName} oppAvatar={prep?.cpuAvatar} />
       </ArenaPadProvider>
     </div>
   );

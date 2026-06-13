@@ -27,8 +27,12 @@ import { CardImage } from "../ranked/CardImage";
 import { useT } from "../i18n";
 import type { CardId } from "../ranked/rankedTypes";
 import { arenaSupported } from "./arenaCardEffects";
+import { arenaSpellCost } from "./arenaSpellHelpers";
+import { isFusible, findFusionResult, fusionPartnersOf } from "./arenaFusionCards";
+import { alog } from "./arenaLog";
+import { ArenaHeroStrip } from "./ArenaHeroStrip";
 import { ArenaCardInspect } from "./ArenaCardInspect";
-import { CARD_TARGET_KIND as SHARED_TARGET_KIND, LANE_SPELL_TARGET_SIDE, type ArenaTargeting } from "./arenaTypes";
+import { CARD_TARGET_KIND as SHARED_TARGET_KIND, LANE_SPELL_TARGET_SIDE, intentManaGrant, type ArenaTargeting } from "./arenaTypes";
 import type {
   BoardState,
   LaneIndex,
@@ -60,17 +64,36 @@ export interface ArenaPlanPhaseProps {
   onAddSummon: (summon: PlannedSummon) => void;
   onRemoveSummon: (lane: LaneIndex) => void;
   onLock: () => void;
+  /** Dépôt / fusion sur TA forge — lit le targeting courant (carte glissée).
+   *  Permet le drag d'une carte jusqu'à la case de fusion (Alex 2026-06-13). */
+  onForgeTap?: () => void;
+  /** Dépôt / fusion FIABLE d'une carte EXPLICITE (bouton ⚗ de la fiche) —
+   *  indépendant du targeting, marche pour tout ciblage (Alex 2026-06-13). */
+  onForgeDeposit?: (id: CardId) => void;
+  /** Player hero strip props — le strip est rendu ICI (juste au-dessus du
+   *  picker) plutôt que dans ArenaBoard, pour qu'il soit à 1px des moves
+   *  (Alex 2026-06-11). */
+  incomingAttackKey?: number | null;
+  playerName: string;
+  playerAvatar?: string;
 }
 
 export function ArenaPlanPhase({
   board, intent, intentCost, disabled,
   targeting, onSetTargeting,
-  onAddSpell, onRemoveSpell, onAddSummon, onRemoveSummon, onLock,
+  onAddSpell, onRemoveSpell, onAddSummon, onRemoveSummon: _onRemoveSummon, onLock,
+  onForgeTap, onForgeDeposit,
+  incomingAttackKey, playerName, playerAvatar,
 }: ArenaPlanPhaseProps) {
+  // _onRemoveSummon : préfixé _ car la chip miniature qui l'utilisait a été
+  // retirée (Alex 2026-06-11). Le retap du picker move annule maintenant.
   const t = useT();
   const me = board.a;
-  const manaLeft = me.mana - intentCost;
-  const canLock = !disabled && intentCost <= me.mana;
+  // Budget = mana + mana « tempo » offert par les cartes planifiées (Sablier,
+  // Offre) → utilisable DÈS CE TOUR (Alex 2026-06-13).
+  const manaBudget = me.mana + intentManaGrant(intent);
+  const manaLeft = manaBudget - intentCost;
+  const canLock = !disabled && intentCost <= manaBudget;
   // `targeting` + `onSetTargeting` are LIFTED to ArenaGame (so the board
   // can also commit lane taps). The local setTargeting alias below keeps
   // the rest of this file readable.
@@ -80,21 +103,39 @@ export function ArenaPlanPhase({
    *  description. Independent of `targeting` so the player can read a
    *  card without committing to play it. */
   const [inspecting, setInspecting] = useState<CardId | null>(null);
+  // POSITION touchée dans l'éventail (Alex 2026-06-13) : targeting/inspecting
+  // ne stockent que l'ID → avec 2 copies de la même carte en main, LES DEUX
+  // se soulevaient. On retient la position tapée : elle seule s'active.
+  const [activePos, setActivePos] = useState<number | null>(null);
+  // Carte sous le doigt (Alex 2026-06-13 « certaines cartes ne veulent pas
+  // être sélectionnées ») : au pointer-down on la passe DEVANT (z + remontée)
+  // → le geste atterrit sur la bonne carte malgré le chevauchement de l'éventail.
+  const [pressedPos, setPressedPos] = useState<number | null>(null);
+  // (Pill nom : rendue par-carte sous la carte active — cf. éventail.)
 
   function pickMoveToSummon(mv: Move) {
+    alog("hand", `TAP move ${mv}${disabled ? " (disabled)" : ""}`);
     if (disabled) return;
+    // Re-tap sur le move déjà en target = ANNULER (Alex 2026-06-11). Avant
+    // une phrase jaune "Annuler" était affichée ; maintenant retap suffit.
+    if (targeting?.kind === "summon" && targeting.move === mv) {
+      hapticTap();
+      setTargeting(null);
+      return;
+    }
     if (manaLeft < 1) { hapticAlert(); return; }
     hapticTap();
-    setInspecting(null); // close any open spell inspect when going to summon
+    setInspecting(null);
     setTargeting({ kind: "summon", move: mv });
   }
 
-  /** Commit a card — fire if no target needed, else enter targeting. */
-  function commitCard(id: CardId) {
-    if (disabled) return;
-    const card = CARDS[id];
+  /** Joue RÉELLEMENT la carte : arme la cible lane, ou auto-joue l'utilitaire.
+   *  Appelé par le tap direct ET par « Lancer » dans la fiche — AUCUNE
+   *  redirection fiche ici (sinon le bouton Lancer rouvrirait la fiche en
+   *  boucle pour un utilitaire fusible). */
+  function playCard(id: CardId) {
     if (!arenaSupported(id)) { hapticAlert(); return; }
-    if (manaLeft < card.cost) { hapticAlert(); return; }
+    if (manaLeft < arenaSpellCost(me, id)) { hapticAlert(); return; }
     hapticTap();
     setInspecting(null);
     const targetKind = CARD_TARGET_KIND[id] ?? "global";
@@ -103,6 +144,26 @@ export function ArenaPlanPhase({
       return;
     }
     setTargeting({ kind: "spell", id, targetKind });
+  }
+
+  /** Tap sur une carte : re-tap = annule ; un utilitaire FUSIBLE ouvre la
+   *  fiche (choix Lancer / ⚗ Forge) au lieu de s'auto-jouer (sinon impossible
+   *  à déposer sur la forge — Alex 2026-06-13) ; sinon joue/arme directement. */
+  function commitCard(id: CardId) {
+    alog("hand", `TAP card ${id}${disabled ? " (disabled)" : ""}`);
+    if (disabled) return;
+    if (targeting?.kind === "spell" && targeting.id === id) {
+      hapticTap();
+      setTargeting(null);
+      return;
+    }
+    const tk = CARD_TARGET_KIND[id] ?? "global";
+    if (isFusible(id) && (tk === "self" || tk === "global" || tk === "hero")) {
+      hapticTap();
+      setInspecting(id);
+      return;
+    }
+    playCard(id);
   }
 
   /** Drop-zone hit-test — finds the ArenaLaneSlot under a screen point and
@@ -149,6 +210,30 @@ export function ArenaPlanPhase({
         return true;
       }
     }
+    // FORGE — drop d'une CARTE (spell) près de TA forge = dépôt / fusion.
+    // (Alex 2026-06-13 : « le drag jusqu'à la case de fusion ne marche pas ».)
+    // Avant : la forge n'était PAS une cible de drop → le geste échouait
+    // toujours. On teste la proximité de la boîte forge (pad généreux ~26px)
+    // pour une cible facile à viser même petite. handleForgeTap lit le
+    // targeting courant (= la carte glissée) → dépôt si vide, fusion si
+    // partenaire, sinon log « ne fusionne pas ». Les invocations (kind summon)
+    // ne vont jamais sur la forge.
+    if (current.kind === "spell" && onForgeTap && typeof document !== "undefined") {
+      const forgeEl = document.querySelector("[data-arena-forge='you']");
+      if (forgeEl) {
+        const r = forgeEl.getBoundingClientRect();
+        const pad = 26;
+        const near =
+          point.x >= r.left - pad && point.x <= r.right + pad &&
+          point.y >= r.top - pad && point.y <= r.bottom + pad;
+        if (near) {
+          hapticTap();
+          onForgeTap();      // lit targeting = la carte glissée
+          setTargeting(null);
+          return true;
+        }
+      }
+    }
     return false;
   }
 
@@ -182,73 +267,20 @@ export function ArenaPlanPhase({
   // along with the targeting state so the BOARD's lane slots can commit
   // the target directly. This file no longer needs a local helper.
 
-  function cancelTargeting() {
-    hapticTap();
-    setTargeting(null);
-    setInspecting(null);
-  }
+  // cancelTargeting retiré (Alex 2026-06-11) : la phrase jaune "Annuler" qui
+  // l'utilisait est supprimée. Le re-tap sur le move/carte annule directement.
 
   return (
     <div className="flex flex-col gap-1 px-2 pb-1.5 shrink-0">
-      {/* Targeting hint — instructs the player to tap a lane ON THE BOARD
-       *  itself now (CCG-style direct target). The board's player
-       *  row pulses while targeting is active; this strip just reminds. */}
-      <div className="h-6 flex items-center justify-center">
-        <AnimatePresence>
-          {targeting && (
-            <motion.div
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              className="text-[11px] uppercase tracking-[0.15em] text-amber-300 font-bold flex items-center gap-2"
-            >
-              {targeting.kind === "summon" && <>↑ Touche une LANE VIDE de ton côté pour invoquer {targeting.move.toUpperCase()}</>}
-              {targeting.kind === "spell" && targeting.targetKind === "lane" && (() => {
-                const side = LANE_SPELL_TARGET_SIDE[targeting.id] ?? "my-creature";
-                if (side === "my-creature") return <>↑ Touche TA CRÉATURE à cibler</>;
-                if (side === "opp-creature") return <>↑ Touche la CRÉATURE ADVERSE à cibler</>;
-                if (side === "my-empty-opp-occupied") return <>↑ Touche UNE LANE VIDE face à un adversaire</>;
-                return <>↑ Touche une lane de ton côté</>;
-              })()}
-              <button
-                onClick={cancelTargeting}
-                className="px-2 py-0.5 rounded-full bg-hairline text-[10px] font-bold"
-              >Annuler</button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+      {/* Phrase jaune retirée (Alex 2026-06-11) : les lanes illuminées indiquent
+       *  déjà où cibler, et re-tap sur le move/carte = annuler. */}
 
-      {/* Queued summons + spells chips — FIXED HEIGHT to keep the board's
-       *  ScaleToFit measurement stable across the turn. Without this, every
-       *  added/removed chip changes the plan-phase height, which makes
-       *  ScaleToFit re-shrink the board → Alex's "le pad change de
-       *  dimensions". Chips themselves are bigger + show an explicit
-       *  "Annuler ✕" label so the player understands they're tappable. */}
-      <div className="h-7 flex flex-wrap items-center justify-center gap-1.5 max-w-md mx-auto w-full">
-        {intent.summons.map((s) => (
-          <button
-            key={`sum-${s.lane}`}
-            onClick={() => onRemoveSummon(s.lane)}
-            className="text-[11px] font-bold rounded-full pl-2 pr-1.5 py-0.5 bg-emerald-500/30 border border-emerald-400/65 text-emerald-50 inline-flex items-center gap-1.5 shadow shadow-emerald-500/20 active:scale-95"
-          >
-            <MoveGlyph move={s.move} className="w-3.5 h-3.5" />
-            <span>L{s.lane + 1}</span>
-            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-rose-500/85 text-white text-[10px] leading-none">✕</span>
-          </button>
-        ))}
-        {intent.spells.map((s, idx) => (
-          <button
-            key={`sp-${idx}`}
-            onClick={() => onRemoveSpell(idx)}
-            className="text-[11px] font-bold rounded-full pl-2 pr-1.5 py-0.5 bg-violet-500/30 border border-violet-400/65 text-violet-50 inline-flex items-center gap-1.5 shadow shadow-violet-500/20 active:scale-95"
-          >
-            <span className="text-[13px] leading-none">{CARDS[s.id].glyph}</span>
-            <span>{CARDS[s.id].cost}m</span>
-            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-rose-500/85 text-white text-[10px] leading-none">✕</span>
-          </button>
-        ))}
-      </div>
+      {/* Zone chips planifiés RETIRÉE (Alex 2026-06-11 "ordonner le tout") :
+       *  - les sorts LANE-target s'affichent comme stickers en éventail dans
+       *    le coin sup-gauche de leur lane (cf. ArenaBoard).
+       *  - les sorts UTILITY (hero/self/global) s'affichent en mini-cards sur
+       *    le strip you (à droite, tappables pour retirer).
+       *  → plus de zone 52px entre le pad et le strip you. */}
 
       {/* Card inspect — now a FULLSCREEN MODAL (z-50 overlay) rather than
        *  an inline panel, so opening it doesn't touch the plan-phase
@@ -260,19 +292,54 @@ export function ArenaPlanPhase({
             id={inspecting}
             targetKind={CARD_TARGET_KIND[inspecting] ?? "global"}
             t={t}
-            onCommit={() => commitCard(inspecting)}
+            onCommit={() => { playCard(inspecting); setInspecting(null); }}
             onClose={() => setInspecting(null)}
+            forgeHint={(() => {
+              if (!isFusible(inspecting)) return undefined;
+              const r = board.forgeA ? findFusionResult(inspecting, board.forgeA) : null;
+              return r ? `⚗ Fusionner → ${t(CARDS[r].nameKey)}` : "⚗ Déposer sur la Forge";
+            })()}
+            onForge={isFusible(inspecting) && onForgeDeposit
+              ? () => { onForgeDeposit(inspecting); setInspecting(null); }
+              : undefined}
+            fusionRecipes={fusionPartnersOf(inspecting).map((r) => ({
+              partner: r.a === inspecting ? r.b : r.a,
+              result: r.result,
+            }))}
           />
         )}
       </AnimatePresence>
 
-      {/* Mana summary */}
-      <div className="text-center text-[10px] text-ink-muted font-bold tabular-nums">
-        Mana planifié : <span className={intentCost > me.mana ? "text-rose-300" : "text-sky-300"}>
-          {intentCost}/{me.mana}
-        </span>
-        {intentCost === 0 && !inspecting && <span className="text-ink-faint"> · tape une carte / un coup · hold 1.5s pour lire</span>}
-        {inspecting && <span className="text-amber-300"> · lis puis tape ✓ JOUER pour confirmer</span>}
+      {/* Mana summary déplacé SOUS le bouton FIN DE TOUR (Alex 2026-06-11). */}
+
+      {/* ════ PLAYER HERO STRIP — rendu ICI, JUSTE au-dessus du picker, pour
+       *  être à ~1px des moves (Alex 2026-06-11). Bloc indépendant. ════ */}
+      <div className="pl-0 pr-1 shrink-0 mb-0.5">
+        <ArenaHeroStrip
+          hero={me}
+          board={board}
+          side="you"
+          turn={board.turn}
+          name={playerName}
+          avatar={playerAvatar}
+          incomingAttackKey={incomingAttackKey}
+          augurRevealed={board.augurRevealedA}
+          pendingUtility={intent.spells.filter((s) => s.kind !== "lane")}
+          /* Croix de retrait DISPONIBLE tant que « Fin de tour » pas appuyé
+           * (disabled=false). Alex 2026-06-13 : « il faut la petite croix pour
+           * retirer un Second Souffle tant que pas locké ». Post-lock
+           * (resolving) → undefined → chips non-retirables. */
+          onRemoveUtility={disabled ? undefined : (localIdx) => {
+            // Mappe l'index local (liste utility filtrée) → index global intent.
+            let seen = -1;
+            for (let i = 0; i < intent.spells.length; i++) {
+              if (intent.spells[i].kind !== "lane") {
+                seen += 1;
+                if (seen === localIdx) { onRemoveSpell(i); return; }
+              }
+            }
+          }}
+        />
       </div>
 
       {/* RPSLS move picker — compact strip. Tap to enter targeting mode
@@ -283,7 +350,10 @@ export function ArenaPlanPhase({
         {MOVES.map((mv) => {
           const pal = MOVE_PALETTE[mv];
           const cannotAfford = manaLeft < 1;
-          const isTargeting = targeting?.kind === "summon" && targeting.move === mv;
+          // isTargeting OU déjà confirmé dans intent.summons (Alex 2026-06-11) :
+          // le glow gold sur le picker remplace la mini-carte chip de la queue.
+          const isPlannedSummon = intent.summons.some((s) => s.move === mv);
+          const isTargeting = (targeting?.kind === "summon" && targeting.move === mv) || isPlannedSummon;
           const rim = moveRim(pal.hex);
           const glow = moveGlow(pal.hex);
           const canDrag = !cannotAfford && !disabled;
@@ -343,16 +413,35 @@ export function ArenaPlanPhase({
         })}
       </div>
 
+      {/* É1 COCKPIT (audit UX 2026-06-12) — la main et le bouton FIN DE TOUR
+       *  partagent une RANGÉE façon Hearthstone : main éventail flex-1 +
+       *  bouton ROND doré fixe à droite (badge mana planifié intégré). */}
+      <div className="shrink-0 flex items-end gap-1.5">
       {/* Hand strip — tap = commit/target, hold 1.4s = inspect modal, DRAG =
-       *  one-gesture commit to a lane (only meaningful for lane-targeted
-       *  spells; non-lane cards just snap back). dragSnapToOrigin returns
-       *  the card to its slot after release. */}
-      {/* Hand strip — FIXED HEIGHT container so the pad doesn't reflow when
-       *  cards leave/enter the hand. relative + z-30 pour s'assurer que les
-       *  cartes apparaissent DEVANT le board (Alex flag : "afficher en
-       *  éventail mais DEVANT, pas DERRIÈRE!"). */}
-      <div className="h-[82px] flex items-end justify-center relative z-30">
-      {me.hand.length > 0 ? (
+       *  one-gesture commit to a lane. É2 : éventail COURBE (rotate/y par
+       *  index, carte active remontée ×1.16) — transform-only, GPU. */}
+      {/* h-[96px] (Alex 2026-06-12 #4) : +8px pour l'éventail ET les noms —
+       *  le pad se réduit AUTOMATIQUEMENT d'autant via BoardFillSlot (flex),
+       *  sans bouger de place. */}
+      <div className="h-[96px] flex-1 min-w-0 flex items-end justify-center relative z-30">
+      {(() => {
+        // Filtre visuel (Alex 2026-06-11) : les cartes mises dans l'intent
+        // sont DIRECTEMENT retirées de la main affichée → sentiment CCG net.
+        // On compte combien de copies de chaque id sont déjà queue, et on
+        // skip ce nombre depuis le début de la main.
+        const queuedById = new Map<CardId, number>();
+        for (const sp of intent.spells) {
+          queuedById.set(sp.id, (queuedById.get(sp.id) ?? 0) + 1);
+        }
+        const visibleHand: Array<{ id: CardId; i: number }> = [];
+        const skipLeft = new Map(queuedById);
+        for (let i = 0; i < me.hand.length; i++) {
+          const id = me.hand[i];
+          const left = skipLeft.get(id) ?? 0;
+          if (left > 0) { skipLeft.set(id, left - 1); continue; }
+          visibleHand.push({ id, i });
+        }
+        return visibleHand.length > 0 ? (
         // Alex feedback : "pas dispo le slide" → ajout de touchAction
         // pan-x au wrapper pour permettre le scroll horizontal natif sans
         // que le drag-card intercepte le swipe horizontal.
@@ -360,73 +449,105 @@ export function ArenaPlanPhase({
         // (si center et qu'il manque de place, les cards des extrémités
         // sont coupées sans pouvoir scroller).
         <div
-          className="flex items-end justify-start gap-1 px-1 overflow-x-auto w-full"
-          style={{ touchAction: "pan-x", scrollbarWidth: "thin" }}
+          // justify-CENTER (Alex 2026-06-12 #2) : l'éventail se recentre à
+          // chaque ajout/retrait de carte (anim layout).
+          // h-full + PAS d'overflow (Alex 2026-06-12 "hauts des cartes
+          // cachés") : l'ancien overflow-x-auto créait une boîte de ~62px
+          // bottom-alignée qui ROGNAIT tout ce qui montait au-dessus de son
+          // bord (carte active +12px, coins inclinés). L'éventail tient en
+          // largeur par design (max 8 cartes overlappées ≈ 300px) → pas
+          // besoin de scroll ; la carte levée peut déborder librement
+          // au-dessus (z-30 > picker, elle passe DEVANT, façon Hearthstone).
+          className="h-full flex items-end justify-center gap-0.5 px-1 pb-0.5 w-full"
         >
-          {me.hand.map((id, i) => {
+          <AnimatePresence>
+          {visibleHand.map(({ id, i }, pos) => {
             const card = CARDS[id];
             const supported = arenaSupported(id);
-            const cannotAfford = manaLeft < card.cost;
+            const cannotAfford = manaLeft < arenaSpellCost(me, id);
             const isTargeting = targeting?.kind === "spell" && targeting.id === id;
             const isInspecting = inspecting === id;
-            const targetKind = CARD_TARGET_KIND[id] ?? "global";
-            // Alex feedback 2026-06-09 : badge LOCK sur les Aegis si le hero
-            // a déjà cast Aegis ce match (lock activé). Visuel grayscale +
-            // chip "🔒 LOCK" pour clarifier que la carte est inutile.
-            const aegisLocked = id === "aegis" && !!me.aegisCastThisMatch;
-            const canDragCard = supported && !cannotAfford && !disabled && targetKind === "lane" && !aegisLocked;
+            // É2 — géométrie de l'éventail : rotation répartie (max ±12°),
+            // creux parabolique vers les bords, carte active redressée +
+            // remontée au-dessus des voisines.
+            // Courbe ADOUCIE (Alex 2026-06-12 #4) : ±9° max et creux réduit —
+            // les noms des cartes extrêmes restent lisibles, plus de coupe.
+            const n = visibleHand.length;
+            const center = (n - 1) / 2;
+            const stepDeg = n > 1 ? Math.min(4, 18 / (n - 1)) : 0;
+            const fanAngle = (pos - center) * stepDeg;
+            const fanY = Math.pow(Math.abs(pos - center), 2) * (n > 6 ? 0.8 : 1.2);
+            const fanActive = (isTargeting || isInspecting) && activePos === pos;
+            // Chevauchement DYNAMIQUE (Alex 2026-06-13) : plus il y a de cartes,
+            // plus elles se SERRENT → l'éventail ne déborde plus sur le bouton
+            // FIN DE TOUR (à droite de la rangée). Le drag des cartes est retiré
+            // → tap fiable malgré le chevauchement (cf. bouton nu + pressedPos).
+            const overlap = n > 6 ? 12 : n > 4 ? 8 : 5;
             return (
-              <div key={`${id}-${i}`} className="flex flex-col items-center gap-0.5 shrink-0">
               <motion.div
-                drag={canDragCard}
-                dragSnapToOrigin
-                dragMomentum={false}
-                dragElastic={0.18}
-                dragTransition={{ bounceStiffness: 720, bounceDamping: 28, power: 0.35 }}
-                whileDrag={{ scale: 1.12, zIndex: 60, transition: { type: "spring", stiffness: 520, damping: 32 } }}
-                onDragStart={() => {
-                  // Cancel any in-flight long-press timer — the user is
-                  // dragging, not holding to inspect.
-                  if (pressTimerRef.current) {
-                    window.clearTimeout(pressTimerRef.current);
-                    pressTimerRef.current = null;
-                  }
-                  longPressedRef.current = true; // suppress release-commit
-                  if (!canDragCard) return;
-                  hapticTap();
-                  setInspecting(null);
-                  setTargeting({ kind: "spell", id, targetKind: "lane" });
+                key={`${id}-${i}`}
+                layout
+                // PIOCHE animée (Alex 2026-06-13) : la carte GLISSE depuis la
+                // droite (le deck) avec une rotation, au lieu d'apparaître.
+                initial={{ scale: 0.6, opacity: 0, x: 46, rotate: 14 }}
+                // É2 — éventail : rotation/creux par index ; carte active
+                // redressée, remontée et agrandie AU-DESSUS des voisines.
+                animate={{
+                  // PRESS ne change PLUS la transform (Alex 2026-06-13 : la carte
+                  // se redressait/remontait sous le doigt → l'extrémité « fuyait »
+                  // le toucher → sélection partielle/instable). On ne fait que la
+                  // passer DEVANT (zIndex). Elle reste EXACTEMENT sous le doigt.
+                  scale: fanActive ? 1.16 : 1,
+                  opacity: 1,
+                  x: 0,
+                  rotate: fanActive ? 0 : fanAngle,
+                  y: fanActive ? -12 : fanY,
                 }}
-                onDragEnd={(_e, info) => {
-                  if (!canDragCard) return;
-                  commitDragDrop(info.point, { kind: "spell", id, targetKind: "lane" });
-                }}
-                style={{ touchAction: "none" }}
+                exit={{ scale: 0.5, opacity: 0, y: -16 }}
+                // Réarrangement QUASI-INSTANTANÉ (Alex 2026-06-11) : layout +
+                // exit très courts (~90ms) pour que le joueur enchaîne la
+                // carte suivante sans attendre la fin de l'anim.
+                transition={{ layout: { duration: 0.09, ease: "easeOut" }, duration: 0.12, ease: "easeOut" }}
+                className="shrink-0"
+                style={{ marginLeft: pos === 0 ? 0 : -overlap, transformOrigin: "50% 100%", zIndex: pressedPos === pos ? 70 : fanActive ? 60 : pos }}
               >
+              {/* DRAG des cartes SUPPRIMÉ (Alex 2026-06-13) : l'enveloppe
+               *  motion.div drag (même drag={false}) posait touchAction:none +
+               *  un setup pointer framer qui « volait » certains taps (Second
+               *  Souffle obligeait à rester appuyé). Bouton NU = tap fiable. */}
               <button
-                onPointerDown={() => startPress(id)}
-                onPointerUp={() => endPress(id, true)}
-                onPointerLeave={() => endPress(id, false)}
-                onPointerCancel={() => endPress(id, false)}
-                disabled={!supported || cannotAfford || disabled || aegisLocked}
+                onPointerDown={(e) => {
+                  // 🎯 Pointer CAPTURE (Alex 2026-06-13 « le toucher des cartes aux
+                  // EXTRÉMITÉS craint, le milieu ça va ») : aux bords le pouce
+                  // s'étire et ROULE de quelques px → sans capture le pointeur
+                  // quitte la cible de 44px → pointerleave/cancel ANNULAIT le tap
+                  // (« se sélectionne/déselectionne, partiel »). Capturé, la carte
+                  // garde le pointeur jusqu'au relâché → tap fiable partout.
+                  // touchAction:none empêche en plus le WebView de lire ce micro-
+                  // mouvement comme un scroll/zoom (le picker RPSLS fait déjà ça).
+                  try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ }
+                  setActivePos(pos); setPressedPos(pos); startPress(id);
+                }}
+                onPointerUp={() => { setPressedPos(null); endPress(id, true); }}
+                onPointerLeave={() => { setPressedPos(null); endPress(id, false); }}
+                onPointerCancel={() => { setPressedPos(null); endPress(id, false); }}
+                disabled={!supported || cannotAfford || disabled}
+                style={{ touchAction: "none" }}
                 className={
                   "relative w-[44px] h-[60px] sm:w-[48px] sm:h-[66px] rounded-lg overflow-hidden bg-surface-raised transition " +
+                  // É2 : plus de scale-110 interne — l'emphase (×1.16 + remontée)
+                  // est portée par l'enveloppe éventail.
                   "ring-2 " + (
-                    isTargeting ? "ring-amber-300 scale-110"
-                    : isInspecting ? "ring-sky-300 scale-110"
-                    : aegisLocked ? "ring-zinc-600/60"
+                    isTargeting ? "ring-amber-300"
+                    : isInspecting ? "ring-sky-300"
                     : "ring-white/20"
                   ) +
-                  (!supported ? " grayscale opacity-30" : aegisLocked ? " grayscale opacity-50" : cannotAfford ? " opacity-40" : "")
+                  (!supported ? " grayscale opacity-30" : cannotAfford ? " opacity-40" : "")
                 }
-                title={aegisLocked ? "Aegis déjà utilisé ce match (lock)" : supported ? undefined : "Carte pas encore disponible en Arena"}
+                title={supported ? undefined : "Carte pas encore disponible en Arena"}
               >
                 <CardImage id={id} glyphSize="text-xl" />
-                {aegisLocked && (
-                  <div className="absolute inset-x-0 bottom-0 bg-zinc-900/85 text-zinc-300 text-[8px] font-bold uppercase tracking-wider text-center py-0.5 backdrop-blur-sm">
-                    🔒 LOCK
-                  </div>
-                )}
+
                 <div className="absolute top-0.5 left-0.5 z-10 inline-flex items-center justify-center gap-0.5 px-1 py-0.5 rounded-full bg-black/65 backdrop-blur-sm">
                   {Array.from({ length: card.cost }, (_, k) => (
                     <span key={k} className="w-1 h-1 rounded-full bg-sky-300" />
@@ -445,22 +566,50 @@ export function ArenaPlanPhase({
                     </span>
                   </div>
                 )}
+                {/* Badge ⚠ Pleine vie sur Second souffle (Alex 2026-06-11) :
+                 *  carte cast à HP max = mana + carte brûlés pour rien. Visuel
+                 *  avertit sans bloquer (choix CCG classique). */}
+                {/* ⚗ Badge FUSION — n'apparaît QUE quand une fusion est
+                 *  possible MAINTENANT (le partenaire de cette carte est sur
+                 *  ta Forge). Alex 2026-06-13 : l'ancien badge fuchsia
+                 *  TOUJOURS affiché ("points roses") embrouillait — on ne
+                 *  montre plus que le signal actionnable (OR pulsant). */}
+                {board.forgeA && isFusible(id) && findFusionResult(id, board.forgeA) && (
+                  <div
+                    className="absolute bottom-4 right-0.5 z-10 w-5 h-5 rounded-full flex items-center justify-center text-[11px] leading-none shadow bg-amber-400 text-zinc-900 animate-pulse ring-1 ring-amber-200"
+                    title="Fusion possible — tape la Forge !"
+                  >
+                    ⚗
+                  </div>
+                )}
+                {id === "second-wind" && me.hp >= me.maxHp && (
+                  <div
+                    className="absolute top-0.5 right-0.5 z-10 px-1 py-0.5 rounded-md bg-amber-500/90 text-[8px] font-black text-zinc-900 leading-none shadow"
+                    title="Tu es à pleine vie — la carte sera dépensée sans effet"
+                  >
+                    ⚠
+                  </div>
+                )}
               </button>
+              {/* Pill NOM — SOUS la carte touchée (Alex 2026-06-13 : "le nom
+               *  sous elle, pas ailleurs"). Enfant du wrapper éventail → suit
+               *  la carte (position + scale), centrée dessous, jamais tronquée. */}
+              {fanActive && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.12 }}
+                  className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-50 pointer-events-none"
+                >
+                  <span className="px-2 py-0.5 rounded-full bg-black/80 border border-amber-300/60 text-amber-100 text-[10px] font-black uppercase tracking-wider whitespace-nowrap shadow-lg">
+                    {t(card.nameKey)}
+                  </span>
+                </motion.div>
+              )}
               </motion.div>
-              {/* Name label beneath the card — truncated to the card width
-               *  so the player can scan their hand without tapping each. */}
-              <span
-                className={
-                  "text-[8px] sm:text-[9px] font-bold uppercase tracking-wider truncate max-w-[48px] leading-none " +
-                  (cannotAfford || !supported ? "text-ink-faint" : "text-ink")
-                }
-                title={t(card.nameKey)}
-              >
-                {t(card.nameKey)}
-              </span>
-              </div>
             );
           })}
+          </AnimatePresence>
         </div>
       ) : (
         <div className="flex flex-col items-center gap-1.5 opacity-65">
@@ -468,32 +617,31 @@ export function ArenaPlanPhase({
             🎴
           </div>
           <span className="text-[10px] text-ink-faint italic">
-            {/* Alex feedback (c) 2026-06-09 : si plus rien à piocher (deck
-             *  + discard vides), dire clairement "plus de cartes" — sinon
-             *  le message "fin de tour pour piocher" ment quand y'a rien. */}
-            {me.deck.length + me.discard.length === 0
+            {me.hand.length === 0 && me.deck.length + me.discard.length === 0
               ? "Plus de cartes à piocher (deck + défausse vides)"
-              : "Main vide — fin de tour pour piocher"}
+              : me.hand.length === 0
+              ? "Main vide — fin de tour pour piocher"
+              : "Toutes les cartes en main sont déjà planifiées"}
           </span>
         </div>
-      )}
+      );
+      })()}
+      {/* (Pill nom de carte : rendue PAR CARTE, sous la carte active —
+       *  cf. wrapper éventail. Alex 2026-06-13 : "le nom SOUS la carte,
+       *  pas ailleurs".) */}
       </div>
 
-      {/* Lock button — HTML button (stable on device, matches Ranked pattern).
-       *  Wrapped in a relative div with an ABSOLUTE blurred glow underneath
-       *  that pulses when canLock to indicate "tape ici" (Alex feedback #1).
-       *  The button itself stays rigid + cliquable — only the glow animates. */}
-      <div className="relative shrink-0 self-center mt-2">
+      {/* É1 — FIN DE TOUR : bouton ROND doré fixe (ancre visuelle façon
+       *  Hearthstone), badge MANA PLANIFIÉ intégré. Remplace l'ancien pill
+       *  centré + la ligne texte "Mana restant" (info dans le bouton). */}
+      <div className="relative shrink-0 pb-1.5 pr-0.5">
         {canLock && (
           <motion.div
             aria-hidden
-            animate={{ opacity: [0.35, 0.85, 0.35], scale: [0.96, 1.06, 0.96] }}
+            animate={{ opacity: [0.35, 0.85, 0.35], scale: [0.94, 1.1, 0.94] }}
             transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute inset-0 rounded-2xl pointer-events-none"
-            style={{
-              background: "linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))",
-              filter: "blur(14px)",
-            }}
+            className="absolute inset-0 rounded-full pointer-events-none"
+            style={{ background: "radial-gradient(circle, rgba(252,211,77,0.85), transparent 70%)", filter: "blur(10px)" }}
           />
         )}
         <button
@@ -507,20 +655,25 @@ export function ArenaPlanPhase({
           }}
           disabled={!canLock}
           className={
-            "relative px-7 py-2.5 rounded-2xl font-black text-white text-sm transition active:scale-[0.97] " +
+            "relative w-14 h-14 rounded-full flex flex-col items-center justify-center leading-none transition active:scale-[0.94] " +
             (canLock
-              ? "shadow-lg ring-2 ring-amber-300/40"
-              : "bg-hairline text-ink-faint cursor-not-allowed")
+              ? "text-zinc-900 shadow-xl ring-2 ring-amber-200/80"
+              : "bg-hairline text-ink-faint cursor-not-allowed ring-2 ring-white/10")
           }
           style={canLock ? {
-            background: "linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))",
+            background: "linear-gradient(140deg, #fde68a 0%, #f59e0b 55%, #b45309 100%)",
             fontFamily: "var(--font-headline)",
-            letterSpacing: "0.1em",
+            boxShadow: "0 6px 18px -4px rgba(245,158,11,0.7), inset 0 1px 0 rgba(255,255,255,0.5)",
             touchAction: "manipulation",
           } : { touchAction: "manipulation" }}
         >
-          ✓ FIN DE TOUR
+          {/* Badge mana retiré (Alex 2026-06-13 : "le chiffre + flèche pas
+           *  clair") — le mana est déjà lisible sur le strip you. Le bouton
+           *  ne dit plus que "FIN". */}
+          <span className="text-[12px] font-black tracking-wider leading-none">FIN</span>
+          <span className="text-[8px] font-bold uppercase tracking-wider opacity-80 leading-none mt-0.5">de tour</span>
         </button>
+      </div>
       </div>
     </div>
   );

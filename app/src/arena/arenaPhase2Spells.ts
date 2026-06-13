@@ -10,16 +10,17 @@
  * of truth for spell ordering); only the bodies live here.
  */
 
-import { drawCards, damageHero, healHero, creatureEffectiveAtk } from "./arenaRules";
+import { drawCards, damageHero, healHero, creatureEffectiveAtk, makeCreature } from "./arenaRules";
 import {
   getMyCreatureOnLane,
   getOppCreatureOnLane,
   withMyCreatureOnLane,
   withOppCreatureOnLane,
   withSideHero,
-  oppSide,
 } from "./arenaSpellHelpers";
-import { MANA_CAP, type BoardState, type Creature, type LaneState, type PlayedSpell, type Side } from "./arenaTypes";
+import { MANA_CAP, moveCountersMove, type BoardState, type Creature, type LaneState, type PlayedSpell, type Side } from "./arenaTypes";
+import { MOVES, type Move } from "../engine/game";
+import { alog } from "./arenaLog";
 import type { CardId } from "../ranked/rankedTypes";
 
 /** Gaia — heal hero +6 HP. */
@@ -28,18 +29,21 @@ export function applyGaia(board: BoardState, side: Side): BoardState {
   return withSideHero(board, side, healHero(hero, 6));
 }
 
-/** Sablier — +2 mana refresh THIS turn (over the cap if needed). Pure tempo. */
+/** Sablier — +2 mana THIS turn, plafonné à MANA_CAP (8). Pure tempo. Le
+ *  texte de carte Arena dit explicitement "plafond 8" — pas d'over-cap. */
 export function applySablier(board: BoardState, side: Side): BoardState {
   const hero = side === "a" ? board.a : board.b;
   return withSideHero(board, side, { ...hero, mana: Math.min(MANA_CAP, hero.mana + 2) });
 }
 
-/** Offre — +1 to max mana permanently (cap MANA_CAP). Stays for the rest of
- *  the match. Mana refreshes to the new cap on next turn. */
+/** Offre — +2 to max mana permanently (cap MANA_CAP). L'illustration montre
+ *  "+2" (Alex 2026-06-11), on suit l'image. Le mana courant grimpe aussi de
+ *  +2 (capé au nouveau max) pour que le gain soit utilisable dès ce tour. */
 export function applyOffre(board: BoardState, side: Side): BoardState {
   const hero = side === "a" ? board.a : board.b;
-  const newMax = Math.min(MANA_CAP, hero.maxMana + 1);
-  return withSideHero(board, side, { ...hero, maxMana: newMax });
+  const newMax = Math.min(MANA_CAP, hero.maxMana + 2);
+  const newMana = Math.min(newMax, hero.mana + 2);
+  return withSideHero(board, side, { ...hero, maxMana: newMax, mana: newMana });
 }
 
 /** Rempart — give every one of my creatures +2 max HP. Spock Détaché skipped. */
@@ -64,11 +68,12 @@ export function applyBenediction(board: BoardState, side: Side): BoardState {
   return { ...board, lanes };
 }
 
-/** Oracle Inverse — peek FULL opp hand (Augur shows the first 4 only). */
+/** Oracle Inverse — peek FULL opp hand (Augur shows the first 4 only).
+ *  Reste affichée 2 tours comme Augur (Alex 2026-06-11). */
 export function applyOracleInverse(board: BoardState, side: Side): BoardState {
   const opp = side === "a" ? board.b : board.a;
-  if (side === "a") return { ...board, augurRevealedB: opp.hand.slice() };
-  return { ...board, augurRevealedA: opp.hand.slice() };
+  if (side === "a") return { ...board, augurRevealedB: opp.hand.slice(), augurTurnsLeftB: 2 };
+  return { ...board, augurRevealedA: opp.hand.slice(), augurTurnsLeftA: 2 };
 }
 
 /** Cascade — draw 3 cards, then discard 1 random from hand (cycle a bad hand). */
@@ -95,15 +100,31 @@ export function applyEchappee(board: BoardState, side: Side, spell: PlayedSpell)
   return after;
 }
 
-/** Mascarade — opp discards 1 random card from hand. */
-export function applyMascarade(board: BoardState, side: Side): BoardState {
-  const oppS = oppSide(side);
-  const opp = oppS === "a" ? board.a : board.b;
-  if (opp.hand.length === 0) return board;
-  const idx = Math.floor(Math.random() * opp.hand.length);
-  const newHand = [...opp.hand.slice(0, idx), ...opp.hand.slice(idx + 1)];
-  const newDiscard = [...opp.discard, opp.hand[idx]];
-  return withSideHero(board, oppS, { ...opp, hand: newHand, discard: newDiscard });
+/** Mascarade — DÉGUISEMENT (Alex 2026-06-11, refonte) : transforme TA créature
+ *  ciblée en le symbole qui BAT la créature adverse en face (elle gagne la
+ *  lane ce tour). Sans adversaire en face : elle prend le symbole de ta Voie.
+ *  Fizzle s'il n'y a pas de créature à toi sur la lane. La créature redevient
+ *  fraîche (PV/charges du nouveau symbole + passif correspondant). */
+export function applyMascarade(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
+  if (spell.kind !== "lane") return board;
+  const me = getMyCreatureOnLane(board, side, spell.lane);
+  if (!me) {
+    alog("spell", `💤 ${side} Mascarade L${spell.lane} ne fait rien : aucune créature à toi sur cette lane à déguiser.`);
+    return board;
+  }
+  const oppC = getOppCreatureOnLane(board, side, spell.lane);
+  const hero = side === "a" ? board.a : board.b;
+  // Symbole de déguisement : celui qui counter l'adversaire en face ;
+  // sinon le symbole de Voie (pour relancer la Constellation).
+  let newMove: Move;
+  if (oppC) {
+    newMove = MOVES.find((m) => moveCountersMove(m, oppC.move)) ?? me.move;
+  } else {
+    newMove = hero.affinity ?? me.move;
+  }
+  const disguised = makeCreature(newMove, side, hero.affinity);
+  alog("spell", `${side} MASCARADE L${spell.lane} : ${me.move} → ${newMove}${oppC ? ` (counter ${oppC.move})` : ""}`);
+  return withMyCreatureOnLane(board, side, spell.lane, disguised);
 }
 
 /** Sangsue — heal hero by the effective ATK of my creature on the lane.
