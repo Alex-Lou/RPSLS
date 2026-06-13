@@ -29,6 +29,12 @@ export const LANE_COUNT = 3;
 // donc 7 cartes max est confortable sans débordement.
 export const HAND_CAP = 7;
 export const STARTING_HAND_SIZE = 5;
+/** Coût en mana pour RÉCUPÉRER vers la main la carte FUSIONNÉE de SA forge (Alex
+ *  2026-06-13, option B). Crée un EMPÊCHEMENT (mana serré → fusion coincée sur la
+ *  forge) ET une OPPORTUNITÉ DE VOL (tant qu'elle traîne, la Razzia adverse peut
+ *  la rafler). DÉPÔT, FUSION et reprise d'un simple dépôt restent GRATUITS ; seule
+ *  la sortie du PAYOFF (la carte fusionnée) se paie. */
+export const FORGE_RECOVER_COST = 1;
 // CAPS LEVÉS (Alex 2026-06-13 "CCG expert — pas de limites quand pas
 // nécessaires") : le MANA est désormais L'UNIQUE limite du tour, comme dans
 // tout CCG mature (Hearthstone n'a aucun cap de sorts/tour). 99 = inerte ;

@@ -146,21 +146,20 @@ export function ArenaPlanPhase({
     setTargeting({ kind: "spell", id, targetKind });
   }
 
-  /** Tap sur une carte : re-tap = annule ; un utilitaire FUSIBLE ouvre la
-   *  fiche (choix Lancer / ⚗ Forge) au lieu de s'auto-jouer (sinon impossible
-   *  à déposer sur la forge — Alex 2026-06-13) ; sinon joue/arme directement. */
+  /** Tap sur une carte : re-tap (carte déjà ciblée) = annule ; sinon JOUE/arme
+   *  directement. Les cartes FUSIBLES self/hero/global ne détournent PLUS le tap
+   *  vers la fiche (Alex 2026-06-13 « Second Souffle / Supernova réagissent
+   *  VRAIMENT bizarrement ») : la carte se soulevait (fanActive sur isInspecting)
+   *  PUIS une modale s'ouvrait = effet de DEMI-SÉLECTION, pire à l'extrémité
+   *  gauche où le chevauchement est le plus serré. Le chemin Forge reste
+   *  accessible par APPUI LONG → fiche → ⚗ (Déposer / Fusionner). Règle nette,
+   *  cohérente pour TOUTES les cartes : tap = jouer. */
   function commitCard(id: CardId) {
     alog("hand", `TAP card ${id}${disabled ? " (disabled)" : ""}`);
     if (disabled) return;
     if (targeting?.kind === "spell" && targeting.id === id) {
       hapticTap();
       setTargeting(null);
-      return;
-    }
-    const tk = CARD_TARGET_KIND[id] ?? "global";
-    if (isFusible(id) && (tk === "self" || tk === "global" || tk === "hero")) {
-      hapticTap();
-      setInspecting(id);
       return;
     }
     playCard(id);

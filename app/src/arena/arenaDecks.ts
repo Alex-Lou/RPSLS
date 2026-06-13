@@ -149,6 +149,12 @@ export const RARITY_COPIES: Record<string, number> = {
   common: 3, rare: 2, epic: 2, legendary: 1,
 };
 
+/** CAP de cartes LÉGENDAIRES autorisées dans un deck ARENA (Alex 2026-06-13
+ *  « pas 4 légendaires en repioche, équité ») — au-delà, le surplus est retiré
+ *  au build (buildPlayerDeck, donc le CPU mirror est capé aussi → parité) ET
+ *  bloqué dans le DeckManager. Tunable d'un seul chiffre. */
+export const ARENA_LEGENDARY_CAP = 2;
+
 export function buildPlayerDeck(saved: CardId[] | undefined): CardId[] {
   // REFONTE Alex 2026-06-12 : le deck RESPECTE les choix du joueur (zéro
   // carte parasite). ÉCONOMIE 2026-06-13 : chaque carte choisie est étendue
@@ -169,13 +175,26 @@ export function buildPlayerDeck(saved: CardId[] | undefined): CardId[] {
     counts.set(c, cur + 1);
     return true;
   };
-  // 1) Les CHOIX du joueur, étendus en copies-par-rareté.
-  const chosen = [...new Set((saved ?? []).filter(isDeckable))];
+  // 1) Les CHOIX du joueur, étendus en copies-par-rareté. CAP LÉGENDAIRES
+  //    (Alex 2026-06-13 équité) : on garde au plus ARENA_LEGENDARY_CAP
+  //    légendaires (les 1res choisies, ordre deck) ; le surplus est retiré.
+  const isLegend = (c: CardId) => CARDS[c]?.rarity === "legendary";
+  let legKept = 0;
+  const chosen = [...new Set((saved ?? []).filter(isDeckable))].filter((c) => {
+    if (!isLegend(c)) return true;
+    if (legKept >= ARENA_LEGENDARY_CAP) return false; // surplus de légendaires retiré
+    legKept += 1;
+    return true;
+  });
   for (const c of chosen) {
     for (let k = 0; k < copiesFor(c); k++) tryPush(c);
   }
-  // 2) Filet de portée : 1 carte reach garantie SEULEMENT si aucune présente.
-  if (!out.some((c) => REACH_CARDS.has(c))) tryPush("supernova");
+  // 2) Filet de portée : 1 carte reach garantie SEULEMENT si aucune présente —
+  //    supernova (légendaire) si on est SOUS le cap, sinon heist (épique) pour
+  //    ne pas dépasser ARENA_LEGENDARY_CAP.
+  if (!out.some((c) => REACH_CARDS.has(c))) {
+    tryPush(out.filter(isLegend).length < ARENA_LEGENDARY_CAP ? "supernova" : "heist");
+  }
   // 3) ANTI-POINT-MORT (Alex : "aucun point mort, coincé") : l'exil des
   //    légendaires retire des cartes du cycle — si le deck choisi est trop
   //    légendaire-lourd, le pool recyclable peut s'assécher. Garantie : au

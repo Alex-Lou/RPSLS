@@ -200,15 +200,21 @@ export function drawOneAvoidingHand(
 ): { card: CardId; deck: CardId[]; discard: CardId[] } | null {
   let d = deck.slice();
   let disc = discard.slice();
+  // ⚖️ Légendaires NE RECYCLENT PAS (Alex 2026-06-13 « 4 légendaires en repioche,
+  // wtf ») : à chaque RESHUFFLE de la défausse on les DROPPE → une légendaire VUE
+  // ne revient jamais en pioche. En plus de l'exil au CAST, ça sort aussi du
+  // cycle une légendaire défaussée SANS être jouée (Juge/Cascade) — fini le flood.
+  const noLegend = (pool: CardId[]) => pool.filter((c) => CARDS[c]?.rarity !== "legendary");
   if (d.length === 0) {
-    if (disc.length === 0) return null;
-    d = shuffle(disc); disc = [];
+    const pool = noLegend(disc);
+    if (pool.length === 0) return null;
+    d = shuffle(pool); disc = [];
   }
   // Préfère une carte PAS déjà dans `avoid`.
   let idx = d.findIndex((c) => !avoid.includes(c));
   if (idx < 0 && disc.length > 0) {
-    // Rien de neuf dans le deck → injecte la défausse mélangée et re-cherche.
-    d = d.concat(shuffle(disc)); disc = [];
+    // Rien de neuf dans le deck → injecte la défausse mélangée (sans légendaires).
+    d = d.concat(shuffle(noLegend(disc))); disc = [];
     idx = d.findIndex((c) => !avoid.includes(c));
   }
   if (idx < 0) idx = 0; // tout le pool est doublon → filet : pioche la tête

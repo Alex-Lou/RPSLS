@@ -14,6 +14,7 @@ import { useStore } from "../store/store";
 import { ALL_CARD_IDS, CARDS, isPassiveCard, RARITY_COLOR, RARITY_ORDER } from "./cards";
 import { isFusible } from "../arena/arenaFusionCards";
 import { isCastOnDraw } from "../arena/arenaCastOnDraw";
+import { ARENA_LEGENDARY_CAP } from "../arena/arenaDecks";
 import { CardImage } from "./CardImage";
 import { masteryLevel, MASTERY_MAX_LEVEL } from "../engine/economy";
 import type { CardId, CardRarity } from "./rankedTypes";
@@ -180,6 +181,17 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
       setModalOpen(false); setSelected(null);
       return;
     }
+    // CAP légendaires en ARENA (Alex 2026-06-13 équité) : pas plus de
+    // ARENA_LEGENDARY_CAP légendaires dans le deck → fini le flood de bombes en
+    // repioche. (Le retrait ci-dessus reste toujours possible.)
+    if (mode === "arena" && card.rarity === "legendary") {
+      const legCount = deck.filter((c) => c !== null && CARDS[c]?.rarity === "legendary").length;
+      if (legCount >= ARENA_LEGENDARY_CAP) {
+        setModalOpen(false);
+        setDeckMsg({ text: `Max ${ARENA_LEGENDARY_CAP} légendaires en Arena (équité) — retires-en une d'abord`, tone: "warn", key: Date.now() });
+        return;
+      }
+    }
     const freeIdx = deck.indexOf(null);
     if (freeIdx < 0) {
       // Deck plein : pas de cul-de-sac. On GARDE la carte sélectionnée, on
@@ -212,6 +224,13 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
     const next = [...deck];
     if (existingIdx >= 0) next[existingIdx] = slotCard; // swap
     next[slotIdx] = selected;
+    // CAP légendaires ARENA (Alex 2026-06-13 équité) — vaut AUSSI pour le swap,
+    // sinon on pouvait dépasser le cap en remplaçant un slot.
+    if (mode === "arena" && CARDS[selected].rarity === "legendary"
+        && next.filter((c) => c !== null && CARDS[c]?.rarity === "legendary").length > ARENA_LEGENDARY_CAP) {
+      setDeckMsg({ text: `Max ${ARENA_LEGENDARY_CAP} légendaires en Arena (équité) — retires-en une d'abord`, tone: "warn", key: Date.now() });
+      return; // swap annulé, selected reste set
+    }
     setDeck(next);
     setDeckMsg({
       text: slotCard

@@ -5,12 +5,16 @@
  * mécanique dépôt/fusion/reprise vit dans ArenaGame (depositOrFuse).
  *
  * RÈGLE DE LISIBILITÉ (Alex « forge pas claire ») : l'étiquette ANNONCE
- * l'action — Déposer / Fusion ✦ / Reprendre ↩ / Forge. Dépôt GRATUIT (0 mana) ;
- * seul le coût de la carte fusionnée se paie à sa pose.
+ * l'action — Déposer / Fusion ✦ / Reprendre ↩ / Forge. Dépôt, fusion ET reprise
+ * d'un simple dépôt GRATUITS ; seule la RÉCUP d'une carte FUSIONNÉE coûte
+ * FORGE_RECOVER_COST mana (Alex 2026-06-13, option B : empêchement + fenêtre de
+ * vol Razzia), affiché dans l'étiquette ; le coût de la carte fusionnée se paie
+ * en plus à sa pose.
  */
 
 import { AnimatePresence, motion } from "motion/react";
 import { CardImage } from "../ranked/CardImage";
+import { FORGE_RECOVER_COST } from "./arenaTypes";
 import type { CardId } from "../ranked/rankedTypes";
 
 /** ⚗️ FORGE SLOT — la 4e case de chaque joueur (bande centrale du pad).
@@ -101,7 +105,11 @@ export function ForgeSlot({
        *   • sinon → « Forge ». Dépôt GRATUIT (0 mana) ; seul le coût de la
        *     carte fusionnée se paie à sa pose. */}
       {(() => {
-        const label = !mine ? "Forge" : highlight === "fuse" ? "Fusion ✦" : highlight === "deposit" ? "Déposer" : forged ? "✨ Récupérer" : card ? "↩ Reprendre" : "Forge";
+        // SEULE la carte FUSIONNÉE coûte à la récup (option B, Alex 2026-06-13) :
+        // le coût est ANNONCÉ dans l'étiquette « ✨ Récupérer ·1◆ ». Reprendre un
+        // simple dépôt reste gratuit → pas de coût affiché.
+        const recover = ` ·${FORGE_RECOVER_COST}◆`;
+        const label = !mine ? "Forge" : highlight === "fuse" ? "Fusion ✦" : highlight === "deposit" ? "Déposer" : forged ? `✨ Récupérer${recover}` : card ? "↩ Reprendre" : "Forge";
         // « Reprendre / Récupérer » : petit ENCADRÉ-bouton juste sous la carte
         // (Alex 2026-06-13) → on voit que la forge est tappable pour récupérer.
         const isReprise = mine && !!card && !highlight;
