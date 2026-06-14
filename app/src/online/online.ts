@@ -99,6 +99,9 @@ export type ClientMessage =
   // identity + progression. Both reply auth_ok / auth_error.
   | { type: "signup"; email: string; password: string }
   | { type: "login"; email: string; password: string }
+  // Sign in with Google — `id_token` is a Google-issued OIDC ID token obtained
+  // on-device; the server verifies it (RS256/JWKS) and replies auth_ok/error.
+  | { type: "google_login"; id_token: string }
   | { type: "create_lobby"; best_of: number }
   | { type: "join_lobby"; code: string }
   | { type: "join_queue"; best_of: number }
@@ -155,7 +158,7 @@ export type ServerMessage =
   // Auth (signup/login) result. On auth_ok the client adopts player_id +
   // claim_token and merges `state`. auth_error.code is generic (never leaks
   // whether an e-mail exists).
-  | { type: "auth_ok"; player_id: string; claim_token?: string; state: PlayerProgress }
+  | { type: "auth_ok"; player_id: string; claim_token?: string; state: PlayerProgress; email?: string }
   | { type: "auth_error"; code: string }
   /* Lanes variants */
   | {

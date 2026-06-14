@@ -35,6 +35,7 @@ use crate::session::Session;
 
 mod account;
 mod auth;
+mod google_auth;
 // Économie serveur-autoritaire (Alex 2026-06-13) — fondation pure pour l'instant
 // (règles + méta cartes). Pas encore câblée → dead_code toléré le temps des
 // incréments (endpoints validés à venir).
@@ -277,6 +278,10 @@ async fn main() {
     info!(
         "player state sync: {}",
         if player_state::enabled() { "ENABLED (Upstash)" } else { "disabled" }
+    );
+    info!(
+        "google sign-in: {}",
+        if google_auth::is_configured() { "ENABLED (GOOGLE_OAUTH_CLIENT_IDS set)" } else { "disabled (set GOOGLE_OAUTH_CLIENT_IDS)" }
     );
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
@@ -527,6 +532,10 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
 
         ClientMessage::Login { email, password } => {
             account::handle_login(&state.auth_attempts, session, email, password);
+        }
+
+        ClientMessage::GoogleLogin { id_token } => {
+            google_auth::handle_google_login(&state.auth_attempts, session, id_token);
         }
 
         ClientMessage::CreateLobby { best_of } => {

@@ -51,3 +51,8 @@ base64 = "0.22"
 # random per-password salt — pure Rust, no system/OpenSSL deps so the Docker
 # build stays clean. Salt bytes come from the existing `rand` dependency.
 argon2 = "0.5"
+
+# Google ID-token (OIDC) verification for "Sign in with Google" / Play Games.
+# Real RS256 signature check against Google's JWKS (fetched + cached) plus
+# aud / iss / exp validation. Pure Rust — keeps the Docker/rustls build clean.
+jsonwebtoken = "9"

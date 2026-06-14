@@ -41,6 +41,12 @@ pub enum ClientMessage {
     /// progression. Replies with `AuthOk` / `AuthError`.
     Login { email: String, password: String },
 
+    /// Sign in with Google: the client sends a Google-issued OIDC ID token; the
+    /// server verifies it (RS256 + JWKS, aud/iss/exp) and maps the verified
+    /// `sub` to a durable player_id. Replies `AuthOk` / `AuthError`. See
+    /// `google_auth.rs`.
+    GoogleLogin { id_token: String },
+
     /// Create a private lobby. Server replies with a 6-char code.
     CreateLobby { best_of: u8 },
 
@@ -185,6 +191,11 @@ pub enum ServerMessage {
         #[serde(skip_serializing_if = "Option::is_none")]
         claim_token: Option<String>,
         state: PlayerProgress,
+        /// Verified account e-mail when the server knows it (Google sign-in
+        /// returns it so the client can show "signed in as …" + enable logout).
+        /// Omitted for e-mail/password (the client already has the typed value).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        email: Option<String>,
     },
 
     /// Auth failed. `code` is intentionally generic (`invalid_credentials`,

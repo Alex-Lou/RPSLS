@@ -316,6 +316,7 @@ pub fn handle_signup(
                             player_id: pid,
                             claim_token,
                             state: progress,
+                            email: None,
                         });
                     }
                     Ok(false) => {
@@ -378,6 +379,7 @@ pub fn handle_login(
                     player_id: pid,
                     claim_token,
                     state: progress,
+                    email: None,
                 });
             }
             _ => {
