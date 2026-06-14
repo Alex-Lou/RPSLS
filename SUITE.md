@@ -6,11 +6,11 @@
 ---
 
 ## 0. TL;DR — état au 14/06
-- Tout est **en prod** : `main` = `develop` = `feat/accounts` = `5c74631` (pushé, déployé Render). Working tree **propre**.
+- Base déployée Render = `main` = `develop` = `5c74631`. `feat/accounts` porte la doc + le split serveur (`dispatch.rs`/`hello.rs`), promu `→ develop → main` à ce push.
 - **Comptes e-mail/mdp** : FINIS, durcis (revue adversariale, 4 trous corrigés), validés device. ✅
 - **Google sign-in** : **DÉSACTIVÉ** (plante l'app — voir §3). Le bouton ne s'affiche plus.
 - **DRY** : 3 wins faits + pushés (voir §1). Le reste = §1.
-- **Splits <400 lignes** : à peine entamés (serveur `main.rs` 854→703). ~20 fichiers restants — voir §2.
+- **Splits <400 lignes** : serveur `main.rs` **FAIT** (762→317, routeur extrait → `dispatch.rs`+`hello.rs`, cargo 23/23, vérif adversariale = extraction pure). ~19 fichiers client restants — voir §2.
 - **Traductions** : FR 100%, autres langues incomplètes (reporté — voir §4).
 - **Règles durables** (rappel, détail dans `HANDOFF.md` §4) : commits **sans trace IA**, auteur Alex, FR conventionnel · **build + test device AVANT push** · fichiers **<400 lignes** · `feat → develop → main` (Render déploie depuis `main`).
 
@@ -51,7 +51,7 @@ Fichiers >400l (hors `i18n/locales/*` = data, exemptés). **Du plus gros au plus
 | `app/src/pages/play/PlayMenu.tsx` | 1089 | |
 | `app/src/ranked/DeckManager.tsx` | 1030 | |
 | `app/src/arena/ArenaGame.tsx` / `ArenaBoard` / `ArenaLaneSlot` | 909 / 861 / 859 | |
-| `crates/rpsls-server/src/main.rs` | **703** | **entamé** (janitors sortis) → reste à extraire `handle_client_message` → `dispatch.rs` pour passer <400 |
+| ~~`crates/rpsls-server/src/main.rs`~~ | ✅ **317** | FAIT — routeur extrait → `dispatch.rs` (276) + `hello.rs` (217, Hello/TOFU), tous <400 |
 | `app/src/store/store.ts` | 811 | extraire `migrate` (v7→v22) + `defaultPlayer` |
 | `app/src/match/sharedMatchUI.tsx` · `arena/arenaRules.ts` · `ranked/cards.ts` · `pages/ShopPage.tsx` · `App.tsx` (605, extraire Splash/AppBackdropLayers) … | 600-800 | |
 
