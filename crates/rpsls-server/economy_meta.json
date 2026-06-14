@@ -34,6 +34,20 @@
     "stars": 30,
     "cards": 14
   },
+  "premiumSetIds": [
+    "bloom",
+    "coral",
+    "eclipse",
+    "emberforge",
+    "ink",
+    "phantom",
+    "prism",
+    "quartz",
+    "rust",
+    "storm",
+    "tempus",
+    "void"
+  ],
   "codexTiers": [
     {
       "threshold": 5,

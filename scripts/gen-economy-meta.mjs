@@ -18,6 +18,8 @@ import { dirname, join } from "node:path";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const ECO = readFileSync(join(ROOT, "app", "src", "engine", "economy.ts"), "utf8");
 const RANK = readFileSync(join(ROOT, "app", "src", "engine", "rank.ts"), "utf8");
+const THEMES = readFileSync(join(ROOT, "app", "src", "theme", "themes.ts"), "utf8");
+const TYPES = readFileSync(join(ROOT, "app", "src", "types.ts"), "utf8");
 const OUT = join(ROOT, "crates", "rpsls-server", "economy_meta.json");
 
 const fail = (msg) => { throw new Error(`gen-economy-meta: ${msg}`); };
@@ -58,6 +60,18 @@ const dustPerDuplicate = numMap(objectBody(ECO, "DUST_PER_DUPLICATE"));
 const craftCost = numMap(objectBody(ECO, "CRAFT_COST"));
 const welcomeBonus = numMap(objectBody(ECO, "WELCOME_BONUS"));
 
+// Ids des sets premium (whitelist anti-forge serveur) — UNION des `premiumSetId`
+// déclarés sur les fonds (themes.ts) ET les pads (PAD_META dans types.ts), car un
+// set est un bundle fond+pad+HUD. Un id absent de cette liste ne peut PAS être
+// légitimement possédé → le serveur le retire de ownedPremiumSets. L'union ne
+// peut qu'ajouter de vrais ids (jamais en retirer) → zéro perte.
+const premiumSetIds = [...new Set(
+  [THEMES, TYPES].flatMap((src) =>
+    [...src.matchAll(/premiumSetId:\s*"([a-z0-9-]+)"/g)].map((m) => m[1]),
+  ),
+)].sort();
+if (!premiumSetIds.length) fail("aucun premiumSetId trouvé dans themes.ts / types.ts");
+
 const codexTiers = [];
 for (const m of arrayBody(ECO, "CODEX_TIERS").matchAll(
   /threshold:\s*(\d+),\s*eclats:\s*(\d+),\s*dust:\s*(\d+)/g)) {
@@ -91,6 +105,7 @@ const meta = {
   dustPerDuplicate,
   craftCost,
   welcomeBonus,
+  premiumSetIds,
   codexTiers,
   seasonRewards,
 };

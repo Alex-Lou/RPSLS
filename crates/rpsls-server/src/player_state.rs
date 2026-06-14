@@ -228,6 +228,19 @@ impl PlayerProgress {
         // Opaque JSON — records are client-authored; the count cap is the guard.
         self.history.truncate(60);
         cap_vec(&mut self.owned_premium_sets, 32, 32);
+        // Whitelist anti-forge : retire les sets premium INCONNUS (un sync
+        // trafiqué qui s'octroie tous les cosmétiques payants). Un set légitime
+        // est TOUJOURS dans themes.ts → jamais perdu. ⚠️ Ajouter un set premium =
+        // relancer scripts/gen-economy-meta.mjs, sinon le serveur le retirerait.
+        let before_sets = self.owned_premium_sets.len();
+        self.owned_premium_sets
+            .retain(|s| crate::economy::is_premium_set(s));
+        if self.owned_premium_sets.len() < before_sets {
+            warn!(
+                dropped = before_sets - self.owned_premium_sets.len(),
+                "owned_premium_sets : ids inconnus retirés (forge ou economy_meta périmé)"
+            );
+        }
         // Quests accumulate over seasons of play — 128 ids is plenty without
         // letting a tampered client blow up Redis storage.
         cap_vec(&mut self.claimed_quests, 128, 64);

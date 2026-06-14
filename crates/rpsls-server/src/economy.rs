@@ -104,6 +104,7 @@ struct EconomyMeta {
     dust_per_duplicate: HashMap<String, u64>,
     craft_cost: HashMap<String, u64>,
     welcome_bonus: WelcomeBonus,
+    premium_set_ids: Vec<String>,
     codex_tiers: Vec<CodexTier>,
     season_rewards: Vec<SeasonReward>,
 }
@@ -188,6 +189,13 @@ pub fn welcome_stars() -> u64 {
     economy_meta().welcome_bonus.stars
 }
 
+/// Vrai si `id` est un set premium CONNU (défini dans themes.ts). Sert de
+/// whitelist anti-forge serveur : un set absent de la liste ne peut pas être
+/// légitimement possédé, donc le serveur le retire de `ownedPremiumSets`.
+pub fn is_premium_set(id: &str) -> bool {
+    economy_meta().premium_set_ids.iter().any(|s| s == id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -237,5 +245,9 @@ mod tests {
         assert_eq!((season[4].min_lp, season[4].eclats, season[4].dust), (1750, 700, 200));
         // Bonus de bienvenue (single source economy.ts, lu par account.rs).
         assert_eq!((welcome_eclats(), welcome_dust(), welcome_stars()), (300, 150, 30));
+        // Whitelist sets premium : ids connus acceptés, id forgé rejeté.
+        assert!(is_premium_set("eclipse"));
+        assert!(is_premium_set("quartz"));
+        assert!(!is_premium_set("forged-set-xyz"));
     }
 }
