@@ -10,8 +10,10 @@
  * the app calls `pushPlayerState()` to persist the update server-side.
  */
 
-import type { BackgroundId, Difficulty, PadId, Player, ThemeId } from "../types";
+import type { BackgroundId, ByMoveStat, Difficulty, PadId, Player, ThemeId } from "../types";
+import type { Move } from "../engine/game";
 import { PAD_META } from "../types";
+import { todayDateKey } from "../engine/daily";
 import { type OnlineClient, type PlayerProgress } from "./online";
 import { resolveWsUrl, helloFrame } from "./transientSession";
 import { useStore, emptyByMove } from "../store/store";
@@ -65,6 +67,13 @@ export function buildProgressFromPlayer(player: Player): PlayerProgress {
     // uniquement sur install fraîche côté merge → jamais d'écrasement d'un
     // historique local non vide.
     history: useStore.getState().history?.slice(0, 50) ?? [],
+    // ── Progression réparée 2026-06-14 : ces champs étaient ABSENTS du payload
+    // → jamais persistés → perdus à chaque install propre (défis du jour
+    // re-réclamables, quête pentagramme + Voie réinitialisées). ──
+    dailyClaims: player.dailyClaims ?? { date: "", ids: [] },
+    completedDailies: player.completedDailies ?? [],
+    byMove: player.stats?.byMove ?? {},
+    arenaAffinity: player.arenaAffinity,
   };
 }
 
@@ -85,13 +94,27 @@ export function mergeServerState(
   if (server.stars != null && server.stars > (local.stars ?? 0)) patch.stars = server.stars;
 
   // Stats — take max per field
-  const localStats = local.stats ?? { wins: 0, losses: 0, draws: 0, byMove: {} };
-  if (server.wins > localStats.wins || server.losses > localStats.losses || server.draws > localStats.draws) {
+  const localStats = local.stats ?? { wins: 0, losses: 0, draws: 0, byMove: emptyByMove() };
+  // byMove (progression quête pentagramme) — restauré du serveur, max par coup
+  // et par compteur. Était perdu à chaque install propre → quête à refaire.
+  const mergedByMove: Record<string, ByMoveStat> = { ...(localStats.byMove ?? {}) };
+  let byMoveChanged = false;
+  for (const [mv, s] of Object.entries(server.byMove ?? {})) {
+    const cur = mergedByMove[mv] ?? { picked: 0, won: 0 };
+    const picked = Math.max(cur.picked, s.picked ?? 0);
+    const won = Math.max(cur.won, s.won ?? 0);
+    if (picked !== cur.picked || won !== cur.won) {
+      mergedByMove[mv] = { picked, won };
+      byMoveChanged = true;
+    }
+  }
+  if (server.wins > localStats.wins || server.losses > localStats.losses || server.draws > localStats.draws || byMoveChanged) {
     patch.stats = {
       ...localStats,
       wins: Math.max(localStats.wins, server.wins),
       losses: Math.max(localStats.losses, server.losses),
       draws: Math.max(localStats.draws, server.draws),
+      byMove: mergedByMove as Record<Move, ByMoveStat>,
     };
   }
 
@@ -140,6 +163,38 @@ export function mergeServerState(
     if (!localQuests.has(q)) { localQuests.add(q); questsChanged = true; }
   }
   if (questsChanged) patch.claimedQuests = Array.from(localQuests);
+
+  // Défis du jour réclamés — restaure l'état "réclamé" d'AUJOURD'HUI (scopé au
+  // jour). Sans ça, après un réinstall les défis repartaient "à réclamer" alors
+  // que la récompense XP avait persisté = re-réclamation (farm). Restore-only :
+  // serveur=aujourd'hui & local≠aujourd'hui → adopte ; les deux aujourd'hui →
+  // union des ids ; serveur périmé (autre jour) → ignore (défis du jour neufs).
+  const today = todayDateKey();
+  const srvDaily = server.dailyClaims;
+  if (srvDaily && srvDaily.date === today) {
+    const locDaily = local.dailyClaims;
+    if (!locDaily || locDaily.date !== today) {
+      patch.dailyClaims = { date: today, ids: [...(srvDaily.ids ?? [])] };
+    } else {
+      const union = new Set([...(locDaily.ids ?? []), ...(srvDaily.ids ?? [])]);
+      if (union.size > (locDaily.ids ?? []).length) {
+        patch.dailyClaims = { date: today, ids: Array.from(union) };
+      }
+    }
+  }
+
+  // Jours complétés — union (monotone, jamais perdu).
+  const localCompleted = new Set(local.completedDailies ?? []);
+  let completedChanged = false;
+  for (const d of server.completedDailies ?? []) {
+    if (!localCompleted.has(d)) { localCompleted.add(d); completedChanged = true; }
+  }
+  if (completedChanged) patch.completedDailies = Array.from(localCompleted);
+
+  // Voie Constellation Pro — adopte celle du serveur si le local n'en a pas.
+  if (server.arenaAffinity && !local.arenaAffinity) {
+    patch.arenaAffinity = server.arenaAffinity as Move;
+  }
 
   // Decks (Classé + Pro) — restaurés du cloud quand le profil LOCAL est FRAIS
   // (`!local.syncedAt` = jamais sync sur cette install = neuve/wipée) OU vide.
@@ -258,11 +313,16 @@ function adoptServerState(server: PlayerProgress): Partial<Player> {
     eclats: server.eclats,
     dust: server.dust,
     stars: server.stars ?? 0,
-    // Adopt the account's W/L/D and RESET byMove. byMove isn't synced, but the
-    // pentagram quest (win once with each move) gates on it — keeping the guest's
-    // would launder that quest progress into the account. It rebuilds from the
-    // account's own matches.
-    stats: { wins: server.wins, losses: server.losses, draws: server.draws, byMove: emptyByMove() },
+    // Adopte les W/L/D + le byMove DU COMPTE. byMove est désormais synchronisé
+    // (réparé 2026-06-14), donc on adopte la progression pentagramme du compte
+    // (overlay sur emptyByMove pour garantir les 5 coups). On n'hérite PAS du
+    // byMove invité → pas de blanchiment de la quête pentagramme vers le compte.
+    stats: {
+      wins: server.wins,
+      losses: server.losses,
+      draws: server.draws,
+      byMove: { ...emptyByMove(), ...(server.byMove ?? {}) } as Record<Move, ByMoveStat>,
+    },
     cardCollection: server.cardCollection ?? [],
     cardMastery: server.cardMastery ?? {},
     codexClaimed: server.codexClaimed ?? [],
@@ -303,6 +363,13 @@ function adoptServerState(server: PlayerProgress): Partial<Player> {
   }
   if (server.fontScale && server.fontScale >= 1) patch.fontScale = server.fontScale;
   if (server.padChosen) patch.padChosen = true;
+  // Défis du jour / Voie du COMPTE (réparé 2026-06-14) — adoptés comme le reste.
+  patch.completedDailies = server.completedDailies ?? [];
+  const todayAdopt = todayDateKey();
+  if (server.dailyClaims && server.dailyClaims.date === todayAdopt) {
+    patch.dailyClaims = { date: todayAdopt, ids: [...(server.dailyClaims.ids ?? [])] };
+  }
+  if (server.arenaAffinity) patch.arenaAffinity = server.arenaAffinity as Move;
   return patch;
 }
 
@@ -435,6 +502,13 @@ function syncFingerprint(p: Player): string {
     // (Alex 2026-06-13 ; n'étaient PAS dans le fingerprint avant → un edit
     // de deck ne se sync'ait qu'au prochain autre changement).
     (p.rankedDeck ?? []).join(","), (p.arenaDeck ?? []).join(","),
+    // Défis du jour + progression pentagramme + Voie (réparés 2026-06-14) — pour
+    // qu'un défi réclamé/complété, un gain de byMove ou un choix de Voie poussent
+    // au cloud (sinon recordDailyComplete/choix Voie ne déclenchaient rien).
+    p.dailyClaims?.date ?? "", (p.dailyClaims?.ids ?? []).join(","),
+    (p.completedDailies ?? []).length,
+    Object.values(p.stats?.byMove ?? {}).reduce((a, b) => a + (b.picked ?? 0) + (b.won ?? 0), 0),
+    p.arenaAffinity ?? "",
   ].join("|");
 }
 

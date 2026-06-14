@@ -89,6 +89,18 @@ export interface PlayerProgress {
    *  les VOIES jouées survivent à un réinstall (Alex 2026-06-13). Optionnel
    *  (back-compat avec un serveur qui ne renvoie pas encore le champ). */
   history?: MatchRecord[];
+  /** Défis du jour réclamés aujourd'hui (scopé au jour) — synchronisé pour que
+   *  l'état "réclamé" survive à un réinstall (sinon les défis repartent "à
+   *  réclamer" alors que la récompense XP, elle, a persisté = re-réclamation).
+   *  Réparé 2026-06-14. */
+  dailyClaims?: { date: string; ids: string[] };
+  /** Jours (YYYY-MM-DD) dont le set de défis est complété — union. */
+  completedDailies?: string[];
+  /** Tally pick/win par coup — progression quête pentagramme (gagner 1× avec
+   *  chaque coup). Restauré au merge (max par coup). */
+  byMove?: Record<string, { picked: number; won: number }>;
+  /** Voie / affinité Constellation Pro choisie. */
+  arenaAffinity?: string;
 }
 
 /* Client → Server */
