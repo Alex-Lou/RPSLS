@@ -13,7 +13,7 @@
 import type { BackgroundId, Difficulty, PadId, Player, ThemeId } from "../types";
 import { PAD_META } from "../types";
 import { type OnlineClient, type PlayerProgress, normalizeServerUrl } from "./online";
-import { useStore, DEFAULT_CLOUD_URL } from "../store/store";
+import { useStore, DEFAULT_CLOUD_URL, emptyByMove } from "../store/store";
 import { THEMES } from "../theme/theme";
 import { BACKGROUNDS_BY_ID } from "../theme/themes";
 import { isAvatarImage } from "../theme/avatar";
@@ -239,33 +239,88 @@ export function mergeServerState(
   return patch;
 }
 
-/** Build the patch to apply on a successful signup / login.
+/** ADOPT the account's saved state wholesale (replacement), used on LOGIN.
  *
- *  Starts from the union/max merge (never lose anything the player has), then —
- *  for LOGIN only — force-adopts the account's single-valued loadout (decks)
- *  and look (cosmetics). That override is needed because switching to an account
- *  on this device must bring THAT account's stuff even when a prior guest sync
- *  already set `syncedAt` (which gates the restore-only-on-fresh logic inside
- *  `mergeServerState`). Signup keeps the guest's current loadout — the server
- *  returns it unchanged plus the welcome bonus, so the plain merge is right. */
+ *  Unlike `mergeServerState` (max/union), this OVERWRITES every progression-
+ *  bearing field with the account's value — even when it's lower than the local
+ *  guest's. That's the point: logging into an account is switching to a DISTINCT
+ *  identity, so the guest's currencies / cards / premium sets must NOT bleed in
+ *  (and then get pushed back to the server under the account's id). Without this
+ *  replacement, a guest with forged or just-higher balances would launder them
+ *  into any account they log into. Decks/cosmetics are adopted only when the
+ *  account actually has them set (a brand-new account keeps this device's
+ *  sensible defaults rather than an empty deck that can't start a match). */
+function adoptServerState(server: PlayerProgress): Partial<Player> {
+  const patch: Partial<Player> = {
+    xp: server.xp,
+    rankLp: server.rankLp,
+    eclats: server.eclats,
+    dust: server.dust,
+    stars: server.stars ?? 0,
+    // Adopt the account's W/L/D and RESET byMove. byMove isn't synced, but the
+    // pentagram quest (win once with each move) gates on it — keeping the guest's
+    // would launder that quest progress into the account. It rebuilds from the
+    // account's own matches.
+    stats: { wins: server.wins, losses: server.losses, draws: server.draws, byMove: emptyByMove() },
+    cardCollection: server.cardCollection ?? [],
+    cardMastery: server.cardMastery ?? {},
+    codexClaimed: server.codexClaimed ?? [],
+    claimedQuests: server.claimedQuests ?? [],
+    ownedPremiumSets: server.ownedPremiumSets ?? [],
+    season: {
+      number: server.seasonNumber || 1,
+      startedAt: server.seasonStartedAt || Date.now(),
+    },
+    winStreak: server.winStreak ?? 0,
+    classeLp: server.classeLp ?? 1000,
+    classeStats: {
+      wins: server.classeWins ?? 0,
+      losses: server.classeLosses ?? 0,
+      draws: server.classeDraws ?? 0,
+    },
+    arenaStats: {
+      wins: server.arenaWins ?? 0,
+      losses: server.arenaLosses ?? 0,
+      draws: server.arenaDraws ?? 0,
+    },
+    // Mark this install as synced to the account so the fresh-install restore
+    // gates in mergeServerState don't re-fire on the next boot.
+    syncedAt: server.updatedAt || Date.now(),
+  };
+  // Loadout + look: adopt only when the account has a real value.
+  if (server.rankedDeck && server.rankedDeck.length > 0) patch.rankedDeck = server.rankedDeck;
+  if (server.arenaDeck && server.arenaDeck.length > 0) patch.arenaDeck = server.arenaDeck;
+  if (server.themeId && server.themeId in THEMES) patch.themeId = server.themeId as ThemeId;
+  if (server.backgroundId && server.backgroundId in BACKGROUNDS_BY_ID) {
+    patch.backgroundId = server.backgroundId as BackgroundId;
+  }
+  if (server.padId && server.padId in PAD_META) patch.padId = server.padId as PadId;
+  if (server.avatar && isAvatarImage(server.avatar)) patch.avatar = server.avatar;
+  if (server.nickname && server.nickname.trim().length > 0) patch.nickname = server.nickname.slice(0, 24);
+  if (server.difficulty && ["easy", "normal", "hard"].includes(server.difficulty)) {
+    patch.difficulty = server.difficulty as Difficulty;
+  }
+  if (server.fontScale && server.fontScale >= 1) patch.fontScale = server.fontScale;
+  if (server.padChosen) patch.padChosen = true;
+  return patch;
+}
+
+/** Build the patch to apply on a successful auth, by STRATEGY:
+ *
+ *  - "merge": union/max — never lose anything local. Used when the guest BECOMES
+ *    the account (e-mail signup; Google first-link, where the server binds the
+ *    guest's own pid so the merge preserves unsynced local progress).
+ *  - "adopt": replace progression with the account's. Used for an e-mail LOGIN —
+ *    switching to a DISTINCT identity, so the guest's balances can't launder into
+ *    the account (and get pushed back under the account's id).  */
 export function applyAuthState(
   local: Player,
   server: PlayerProgress,
-  mode: "signup" | "login",
+  strategy: "merge" | "adopt",
 ): Partial<Player> {
-  const patch = mergeServerState(local, server);
-  if (mode === "login") {
-    if (server.rankedDeck && server.rankedDeck.length > 0) patch.rankedDeck = server.rankedDeck;
-    if (server.arenaDeck && server.arenaDeck.length > 0) patch.arenaDeck = server.arenaDeck;
-    if (server.themeId && server.themeId in THEMES) patch.themeId = server.themeId as ThemeId;
-    if (server.backgroundId && server.backgroundId in BACKGROUNDS_BY_ID) {
-      patch.backgroundId = server.backgroundId as BackgroundId;
-    }
-    if (server.padId && server.padId in PAD_META) patch.padId = server.padId as PadId;
-    if (server.avatar && isAvatarImage(server.avatar)) patch.avatar = server.avatar;
-    if (server.nickname && server.nickname.trim().length > 0) patch.nickname = server.nickname.slice(0, 24);
-  }
-  return patch;
+  return strategy === "adopt"
+    ? adoptServerState(server)
+    : mergeServerState(local, server);
 }
 
 /** Handle a `state_loaded` message from the server: merge into local store

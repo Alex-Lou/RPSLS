@@ -26,5 +26,8 @@ rpsls-core = { workspace = true }
 rand = "0.8"
 tauri-plugin-haptics = "2.3.2"
 tauri-plugin-store = "2"
+# Native "Sign in with Google" (Android Credential Manager / iOS) → returns a
+# Google ID token verified server-side in google_auth.rs.
+tauri-plugin-google-auth = "0.5"
 
 

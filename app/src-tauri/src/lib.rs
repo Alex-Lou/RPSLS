@@ -25,6 +25,9 @@ pub fn run() {
         // claimToken so the account isn't lost when the WebView storage
         // is purged.
         .plugin(tauri_plugin_store::Builder::default().build())
+        // Native "Sign in with Google" — the ID token it returns is verified
+        // server-side (google_auth.rs), so this is purely the token-acquisition.
+        .plugin(tauri_plugin_google_auth::init())
         .invoke_handler(tauri::generate_handler![resolve_round, random_move])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -11,6 +11,7 @@
     "server": "cargo run --manifest-path ../Cargo.toml -p rpsls-server --release"
   },
   "dependencies": {
+    "@choochmeque/tauri-plugin-google-auth-api": "^0.5.1",
     "@fontsource/audiowide": "^5.2.7",
     "@fontsource/bebas-neue": "^5.2.7",
     "@fontsource/bevan": "^5.2.7",

@@ -178,6 +178,11 @@ export interface Player {
    *  record. Presence = "signed in" (gates account-only features + shows the
    *  account in Profile). Wiped on a reinstall until the next login. */
   accountEmail?: string;
+  /** Which provider authenticated this install ("email" | "google"). LOCAL-only.
+   *  Set on any successful login/signup. Presence = "signed in" INDEPENDENT of a
+   *  displayable e-mail — an e-mail-less Google / Play Games identity still clears
+   *  the auth gate. Wiped on logout (full replacement) + on reinstall. */
+  accountProvider?: "email" | "google";
   /** Player's own uploaded background image (data URL), shown when the
    *  "custom" background is selected. Pre-bibliothèque: stores ONLY the
    *  current pick. Post-bibliothèque: mirrors customBgs[0] for back-compat. */

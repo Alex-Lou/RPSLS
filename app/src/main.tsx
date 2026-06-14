@@ -9,6 +9,9 @@ import "./App.css";
 // (Inter, Cinzel, Orbitron, …) so they're available regardless of which
 // theme is currently selected.
 import "./theme/fonts";
+// Side-effect: registers the native Google sign-in provider when a
+// VITE_GOOGLE_CLIENT_ID is configured (otherwise no-op → Google button hidden).
+import "./online/googleProvider";
 
 // Boot Sentry as early as possible — before React renders — so it catches
 // any early errors. It is a NO-OP if the user hasn't opted in OR if no

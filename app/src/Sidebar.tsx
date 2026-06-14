@@ -183,12 +183,17 @@ function SidebarBody({
 
       {/* Pinned footer — language always reachable, kept above the Android nav. */}
       <div className="shrink-0 flex flex-col gap-2 pt-3 mt-1 border-t border-hairline">
-        {/* Sign-out — only when logged into an account; sits ABOVE the language
-            picker. Drops back to the auth gate (App listens for rpsls:show-auth). */}
-        {player.accountEmail && (
+        {/* Account row, ABOVE the language picker:
+              - signed in → e-mail / provider label + Log out
+              - guest     → Log in / Sign up
+            Both surface the blocking auth gate (App listens for rpsls:show-auth);
+            only logout resets to a fresh guest first. */}
+        {(player.accountEmail || player.accountProvider) ? (
           <div className="flex flex-col gap-1">
-            <div className="px-2 text-[10px] text-ink-faint text-center truncate" title={player.accountEmail}>
-              {player.accountEmail}
+            {/* E-mail when we have one, else the provider label (e-mail-less
+                Google / Play Games) so a signed-in user can always log out. */}
+            <div className="px-2 text-[10px] text-ink-faint text-center truncate" title={player.accountEmail ?? "Google"}>
+              {player.accountEmail ?? "Google"}
             </div>
             <button
               onClick={() => {
@@ -206,9 +211,24 @@ function SidebarBody({
               <span>{t("auth.logout")}</span>
             </button>
           </div>
+        ) : (
+          <button
+            onClick={() => {
+              onAfterPick?.();
+              window.dispatchEvent(new CustomEvent("rpsls:show-auth"));
+            }}
+            className="flex items-center justify-center gap-2 rounded-xl border border-hairline bg-hairline/60 px-3 py-2.5 text-sm font-bold text-ink-muted transition hover:border-emerald-400/40 hover:bg-emerald-500/15 hover:text-emerald-200"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+              <polyline points="10 17 15 12 10 7" />
+              <line x1="15" y1="12" x2="3" y2="12" />
+            </svg>
+            <span>{t("auth.tab.login")}</span>
+          </button>
         )}
         <LanguagePicker variant="sidebar" />
-        <div className="text-[10px] text-zinc-600 text-center">RPSLS · v0.1</div>
+        <div className="text-[10px] text-zinc-600 text-center">RPSLS · v0.4.48</div>
       </div>
     </>
   );

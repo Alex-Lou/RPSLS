@@ -62,7 +62,9 @@ export default function App() {
   const hapticIntensity = useStore((s) => s.player.hapticIntensity ?? "med");
   const crashReports = useStore((s) => s.player.crashReports ?? false);
   const fontScale = useStore((s) => s.player.fontScale ?? 1);
-  const accountEmail = useStore((s) => s.player.accountEmail);
+  // "Signed in" = has an account e-mail OR any account provider. The provider
+  // covers an e-mail-less Google / Play Games identity (still authenticated).
+  const signedIn = useStore((s) => !!s.player.accountEmail || !!s.player.accountProvider);
 
   // Accessibility text scale → drives the global --font-scale var that the
   // html font-size (and therefore every rem-based size) keys off.
@@ -212,7 +214,7 @@ export default function App() {
   // signed-in user goes straight to the shell.
   const afterSplash = () => {
     if (!onboarded) { setStage("welcome"); return; }
-    setStage(accountEmail ? "shell" : "auth");
+    setStage(signedIn ? "shell" : "auth");
   };
 
   // Live coded backdrop — rendered behind everything when the chosen
@@ -317,7 +319,7 @@ export default function App() {
         )}
         {stage === "welcome" && (
           <Suspense key="welcome" fallback={<RouteFallback />}>
-            <Welcome onDone={() => setStage(accountEmail ? "shell" : "auth")} />
+            <Welcome onDone={() => setStage(signedIn ? "shell" : "auth")} />
           </Suspense>
         )}
         {stage === "auth" && (

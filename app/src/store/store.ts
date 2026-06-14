@@ -26,7 +26,7 @@ import {
 import type { CardId } from "../ranked/rankedTypes";
 import type { Outcome } from "../types";
 
-const emptyByMove = () => ({
+export const emptyByMove = () => ({
   rock:     { picked: 0, won: 0 },
   paper:    { picked: 0, won: 0 },
   scissors: { picked: 0, won: 0 },
@@ -426,11 +426,15 @@ export const useStore = create<AppState>()(
       }),
 
       restoreHistory: (h) => set({ history: h }),
+      // Editing a deck stamps `syncedAt`: it marks this install as "no longer a
+      // blank slate", so mergeServerState's fresh-install gate can't silently
+      // replace a deliberately-chosen deck with the cloud copy before the first
+      // sync lands (Alex audit 2026-06-14).
       setRankedDeck: (deck) => set((s) => ({
-        player: { ...s.player, rankedDeck: deck },
+        player: { ...s.player, rankedDeck: deck, syncedAt: Date.now() },
       })),
       setArenaDeck: (deck) => set((s) => ({
-        player: { ...s.player, arenaDeck: deck },
+        player: { ...s.player, arenaDeck: deck, syncedAt: Date.now() },
       })),
       setArenaAffinity: (affinity) => set((s) => ({
         player: { ...s.player, arenaAffinity: affinity },
@@ -722,6 +726,15 @@ export const useStore = create<AppState>()(
           // The mainline state stays valid; we just lose past matches.
         }
       },
+      // SECURITY: run the persisted-state guard on EVERY hydration, not only on a
+      // version bump. Zustand calls `migrate` ONLY when the stored `version`
+      // differs from ours, so a tampered localStorage that keeps the current
+      // version would otherwise skip sanitisePersisted entirely — and with it
+      // every guard (avatar / claimToken / custom image URLs / enum fallbacks).
+      // `merge` runs on each boot, so the guard always fires. (migrate keeps its
+      // own call for the upgrade path; sanitisePersisted is idempotent.)
+      merge: (persisted, current) =>
+        ({ ...(current as object), ...(sanitisePersisted(persisted) as object) }) as AppState,
     }
   )
 );
