@@ -10,6 +10,7 @@
 
 import type { CardId, CardRarity } from "../ranked/rankedTypes";
 import { CARDS, ALL_CARD_IDS, RARITY_ORDER } from "../ranked/cards";
+import { RANK_TIERS, type RankTier } from "./rank";
 import type { Outcome, RecordMode } from "../types";
 
 /** Éclats awarded for a win, by recorded match mode. Casual gives less to
@@ -170,13 +171,22 @@ export interface SeasonReward {
   dust: number;
 }
 
-export const SEASON_REWARDS: SeasonReward[] = [
-  { minLp: 0,    tier: "Bronze",   eclats: 50,  dust: 0   },
-  { minLp: 1100, tier: "Silver",   eclats: 150, dust: 20  },
-  { minLp: 1300, tier: "Gold",     eclats: 300, dust: 50  },
-  { minLp: 1500, tier: "Platinum", eclats: 500, dust: 100 },
-  { minLp: 1750, tier: "Diamond",  eclats: 700, dust: 200 },
-];
+/** Reward AMOUNTS per tier (keyed by RANK_TIERS id). Only the amounts live here;
+ *  the LP floors + tier labels are DERIVED from RANK_TIERS (single source), so a
+ *  threshold/label change in rank.ts flows through automatically. */
+const SEASON_REWARD_AMOUNTS: Record<RankTier["id"], { eclats: number; dust: number }> = {
+  bronze:   { eclats: 50,  dust: 0   },
+  silver:   { eclats: 150, dust: 20  },
+  gold:     { eclats: 300, dust: 50  },
+  platinum: { eclats: 500, dust: 100 },
+  diamond:  { eclats: 700, dust: 200 },
+};
+
+export const SEASON_REWARDS: SeasonReward[] = RANK_TIERS.map((t) => ({
+  minLp: t.floor,
+  tier: t.label,
+  ...SEASON_REWARD_AMOUNTS[t.id],
+}));
 
 /** Pick the reward bucket the LP value falls into — highest-tier wins. */
 export function seasonRewardForLp(lp: number): SeasonReward {

@@ -16,7 +16,7 @@ export interface RankTier {
   ceil: number;
 }
 
-const TIERS: Omit<RankTier, "ceil">[] = [
+export const RANK_TIERS: Omit<RankTier, "ceil">[] = [
   { id: "bronze",   label: "Bronze",   emoji: "🥉", gradient: "from-amber-700 to-orange-500",  floor: 0 },
   { id: "silver",   label: "Silver",   emoji: "🥈", gradient: "from-zinc-400 to-slate-200",    floor: 1100 },
   { id: "gold",     label: "Gold",     emoji: "🥇", gradient: "from-yellow-400 to-amber-300",  floor: 1300 },
@@ -27,11 +27,11 @@ const TIERS: Omit<RankTier, "ceil">[] = [
 /** Resolve the tier a given LP total falls into, with its LP window. */
 export function rankFromLp(lp: number): RankTier {
   let idx = 0;
-  for (let i = 0; i < TIERS.length; i++) {
-    if (lp >= TIERS[i].floor) idx = i;
+  for (let i = 0; i < RANK_TIERS.length; i++) {
+    if (lp >= RANK_TIERS[i].floor) idx = i;
   }
-  const t = TIERS[idx];
-  const ceil = idx + 1 < TIERS.length ? TIERS[idx + 1].floor : Infinity;
+  const t = RANK_TIERS[idx];
+  const ceil = idx + 1 < RANK_TIERS.length ? RANK_TIERS[idx + 1].floor : Infinity;
   return { ...t, ceil };
 }
 
