@@ -66,7 +66,7 @@ export function buildProgressFromPlayer(player: Player): PlayerProgress {
     // (Alex 2026-06-13). Lu du STORE (global, pas sur `player`). Restauré
     // uniquement sur install fraîche côté merge → jamais d'écrasement d'un
     // historique local non vide.
-    history: useStore.getState().history?.slice(0, 50) ?? [],
+    history: useStore.getState().history?.slice(0, 60) ?? [],
     // ── Progression réparée 2026-06-14 : ces champs étaient ABSENTS du payload
     // → jamais persistés → perdus à chaque install propre (défis du jour
     // re-réclamables, quête pentagramme + Voie réinitialisées). ──
@@ -74,6 +74,7 @@ export function buildProgressFromPlayer(player: Player): PlayerProgress {
     completedDailies: player.completedDailies ?? [],
     byMove: player.stats?.byMove ?? {},
     arenaAffinity: player.arenaAffinity,
+    abandons: player.abandons,
   };
 }
 
@@ -194,6 +195,19 @@ export function mergeServerState(
   // Voie Constellation Pro — adopte celle du serveur si le local n'en a pas.
   if (server.arenaAffinity && !local.arenaAffinity) {
     patch.arenaAffinity = server.arenaAffinity as Move;
+  }
+
+  // Abandons (pénalité forfait, fenêtre glissante 24h) — max(count) + max(lastAt).
+  // Restaure le compteur après un réinstall (anti-reset) SANS jamais sur-pénaliser :
+  // le count retenu ne dépasse aucune source, et un lastAt vieux de >24h vieillit
+  // à 0 à la lecture (activeAbandonCount). Cf. match/forfeit.ts.
+  const srvAb = server.abandons;
+  if (srvAb) {
+    const count = Math.max(local.abandons?.count ?? 0, srvAb.count ?? 0);
+    const lastAt = Math.max(local.abandons?.lastAt ?? 0, srvAb.lastAt ?? 0);
+    if (count !== (local.abandons?.count ?? 0) || lastAt !== (local.abandons?.lastAt ?? 0)) {
+      patch.abandons = { count, lastAt };
+    }
   }
 
   // Decks (Classé + Pro) — restaurés du cloud quand le profil LOCAL est FRAIS
@@ -370,6 +384,9 @@ function adoptServerState(server: PlayerProgress): Partial<Player> {
     patch.dailyClaims = { date: todayAdopt, ids: [...(server.dailyClaims.ids ?? [])] };
   }
   if (server.arenaAffinity) patch.arenaAffinity = server.arenaAffinity as Move;
+  if (server.abandons) {
+    patch.abandons = { count: server.abandons.count ?? 0, lastAt: server.abandons.lastAt ?? 0 };
+  }
   return patch;
 }
 
@@ -516,6 +533,8 @@ function syncFingerprint(p: Player): string {
     (p.completedDailies ?? []).length,
     Object.values(p.stats?.byMove ?? {}).reduce((a, b) => a + (b.picked ?? 0) + (b.won ?? 0), 0),
     p.arenaAffinity ?? "",
+    // Abandons — pour qu'un forfait (dont le 1er, pénalité 0 → rankLp inchangé) pousse.
+    p.abandons?.count ?? 0, p.abandons?.lastAt ?? 0,
   ].join("|");
 }
 

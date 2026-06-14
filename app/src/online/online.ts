@@ -101,6 +101,9 @@ export interface PlayerProgress {
   byMove?: Record<string, { picked: number; won: number }>;
   /** Voie / affinité Constellation Pro choisie. */
   arenaAffinity?: string;
+  /** Compteur d'abandons (fenêtre glissante 24h) — synchronisé pour qu'un
+   *  quitteur ne réinitialise pas sa pénalité de forfait en réinstallant. */
+  abandons?: { count: number; lastAt: number };
 }
 
 /* Client → Server */

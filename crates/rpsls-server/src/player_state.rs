@@ -37,6 +37,18 @@ pub struct ByMoveStat {
     pub won: u64,
 }
 
+/// Abandon record (pénalité de forfait, fenêtre glissante 24h). Mirror du
+/// `AbandonRecord` client. Le serveur ne fait que le stocker/retourner ; le merge
+/// anti-reset (max) tourne côté client (cf. match/forfeit.ts).
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AbandonRecord {
+    #[serde(default)]
+    pub count: u64,
+    #[serde(default)]
+    pub last_at: u64,
+}
+
 /// The subset of player state that we persist server-side: progression data
 /// PLUS the player's small cosmetic preferences (theme / background / pad /
 /// avatar / nickname) so a reinstall restores the chosen look. Bulky custom
@@ -165,6 +177,10 @@ pub struct PlayerProgress {
     /// Voie / affinité choisie en Constellation Pro (coup RPSLS).
     #[serde(default)]
     pub arena_affinity: String,
+    /// Compteur d'abandons (pénalité forfait, fenêtre 24h) — persisté pour qu'un
+    /// quitteur ne réinitialise pas sa pénalité en réinstallant.
+    #[serde(default)]
+    pub abandons: AbandonRecord,
 }
 
 /// Hard ceiling for any single numeric progression field — well above any
@@ -270,6 +286,11 @@ impl PlayerProgress {
             s.won = s.won.min(MAX_NUM);
         }
         clamp_str(&mut self.arena_affinity, 16);
+        // Abandon count : borne anti-junk (la pénalité est de toute façon capée à
+        // -25 côté client). NE PAS clamper `last_at` : c'est un timestamp ms, et
+        // MAX_NUM (1e10) est INFÉRIEUR à un vrai timestamp → le clamper corromprait
+        // la fenêtre glissante. Un last_at forgé est inerte (au pire auto-pénalité).
+        self.abandons.count = self.abandons.count.min(MAX_NUM);
 
         clamp_str(&mut self.theme_id, 32);
         clamp_str(&mut self.background_id, 32);
