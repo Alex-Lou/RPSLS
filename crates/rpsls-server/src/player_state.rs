@@ -430,6 +430,22 @@ pub(crate) async fn set_nx(key: &str, val: &str) -> Result<bool, ()> {
     }
 }
 
+/// Best-effort `DEL key`. Returns true on a 2xx from Upstash. Used to roll back
+/// a half-written multi-key write (e.g. an account row whose player-link failed).
+pub(crate) async fn del(key: &str) -> bool {
+    let Some((url, token)) = config() else { return false };
+    let endpoint = format!("{url}/pipeline");
+    let cmds: Vec<Vec<String>> = vec![vec!["DEL".into(), key.to_string()]];
+    http()
+        .post(&endpoint)
+        .bearer_auth(token)
+        .json(&cmds)
+        .send()
+        .await
+        .map(|r| r.status().is_success())
+        .unwrap_or(false)
+}
+
 /// Atomically claim a player_id by issuing a fresh TOFU token IFF the key
 /// doesn't already exist (Redis `SET … NX`). Returns:
 ///   `Ok(Some(token))` — the token we just minted (this is the first connection)

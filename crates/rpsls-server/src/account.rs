@@ -32,6 +32,10 @@ const ACCOUNT_PREFIX: &str = "account:";
 /// SÉPARÉ de `PlayerProgress` : un `SyncState` client ne doit jamais pouvoir le
 /// remettre à zéro.
 const WELCOMED_PREFIX: &str = "welcomed:";
+/// Index inverse player_id → e-mail du compte. Pose l'invariant « UN compte par
+/// identité » : à l'inscription on le claim en SET NX ; s'il existe déjà, cette
+/// identité a déjà un compte → on refuse (jamais deux comptes sur un player_id).
+const ACCOUNT_PID_PREFIX: &str = "account_pid:";
 
 /// Enregistrement compte persisté en Redis. Le `player_id` est l'identité
 /// DURABLE : à l'inscription on y lie le player_id de la session invitée
@@ -214,6 +218,22 @@ pub async fn try_mark_welcomed(player_id: &str) -> Result<bool, ()> {
     player_state::set_nx(&key, "1").await
 }
 
+/// Lie ATOMIQUEMENT un player_id à l'e-mail de SON compte (`SET account_pid:{id}
+/// NX`). Ok(true) = lié (cette identité n'avait pas de compte), Ok(false) =
+/// l'identité a DÉJÀ un compte (refuser : un seul compte par identité),
+/// Err = panne backend.
+pub async fn try_link_player(player_id: &str, email_norm: &str) -> Result<bool, ()> {
+    let key = format!("{ACCOUNT_PID_PREFIX}{player_id}");
+    player_state::set_nx(&key, email_norm).await
+}
+
+/// Annule (best-effort) une ligne compte quand une étape ultérieure échoue —
+/// garde l'e-mail libre après un rollback d'inscription.
+async fn delete_account(email_norm: &str) {
+    let key = format!("{ACCOUNT_PREFIX}{email_norm}");
+    player_state::del(&key).await;
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // WS message handlers (called from main.rs dispatch — keeps that match thin)
 // ──────────────────────────────────────────────────────────────────────────
@@ -276,21 +296,37 @@ pub fn handle_signup(
             Err(()) => session_clone.send(ServerMessage::AuthError { code: "server_error".into() }),
             Ok(false) => session_clone.send(ServerMessage::AuthError { code: "email_taken".into() }),
             Ok(true) => {
-                // New account: link the guest's current progression and grant the
-                // welcome bonus exactly once per player_id (atomic `SET
-                // welcomed:{id} NX`). On a backend error we skip the bonus (safe
-                // default) rather than risk a double.
-                let mut progress = player_state::load(&pid).await.unwrap_or_default();
-                if let Ok(true) = try_mark_welcomed(&pid).await {
-                    apply_welcome_bonus(&mut progress);
+                // One account per identity: atomically claim the player_id. If it
+                // already has an account (e.g. the player re-ran signup after a
+                // wipe instead of logging in), roll back the row we just created
+                // and tell the client to log in — never spawn a second account.
+                match try_link_player(&pid, &record.email).await {
+                    Ok(true) => {
+                        // Link the guest's current progression and grant the
+                        // welcome bonus exactly once per player_id (atomic `SET
+                        // welcomed:{id} NX`). On a backend error we skip the bonus
+                        // (safe default) rather than risk a double.
+                        let mut progress = player_state::load(&pid).await.unwrap_or_default();
+                        if let Ok(true) = try_mark_welcomed(&pid).await {
+                            apply_welcome_bonus(&mut progress);
+                        }
+                        player_state::save(pid.clone(), progress.clone());
+                        let claim_token = player_state::load_claim_token(&pid).await;
+                        session_clone.send(ServerMessage::AuthOk {
+                            player_id: pid,
+                            claim_token,
+                            state: progress,
+                        });
+                    }
+                    Ok(false) => {
+                        delete_account(&record.email).await;
+                        session_clone.send(ServerMessage::AuthError { code: "already_linked".into() });
+                    }
+                    Err(()) => {
+                        delete_account(&record.email).await;
+                        session_clone.send(ServerMessage::AuthError { code: "server_error".into() });
+                    }
                 }
-                player_state::save(pid.clone(), progress.clone());
-                let claim_token = player_state::load_claim_token(&pid).await;
-                session_clone.send(ServerMessage::AuthOk {
-                    player_id: pid,
-                    claim_token,
-                    state: progress,
-                });
             }
         }
     });
