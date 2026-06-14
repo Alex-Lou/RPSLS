@@ -37,6 +37,9 @@ Thumbs.db
 *.apk
 *.aab
 logo-source.png
+# Debug screenshots dumped to the repo root during dev (e.g. _screen_debug.png).
+*_debug.png
+_screen_debug.png
 
 ## ────── Release signing (NEVER commit) ──────
 # The Android upload keystore + its props file. Losing these blocks future
