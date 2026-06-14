@@ -1,5 +1,6 @@
 import { motion } from "motion/react";
 import { useStore } from "../store/store";
+import { ModalShell } from "../ui/ModalShell";
 import { activeAbandonCount, abandonPenaltyLp } from "./forfeit";
 
 /**
@@ -26,13 +27,7 @@ export function QuitConfirmModal({
   const extra = competitive ? abandonPenaltyLp(prior) : 0;
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[90] flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm"
-      onClick={onCancel}
-    >
+    <ModalShell onClose={onCancel} z="z-[90]" padding="p-6" backdrop="bg-black/70">
       <motion.div
         initial={{ scale: 0.9, y: 12, opacity: 0 }}
         animate={{ scale: 1, y: 0, opacity: 1 }}
@@ -72,6 +67,6 @@ export function QuitConfirmModal({
           </button>
         </div>
       </motion.div>
-    </motion.div>
+    </ModalShell>
   );
 }

@@ -13,8 +13,8 @@
  */
 
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
+import { ModalShell } from "./ModalShell";
 import { useStore } from "../store/store";
 import { formatNumber } from "../i18n/format";
 import { PremiumBadge } from "./PremiumBadge";
@@ -66,15 +66,6 @@ export function PremiumPurchaseModal({
     if (set) setPhase("idle");
   }, [set]);
 
-  // Esc-to-close, idle phase only. Separate effect so its onClose dependency
-  // can't reset the celebration phase.
-  useEffect(() => {
-    if (!set) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && phase === "idle") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [set, onClose, phase]);
-
   if (!set) return null;
   const affordable = stars >= set.cost;
 
@@ -100,24 +91,23 @@ export function PremiumPurchaseModal({
   // the profile page / the full-screen peek it opens over. WITHOUT this, the
   // peek (portaled to body at z-[9999]) sits ON TOP of the modal and its
   // celebration — the player saw nothing on purchase. z-[10000] clears it.
-  return createPortal(
-    <motion.div
-      role="dialog"
-      aria-modal
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+  return (
+    <ModalShell
+      onClose={onClose}
+      z="z-[10000]"
+      padding="px-4"
+      backdrop="bg-black/70"
+      portal
+      dialog
+      closeOnEscape={phase === "idle"}
+      aside={
+        <AnimatePresence>
+          {phase === "celebrating" && (
+            <CelebrationOverlay label={t("premium.unlocked")} setId={set.id} />
+          )}
+        </AnimatePresence>
+      }
     >
-      {/* Full-screen celebration — rendered as a SIBLING of the card (not
-          inside it) so the burst fills the whole screen instead of being
-          clipped to the small card. z above the card. */}
-      <AnimatePresence>
-        {phase === "celebrating" && (
-          <CelebrationOverlay label={t("premium.unlocked")} setId={set.id} />
-        )}
-      </AnimatePresence>
       <motion.div
         onClick={(e) => e.stopPropagation()}
         initial={{ scale: 0.92, y: 16, opacity: 0 }}
@@ -187,8 +177,7 @@ export function PremiumPurchaseModal({
           </div>
         </div>
       </motion.div>
-    </motion.div>,
-    document.body,
+    </ModalShell>
   );
 }
 

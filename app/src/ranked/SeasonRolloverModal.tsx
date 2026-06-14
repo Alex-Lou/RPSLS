@@ -7,6 +7,7 @@
  */
 
 import { motion } from "motion/react";
+import { ModalShell } from "../ui/ModalShell";
 import type { SeasonReward } from "../engine/economy";
 
 interface Props {
@@ -19,14 +20,7 @@ interface Props {
 
 export function SeasonRolloverModal({ fromSeason, reward, lpBefore, lpAfter, onClose }: Props) {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-      onClick={onClose}
-    >
+    <ModalShell onClose={onClose} z="z-50" padding="p-4" backdrop="bg-black/80" overlayTransition={{ duration: 0.2 }}>
       <motion.div
         initial={{ scale: 0.92, y: 12 }}
         animate={{ scale: 1, y: 0 }}
@@ -71,6 +65,6 @@ export function SeasonRolloverModal({ fromSeason, reward, lpBefore, lpAfter, onC
           Lancer la saison
         </motion.button>
       </motion.div>
-    </motion.div>
+    </ModalShell>
   );
 }
