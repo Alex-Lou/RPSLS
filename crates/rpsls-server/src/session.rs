@@ -64,9 +64,4 @@ impl Session {
     pub fn set_in_match(&self, v: bool) {
         self.in_match.store(v, Ordering::SeqCst);
     }
-
-    #[allow(dead_code)]
-    pub fn is_in_match(&self) -> bool {
-        self.in_match.load(Ordering::SeqCst)
-    }
 }

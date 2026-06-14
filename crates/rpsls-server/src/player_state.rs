@@ -471,38 +471,6 @@ pub async fn try_create_claim_token(player_id: &str) -> Result<Option<String>, (
     }
 }
 
-/// Persist a TOFU claim token. Fire-and-forget.
-#[allow(dead_code)]
-pub fn save_claim_token(player_id: String, claim_token: String) {
-    let Some((url, auth_token)) = config() else { return };
-    if player_id.trim().is_empty() || claim_token.is_empty() {
-        return;
-    }
-    let key = format!("{CLAIM_PREFIX}{player_id}");
-    let auth_token = auth_token.clone();
-    let endpoint = format!("{url}/pipeline");
-    let cmds: Vec<Vec<String>> = vec![vec!["SET".into(), key, claim_token]];
-
-    tokio::spawn(async move {
-        match http()
-            .post(&endpoint)
-            .bearer_auth(&auth_token)
-            .json(&cmds)
-            .send()
-            .await
-        {
-            Ok(resp) if resp.status().is_success() => {
-                debug!(player_id = %player_id, "claim token saved");
-            }
-            Ok(resp) => {
-                let status = resp.status();
-                warn!(%status, "claim token save rejected");
-            }
-            Err(e) => warn!(error = %e, "claim token save failed"),
-        }
-    });
-}
-
 /// Save player state to Redis. Fire-and-forget (spawns a detached task).
 /// The payload is `sanitize`d first — it is fully client-authored and must
 /// never reach Redis unbounded.
