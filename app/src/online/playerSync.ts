@@ -12,8 +12,9 @@
 
 import type { BackgroundId, Difficulty, PadId, Player, ThemeId } from "../types";
 import { PAD_META } from "../types";
-import { type OnlineClient, type PlayerProgress, normalizeServerUrl } from "./online";
-import { useStore, DEFAULT_CLOUD_URL, emptyByMove } from "../store/store";
+import { type OnlineClient, type PlayerProgress } from "./online";
+import { resolveWsUrl, helloFrame } from "./transientSession";
+import { useStore, emptyByMove } from "../store/store";
 import { THEMES } from "../theme/theme";
 import { BACKGROUNDS_BY_ID } from "../theme/themes";
 import { isAvatarImage } from "../theme/avatar";
@@ -373,13 +374,10 @@ const ONE_SHOT_TIMEOUT = 8_000;
  *  exact "j'ai plus les cartes que j'ai achetées" symptom. Mirrors bootSync's
  *  ephemeral connect → hello → state_loaded → sync_state → close lifecycle. */
 function pushPlayerStateOneShot(): void {
-  const state = useStore.getState();
-  const player = state.player;
+  const player = useStore.getState().player;
   if (!player.id) return;
-  const url = state.serverConfig?.cloudUrl || DEFAULT_CLOUD_URL;
-  const normalized = normalizeServerUrl(url);
-  if (!normalized) return;
-  const wsUrl = normalized.replace(/\/+$/, "") + "/ws";
+  const wsUrl = resolveWsUrl();
+  if (!wsUrl) return;
 
   let ws: WebSocket;
   try { ws = new WebSocket(wsUrl); } catch { return; }
@@ -387,12 +385,7 @@ function pushPlayerStateOneShot(): void {
 
   ws.onopen = () => {
     try {
-      ws.send(JSON.stringify({
-        type: "hello",
-        nickname: player.nickname || "Anonymous",
-        player_id: player.id,
-        claim_token: player.claimToken || "",
-      }));
+      ws.send(JSON.stringify(helloFrame(player)));
     } catch { /* */ }
   };
 

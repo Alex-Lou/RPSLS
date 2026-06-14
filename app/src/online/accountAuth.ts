@@ -13,8 +13,9 @@
  * and the rest of this flow is unchanged.
  */
 
-import { useStore, DEFAULT_CLOUD_URL } from "../store/store";
-import { normalizeServerUrl, type PlayerProgress } from "./online";
+import { useStore } from "../store/store";
+import { type PlayerProgress } from "./online";
+import { resolveWsUrl, helloFrame } from "./transientSession";
 import { applyAuthState } from "./playerSync";
 import { saveAnchor } from "./playerAnchor";
 
@@ -65,15 +66,12 @@ interface ExchangeOpts {
 
 function runExchange(opts: ExchangeOpts): Promise<AuthResult> {
   return new Promise<AuthResult>((resolve) => {
-    const state = useStore.getState();
-    const player = state.player;
-    const url = state.serverConfig?.cloudUrl || DEFAULT_CLOUD_URL;
-    const normalized = normalizeServerUrl(url);
-    if (!normalized) {
+    const player = useStore.getState().player;
+    const wsUrl = resolveWsUrl();
+    if (!wsUrl) {
       resolve({ ok: false, code: "no_server" });
       return;
     }
-    const wsUrl = normalized.replace(/\/+$/, "") + "/ws";
 
     let ws: WebSocket;
     try {
@@ -106,12 +104,7 @@ function runExchange(opts: ExchangeOpts): Promise<AuthResult> {
 
     ws.onopen = () => {
       try {
-        ws.send(JSON.stringify({
-          type: "hello",
-          nickname: player.nickname || "Anonymous",
-          player_id: player.id,
-          claim_token: player.claimToken || "",
-        }));
+        ws.send(JSON.stringify(helloFrame(player)));
         // Plain login is independent of the guest session being authenticated.
         if (!opts.waitForState) sendCredential();
       } catch {

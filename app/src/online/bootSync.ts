@@ -7,8 +7,9 @@
  * asleep, no network), it's a no-op and the app works fully offline.
  */
 
-import { useStore, DEFAULT_CLOUD_URL } from "../store/store";
-import { normalizeServerUrl, type PlayerProgress } from "./online";
+import { useStore } from "../store/store";
+import { type PlayerProgress } from "./online";
+import { resolveWsUrl, helloFrame } from "./transientSession";
 import { buildProgressFromPlayer, mergeServerState } from "./playerSync";
 import { loadAnchor, saveAnchor } from "./playerAnchor";
 
@@ -73,11 +74,9 @@ export function runBootSync() {
   const player = state.player;
   if (!player.id) return;
 
-  const url = state.serverConfig?.cloudUrl || DEFAULT_CLOUD_URL;
-  const normalized = normalizeServerUrl(url);
-  if (!normalized) return;
+  const wsUrl = resolveWsUrl();
+  if (!wsUrl) return;
 
-  const wsUrl = normalized.replace(/\/+$/, "") + "/ws";
   const jitterMs = Math.floor(Math.random() * BOOT_SYNC_JITTER_MAX_MS);
   // Bail the whole thing into a microtask after the jitter so the WebSocket
   // is only constructed AFTER the random wait — otherwise we'd build the
@@ -98,12 +97,7 @@ function runBootSyncImmediate(player: { id: string; nickname: string; claimToken
   }, BOOT_SYNC_TIMEOUT);
 
   ws.onopen = () => {
-    ws.send(JSON.stringify({
-      type: "hello",
-      nickname: player.nickname || "Anonymous",
-      player_id: player.id,
-      claim_token: player.claimToken || "",
-    }));
+    ws.send(JSON.stringify(helloFrame(player)));
   };
 
   ws.onmessage = (ev) => {
@@ -149,12 +143,11 @@ function runBootSyncImmediate(player: { id: string; nickname: string; claimToken
           (player as { id: string; claimToken?: string }).id = anchor.id;
           (player as { id: string; claimToken?: string }).claimToken = anchor.claimToken;
           try {
-            ws.send(JSON.stringify({
-              type: "hello",
-              nickname: player.nickname || "Anonymous",
-              player_id: anchor.id,
-              claim_token: anchor.claimToken,
-            }));
+            ws.send(JSON.stringify(helloFrame({
+              id: anchor.id,
+              nickname: player.nickname,
+              claimToken: anchor.claimToken,
+            })));
           } catch { /* */ }
           return;
         }
@@ -165,12 +158,7 @@ function runBootSyncImmediate(player: { id: string; nickname: string; claimToken
         console.warn("[bootSync] claim-mismatch + no anchor — regenerating player.id (true fresh start).", { oldId: player.id, newId });
         store.applyServerSync({ id: newId, claimToken: undefined });
         try {
-          ws.send(JSON.stringify({
-            type: "hello",
-            nickname: player.nickname || "Anonymous",
-            player_id: newId,
-            claim_token: "",
-          }));
+          ws.send(JSON.stringify(helloFrame({ id: newId, nickname: player.nickname, claimToken: "" })));
           (player as { id: string }).id = newId;
         } catch { /* */ }
       });
