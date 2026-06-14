@@ -82,6 +82,10 @@ struct AppState {
     /// `login|email|ip` and `signup|ip`. Blocks online password brute-force and
     /// mass-signup; pruned by the same janitor pattern as `lobby_attempts`.
     auth_attempts: Arc<AuthAttemptTracker>,
+    /// Per-ACCOUNT login lock, keyed by e-mail alone (all IPs) — closes the
+    /// IP-rotation bypass of `auth_attempts`. Wider window / higher ceiling
+    /// (`LOGIN_EMAIL_*`). Pruned by the same janitor pattern.
+    login_email_attempts: Arc<AuthAttemptTracker>,
     /// session_id → (match_tx, our_slot) — classic 1v1 mode.
     in_match: DashMap<String, (mpsc::UnboundedSender<MatchCommand>, PlayerSlot)>,
     /// session_id → (lanes_tx, our_slot) — Constellation Lanes mode (Phase 1+).
@@ -112,6 +116,10 @@ async fn main() {
             security::AUTH_WINDOW,
             security::AUTH_MAX_ATTEMPTS,
         )),
+        login_email_attempts: Arc::new(AuthAttemptTracker::new(
+            security::LOGIN_EMAIL_WINDOW,
+            security::LOGIN_EMAIL_MAX,
+        )),
         in_match: DashMap::new(),
         in_lanes: DashMap::new(),
         sync_throttle: DashMap::new(),
@@ -122,6 +130,7 @@ async fn main() {
     // a lobby join. Runs every 5 min, no-op when nothing to prune.
     state.lobby_attempts.clone().spawn_janitor();
     state.auth_attempts.clone().spawn_janitor();
+    state.login_email_attempts.clone().spawn_janitor();
 
     // Inactive-user sweeper: every 24h, SCAN `player:*`, read each row's
     // `updatedAt`, and DELETE both `player:{id}` and `claim:{id}` when the
@@ -531,7 +540,13 @@ async fn handle_client_message(state: &Arc<AppState>, session: &Arc<Session>, ms
         }
 
         ClientMessage::Login { email, password } => {
-            account::handle_login(&state.auth_attempts, session, email, password);
+            account::handle_login(
+                &state.auth_attempts,
+                &state.login_email_attempts,
+                session,
+                email,
+                password,
+            );
         }
 
         ClientMessage::GoogleLogin { id_token } => {

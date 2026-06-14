@@ -32,6 +32,12 @@ const ACCOUNT_PREFIX: &str = "account:";
 /// SÉPARÉ de `PlayerProgress` : un `SyncState` client ne doit jamais pouvoir le
 /// remettre à zéro.
 const WELCOMED_PREFIX: &str = "welcomed:";
+/// Drapeau « cette BOÎTE e-mail a déjà reçu le bonus » (SET NX), keyé sur la
+/// forme CANONIQUE de l'e-mail (cf. `canonical_email`). C'est lui qui rend le
+/// bonus infarmable côté inscription e-mail : réinstaller (player_id neuf) ou
+/// décliner des variantes `+tag` ne donne plus un nouveau bonus tant que la
+/// vraie boîte est la même. Séparé de `welcomed:` (keyé player_id, voie Google).
+const WELCOMED_EMAIL_PREFIX: &str = "welcomed_email:";
 /// Index inverse player_id → e-mail du compte. Pose l'invariant « UN compte par
 /// identité » : à l'inscription on le claim en SET NX ; s'il existe déjà, cette
 /// identité a déjà un compte → on refuse (jamais deux comptes sur un player_id).
@@ -107,6 +113,46 @@ pub fn validate_password(pw: &str) -> Result<(), ()> {
     } else {
         Err(())
     }
+}
+
+/// Domaines e-mail jetables connus. Refusés à l'inscription pour brider le farm
+/// du bonus de bienvenue via des boîtes éphémères. Liste courte et conservatrice
+/// (faux positifs quasi nuls) ; à étendre au besoin. Ce n'est PAS une frontière
+/// de sécurité — juste un coût supplémentaire pour l'abuseur.
+const DISPOSABLE_DOMAINS: &[&str] = &[
+    "mailinator.com", "guerrillamail.com", "guerrillamail.info", "10minutemail.com",
+    "tempmail.com", "temp-mail.org", "throwawaymail.com", "yopmail.com", "getnada.com",
+    "trashmail.com", "sharklasers.com", "maildrop.cc", "dispostable.com", "fakeinbox.com",
+    "mintemail.com", "mohmal.com", "spam4.me", "emailondeck.com", "moakt.com",
+];
+
+/// True si l'e-mail NORMALISÉ appartient à un domaine jetable connu.
+pub fn is_disposable_email(email_norm: &str) -> bool {
+    match email_norm.rsplit('@').next() {
+        Some(domain) => DISPOSABLE_DOMAINS.iter().any(|d| *d == domain),
+        None => false,
+    }
+}
+
+/// Forme CANONIQUE d'un e-mail pour la clé « bonus déjà reçu » : on retire le
+/// sous-adressage `+tag` de la partie locale (et les points pour Gmail, qui les
+/// ignore). `moi+1@gmail.com`, `moi.2+x@gmail.com` et `moi@gmail.com` partagent
+/// donc UNE seule clé de bienvenue → un bonus par vraie boîte, même en
+/// fabriquant des variantes. N'affecte PAS l'identité du compte
+/// (`account:{email}` garde l'e-mail complet tel que saisi).
+pub fn canonical_email(email_norm: &str) -> String {
+    let mut parts = email_norm.splitn(2, '@');
+    let local_raw = parts.next().unwrap_or("");
+    let domain_raw = parts.next().unwrap_or("");
+    // googlemail.com is an official alias of gmail.com — same physical inbox —
+    // so fold it onto gmail.com BEFORE keying, else the same mailbox claims the
+    // bonus twice (name@gmail.com vs name@googlemail.com).
+    let domain = if domain_raw == "googlemail.com" { "gmail.com" } else { domain_raw };
+    let mut local = local_raw.split('+').next().unwrap_or(local_raw).to_string();
+    if domain == "gmail.com" {
+        local = local.replace('.', "");
+    }
+    format!("{local}@{domain}")
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -218,6 +264,15 @@ pub async fn try_mark_welcomed(player_id: &str) -> Result<bool, ()> {
     player_state::set_nx(&key, "1").await
 }
 
+/// Marque ATOMIQUEMENT une BOÎTE e-mail (forme canonique) comme « bonus reçu »
+/// (`SET welcomed_email:{canonical} NX`). Ok(true) = première fois pour cette
+/// boîte (don autorisé), Ok(false) = déjà reçu (refuser), Err = panne (défaut
+/// sûr : pas de don). C'est la garde anti-farm de l'inscription e-mail.
+pub async fn try_mark_welcomed_email(canonical: &str) -> Result<bool, ()> {
+    let key = format!("{WELCOMED_EMAIL_PREFIX}{canonical}");
+    player_state::set_nx(&key, "1").await
+}
+
 /// Lie ATOMIQUEMENT un player_id à l'e-mail de SON compte (`SET account_pid:{id}
 /// NX`). Ok(true) = lié (cette identité n'avait pas de compte), Ok(false) =
 /// l'identité a DÉJÀ un compte (refuser : un seul compte par identité),
@@ -227,10 +282,11 @@ pub async fn try_link_player(player_id: &str, email_norm: &str) -> Result<bool, 
     player_state::set_nx(&key, email_norm).await
 }
 
-/// Annule (best-effort) une ligne compte quand une étape ultérieure échoue —
-/// garde l'e-mail libre après un rollback d'inscription.
-async fn delete_account(email_norm: &str) {
-    let key = format!("{ACCOUNT_PREFIX}{email_norm}");
+/// Annule (best-effort) le lien identité→compte posé par `try_link_player`,
+/// quand l'étape de création de la ligne compte échoue ENSUITE. Garde l'identité
+/// réutilisable pour une nouvelle tentative d'inscription.
+async fn delete_account_link(player_id: &str) {
+    let key = format!("{ACCOUNT_PID_PREFIX}{player_id}");
     player_state::del(&key).await;
 }
 
@@ -261,6 +317,11 @@ pub fn handle_signup(
     if validate_password(&password).is_err() {
         return reply_auth_error(session, "weak_password");
     }
+    // Disposable mailbox → refuse outright (raises the cost of welcome-bonus
+    // farming; generic code so it doesn't leak the reason).
+    if is_disposable_email(&email_norm) {
+        return reply_auth_error(session, "invalid_credentials");
+    }
     // Linking the new account to the guest's progression requires an
     // authenticated guest session — the client always Hellos first, so this is
     // just a guard (never a normal path).
@@ -268,16 +329,25 @@ pub fn handle_signup(
     if pid.is_empty() {
         return reply_auth_error(session, "auth_needed");
     }
-    // Mass-signup guard: bound signups per IP. Every attempt counts and ages out
-    // of the window; no per-key success-clear here.
+    // Mass-signup guard, keyed by IP. Checked synchronously here; counted once in
+    // the async task below. We count EVERY attempt that gets this far — success
+    // INCLUDED, because a fresh pid + fresh e-mail always "succeeds", so a
+    // successful creation is precisely the mass-signup signal (and we must NOT
+    // clear on success, or the cap becomes a no-op). Structural rejects (invalid
+    // e-mail, weak password, disposable domain, empty pid) returned BEFORE here,
+    // so a legit user's typo bounces never consume the budget — and AUTH_MAX
+    // (10/5min) is far above any real person's signup burst.
     let sk = format!("signup|{}", session.peer_ip);
     if auth_attempts.is_blocked(sk.clone()) {
         return reply_auth_error(session, "rate_limited");
     }
-    auth_attempts.record_failed(sk);
 
     let session_clone = session.clone();
+    let attempts = auth_attempts.clone();
     tokio::spawn(async move {
+        // One count per attempt that reaches the work, regardless of outcome.
+        attempts.record_failed(sk);
+
         let hash = match hash_password(&password) {
             Ok(h) => h,
             Err(()) => {
@@ -292,43 +362,54 @@ pub fn handle_signup(
             created_at: now_ms(),
             verified: false,
         };
-        match try_create_account(&record).await {
-            Err(()) => session_clone.send(ServerMessage::AuthError { code: "server_error".into() }),
-            Ok(false) => session_clone.send(ServerMessage::AuthError { code: "email_taken".into() }),
-            Ok(true) => {
-                // One account per identity: atomically claim the player_id. If it
-                // already has an account (e.g. the player re-ran signup after a
-                // wipe instead of logging in), roll back the row we just created
-                // and tell the client to log in — never spawn a second account.
-                match try_link_player(&pid, &record.email).await {
-                    Ok(true) => {
-                        // Link the guest's current progression and grant the
-                        // welcome bonus exactly once per player_id (atomic `SET
-                        // welcomed:{id} NX`). On a backend error we skip the bonus
-                        // (safe default) rather than risk a double.
-                        let mut progress = player_state::load(&pid).await.unwrap_or_default();
-                        if let Ok(true) = try_mark_welcomed(&pid).await {
-                            apply_welcome_bonus(&mut progress);
-                        }
-                        player_state::save(pid.clone(), progress.clone());
-                        let claim_token = player_state::load_claim_token(&pid).await;
-                        session_clone.send(ServerMessage::AuthOk {
-                            player_id: pid,
-                            claim_token,
-                            state: progress,
-                            email: None,
-                        });
-                    }
-                    Ok(false) => {
-                        delete_account(&record.email).await;
-                        session_clone.send(ServerMessage::AuthError { code: "already_linked".into() });
-                    }
-                    Err(()) => {
-                        delete_account(&record.email).await;
-                        session_clone.send(ServerMessage::AuthError { code: "server_error".into() });
-                    }
-                }
+        // ATOMICITY: claim the IDENTITY first (`account_pid:{pid}` NX), BEFORE
+        // reserving the e-mail row. An already-linked identity therefore costs
+        // nothing to roll back (no orphan row), and if the row creation fails
+        // afterwards we release the link cleanly. This removes the previous
+        // window where `account:{email}` was reserved with no owning identity.
+        match try_link_player(&pid, &record.email).await {
+            Ok(false) => {
+                // This identity already has an account (e.g. re-ran signup after a
+                // wipe instead of logging in). Nothing was created → tell the
+                // client to log in. (Still counted toward the per-IP cap above.)
+                session_clone.send(ServerMessage::AuthError { code: "already_linked".into() });
             }
+            Err(()) => {
+                session_clone.send(ServerMessage::AuthError { code: "server_error".into() });
+            }
+            Ok(true) => match try_create_account(&record).await {
+                Err(()) => {
+                    delete_account_link(&pid).await;
+                    session_clone.send(ServerMessage::AuthError { code: "server_error".into() });
+                }
+                Ok(false) => {
+                    // E-mail already taken by ANOTHER identity → release our link.
+                    delete_account_link(&pid).await;
+                    session_clone.send(ServerMessage::AuthError { code: "email_taken".into() });
+                }
+                Ok(true) => {
+                    let mut progress = player_state::load(&pid).await.unwrap_or_default();
+                    // Welcome bonus EXACTLY once per real mailbox: gate on the
+                    // canonical e-mail (`+tag` / Gmail dots folded). A fresh
+                    // install (new pid) or a `+tag` variant of the same mailbox
+                    // can no longer re-trigger it. Backend error → no bonus (safe
+                    // default). `welcomed:{pid}` is also marked for parity with
+                    // the Google path, but the e-mail key is the real guard here.
+                    let canonical = canonical_email(&record.email);
+                    if let Ok(true) = try_mark_welcomed_email(&canonical).await {
+                        apply_welcome_bonus(&mut progress);
+                    }
+                    let _ = try_mark_welcomed(&pid).await;
+                    player_state::save(pid.clone(), progress.clone());
+                    let claim_token = player_state::load_claim_token(&pid).await;
+                    session_clone.send(ServerMessage::AuthOk {
+                        player_id: pid,
+                        claim_token,
+                        state: progress,
+                        email: None,
+                    });
+                }
+            },
         }
     });
 }
@@ -338,6 +419,7 @@ pub fn handle_signup(
 /// and reply.
 pub fn handle_login(
     auth_attempts: &Arc<AuthAttemptTracker>,
+    email_attempts: &Arc<AuthAttemptTracker>,
     session: &Arc<Session>,
     email: String,
     password: String,
@@ -346,11 +428,17 @@ pub fn handle_login(
         return reply_auth_error(session, "invalid_credentials");
     };
     let lk = format!("login|{}|{}", email_norm, session.peer_ip);
-    if auth_attempts.is_blocked(lk.clone()) {
+    // Second lock keyed on the e-mail ALONE (all IPs). The per-IP lock above is
+    // trivially bypassed by IP rotation behind a botnet/proxy pool; this one caps
+    // total guesses per account regardless of source IP. Wider window + higher
+    // ceiling (LOGIN_EMAIL_*) so a fumbling legit user is never the one blocked.
+    let ek = format!("login-email|{email_norm}");
+    if auth_attempts.is_blocked(lk.clone()) || email_attempts.is_blocked(ek.clone()) {
         return reply_auth_error(session, "rate_limited");
     }
     let session_clone = session.clone();
     let attempts = auth_attempts.clone();
+    let email_attempts = email_attempts.clone();
     tokio::spawn(async move {
         let acct = load_account(&email_norm).await;
         // Always spend a verify (real or dummy) so timing is ~constant whether or
@@ -365,6 +453,7 @@ pub fn handle_login(
         match acct {
             Some(a) if ok => {
                 attempts.record_success(lk);
+                email_attempts.record_success(ek);
                 let pid = a.player_id;
                 // Adopt the account's stable identity (cross-device login).
                 session_clone.set_player_id(pid.clone());
@@ -384,6 +473,7 @@ pub fn handle_login(
             }
             _ => {
                 attempts.record_failed(lk);
+                email_attempts.record_failed(ek);
                 session_clone.send(ServerMessage::AuthError { code: "invalid_credentials".into() });
             }
         }
@@ -410,6 +500,30 @@ mod tests {
         assert!(normalize_email("a b@example.com").is_none()); // espace
         assert!(normalize_email("a@@example.com").is_none()); // deux @
         assert!(normalize_email("évil@example.com").is_none()); // non-ASCII
+    }
+
+    #[test]
+    fn canonical_email_folds_plus_tag_and_gmail_dots() {
+        // +tag stripped for everyone
+        assert_eq!(canonical_email("moi+promo@example.com"), "moi@example.com");
+        assert_eq!(canonical_email("moi+1+2@example.com"), "moi@example.com");
+        // Gmail folds dots, and googlemail.com is folded onto gmail.com → the
+        // same real inbox shares ONE welcome key across all these variants.
+        assert_eq!(canonical_email("jo.hn+x@gmail.com"), "john@gmail.com");
+        assert_eq!(canonical_email("j.o.h.n@googlemail.com"), "john@gmail.com");
+        assert_eq!(canonical_email("john+promo@googlemail.com"), "john@gmail.com");
+        // Non-gmail keeps dots
+        assert_eq!(canonical_email("jo.hn@example.com"), "jo.hn@example.com");
+        // Plain address is its own canonical form
+        assert_eq!(canonical_email("alex@example.com"), "alex@example.com");
+    }
+
+    #[test]
+    fn disposable_domains_are_flagged() {
+        assert!(is_disposable_email("x@mailinator.com"));
+        assert!(is_disposable_email("a+b@yopmail.com"));
+        assert!(!is_disposable_email("alex@gmail.com"));
+        assert!(!is_disposable_email("alex@example.com"));
     }
 
     #[test]

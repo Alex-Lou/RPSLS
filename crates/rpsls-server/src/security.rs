@@ -265,6 +265,16 @@ pub type AuthAttemptTracker = AttemptTracker<String>;
 pub const AUTH_WINDOW: Duration = Duration::from_secs(300);
 pub const AUTH_MAX_ATTEMPTS: usize = 10;
 
+/// Per-ACCOUNT login lock (keyed by e-mail alone, all IPs). Closes the IP-
+/// rotation bypass of the per-`email|ip` throttle above: an attacker behind a
+/// proxy/botnet pool can no longer reset their per-IP budget by switching IP.
+/// Deliberately wider + higher than the per-IP lock — assuming each verify costs
+/// an Argon2id, 15 guesses / 15 min per account makes online brute-force
+/// impractical while being high enough that a legit user is never the one
+/// locked out (and the window self-heals quickly to limit any lockout griefing).
+pub const LOGIN_EMAIL_WINDOW: Duration = Duration::from_secs(900);
+pub const LOGIN_EMAIL_MAX: usize = 15;
+
 fn prune_old(entry: &mut VecDeque<Instant>, now: Instant, window: Duration) {
     while entry.front().is_some_and(|t| now.duration_since(*t) >= window) {
         entry.pop_front();
