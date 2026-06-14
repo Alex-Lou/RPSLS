@@ -684,6 +684,19 @@ export function starterDeck(): CardId[] {
   return ["aegis", "precision", "anchor", "second-wind", "surge", "augur", "surge", "curse"];
 }
 
+/** Cards every new player owns at first launch (6 commons + first rares). SINGLE
+ *  SOURCE — was duplicated in store.defaultPlayer (cardCollection) and DeckManager
+ *  (STARTER_CARDS); overlaps the server's WELCOME_CARDS starter subset. */
+export const STARTER_COLLECTION: CardId[] = ["aegis", "precision", "anchor", "second-wind", "surge", "augur"];
+
+/** Default 6-card Classé deck for a fresh / wiped profile. */
+export const DEFAULT_RANKED_DECK: CardId[] = ["aegis", "precision", "surge", "augur", "anchor", "second-wind"];
+
+/** Default 10-card Arena (Constellation Pro) deck for a fresh / wiped profile. */
+export const DEFAULT_ARENA_DECK: CardId[] = [
+  "aegis", "precision", "surge", "augur", "anchor", "second-wind", "heist", "supernova", "seve", "jet-caillou",
+];
+
 export function shuffle<T>(input: readonly T[]): T[] {
   const out = input.slice();
   for (let i = out.length - 1; i > 0; i--) {

@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
-import { ALL_CARD_IDS, CARDS, isPassiveCard, RARITY_COLOR, RARITY_ORDER } from "./cards";
+import { ALL_CARD_IDS, CARDS, isPassiveCard, RARITY_COLOR, RARITY_ORDER, STARTER_COLLECTION } from "./cards";
 import { isFusible } from "../arena/arenaFusionCards";
 import { isCastOnDraw } from "../arena/arenaCastOnDraw";
 import { ARENA_LEGENDARY_CAP } from "../arena/arenaDecks";
@@ -52,9 +52,6 @@ const RARITY_RING: Record<CardRarity, string> = {
   epic: "ring-violet-400/60 bg-violet-400/15 text-violet-100",
   legendary: "ring-amber-400/60 bg-amber-400/15 text-amber-100",
 };
-
-/** Cards unlocked by default (commons + first rares). Others need achievements. */
-const STARTER_CARDS: CardId[] = ["aegis", "precision", "anchor", "second-wind", "surge", "augur"];
 
 const UNLOCK_HINTS: Partial<Record<CardId, string>> = {
   mirror: "Gagne 3 matchs en mode classé",
@@ -121,7 +118,7 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
   // encore d'arenaDeck (migration douce des joueurs existants).
   const savedDeck = mode === "arena" ? (player.arenaDeck ?? player.rankedDeck ?? []) : (player.rankedDeck ?? []);
   const saveDeck = mode === "arena" ? setArenaDeck : setRankedDeck;
-  const collection = player.cardCollection ?? STARTER_CARDS;
+  const collection = player.cardCollection ?? STARTER_COLLECTION;
   const [deck, setDeck] = useState<(CardId | null)[]>(() => {
     const padded = [...savedDeck];
     while (padded.length < TOTAL) padded.push(null as unknown as string);

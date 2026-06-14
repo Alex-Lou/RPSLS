@@ -9,6 +9,7 @@ import { sanitisePersisted } from "./storeMigrationGuard";
 import { clearAnchor } from "../online/playerAnchor";
 import { abandonPenaltyLp, activeAbandonCount, nextAbandon } from "../match/forfeit";
 import { nextStreak, streakBonusXp } from "../match/streak";
+import { STARTER_COLLECTION, DEFAULT_RANKED_DECK, DEFAULT_ARENA_DECK } from "../ranked/cards";
 import {
   PACK_COST,
   SEASON_DURATION_MS,
@@ -58,9 +59,9 @@ export function defaultPlayer(): Player {
     createdAt: Date.now(),
     hapticEnabled: true,
     hapticIntensity: "med",
-    cardCollection: ["aegis", "precision", "anchor", "second-wind", "surge", "augur"],
-    rankedDeck: ["aegis", "precision", "surge", "augur", "anchor", "second-wind"],
-    arenaDeck: ["aegis", "precision", "surge", "augur", "anchor", "second-wind", "heist", "supernova", "seve", "jet-caillou"],
+    cardCollection: [...STARTER_COLLECTION],
+    rankedDeck: [...DEFAULT_RANKED_DECK],
+    arenaDeck: [...DEFAULT_ARENA_DECK],
     eclats: 0,
     dust: 0,
     stars: 0,
