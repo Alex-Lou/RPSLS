@@ -1,0 +1,100 @@
+{
+  "packCost": 50,
+  "packSize": 3,
+  "eclatsPerLoss": 2,
+  "eclatsPerWin": {
+    "casual": 5,
+    "ranked": 15,
+    "hotseat": 5,
+    "training": 5,
+    "online": 15,
+    "constellation": 12
+  },
+  "packWeights": {
+    "common": 60,
+    "rare": 30,
+    "epic": 9,
+    "legendary": 1
+  },
+  "dustPerDuplicate": {
+    "common": 5,
+    "rare": 15,
+    "epic": 40,
+    "legendary": 100
+  },
+  "craftCost": {
+    "common": 25,
+    "rare": 75,
+    "epic": 200,
+    "legendary": 500
+  },
+  "codexTiers": [
+    {
+      "threshold": 5,
+      "eclats": 50,
+      "dust": 0
+    },
+    {
+      "threshold": 10,
+      "eclats": 120,
+      "dust": 30
+    },
+    {
+      "threshold": 15,
+      "eclats": 300,
+      "dust": 80
+    },
+    {
+      "threshold": 20,
+      "eclats": 450,
+      "dust": 120
+    },
+    {
+      "threshold": 26,
+      "eclats": 700,
+      "dust": 200
+    },
+    {
+      "threshold": 32,
+      "eclats": 850,
+      "dust": 250
+    },
+    {
+      "threshold": 40,
+      "eclats": 1100,
+      "dust": 350
+    },
+    {
+      "threshold": 46,
+      "eclats": 1500,
+      "dust": 500
+    }
+  ],
+  "seasonRewards": [
+    {
+      "minLp": 0,
+      "eclats": 50,
+      "dust": 0
+    },
+    {
+      "minLp": 1100,
+      "eclats": 150,
+      "dust": 20
+    },
+    {
+      "minLp": 1300,
+      "eclats": 300,
+      "dust": 50
+    },
+    {
+      "minLp": 1500,
+      "eclats": 500,
+      "dust": 100
+    },
+    {
+      "minLp": 1750,
+      "eclats": 700,
+      "dust": 200
+    }
+  ]
+}

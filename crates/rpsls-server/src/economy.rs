@@ -4,7 +4,8 @@
 //! prix / récompenses / raretés INDÉPENDAMMENT du client, sinon un client
 //! modifié peut prétendre « cette légendaire coûte 0 » ou « j'ai gagné 1M
 //! d'éclats ». Ici : la méta cartes (générée depuis cards.ts → zéro dérive) +
-//! les barèmes (miroir de app/src/engine/economy.ts — À GARDER EN SYNC).
+//! les barèmes (générés depuis app/src/engine/economy.ts + rank.ts → zéro dérive,
+//! via scripts/gen-economy-meta.mjs).
 //!
 //! ⚠️ Ce module est PUR (data + fonctions). Il ne mute encore rien : les
 //! endpoints validés (buy_pack / craft / claim / grant_match_reward) viendront
@@ -59,50 +60,82 @@ pub fn collectible_ids() -> Vec<&'static str> {
         .collect()
 }
 
-// ───────── Barèmes (miroir de app/src/engine/economy.ts — SYNC à la main) ─────────
+// ───────── Barèmes — GÉNÉRÉS depuis app/src/engine/economy.ts (+ les floors de
+// tiers de rank.ts pour la saison) par scripts/gen-economy-meta.mjs, embarqués
+// ici via include_str!. ZÉRO dérive : relancer le générateur après toute modif
+// de barème côté TS. ─────────
 
-pub const PACK_COST: u64 = 50;
-pub const PACK_SIZE: usize = 3;
-pub const ECLATS_PER_LOSS: u64 = 2;
+#[derive(Debug, Clone, Deserialize)]
+pub struct CodexTier {
+    pub threshold: usize,
+    pub eclats: u64,
+    pub dust: u64,
+}
 
-/// Éclats pour une victoire, par mode de match enregistré.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SeasonReward {
+    pub min_lp: u64,
+    pub eclats: u64,
+    pub dust: u64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EconomyMeta {
+    pack_cost: u64,
+    pack_size: usize,
+    eclats_per_loss: u64,
+    eclats_per_win: HashMap<String, u64>,
+    pack_weights: HashMap<String, u32>,
+    dust_per_duplicate: HashMap<String, u64>,
+    craft_cost: HashMap<String, u64>,
+    codex_tiers: Vec<CodexTier>,
+    season_rewards: Vec<SeasonReward>,
+}
+
+const ECONOMY_META_JSON: &str = include_str!("../economy_meta.json");
+
+fn economy_meta() -> &'static EconomyMeta {
+    static M: OnceLock<EconomyMeta> = OnceLock::new();
+    M.get_or_init(|| {
+        serde_json::from_str(ECONOMY_META_JSON)
+            .expect("economy_meta.json invalide — relancer scripts/gen-economy-meta.mjs")
+    })
+}
+
+pub fn pack_cost() -> u64 {
+    economy_meta().pack_cost
+}
+pub fn pack_size() -> usize {
+    economy_meta().pack_size
+}
+pub fn eclats_per_loss() -> u64 {
+    economy_meta().eclats_per_loss
+}
+
+/// Éclats pour une victoire dans `mode`. Mode inconnu → 0 (miroir du `?? 0` de
+/// economy.ts ; l'ancien `_ => 5` côté Rust était une dérive silencieuse).
 pub fn eclats_per_win(mode: &str) -> u64 {
-    match mode {
-        "ranked" | "online" => 15,
-        "constellation" => 12,
-        // casual / hotseat / training
-        _ => 5,
-    }
+    economy_meta().eclats_per_win.get(mode).copied().unwrap_or(0)
 }
 
 pub fn eclats_reward(mode: &str, outcome: &str) -> u64 {
     match outcome {
         "win" => eclats_per_win(mode),
-        "loss" => ECLATS_PER_LOSS,
+        "loss" => eclats_per_loss(),
         _ => 0,
     }
 }
 
 /// Poids de tirage d'une rareté dans un pack (la somme n'a pas à faire 100).
 pub fn pack_weight(rarity: &str) -> u32 {
-    match rarity {
-        "common" => 60,
-        "rare" => 30,
-        "epic" => 9,
-        "legendary" => 1,
-        _ => 0,
-    }
+    economy_meta().pack_weights.get(rarity).copied().unwrap_or(0)
 }
 
 /// Poussière gagnée quand une carte tirée double une déjà possédée.
 pub fn dust_per_duplicate(rarity: &str) -> u64 {
-    match rarity {
-        "common" => 5,
-        "rare" => 15,
-        "epic" => 40,
-        "legendary" => 100,
-        _ => 0,
-    }
+    economy_meta().dust_per_duplicate.get(rarity).copied().unwrap_or(0)
 }
 pub fn dust_for_duplicate(id: &str) -> u64 {
     rarity_of(id).map(dust_per_duplicate).unwrap_or(0)
@@ -110,39 +143,22 @@ pub fn dust_for_duplicate(id: &str) -> u64 {
 
 /// Poussière nécessaire pour crafter une carte verrouillée précise.
 pub fn craft_cost_for_rarity(rarity: &str) -> u64 {
-    match rarity {
-        "common" => 25,
-        "rare" => 75,
-        "epic" => 200,
-        "legendary" => 500,
-        _ => 0,
-    }
+    economy_meta().craft_cost.get(rarity).copied().unwrap_or(0)
 }
 pub fn craft_cost(id: &str) -> Option<u64> {
     rarity_of(id).map(craft_cost_for_rarity)
 }
 
-/// Paliers Codex : (seuil de cartes possédées, éclats, poussière). Pour valider
+/// Paliers Codex (seuil de cartes possédées, éclats, poussière) — pour valider
 /// un claim côté serveur (collection ≥ seuil ET pas déjà réclamé).
-pub const CODEX_TIERS: &[(usize, u64, u64)] = &[
-    (5, 50, 0),
-    (10, 120, 30),
-    (15, 300, 80),
-    (20, 450, 120),
-    (26, 700, 200),
-    (32, 850, 250),
-    (40, 1100, 350),
-    (46, 1500, 500),
-];
+pub fn codex_tiers() -> &'static [CodexTier] {
+    &economy_meta().codex_tiers
+}
 
-/// Récompenses de saison : (LP minimum du palier, éclats, poussière).
-pub const SEASON_REWARDS: &[(u64, u64, u64)] = &[
-    (0, 50, 0),
-    (1100, 150, 20),
-    (1300, 300, 50),
-    (1500, 500, 100),
-    (1750, 700, 200),
-];
+/// Récompenses de saison (LP minimum du palier, éclats, poussière).
+pub fn season_rewards() -> &'static [SeasonReward] {
+    &economy_meta().season_rewards
+}
 
 #[cfg(test)]
 mod tests {
@@ -161,5 +177,35 @@ mod tests {
         assert!(!is_collectible("apocalypse")); // carte de fusion
         assert_eq!(eclats_reward("ranked", "win"), 15);
         assert_eq!(eclats_reward("constellation", "win"), 12);
+    }
+
+    #[test]
+    fn economy_meta_barems_match_source() {
+        // Valeurs générées depuis economy.ts — gate de régression du codegen.
+        assert_eq!(pack_cost(), 50);
+        assert_eq!(pack_size(), 3);
+        assert_eq!(eclats_per_loss(), 2);
+        assert_eq!(eclats_per_win("ranked"), 15);
+        assert_eq!(eclats_per_win("online"), 15);
+        assert_eq!(eclats_per_win("constellation"), 12);
+        assert_eq!(eclats_per_win("casual"), 5);
+        // Mode inconnu → 0 (miroir du `?? 0` de economy.ts ; corrige la dérive `_ => 5`).
+        assert_eq!(eclats_per_win("bogus"), 0);
+        assert_eq!(eclats_reward("bogus", "win"), 0);
+        assert_eq!(pack_weight("common"), 60);
+        assert_eq!(pack_weight("legendary"), 1);
+        assert_eq!(dust_per_duplicate("legendary"), 100);
+        assert_eq!(dust_per_duplicate("common"), 5);
+        assert_eq!(craft_cost_for_rarity("epic"), 200);
+        // Codex : 8 paliers, premier (5,50,0), dernier seuil 46.
+        let codex = codex_tiers();
+        assert_eq!(codex.len(), 8);
+        assert_eq!((codex[0].threshold, codex[0].eclats, codex[0].dust), (5, 50, 0));
+        assert_eq!(codex[7].threshold, 46);
+        // Saison : 5 paliers, bronze (0,50,..) et diamond (1750,700,200).
+        let season = season_rewards();
+        assert_eq!(season.len(), 5);
+        assert_eq!((season[0].min_lp, season[0].eclats), (0, 50));
+        assert_eq!((season[4].min_lp, season[4].eclats, season[4].dust), (1750, 700, 200));
     }
 }
