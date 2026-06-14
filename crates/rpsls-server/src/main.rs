@@ -41,6 +41,7 @@ mod google_auth;
 // incréments (endpoints validés à venir).
 #[allow(dead_code)]
 mod economy;
+mod janitors;
 mod lanes_engine;
 mod leaderboard;
 mod lobby;
@@ -69,7 +70,7 @@ fn cap_from_env(var: &str, default: usize) -> usize {
         .unwrap_or(default)
 }
 
-struct AppState {
+pub(crate) struct AppState {
     /// `in_match.len() + in_lanes.len()` must stay below this to accept new
     /// matches. Loaded once at boot from `MAX_CONCURRENT_MATCHES` env.
     max_matches: usize,
@@ -87,12 +88,12 @@ struct AppState {
     /// (`LOGIN_EMAIL_*`). Pruned by the same janitor pattern.
     login_email_attempts: Arc<AuthAttemptTracker>,
     /// session_id → (match_tx, our_slot) — classic 1v1 mode.
-    in_match: DashMap<String, (mpsc::UnboundedSender<MatchCommand>, PlayerSlot)>,
+    pub(crate) in_match: DashMap<String, (mpsc::UnboundedSender<MatchCommand>, PlayerSlot)>,
     /// session_id → (lanes_tx, our_slot) — Constellation Lanes mode (Phase 1+).
-    in_lanes: DashMap<String, (mpsc::UnboundedSender<LanesCommand>, PlayerSlot)>,
+    pub(crate) in_lanes: DashMap<String, (mpsc::UnboundedSender<LanesCommand>, PlayerSlot)>,
     /// player_id → last SyncState save timestamp — server-side write throttle
     /// (max 1 save per 5s per identity) to protect Upstash quota.
-    sync_throttle: DashMap<String, Instant>,
+    pub(crate) sync_throttle: DashMap<String, Instant>,
 }
 
 #[tokio::main]
@@ -138,49 +139,7 @@ async fn main() {
     // already deleted last sweep just isn't there next sweep). Bounded:
     // we sleep between SCAN pages so a sudden 100k-key sweep can't burn
     // through the Upstash request budget.
-    tokio::spawn(async move {
-        const INACTIVE_TTL_DAYS: u64 = 180;
-        const SWEEP_INTERVAL_SECS: u64 = 24 * 3600;
-        const SCAN_PAGE: u32 = 200;
-        const PAGE_PAUSE_MS: u64 = 250;
-        let ttl_ms: u64 = INACTIVE_TTL_DAYS * 24 * 3600 * 1000;
-        // Skip the immediate first tick — boot-time bursts are bad form.
-        let mut tick = tokio::time::interval(std::time::Duration::from_secs(SWEEP_INTERVAL_SECS));
-        tick.tick().await;
-        loop {
-            tick.tick().await;
-            if !player_state::enabled() {
-                continue;
-            }
-            let now_ms = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_millis() as u64)
-                .unwrap_or(0);
-            let cutoff_ms = now_ms.saturating_sub(ttl_ms);
-            let mut cursor = "0".to_string();
-            let mut deleted = 0u32;
-            let mut scanned = 0u32;
-            loop {
-                let Some((next, keys)) = player_state::scan_player_keys(&cursor, SCAN_PAGE).await else {
-                    break;
-                };
-                scanned += keys.len() as u32;
-                for key in &keys {
-                    let updated = player_state::read_updated_at(key).await;
-                    let Some(ts) = updated else { continue };
-                    if ts >= cutoff_ms { continue }
-                    let Some(pid) = player_state::player_id_from_key(key) else { continue };
-                    if player_state::delete_player(pid).await {
-                        deleted += 1;
-                    }
-                }
-                cursor = next;
-                if cursor == "0" { break }
-                tokio::time::sleep(std::time::Duration::from_millis(PAGE_PAUSE_MS)).await;
-            }
-            info!(scanned, deleted, days = INACTIVE_TTL_DAYS, "inactive-user sweep done");
-        }
-    });
+    janitors::spawn_inactive_user_sweeper();
 
     // Same pattern for the SyncState throttle map: each player_id who ever
     // pushed leaves an Instant entry; without periodic pruning the map grows
@@ -191,30 +150,7 @@ async fn main() {
     // to 60s so the map'\''s upper bound is bounded by the actual concurrent
     // pusher count, not by the sweep interval. cutoff stays 60s — 12× the
     // 5s throttle window, so a legitimate cooldown is never evicted early.
-    let throttle_state = state.clone();
-    tokio::spawn(async move {
-        let mut tick = tokio::time::interval(std::time::Duration::from_secs(60));
-        tick.tick().await; // skip first immediate tick
-        loop {
-            tick.tick().await;
-            let cutoff = std::time::Duration::from_secs(60);
-            let now = Instant::now();
-            let stale: Vec<String> = throttle_state
-                .sync_throttle
-                .iter()
-                .filter(|e| now.duration_since(*e.value()) >= cutoff)
-                .map(|e| e.key().clone())
-                .collect();
-            for pid in &stale {
-                throttle_state
-                    .sync_throttle
-                    .remove_if(pid, |_, v| now.duration_since(*v) >= cutoff);
-            }
-            if !stale.is_empty() {
-                tracing::debug!(removed = stale.len(), "sync throttle swept");
-            }
-        }
-    });
+    janitors::spawn_sync_throttle_sweeper(state.clone());
 
     // Dead-match janitor: on_end runs when a match task exits cleanly, but a
     // panic inside run_match (e.g. channel send failure) skips on_end and
@@ -222,36 +158,7 @@ async fn main() {
     // that'\''s a slow leak. Every 2 min, scan both maps and drop entries whose
     // command sender is closed — a closed sender means the match task is no
     // longer receiving, so cleanup is safe and idempotent.
-    let dead_match_state = state.clone();
-    tokio::spawn(async move {
-        let mut tick = tokio::time::interval(std::time::Duration::from_secs(120));
-        tick.tick().await;
-        loop {
-            tick.tick().await;
-            let dead_classic: Vec<String> = dead_match_state
-                .in_match
-                .iter()
-                .filter(|e| e.value().0.is_closed())
-                .map(|e| e.key().clone())
-                .collect();
-            let dead_lanes: Vec<String> = dead_match_state
-                .in_lanes
-                .iter()
-                .filter(|e| e.value().0.is_closed())
-                .map(|e| e.key().clone())
-                .collect();
-            let total = dead_classic.len() + dead_lanes.len();
-            for id in &dead_classic {
-                dead_match_state.in_match.remove_if(id, |_, v| v.0.is_closed());
-            }
-            for id in &dead_lanes {
-                dead_match_state.in_lanes.remove_if(id, |_, v| v.0.is_closed());
-            }
-            if total > 0 {
-                tracing::warn!(removed = total, "dead match channels swept (on_end skipped?)");
-            }
-        }
-    });
+    janitors::spawn_dead_match_sweeper(state.clone());
 
     // `/health` is infra-only: Render hammers it during rolling deploys
     // (multiple probes per second to confirm the new instance is up before
