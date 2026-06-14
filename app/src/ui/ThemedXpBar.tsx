@@ -17,6 +17,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { formatNumber } from "../i18n/format";
 
 export interface ThemedXpBarProps {
   /** Current value within the level (e.g. xpInLevel). */
@@ -64,7 +65,7 @@ export function ThemedXpBar({
             {label}
           </span>
           <span className="text-[10px] tabular-nums font-bold text-ink-faint">
-            {current.toLocaleString("fr-FR")} / {total.toLocaleString("fr-FR")}
+            {formatNumber(current)} / {formatNumber(total)}
           </span>
         </div>
       )}

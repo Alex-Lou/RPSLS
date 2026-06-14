@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { setBurgerHidden } from "../../Sidebar";
 import { InlineBurger } from "../../ui/ModeLobbyShell";
 import { useStore } from "../../store/store";
+import { formatNumber } from "../../i18n/format";
 import { GameMode, MODE_META, REWARDS, type Difficulty } from "../../types";
 import { THEMES, gradientFromTheme } from "../../theme/theme";
 import { rankProgress } from "../../engine/rank";
@@ -737,12 +738,12 @@ export function ClasseLobby({
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-2">
               <span className="font-black text-lg leading-none">{tier.label}</span>
-              <span className="text-[11px] text-ink-muted tabular-nums">{classeLp.toLocaleString("fr-FR")} PR</span>
+              <span className="text-[11px] text-ink-muted tabular-nums">{formatNumber(classeLp)} PR</span>
             </div>
             <LpBar progress={lpProgress} className="mt-1.5" />
             <div className="mt-1 text-[10px] text-ink-faint">
               {nextTier
-                ? `${(tier.ceil - classeLp).toLocaleString("fr-FR")} PR avant ${nextTier.label} ${nextTier.emoji}`
+                ? `${formatNumber(tier.ceil - classeLp)} PR avant ${nextTier.label} ${nextTier.emoji}`
                 : "Palier maximum atteint"}
             </div>
           </div>

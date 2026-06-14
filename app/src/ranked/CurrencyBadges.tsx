@@ -14,6 +14,7 @@
 import { motion } from "motion/react";
 import { useStore } from "../store/store";
 import { PACK_COST } from "../engine/economy";
+import { formatCompact, formatNumber } from "../i18n/format";
 
 interface Props {
   /** Click handler — usually a navigation to the shop. When undefined the
@@ -111,7 +112,7 @@ function CurrencyChip({
     <Tag
       onClick={interactive ? onClick : undefined}
       whileTap={interactive ? { scale: 0.94 } : undefined}
-      title={`${label} : ${value.toLocaleString("fr-FR")}`}
+      title={`${label} : ${formatNumber(value)}`}
       aria-label={`${label} ${value}`}
       className={
         // flex-1 + justify-center so the chip row fills the badge width and the
@@ -157,12 +158,3 @@ function CurrencyChip({
   );
 }
 
-/** Pretty-print large numbers — show the FULL amount up to 99 999 (with thin
- *  thousand separator so the player actually reads their balance), then fall
- *  back to compact "100k / 1.2M" once a chip would overflow. Hiding 9 000 as
- *  "9k" was Alex's complaint: numbers were unreadable AND cryptic. */
-function formatCompact(n: number): string {
-  if (n < 100_000) return n.toLocaleString("fr-FR");
-  if (n < 1_000_000) return Math.round(n / 1000) + "k";
-  return (n / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
-}

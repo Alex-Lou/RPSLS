@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
+import { formatNumber } from "../i18n/format";
 import { PremiumBadge } from "./PremiumBadge";
 import { useT } from "../i18n";
 import { hapticMatchStart, hapticMatchWin, hapticTap } from "../haptic";
@@ -144,11 +145,11 @@ export function PremiumPurchaseModal({
               {t("premium.priceLabel")}
             </span>
             <span className="text-base font-black text-amber-200 inline-flex items-center gap-1">
-              <span className="text-lg leading-none">✦</span>{set.cost.toLocaleString("fr-FR")}
+              <span className="text-lg leading-none">✦</span>{formatNumber(set.cost)}
             </span>
           </div>
           <div className="text-[11px] text-ink-faint text-center">
-            {t("premium.youHave", { n: stars.toLocaleString("fr-FR") })}
+            {t("premium.youHave", { n: formatNumber(stars) })}
           </div>
           <div className="flex flex-col gap-2 mt-1">
             {owned ? (

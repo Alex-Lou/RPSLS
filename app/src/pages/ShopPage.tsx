@@ -12,6 +12,7 @@
  */
 
 import { useMemo, useState } from "react";
+import { formatNumber } from "../i18n/format";
 import { AnimatePresence, motion } from "motion/react";
 import { BurstCanvas } from "../fx/LevelUpOverlay";
 import { useStore } from "../store/store";
@@ -132,7 +133,7 @@ export function ShopPage() {
           >
             {canBuyPack
               ? `Ouvrir un pack · ${PACK_COST} 💎`
-              : `Il manque ${(PACK_COST - eclats).toLocaleString("fr-FR")} 💎`}
+              : `Il manque ${formatNumber(PACK_COST - eclats)} 💎`}
           </motion.button>
         </section>
 
