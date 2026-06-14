@@ -94,6 +94,11 @@ export interface PlayerProgress {
 /* Client → Server */
 export type ClientMessage =
   | { type: "hello"; nickname: string; player_id?: string; claim_token?: string }
+  // Account auth (§9-A). signup links the current guest session's progression
+  // to a new account + grants the welcome bonus; login adopts the account's
+  // identity + progression. Both reply auth_ok / auth_error.
+  | { type: "signup"; email: string; password: string }
+  | { type: "login"; email: string; password: string }
   | { type: "create_lobby"; best_of: number }
   | { type: "join_lobby"; code: string }
   | { type: "join_queue"; best_of: number }
@@ -147,6 +152,11 @@ export type ServerMessage =
   | { type: "rematch_offered" }
   | { type: "rematch_declined" }
   | { type: "state_loaded"; state: PlayerProgress; claim_token?: string }
+  // Auth (signup/login) result. On auth_ok the client adopts player_id +
+  // claim_token and merges `state`. auth_error.code is generic (never leaks
+  // whether an e-mail exists).
+  | { type: "auth_ok"; player_id: string; claim_token?: string; state: PlayerProgress }
+  | { type: "auth_error"; code: string }
   /* Lanes variants */
   | {
       type: "lanes_match_found";

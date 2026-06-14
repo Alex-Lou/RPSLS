@@ -72,6 +72,7 @@ function SidebarBody({
   onAfterPick?: () => void;
 }) {
   const player = useStore((s) => s.player);
+  const logout = useStore((s) => s.logout);
   const info = levelFromXp(player.xp);
   const theme = THEMES[player.themeId];
   const t = useT();
@@ -182,6 +183,30 @@ function SidebarBody({
 
       {/* Pinned footer — language always reachable, kept above the Android nav. */}
       <div className="shrink-0 flex flex-col gap-2 pt-3 mt-1 border-t border-hairline">
+        {/* Sign-out — only when logged into an account; sits ABOVE the language
+            picker. Drops back to the auth gate (App listens for rpsls:show-auth). */}
+        {player.accountEmail && (
+          <div className="flex flex-col gap-1">
+            <div className="px-2 text-[10px] text-ink-faint text-center truncate" title={player.accountEmail}>
+              {player.accountEmail}
+            </div>
+            <button
+              onClick={() => {
+                logout();
+                onAfterPick?.();
+                window.dispatchEvent(new CustomEvent("rpsls:show-auth"));
+              }}
+              className="flex items-center justify-center gap-2 rounded-xl border border-hairline bg-hairline/60 px-3 py-2.5 text-sm font-bold text-ink-muted transition hover:border-rose-400/40 hover:bg-rose-500/15 hover:text-rose-200"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              <span>{t("auth.logout")}</span>
+            </button>
+          </div>
+        )}
         <LanguagePicker variant="sidebar" />
         <div className="text-[10px] text-zinc-600 text-center">RPSLS · v0.1</div>
       </div>

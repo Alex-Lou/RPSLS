@@ -239,6 +239,35 @@ export function mergeServerState(
   return patch;
 }
 
+/** Build the patch to apply on a successful signup / login.
+ *
+ *  Starts from the union/max merge (never lose anything the player has), then —
+ *  for LOGIN only — force-adopts the account's single-valued loadout (decks)
+ *  and look (cosmetics). That override is needed because switching to an account
+ *  on this device must bring THAT account's stuff even when a prior guest sync
+ *  already set `syncedAt` (which gates the restore-only-on-fresh logic inside
+ *  `mergeServerState`). Signup keeps the guest's current loadout — the server
+ *  returns it unchanged plus the welcome bonus, so the plain merge is right. */
+export function applyAuthState(
+  local: Player,
+  server: PlayerProgress,
+  mode: "signup" | "login",
+): Partial<Player> {
+  const patch = mergeServerState(local, server);
+  if (mode === "login") {
+    if (server.rankedDeck && server.rankedDeck.length > 0) patch.rankedDeck = server.rankedDeck;
+    if (server.arenaDeck && server.arenaDeck.length > 0) patch.arenaDeck = server.arenaDeck;
+    if (server.themeId && server.themeId in THEMES) patch.themeId = server.themeId as ThemeId;
+    if (server.backgroundId && server.backgroundId in BACKGROUNDS_BY_ID) {
+      patch.backgroundId = server.backgroundId as BackgroundId;
+    }
+    if (server.padId && server.padId in PAD_META) patch.padId = server.padId as PadId;
+    if (server.avatar && isAvatarImage(server.avatar)) patch.avatar = server.avatar;
+    if (server.nickname && server.nickname.trim().length > 0) patch.nickname = server.nickname.slice(0, 24);
+  }
+  return patch;
+}
+
 /** Handle a `state_loaded` message from the server: merge into local store
  *  and push the merged result back. */
 export function handleStateLoaded(server: PlayerProgress, client: OnlineClient, claimToken?: string) {

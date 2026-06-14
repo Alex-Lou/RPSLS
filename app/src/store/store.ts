@@ -6,6 +6,7 @@ import { CLASSE_LP, classeLpDelta } from "../types";
 import type { Locale } from "../i18n";
 import { todayDateKey } from "../engine/daily";
 import { sanitisePersisted } from "./storeMigrationGuard";
+import { clearAnchor } from "../online/playerAnchor";
 import { abandonPenaltyLp, activeAbandonCount, nextAbandon } from "../match/forfeit";
 import { nextStreak, streakBonusXp } from "../match/streak";
 import {
@@ -147,6 +148,10 @@ interface AppState {
   /** Apply a server-synced progression patch to the local player. Used by
    *  bootSync and the state_loaded handler to merge server-saved data. */
   applyServerSync: (patch: Partial<Player>) => void;
+  /** Sign out of the account: become a fresh guest (new id, default progression)
+   *  and break the durable anchor so the next boot doesn't restore the account.
+   *  The account's cloud data is untouched — logging back in restores it. */
+  logout: () => void;
   /** SIMULATE a premium-set purchase (no real money). Debits the cost in
    *  stars and adds the set to ownedPremiumSets. Returns `false` if the
    *  player can't afford it or already owns the set. Production swap-in
@@ -528,6 +533,13 @@ export const useStore = create<AppState>()(
 
       applyServerSync: (patch) =>
         set((s) => ({ player: { ...s.player, ...patch } })),
+      logout: () => {
+        // Break the durable account link so the next boot doesn't restore it,
+        // then become a fresh guest. The account's data stays in the cloud
+        // (under its own player_id) — logging back in restores everything.
+        void clearAnchor();
+        set({ player: defaultPlayer(), history: [] });
+      },
       simulatePremiumPurchase: (setId, costStars) => {
         const p = useStore.getState().player;
         const owned = p.ownedPremiumSets ?? [];

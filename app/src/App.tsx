@@ -24,6 +24,7 @@ import { setHapticSettings } from "./haptic";
 import { initSentry, shutdownSentry } from "./monitoring/sentry";
 import { startSyncSubscriber } from "./online/playerSync";
 import { runBootSync, restoreAnchorIntoStore } from "./online/bootSync";
+import { AuthGate } from "./auth/AuthGate";
 
 // Code-split heavy pages — each becomes its own JS chunk that Vite ships
 // on demand the first time the user navigates there. Cuts the initial
@@ -43,7 +44,7 @@ const ContactPage  = lazy(() => import("./pages/ContactPage").then(m => ({ defau
 const PrivacyPage  = lazy(() => import("./legal/PrivacyPage").then(m => ({ default: m.PrivacyPage })));
 const Welcome      = lazy(() => import("./pages/Welcome").then(m => ({ default: m.Welcome })));
 
-type Stage = "splash" | "welcome" | "shell";
+type Stage = "splash" | "welcome" | "auth" | "shell";
 
 export default function App() {
   const themeId = useStore((s) => s.player.themeId);
@@ -61,6 +62,7 @@ export default function App() {
   const hapticIntensity = useStore((s) => s.player.hapticIntensity ?? "med");
   const crashReports = useStore((s) => s.player.crashReports ?? false);
   const fontScale = useStore((s) => s.player.fontScale ?? 1);
+  const accountEmail = useStore((s) => s.player.accountEmail);
 
   // Accessibility text scale → drives the global --font-scale var that the
   // html font-size (and therefore every rem-based size) keys off.
@@ -85,6 +87,15 @@ export default function App() {
     };
     window.addEventListener("rpsls:navigate", onNav);
     return () => window.removeEventListener("rpsls:navigate", onNav);
+  }, []);
+
+  // Logout (from the burger) → drop back to the blocking auth gate and kick a
+  // fresh bootSync so the new guest identity (the store action already reset +
+  // cleared the anchor) gets its claim token persisted.
+  useEffect(() => {
+    const onShowAuth = () => { setStage("auth"); runBootSync(); };
+    window.addEventListener("rpsls:show-auth", onShowAuth);
+    return () => window.removeEventListener("rpsls:show-auth", onShowAuth);
   }, []);
   const [stage, setStage] = useState<Stage>("splash");
   const [page, setPage] = useState<Page>("play");
@@ -196,7 +207,13 @@ export default function App() {
     return () => window.removeEventListener("popstate", onPop);
   }, [page]);
 
-  const afterSplash = () => setStage(onboarded ? "shell" : "welcome");
+  // After the splash tap: first-run → onboarding; otherwise a guest (no linked
+  // account) hits the blocking auth gate BEFORE the menu loads, while a
+  // signed-in user goes straight to the shell.
+  const afterSplash = () => {
+    if (!onboarded) { setStage("welcome"); return; }
+    setStage(accountEmail ? "shell" : "auth");
+  };
 
   // Live coded backdrop — rendered behind everything when the chosen
   // background is a procedural scene (nebula/aurora/grid) and we're past
@@ -232,7 +249,7 @@ export default function App() {
       {/* Backdrop stays gated on `stage !== "splash"` — Splash already mounts
           its own ThemedBackdrop via SplashShader, doubling it would render two
           WebGL canvases at z-0 and waste a context. */}
-      {activeScene && stage !== "splash" && <ThemedBackdrop scene={activeScene} />}
+      {activeScene && stage !== "splash" && stage !== "auth" && <ThemedBackdrop scene={activeScene} />}
       {/* Per-theme touch/slide FX for the coded premium scenes (storm/tempus/
           emberforge/phantom/eclipse) — each reacts in its own voice. Passive in
           menus (taps still reach the UI), active during the full-screen peek.
@@ -300,16 +317,20 @@ export default function App() {
         )}
         {stage === "welcome" && (
           <Suspense key="welcome" fallback={<RouteFallback />}>
-            <Welcome onDone={() => setStage("shell")} />
+            <Welcome onDone={() => setStage(accountEmail ? "shell" : "auth")} />
           </Suspense>
+        )}
+        {stage === "auth" && (
+          <AuthGate key="auth" onDone={() => setStage("shell")} />
         )}
         {stage === "shell" && (
           <motion.div
             key="shell"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            // Clean fade-in after the splash has fully exited (mode="wait").
-            transition={{ duration: 0.5, ease: [0.4, 0.0, 0.2, 1] }}
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            // Confident "arrival" rather than a flat fade — the menu scales up as
+            // it lands (esp. after the auth gate's success celebration).
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
             // relative z-10 keeps the shell above the z-0 coded backdrop.
             // During a full-screen peek, hide the shell so the live backdrop fills the screen.
             className={"relative z-10 flex h-full min-h-0" + (peek ? " invisible" : "")}

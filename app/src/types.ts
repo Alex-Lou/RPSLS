@@ -173,6 +173,11 @@ export interface Player {
    *  Hello, required on subsequent connections. Prevents player_id spoofing.
    *  Local-only (not part of PlayerProgress). */
   claimToken?: string;
+  /** Logged-in account e-mail (normalised). LOCAL-only, never part of
+   *  PlayerProgress — the server already binds e-mail↔player_id in its account
+   *  record. Presence = "signed in" (gates account-only features + shows the
+   *  account in Profile). Wiped on a reinstall until the next login. */
+  accountEmail?: string;
   /** Player's own uploaded background image (data URL), shown when the
    *  "custom" background is selected. Pre-bibliothèque: stores ONLY the
    *  current pick. Post-bibliothèque: mirrors customBgs[0] for back-compat. */
