@@ -32,7 +32,8 @@ function scalar(name) {
 /** Corps `{ ... }` d'un objet nommé `NAME ... = { ... };` (les annotations de
  *  type peuvent contenir des `{}` mais jamais de `=` ni de `};`). */
 function objectBody(src, name) {
-  const m = src.match(new RegExp(`${name}[^=]*=\\s*\\{([\\s\\S]*?)\\}\\s*;`));
+  // tolère `} as const;` (WELCOME_BONUS) en plus de `};`
+  const m = src.match(new RegExp(`${name}[^=]*=\\s*\\{([\\s\\S]*?)\\}\\s*(?:as\\s+const)?\\s*;`));
   if (!m) fail(`objet ${name} introuvable`);
   return m[1];
 }
@@ -55,6 +56,7 @@ const eclatsPerWin = numMap(objectBody(ECO, "ECLATS_PER_WIN"));
 const packWeights = numMap(objectBody(ECO, "PACK_WEIGHTS"));
 const dustPerDuplicate = numMap(objectBody(ECO, "DUST_PER_DUPLICATE"));
 const craftCost = numMap(objectBody(ECO, "CRAFT_COST"));
+const welcomeBonus = numMap(objectBody(ECO, "WELCOME_BONUS"));
 
 const codexTiers = [];
 for (const m of arrayBody(ECO, "CODEX_TIERS").matchAll(
@@ -88,6 +90,7 @@ const meta = {
   packWeights,
   dustPerDuplicate,
   craftCost,
+  welcomeBonus,
   codexTiers,
   seasonRewards,
 };

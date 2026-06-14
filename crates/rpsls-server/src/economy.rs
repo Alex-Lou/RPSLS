@@ -80,6 +80,19 @@ pub struct SeasonReward {
     pub dust: u64,
 }
 
+/// Bonus de bienvenue (monnaies accordées une fois à l'inscription). Le champ
+/// `cards` de economy.ts est purement décoratif côté client → ignoré ici (serde
+/// laisse tomber les champs inconnus).
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct WelcomeBonus {
+    #[serde(default)]
+    pub eclats: u64,
+    #[serde(default)]
+    pub dust: u64,
+    #[serde(default)]
+    pub stars: u64,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct EconomyMeta {
@@ -90,6 +103,7 @@ struct EconomyMeta {
     pack_weights: HashMap<String, u32>,
     dust_per_duplicate: HashMap<String, u64>,
     craft_cost: HashMap<String, u64>,
+    welcome_bonus: WelcomeBonus,
     codex_tiers: Vec<CodexTier>,
     season_rewards: Vec<SeasonReward>,
 }
@@ -160,6 +174,20 @@ pub fn season_rewards() -> &'static [SeasonReward] {
     &economy_meta().season_rewards
 }
 
+/// Bonus de bienvenue (monnaies accordées une fois à l'inscription). Source =
+/// `WELCOME_BONUS` dans economy.ts ; account.rs lit ces valeurs au lieu de les
+/// redéfinir (single source ⇒ l'affichage pré-inscription ne peut plus diverger
+/// du don serveur).
+pub fn welcome_eclats() -> u64 {
+    economy_meta().welcome_bonus.eclats
+}
+pub fn welcome_dust() -> u64 {
+    economy_meta().welcome_bonus.dust
+}
+pub fn welcome_stars() -> u64 {
+    economy_meta().welcome_bonus.stars
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -207,5 +235,7 @@ mod tests {
         assert_eq!(season.len(), 5);
         assert_eq!((season[0].min_lp, season[0].eclats), (0, 50));
         assert_eq!((season[4].min_lp, season[4].eclats, season[4].dust), (1750, 700, 200));
+        // Bonus de bienvenue (single source economy.ts, lu par account.rs).
+        assert_eq!((welcome_eclats(), welcome_dust(), welcome_stars()), (300, 150, 30));
     }
 }

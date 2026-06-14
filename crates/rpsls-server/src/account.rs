@@ -202,17 +202,19 @@ pub fn verify_dummy(candidate: &str) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// Bonus de bienvenue (§9-A étape 4) — montants par défaut, à valider par Alex
+// Bonus de bienvenue (§9-A étape 4)
 // ──────────────────────────────────────────────────────────────────────────
-
-pub const WELCOME_ECLATS: u64 = 300;
-pub const WELCOME_DUST: u64 = 150;
-pub const WELCOME_STARS: u64 = 30;
+// Les MONTANTS de monnaies (éclats/dust/stars) viennent de `WELCOME_BONUS` dans
+// app/src/engine/economy.ts via economy_meta.json (single source ⇒ l'affichage
+// pré-inscription d'AuthGate ne peut plus diverger du don serveur) :
+// `crate::economy::welcome_eclats()` / `welcome_dust()` / `welcome_stars()`.
 
 /// Les 14 cartes offertes = 6 starters + les 4 cartes que le deck Arena par
 /// défaut référence HORS collection de départ (`heist/supernova/seve/jet-caillou`,
 /// bug corrigé au passage) + 4 extras (`prescience/riposte/curse/gaia`). Ids
 /// vérifiés contre l'union `CardId` (`app/src/ranked/rankedTypes.ts`).
+/// ⚠️ Le NOMBRE (14) est affiché côté client via `WELCOME_BONUS.cards`
+/// (economy.ts) — garder `WELCOME_CARDS.len()` en phase avec lui.
 pub const WELCOME_CARDS: &[&str] = &[
     // 6 starters
     "aegis", "precision", "anchor", "second-wind", "surge", "augur",
@@ -226,9 +228,9 @@ pub const WELCOME_CARDS: &[&str] = &[
 /// union des cartes (jamais de doublon). PUR — l'appelant gère l'unicité du
 /// don via `try_mark_welcomed`.
 pub fn apply_welcome_bonus(p: &mut PlayerProgress) {
-    p.eclats = p.eclats.saturating_add(WELCOME_ECLATS);
-    p.dust = p.dust.saturating_add(WELCOME_DUST);
-    p.stars = p.stars.saturating_add(WELCOME_STARS);
+    p.eclats = p.eclats.saturating_add(crate::economy::welcome_eclats());
+    p.dust = p.dust.saturating_add(crate::economy::welcome_dust());
+    p.stars = p.stars.saturating_add(crate::economy::welcome_stars());
     for &id in WELCOME_CARDS {
         if !p.card_collection.iter().any(|c| c == id) {
             p.card_collection.push(id.to_string());
@@ -557,9 +559,9 @@ mod tests {
             ..Default::default()
         };
         apply_welcome_bonus(&mut p);
-        assert_eq!(p.eclats, 10 + WELCOME_ECLATS);
-        assert_eq!(p.dust, WELCOME_DUST);
-        assert_eq!(p.stars, WELCOME_STARS);
+        assert_eq!(p.eclats, 10 + crate::economy::welcome_eclats());
+        assert_eq!(p.dust, crate::economy::welcome_dust());
+        assert_eq!(p.stars, crate::economy::welcome_stars());
         // "aegis" déjà présent → pas de doublon.
         assert_eq!(
             p.card_collection.iter().filter(|c| *c == "aegis").count(),

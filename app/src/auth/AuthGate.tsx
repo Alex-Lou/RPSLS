@@ -25,10 +25,11 @@ import { useT } from "../i18n";
 import { hapticMatchWin, hapticTap } from "../haptic";
 import { authenticate, signInWithGoogle, isGoogleAvailable, type AuthMode } from "../online/accountAuth";
 import { useStore } from "../store/store";
+import { WELCOME_BONUS as BONUS } from "../engine/economy";
 
-/** Welcome-gift amounts — MIRROR of `crates/rpsls-server/src/account.rs`
- *  WELCOME_ECLATS / WELCOME_DUST / WELCOME_STARS / WELCOME_CARDS.len(). */
-const BONUS = { eclats: 300, dust: 150, stars: 30, cards: 14 } as const;
+// Montants du cadeau de bienvenue — SOURCE UNIQUE dans economy.ts
+// (`WELCOME_BONUS`), lue aussi par le serveur via economy_meta.json. AuthGate ne
+// fait que les afficher (plus de littéral dupliqué côté client).
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Star positions computed ONCE at module load — no per-render rand, no layout

@@ -28,6 +28,12 @@
     "epic": 200,
     "legendary": 500
   },
+  "welcomeBonus": {
+    "eclats": 300,
+    "dust": 150,
+    "stars": 30,
+    "cards": 14
+  },
   "codexTiers": [
     {
       "threshold": 5,

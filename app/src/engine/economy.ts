@@ -59,6 +59,14 @@ export const CRAFT_COST: Record<CardRarity, number> = {
   legendary: 500,
 };
 
+/** Welcome bonus granted ONCE on first sign-up (server-authoritative — see
+ *  crates/rpsls-server/src/account.rs). Shown pre-signup by AuthGate, so the
+ *  amounts live HERE as the single source: the server reads the SAME values via
+ *  economy_meta.json (scripts/gen-economy-meta.mjs). `cards` is display-only (the
+ *  starter collection the account opens with); the server grants only the three
+ *  currencies. */
+export const WELCOME_BONUS = { eclats: 300, dust: 150, stars: 30, cards: 14 } as const;
+
 /** Compute the éclats earned from a finished match. */
 export function eclatsReward(mode: RecordMode, outcome: Outcome): number {
   if (outcome === "win") return ECLATS_PER_WIN[mode] ?? 0;
