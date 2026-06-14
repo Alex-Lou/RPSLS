@@ -14,6 +14,29 @@ use tracing::{debug, warn};
 const KEY_PREFIX: &str = "player:";
 const CLAIM_PREFIX: &str = "claim:";
 
+/// Daily-challenge claim tracker — which daily quest ids were claimed on a given
+/// day. Mirrors the client's `Player.dailyClaims`. Date-scoped: the client only
+/// honours it when `date` is today, so a stale tracker self-expires.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct DailyClaims {
+    #[serde(default)]
+    pub date: String,
+    #[serde(default)]
+    pub ids: Vec<String>,
+}
+
+/// Per-move pick/win tally (one entry per RPSLS move). Mirrors the client's
+/// `ByMoveStat`. The server only stores/returns it; the pentagram-quest merge
+/// (max per field) runs client-side.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ByMoveStat {
+    #[serde(default)]
+    pub picked: u64,
+    #[serde(default)]
+    pub won: u64,
+}
+
 /// The subset of player state that we persist server-side: progression data
 /// PLUS the player's small cosmetic preferences (theme / background / pad /
 /// avatar / nickname) so a reinstall restores the chosen look. Bulky custom
@@ -125,6 +148,23 @@ pub struct PlayerProgress {
     /// the records.
     #[serde(default)]
     pub history: Vec<serde_json::Value>,
+
+    // ── Champs de progression réparés 2026-06-14 : ils existaient côté client
+    // mais étaient ABSENTS de cette struct → jamais persistés → perdus à chaque
+    // install propre (défis du jour re-réclamables, quête pentagramme + Voie
+    // réinitialisées). Même classe de bug que arena_deck/arena_* (cf. data-persistence). ──
+    /// Défis du jour réclamés aujourd'hui (scopé au jour ; expire à minuit).
+    #[serde(default)]
+    pub daily_claims: DailyClaims,
+    /// Clés de date (YYYY-MM-DD) des jours dont le set de défis est complété.
+    #[serde(default)]
+    pub completed_dailies: Vec<String>,
+    /// Tally pick/win par coup — alimente la quête pentagramme (gagner 1× avec chacun).
+    #[serde(default)]
+    pub by_move: HashMap<String, ByMoveStat>,
+    /// Voie / affinité choisie en Constellation Pro (coup RPSLS).
+    #[serde(default)]
+    pub arena_affinity: String,
 }
 
 /// Hard ceiling for any single numeric progression field — well above any
@@ -200,6 +240,23 @@ impl PlayerProgress {
         for v in self.card_mastery.values_mut() {
             *v = (*v).min(MAX_NUM);
         }
+
+        // Daily / progression (ajoutés 2026-06-14) : borne les tailles pour qu'un
+        // payload forgé ne puisse pas gonfler Redis. Valeurs à faible enjeu
+        // (progression de quête) — on clamp sans valider la légalité.
+        clamp_str(&mut self.daily_claims.date, 10);
+        cap_vec(&mut self.daily_claims.ids, 8, 64);
+        cap_vec(&mut self.completed_dailies, 400, 10);
+        if self.by_move.len() > 16 {
+            let keep: std::collections::HashSet<String> =
+                self.by_move.keys().take(16).cloned().collect();
+            self.by_move.retain(|k, _| keep.contains(k));
+        }
+        for s in self.by_move.values_mut() {
+            s.picked = s.picked.min(MAX_NUM);
+            s.won = s.won.min(MAX_NUM);
+        }
+        clamp_str(&mut self.arena_affinity, 16);
 
         clamp_str(&mut self.theme_id, 32);
         clamp_str(&mut self.background_id, 32);
