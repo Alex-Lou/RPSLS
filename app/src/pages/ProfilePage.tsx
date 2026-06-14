@@ -292,10 +292,8 @@ export function ProfilePage({ onNavigate }: { onNavigate?: (page: Page) => void 
               <button
                 onClick={saveNick}
                 aria-label="Enregistrer"
-                className="flex-1 sm:flex-none sm:w-auto h-11 px-4 rounded-xl text-white font-bold flex items-center justify-center gap-1.5 transition active:scale-[0.97]"
+                className="flex-1 sm:flex-none sm:w-auto h-11 px-4 rounded-xl text-white font-bold flex items-center justify-center gap-1.5 transition active:scale-[0.97] bg-themed-br"
                 style={{
-                  background:
-                    "linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))",
                   boxShadow:
                     "0 6px 16px -6px color-mix(in oklab, var(--theme-primary) 60%, transparent)",
                   fontFamily: "var(--font-headline)",

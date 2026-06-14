@@ -562,8 +562,8 @@ export function SandboxView({
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={play}
-          className="w-full px-7 py-3.5 rounded-2xl font-bold text-white shadow-lg transition hover:scale-[1.01]"
-          style={{ background: "linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))", boxShadow: "0 8px 24px -6px color-mix(in oklab, var(--theme-primary) 55%, transparent)", fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
+          className="w-full px-7 py-3.5 rounded-2xl font-bold text-white shadow-lg transition hover:scale-[1.01] bg-themed-br"
+          style={{ boxShadow: "0 8px 24px -6px color-mix(in oklab, var(--theme-primary) 55%, transparent)", fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
         >
           {mode === "cards" ? "Ouvrir le lobby Cartes →" : "Jouer →"}
         </motion.button>
@@ -678,8 +678,8 @@ export function ConstellationLobby({
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={() => { hapticTick(); onPlay(winTo); }}
-          className="w-full px-7 py-3.5 rounded-2xl font-bold text-white shadow-lg transition hover:scale-[1.01]"
-          style={{ background: "linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))", boxShadow: "0 8px 24px -6px color-mix(in oklab, var(--theme-primary) 55%, transparent)", fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
+          className="w-full px-7 py-3.5 rounded-2xl font-bold text-white shadow-lg transition hover:scale-[1.01] bg-themed-br"
+          style={{ boxShadow: "0 8px 24px -6px color-mix(in oklab, var(--theme-primary) 55%, transparent)", fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
         >
           Jouer →
         </motion.button>

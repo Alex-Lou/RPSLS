@@ -51,9 +51,8 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack, onGoShop }: {
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={onViewBracket}
-          className="w-full rounded-2xl px-5 py-3 flex items-center justify-between font-black text-white shadow-2xl"
+          className="w-full rounded-2xl px-5 py-3 flex items-center justify-between font-black text-white shadow-2xl bg-themed-br"
           style={{
-            background: "linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))",
             boxShadow: "0 12px 32px -6px color-mix(in oklab, var(--theme-primary) 55%, transparent), 0 0 24px color-mix(in oklab, var(--theme-secondary) 35%, transparent)",
             fontFamily: "var(--font-headline)",
             letterSpacing: "0.04em",

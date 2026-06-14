@@ -409,9 +409,8 @@ function CombatButton({ oppName, oppAvatar, onClick }: {
       // Bold, unmistakable primary CTA: a SOLID theme gradient (like the Lock
       // button) so it reads as "the action" while still wearing the active
       // palette. White text + the opponent's avatar give it presence.
-      className="group relative w-full max-w-md mx-auto overflow-hidden rounded-2xl transition"
+      className="group relative w-full max-w-md mx-auto overflow-hidden rounded-2xl transition bg-themed-br"
       style={{
-        background: "linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))",
         boxShadow:
           "0 10px 30px -10px color-mix(in oklab, var(--theme-primary) 70%, transparent), " +
           "inset 0 1px 0 rgba(255,255,255,0.20)",
