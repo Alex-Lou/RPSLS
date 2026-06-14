@@ -1,5 +1,8 @@
 # HANDOFF — RPSLS / Constellation (à lire EN PREMIER, agent suivant)
 
+> ⚠️ **MISE À JOUR 2026-06-14 → voir `SUITE.md` (racine) pour l'état RÉEL et la reprise.**
+> Le §9-A « comptes » de ce fichier est **FAIT + déployé** (e-mail/mdp finis, durcis, validés device). Ce HANDOFF reste la réf générale (stack, persistance, build, règles) mais sa « prochaine tâche = comptes » est **périmée**. La suite (DRY, splits <400l, bug Google, traductions, install device) est dans **`SUITE.md`**.
+
 > Mis à jour : 2026-06-13. But : que tu sois productif **sans cramer des tokens** à re-explorer le repo. Lis les §1–§4 avant de toucher quoi que ce soit.
 
 ---
