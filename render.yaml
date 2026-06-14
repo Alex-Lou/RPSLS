@@ -20,4 +20,10 @@ services:
     envVars:
       - key: RUST_LOG
         value: info,rpsls_server=debug
+      # "Sign in with Google" — the OAuth Web client id(s) we accept as the ID
+      # token audience. PUBLIC value (not a secret), safe to commit. Comma-
+      # separated if several (e.g. web + extra). Must match the app's
+      # VITE_GOOGLE_CLIENT_ID. Unset = google sign-in stays disabled (fail-closed).
+      - key: GOOGLE_OAUTH_CLIENT_IDS
+        value: 353076917557-g7a0ig22ku14bg5rgab5sfc6sojfdfe1.apps.googleusercontent.com
       # PORT is provided automatically by Render and read by the server.
