@@ -495,6 +495,13 @@ function syncFingerprint(p: Player): string {
     // Classé own ladder + record — so a Classé match pushes to the cloud too.
     p.classeLp ?? 1000, p.classeStats?.wins ?? 0, p.classeStats?.losses ?? 0,
     p.arenaStats?.wins ?? 0, p.arenaStats?.losses ?? 0, p.arenaStats?.draws ?? 0,
+    // Sets premium possédés + maîtrise des cartes — pour qu'un achat de set OU un
+    // gain de maîtrise pousse au cloud sans dépendre d'un autre champ qui bouge en
+    // même temps. ownedPremiumSets n'était PAS dans le fingerprint → un achat ne se
+    // sync'ait QUE via la baisse de stars (fragile : un set gratuit/promo, ou un
+    // gain de maîtrise seul, serait silencieusement non sync'é). Audit achats 2026-06-14.
+    (p.ownedPremiumSets ?? []).join(","),
+    Object.values(p.cardMastery ?? {}).reduce((a, b) => a + (b ?? 0), 0),
     // Cosmetics + prefs — so picking a theme/background/pad/avatar/difficulty pushes too.
     p.themeId, p.backgroundId, p.padId, p.avatar, p.nickname,
     p.difficulty, p.fontScale ?? 1, p.padChosen ?? false,
