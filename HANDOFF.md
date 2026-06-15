@@ -1,7 +1,8 @@
 # HANDOFF — RPSLS / Constellation (à lire EN PREMIER, agent suivant)
 
-> ⚠️ **MISE À JOUR 2026-06-14 → voir `SUITE.md` (racine) pour l'état RÉEL et la reprise.**
-> Le §9-A « comptes » de ce fichier est **FAIT + déployé** (e-mail/mdp finis, durcis, validés device). Ce HANDOFF reste la réf générale (stack, persistance, build, règles) mais sa « prochaine tâche = comptes » est **périmée**. La suite (DRY, splits <400l, bug Google, traductions, install device) est dans **`SUITE.md`**.
+> ⚠️ **MISE À JOUR 2026-06-15 → voir `SUITE.md` (racine) pour l'état RÉEL et l'ordre de reprise.**
+> Le §9-A « comptes » de ce fichier est **FAIT + déployé** (e-mail/mdp finis, durcis, validés device ; Google câblé mais désactivé). Le §9-B éco reste à faire. Ce HANDOFF reste la réf générale (stack, persistance, build, règles) mais ses sections « prochaine tâche = comptes » (§0, §8-A) sont **périmées**.
+> Depuis : **splits serveur faits** (`player_state/`/`lanes_engine/` sur `main`, `account/` sur `refactor`), **vague refactor client device-free faite** (`store/`/`arenaTypes/`/`arenaRules/`/`sharedMatchUI/` sur la branche `refactor`, attend device-test + merge), **DRY #2/#5/#6 faits**. Le « reste à faire » consolidé est dans **`SUITE.md` §1-§2 + §6**.
 
 > Mis à jour : 2026-06-13. But : que tu sois productif **sans cramer des tokens** à re-explorer le repo. Lis les §1–§4 avant de toucher quoi que ce soit.
 
@@ -13,8 +14,8 @@
 - **Gros chantiers EN COURS** : (A) **économie serveur-autoritaire anti-triche** (β, fondation faite), (B) **comptes e-mail/mot de passe + bonus de bienvenue + mode invité** (designé, modal mocké, pas codé). Voir §9.
 - **Workflow Alex** : il **build l'APK lui-même** et teste sur tel → toi tu **codes + typecheck**, tu dis « prêt à builder », tu **commit/push seulement après son OK**. Voir §4.
 
-### 🎯 PROCHAINE TÂCHE — COMMENCE PAR LES COMPTES (priorité Alex)
-Avant TOUT le reste : monte le système **comptes utilisateurs** — **inscription / connexion / redirection / BDD (Redis) / liaison de la progression / bonus de bienvenue**. C'est le préalable à l'économie inviolable (le bonus ET l'éco sont liés au compte). **Roadmap séquencée prête en §9‑A.** Le **mode invité** (parties rapides sans compte) et le découpage invité↔compte sont **décidés** (§9‑A). Modal cosmique **validé** (à coder en React). L'économie complète (endpoints validés) vient **APRÈS** (§9‑B).
+### 🎯 PROCHAINE TÂCHE → voir `SUITE.md` §6 (ordre de reprise à jour 15/06)
+~~Comptes~~ **FAITS** (e-mail/mdp déployés + validés device). Ordre actuel (détail `SUITE.md`) : (1) merger `refactor` après device-test, (2) DRY #4 helper Redis (serveur, sans device), (3) vague de splits device-needed (13 UI), (4) Google config, (5) éco serveur-autoritaire §9‑B, (6) features §8‑C, (7) traductions. La roadmap comptes ci-dessous (§9‑A) reste comme **archive de référence** (ce qui a été construit).
 
 ---
 
@@ -99,8 +100,9 @@ Lot validé par Alex + correctif persistance + fondation éco : **commités prop
 ---
 
 ## 8. CHANTIERS — EN COURS / À FAIRE
-### A. 🎯 COMPTES + bonus de bienvenue + mode invité — **PRIORITÉ, commence ici**. Designé, modal validé. Roadmap **§9‑A**.
-### B. Économie SERVEUR-AUTORITAIRE anti-triche (β) — décidé, fondation faite ; **économie complète APRÈS les comptes**. Voir **§9‑B**.
+### A. ✅ COMPTES + bonus de bienvenue + mode invité — **FAIT + déployé** (e-mail/mdp ; Google câblé mais désactivé, config console pending — `SUITE.md` §3). Roadmap construite archivée en **§9‑A**.
+### REFACTOR (en cours, branche `refactor`) — splits <400l : serveur fait, **vague client device-free faite** (attend device-test + merge FF), vague device-needed (13 UI) reste. **État + ordre dans `SUITE.md` §2 + §6.**
+### B. 🎯 Économie SERVEUR-AUTORITAIRE anti-triche (β) — **prochain gros chantier serveur** ; fondation faite (§7). Endpoints validés. Voir **§9‑B**.
 ### C. Pendings (spécifiés, NON construits) :
 - **Livre de recettes** (fusion) : découvrir recettes en jouant → craft (dust+éclats SEULEMENT, jamais argent réel ; stars = accélérateur) → carte deckable. 1re découverte = anim « NOUVELLE RECETTE ». Memory `fusion-recipe-book.md`.
 - **Carte « Brume »** (anti-augure, rare, voile la main 2 tours + dissipe une révélation active).

@@ -1,61 +1,62 @@
-# SUITE — où reprendre (post-session 2026-06-14)
+# SUITE — où reprendre (mis à jour 2026-06-15)
 
-> Fichier propre pour **reprendre** : continuer le DRY, savoir où en est le **bug Google**, et **installer/désinstaller** depuis le tel.
-> Le `HANDOFF.md` (13/06) reste la réf générale (stack, persistance, règles) — mais son §9-A « comptes » est **FAIT**. Ici = l'état réel au 14/06.
-
----
-
-## 0. TL;DR — état au 14/06
-- Base déployée Render = `main` = `develop` = `5c74631`. `feat/accounts` porte la doc + le split serveur (`dispatch.rs`/`hello.rs`), promu `→ develop → main` à ce push.
-- **Comptes e-mail/mdp** : FINIS, durcis (revue adversariale, 4 trous corrigés), validés device. ✅
-- **Google sign-in** : **DÉSACTIVÉ** (plante l'app — voir §3). Le bouton ne s'affiche plus.
-- **DRY** : 3 wins faits + pushés (voir §1). Le reste = §1.
-- **Splits <400 lignes** : serveur `main.rs` **FAIT** (762→317, routeur extrait → `dispatch.rs`+`hello.rs`, cargo 23/23, vérif adversariale = extraction pure). ~19 fichiers client restants — voir §2.
-- **Traductions** : FR 100%, autres langues incomplètes (reporté — voir §4).
-- **Règles durables** (rappel, détail dans `HANDOFF.md` §4) : commits **sans trace IA**, auteur Alex, FR conventionnel · **build + test device AVANT push** · fichiers **<400 lignes** · `feat → develop → main` (Render déploie depuis `main`).
+> Fichier de **reprise** : l'état réel + ce qui reste. `HANDOFF.md` (racine) = réf générale (stack, persistance, build, règles).
+> ⚠️ MàJ 15/06 : la **vague refactor** (splits en dossiers) + plusieurs DRY sont **FAITS** depuis le 14/06 — sections ci-dessous à jour.
 
 ---
 
-## 1. CONTINUER LE DRY
-
-**Vérif après chaque lot** : `pnpm -C app exec tsc --noEmit` (client) · `cargo test -p rpsls-server` (serveur). Commit **par concern**, push **après test device** (les changements client n'apparaissent que dans un nouvel APK).
-
-### ✅ Fait + pushé (NE PAS refaire)
-- `app/src/i18n/format.ts` — `formatNumber`/`formatCompact` locale-aware (dédup `toLocaleString("fr-FR")` sur 7 sites).
-- Decks starter/défaut centralisés dans `app/src/ranked/cards.ts` (`STARTER_COLLECTION`/`DEFAULT_RANKED_DECK`/`DEFAULT_ARENA_DECK`), importés par `store.ts` + `DeckManager.tsx`.
-- `SEASON_REWARDS` (`engine/economy.ts`) **dérivé de** `RANK_TIERS` (`engine/rank.ts`, désormais exporté).
-
-### ⏳ Reste à faire — chacun avec **test device** (touche des chemins sensibles)
-1. **3 impls WebSocket transitoire → 1** (`online/accountAuth.ts`, `online/bootSync.ts`, `online/playerSync.ts::pushPlayerStateOneShot`). Même cycle connect→hello→state_loaded→sync→close. ⚠️ flux auth/sync online → device-verify obligatoire.
-2. **`<ModalShell>`** : extraire overlay + panneau ressort + close-on-backdrop + focus-trap, recopiés dans chaque modal (`ui/PremiumPurchaseModal`, etc.). ⚠️ rendu visuel → device-verify.
-3. **Fingerprint progression** (`online/playerSync.ts::syncFingerprint`) : dériver du payload `buildProgressFromPlayer` au lieu de relister les champs. ⚠️ change le déclenchement du sync (inclut history/avatar) → tester que ça ne sur-pousse pas.
-4. **Helper Redis Upstash** (`crates/rpsls-server/src/player_state.rs`) : ~7 sites répètent `format!("{url}/pipeline") + bearer_auth + json(&cmds) + send`. Extraire `redis_pipeline(cmds) -> Option<Value>`. ⚠️ chemin **persistance argent** → mécanique strict + `cargo test` 23/23, redéploie.
-5. **Barèmes éco TS↔Rust** : `app/src/engine/economy.ts` ⇄ `crates/rpsls-server/src/economy.rs` synchronisés à la main. Faire générer `economy.rs` depuis `economy.ts` (comme `cards_meta.json` via `scripts/gen-card-meta.mjs`). Plus gros, serveur.
-6. **Montants bonus ×2** (client `auth/AuthGate.tsx` affichage ⇄ serveur `account.rs` autoritaire) — lié au point 5.
-
-> Astuce : les wins « purs » (mécaniques, sans changement de comportement, sans rendu) sont faits. Le reste **modifie un comportement ou un rendu** → ne PAS le faire à l'aveugle, build + device d'abord.
+## 0. TL;DR — état au 15/06
+- **Base déployée Render** = `main` = `develop` = `21d4920` — inclut : splits serveur `player_state/` + `lanes_engine/`, corrections **persistance** (caps 64→256, sync abandons/history, défis/pentagramme/Voie), whitelist sets premium, fondation éco. Serveur live `/health` 200 ✅.
+- **Comptes e-mail/mdp** : FINIS, durcis (revue adversariale), validés device. ✅
+- **Google sign-in** : serveur (`google_auth.rs`, RS256/JWKS) + client (`googleProvider.ts`) **câblés** mais **DÉSACTIVÉ** (crash natif tant que la config OAuth console n'est pas faite — §3). **Aucun code à écrire**, juste la config console + SHA-1.
+- **⚠️ Branche `refactor`** (partie de `develop`, 5 commits, **PAS encore mergée**) : porte le split serveur `account/` + la **vague device-free** de splits client (`store/`, `arenaTypes/`, `arenaRules/`, `sharedMatchUI/`). **Attend ton build + device-test, puis FF `refactor → develop → main`.**
+- **DRY** : #2 (ModalShell), #5 (génération `economy.rs`), #6 (bonus single-source) **FAITS** ; #1 (WS transitoire) **partiel** ; #3 (fingerprint) mitigation faite / DRY-derive reste ; #4 (helper Redis) **reste**. Voir §1.
+- **Splits <400** : **serveur 100% fait** ; **client : vague device-free faite** (sur `refactor`), `cards.ts` **skippé** (table de données) ; **vague device-needed (13 UI) reste** (exige device). Voir §2.
+- **Traductions** : FR 100%, autres incomplètes (reporté — §4).
+- **Règles durables** (détail `HANDOFF.md` §4) : commits **sans trace IA**, auteur Alex, FR conventionnel · fichiers **<400 lignes** · `feat → develop → main` (Render déploie `main`) · **build + device AVANT merge/push**. *Exception en cours* : la branche `refactor` est en **auto-push** (splits verbatim vérifiés `tsc`+`build`, non déployés tant que pas mergés).
 
 ---
 
-## 2. SPLITS <400 LIGNES (« au fil de l'eau », mécanique + typecheck)
+## 1. DRY — état
 
-Fichiers >400l (hors `i18n/locales/*` = data, exemptés). **Du plus gros au plus petit** :
+**Vérif après chaque lot** : `pnpm -C app exec tsc --noEmit` (client) · `cargo test -p rpsls-server` (serveur).
 
-| Fichier | Lignes | Note |
+### ✅ Fait + poussé (NE PAS refaire)
+- `app/src/i18n/format.ts` — `formatNumber`/`formatCompact` locale-aware.
+- Decks starter/défaut centralisés dans `app/src/ranked/cards.ts`.
+- `SEASON_REWARDS` (`engine/economy.ts`) **dérivé de** `RANK_TIERS` (`engine/rank.ts`).
+- **#2 `<ModalShell>`** (`app/src/ui/ModalShell.tsx`) : overlay + panneau ressort + close-backdrop partagés.
+- **#5 Barèmes éco GÉNÉRÉS** : `scripts/gen-economy-meta.mjs` → `crates/rpsls-server/economy_meta.json` (`include_str!` dans `economy.rs`). **Relancer le générateur après toute modif de barème TS** (`economy.ts`).
+- **#6 Bonus de bienvenue single-source** dans `economy.ts` (affichage `AuthGate` ⇄ don serveur `account/bonus.rs`).
+
+### ⏳ Reste à faire
+1. **#4 — Helper Redis Upstash** (`crates/rpsls-server/src/player_state/redis.rs`) : ~7 sites répètent `format!("{url}/pipeline")` + `bearer_auth(token)` + `json(&cmds)` + `send`. Extraire `redis_pipeline(cmds) -> Option<Value>`. ⚠️ chemin **persistance argent** → mécanique strict + `cargo test` vert + redéploie. **➜ VÉRIFIABLE SANS DEVICE** (bon prochain pas).
+2. **#3 — Fingerprint progression** (`online/playerSync.ts::syncFingerprint`) : la **mitigation est faite** (champs `ownedPremiumSets`/`cardMastery`/`abandons` ajoutés au fingerprint) ; reste à **dériver** le fingerprint du payload `buildProgressFromPlayer` au lieu de relister les champs à la main. ⚠️ change le déclenchement du sync → device-verify.
+3. **#1 — WS transitoire** : `online/transientSession.ts` extrait déjà `resolveWsUrl`/`helloFrame` (partagés par `accountAuth.ts` + `bootSync.ts`), mais chacun garde son propre `new WebSocket` + cycle. **Finir l'unification** (1 helper connect→hello→state_loaded→sync→close, aussi pour `playerSync.ts::pushPlayerStateOneShot`). ⚠️ flux auth/sync online → device-verify obligatoire.
+
+---
+
+## 2. SPLITS <400 LIGNES
+
+### ✅ Serveur — TOUT fait (cargo vert)
+`main.rs` (762→317) → `dispatch.rs` + `hello.rs` · `player_state.rs` → dossier `player_state/` (mod+redis) · `lanes_engine.rs` → dossier `lanes_engine/` (mod+phases) · `account.rs` → dossier `account/` (validation/hashing/bonus/store/handlers). Seul reste >400 du Rust : `rpsls-core/constellation.rs` (404, sous plafond 600 — non prioritaire).
+
+### ✅ Client — vague DEVICE-FREE faite (sur `refactor`, attend device-test + merge)
+| Fichier | Avant → après | Note |
 |---|---|---|
-| `app/src/pages/OnlinePage.tsx` | 2575 | god-component (WS + machine d'état + bot local + ~12 sous-composants) |
-| `app/src/ranked/RankedGame.tsx` | 1768 | moteur de match inline |
-| `app/src/pages/ProfilePage.tsx` | 1646 | 8 sections réglages + 3 modaux |
-| `app/src/match/LanesMatchView.tsx` | 1459 | + 9 sous-composants |
-| `app/src/pages/play/PlayGame.tsx` | 1437 | |
-| `app/src/pages/play/PlayMenu.tsx` | 1089 | |
-| `app/src/ranked/DeckManager.tsx` | 1030 | |
-| `app/src/arena/ArenaGame.tsx` / `ArenaBoard` / `ArenaLaneSlot` | 909 / 861 / 859 | |
-| ~~`crates/rpsls-server/src/main.rs`~~ | ✅ **317** | FAIT — routeur extrait → `dispatch.rs` (276) + `hello.rs` (217, Hello/TOFU), tous <400 |
-| `app/src/store/store.ts` | 811 | extraire `migrate` (v7→v22) + `defaultPlayer` |
-| `app/src/match/sharedMatchUI.tsx` · `arena/arenaRules.ts` · `ranked/cards.ts` · `pages/ShopPage.tsx` · `App.tsx` (605, extraire Splash/AppBackdropLayers) … | 600-800 | |
+| `store/store.ts` | 811 → 7 fichiers | barrel = **fichier d'entrée gardé** (50 importateurs `store/store`) |
+| `arena/arenaTypes.ts` | 664 → dossier `arenaTypes/` (6) | dossier+index, 28 conso |
+| `arena/arenaRules.ts` | 775 → dossier `arenaRules/` (5) | cycle `arenaRules↔arenaCombat` préservé (heroCreature = feuilles) |
+| `match/sharedMatchUI.tsx` | 798 → dossier `sharedMatchUI/` (9) | 10 conso |
+| `ranked/cards.ts` | **SKIPPÉ** | ~85% table plate `CARDS` (~635l, resterait >600) + piège `gen-card-meta.mjs` parse en **texte** → casserait l'éco serveur en silence |
 
-**Méthode** : extraire des sous-composants/helpers vers de nouveaux fichiers en **gardant l'API publique identique** (le fichier d'origine ré-exporte / importe), `tsc`/`cargo` vert, **un fichier = un commit**. À la fin du lot client : rebuild APK + test device + push.
+**Méthode** : déplacement **verbatim** (corps identiques) → dossier + barrel (`index.ts` OU fichier d'entrée gardé selon comment les conso importent) → `tsc --noEmit` + `vite build` + diff logique vs HEAD. Tout <400.
+
+### ⬜ Client — vague DEVICE-NEEDED (reste, exige tes cycles device)
+UI rendus, **du moins au plus risqué** : `PlayMenu` (1089) · `ShopPage` (683) · `DeckManager` (1030) · `MatchPrepScreen` (640) · `ArenaLaneSlot`→`ArenaBoard`→`ArenaGame` (859/861/909, **high**) · `PlayGame` (1437) · `ArenaPlanPhase` (680) · `LanesMatchView`+`MatchPrepScreen`→`OnlinePage` (1459/2575, **high**) · `ProfilePage` (1646) · `RankedGame` (1768, **high**).
+- **2 décisions avant exécution** : **RankedGame** Plan A (extraire `useRankedMatch`, closures/timing fragiles) requis pour <600 ; **ArenaGame/OnlinePage** = livrer <600 sans forcer <400 (l'extraction hook serait invasive/non-verbatim).
+- ⚠️ Les 3 high-risk (OnlinePage/RankedGame/ArenaGame) : `tsc`+`build` ne prouvent PAS la non-régression timing/refs → **playtest device obligatoire** après chacun.
+- `i18n/locales/*` = data, **exemptés**.
 
 ---
 
@@ -108,7 +109,7 @@ grep -oE '^\s*"[^"]+":' es.ts | grep -oE '"[^"]+"' | sort -u | comm -23 /tmp/en.
 `C:\Users\34643\AppData\Local\Android\Sdk\platform-tools\adb.exe` (remplace `adb` ci-dessous par ce chemin, ou ajoute `platform-tools` au PATH).
 
 Package = **`com.alex.rpsls`**.
-APK debug arm64 (après build) = `app/src-tauri/gen/android/app/src/main/...` → `app/src-tauri/gen/android/app/build/outputs/apk/arm64/debug/app-arm64-debug.apk`.
+APK debug arm64 (après build) = `app/src-tauri/gen/android/app/build/outputs/apk/arm64/debug/app-arm64-debug.apk`.
 
 ```powershell
 # 1. Vérifier que le tel est vu (et AUTORISÉ — sinon accepter le popup sur le tel)
@@ -131,12 +132,16 @@ adb shell monkey -p com.alex.rpsls -c android.intent.category.LAUNCHER 1
 
 **À retenir** :
 - `-r` = **garde les données** (le compte reste connecté). `uninstall` puis `install` (ou `install` sans `-r`) = **wipe** → tu repars en invité, reconnecte-toi (le compte est sur le serveur, rien de perdu).
-- ⚠️ **Piège build Tauri** (détail `HANDOFF.md` §2) : le frontend est embarqué dans `libapp_lib.so`, PAS dans `assets/`. Un build qui ne **recompile pas le `.so`** (juste `dist`→`assets`) **n'embarque PAS** tes changements. Bon enchaînement : `tauri android build --apk --target aarch64` (échoue au symlink Windows, normal) → copier `target/aarch64-linux-android/debug/libapp_lib.so` vers `app/src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a/` → `gradlew assembleArm64Debug -x rustBuildArm64Debug`.
+- ⚠️ **Piège build Tauri** (détail `HANDOFF.md` §2) : le frontend est embarqué dans `libapp_lib.so`, PAS dans `assets/`. Le `RPSLS_BUILD_INSTALL.bat` (racine bureau) fait la procédure correcte (`tauri android build` → copie `.so` → `gradlew` → install). Son étape `pnpm build` (`beforeBuildCommand`) rebuild bien le frontend depuis les sources.
 
 ---
 
 ## 6. Ordre conseillé pour reprendre
-1. **DRY restant** (§1) — point par point, build + device.
-2. **Splits** (§2) — `main.rs` dispatch d'abord (serveur, cargo-vérifié), puis client du plus gros au plus petit.
-3. **Google** (§3) — config console + SHA-1, puis réactiver + test device.
-4. **Traductions** (§4) — passe parallèle + garde de couverture.
+1. **Merger `refactor`** : build + device-test les 4 splits client (verbatim = comportement identique) → FF `refactor → develop → main`.
+2. **DRY #4** (helper Redis, serveur, `cargo`-vérifié, **sans device**) — prochain pas verifiable propre.
+3. **Vague device-needed** (§2) — low-risk d'abord (`PlayMenu`/`ShopPage`/`DeckManager`/`MatchPrepScreen`), puis trancher les 2 décisions, puis high-risk avec playtest.
+4. **DRY #1/#3** (au passage des fichiers concernés, device-verify).
+5. **Google** (§3) — config console + SHA-1, réactiver + test device.
+6. **Éco serveur-autoritaire** (`HANDOFF.md` §9-B) — gros chantier serveur (endpoints validés `buy_pack`/`craft`/`grant_match_reward`/`claim`).
+7. **Features spécifiées non construites** (`HANDOFF.md` §8-C) : livre de recettes fusion, carte « Brume », fusions doubles/triples, cartes « Sur Coup », tuto, bundle thème.
+8. **Traductions** (§4) — passe parallèle + garde de couverture.
