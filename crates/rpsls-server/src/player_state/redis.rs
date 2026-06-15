@@ -26,6 +26,20 @@ pub fn enabled() -> bool {
     config().is_some()
 }
 
+/// POST a command pipeline to the Upstash REST `/pipeline` endpoint. Centralises
+/// the `format!("{url}/pipeline")` + `bearer_auth` + `json` + `send` boilerplate
+/// that every pipeline caller repeated. Returns:
+///   `None`           — Redis isn't configured (no URL/token)
+///   `Some(Ok(resp))` — the HTTP round-trip completed (caller checks the status)
+///   `Some(Err(e))`   — the send itself failed (transport error; caller may log)
+/// The body is intentionally NOT parsed here: callers differ (some want only the
+/// status, some the parsed JSON), so each handles the response as it needs.
+async fn pipeline_send(cmds: &[Vec<String>]) -> Option<reqwest::Result<reqwest::Response>> {
+    let (url, token) = config()?;
+    let endpoint = format!("{url}/pipeline");
+    Some(http().post(&endpoint).bearer_auth(token).json(cmds).send().await)
+}
+
 /// Load player state from Redis. Returns None if not found or on error.
 /// This is awaited on Hello so the player gets their state immediately.
 pub async fn load(player_id: &str) -> Option<PlayerProgress> {
@@ -129,16 +143,13 @@ pub async fn scan_player_keys(cursor: &str, count: u32) -> Option<(String, Vec<S
 /// Delete a player's state and their claim token in one round-trip. Used by
 /// the 6-month inactive-user janitor.
 pub async fn delete_player(player_id: &str) -> bool {
-    let Some((url, token)) = config() else { return false };
     let player_key = format!("{KEY_PREFIX}{player_id}");
     let claim_key = format!("{CLAIM_PREFIX}{player_id}");
-    let endpoint = format!("{url}/pipeline");
     let cmds: Vec<Vec<String>> = vec![
         vec!["DEL".into(), player_key],
         vec!["DEL".into(), claim_key],
     ];
-    let resp = http().post(&endpoint).bearer_auth(token).json(&cmds).send().await.ok();
-    resp.map(|r| r.status().is_success()).unwrap_or(false)
+    matches!(pipeline_send(&cmds).await, Some(Ok(resp)) if resp.status().is_success())
 }
 
 /// Read `updated_at` (epoch millis) from a player_key. Returns None when
@@ -169,13 +180,11 @@ pub fn player_id_from_key(key: &str) -> Option<&str> {
 /// the key is missing / on any backend error. Crate-internal primitive reused by
 /// the account module.
 pub(crate) async fn get_raw(key: &str) -> Option<String> {
-    let (url, token) = config()?;
-    let endpoint = format!("{url}/pipeline");
     let cmds: Vec<Vec<String>> = vec![vec!["GET".into(), key.to_string()]];
-    let resp = http().post(&endpoint).bearer_auth(token).json(&cmds).send().await.ok()?;
-    if !resp.status().is_success() {
-        return None;
-    }
+    let resp = match pipeline_send(&cmds).await {
+        Some(Ok(resp)) if resp.status().is_success() => resp,
+        _ => return None,
+    };
     let body: serde_json::Value = resp.json().await.ok()?;
     // Pipeline form → [{"result": <value-or-null>}].
     let result = body.as_array()?.first()?.get("result")?;
@@ -193,43 +202,33 @@ pub(crate) async fn get_raw(key: &str) -> Option<String> {
 /// are safe. Single create-if-absent primitive shared by the claim-token,
 /// account, and welcome-bonus flows.
 pub(crate) async fn set_nx(key: &str, val: &str) -> Result<bool, ()> {
-    let Some((url, token)) = config() else { return Err(()) };
-    let endpoint = format!("{url}/pipeline");
     let cmds: Vec<Vec<String>> = vec![vec!["SET".into(), key.to_string(), val.to_string(), "NX".into()]];
-    match http().post(&endpoint).bearer_auth(token).json(&cmds).send().await {
-        Ok(resp) if resp.status().is_success() => {
+    match pipeline_send(&cmds).await {
+        Some(Ok(resp)) if resp.status().is_success() => {
             let body: serde_json::Value = resp.json().await.map_err(|_| ())?;
             // Upstash returns [{"result":"OK"}] when set, [{"result":null}] when NX rejected.
             let entry = body.as_array().and_then(|a| a.first()).ok_or(())?;
             let result = entry.get("result").ok_or(())?;
             Ok(result.as_str() == Some("OK"))
         }
-        Ok(resp) => {
+        Some(Ok(resp)) => {
             let status = resp.status();
             warn!(%status, "set_nx rejected");
             Err(())
         }
-        Err(e) => {
+        Some(Err(e)) => {
             warn!(error = %e, "set_nx failed");
             Err(())
         }
+        None => Err(()),
     }
 }
 
 /// Best-effort `DEL key`. Returns true on a 2xx from Upstash. Used to roll back
 /// a half-written multi-key write (e.g. an account row whose player-link failed).
 pub(crate) async fn del(key: &str) -> bool {
-    let Some((url, token)) = config() else { return false };
-    let endpoint = format!("{url}/pipeline");
     let cmds: Vec<Vec<String>> = vec![vec!["DEL".into(), key.to_string()]];
-    http()
-        .post(&endpoint)
-        .bearer_auth(token)
-        .json(&cmds)
-        .send()
-        .await
-        .map(|r| r.status().is_success())
-        .unwrap_or(false)
+    matches!(pipeline_send(&cmds).await, Some(Ok(resp)) if resp.status().is_success())
 }
 
 /// Atomically claim a player_id by issuing a fresh TOFU token IFF the key
