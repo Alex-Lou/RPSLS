@@ -6,14 +6,13 @@
 ---
 
 ## 0. TL;DR — état au 15/06
-- **Base déployée Render** = `main` = `develop` = `21d4920` — inclut : splits serveur `player_state/` + `lanes_engine/`, corrections **persistance** (caps 64→256, sync abandons/history, défis/pentagramme/Voie), whitelist sets premium, fondation éco. Serveur live `/health` 200 ✅.
+- **Base déployée Render** = `main` = `develop` — la **refonte est mergée + déployée + device-validée le 15/06**. Serveur live `/health` 200 ✅.
 - **Comptes e-mail/mdp** : FINIS, durcis (revue adversariale), validés device. ✅
 - **Google sign-in** : serveur (`google_auth.rs`, RS256/JWKS) + client (`googleProvider.ts`) **câblés** mais **DÉSACTIVÉ** (crash natif tant que la config OAuth console n'est pas faite — §3). **Aucun code à écrire**, juste la config console + SHA-1.
-- **⚠️ Branche `refactor`** (partie de `develop`, 5 commits, **PAS encore mergée**) : porte le split serveur `account/` + la **vague device-free** de splits client (`store/`, `arenaTypes/`, `arenaRules/`, `sharedMatchUI/`). **Attend ton build + device-test, puis FF `refactor → develop → main`.**
-- **DRY** : #2 (ModalShell), #5 (génération `economy.rs`), #6 (bonus single-source) **FAITS** ; #1 (WS transitoire) **partiel** ; #3 (fingerprint) mitigation faite / DRY-derive reste ; #4 (helper Redis) **reste**. Voir §1.
-- **Splits <400** : **serveur 100% fait** ; **client : vague device-free faite** (sur `refactor`), `cards.ts` **skippé** (table de données) ; **vague device-needed (13 UI) reste** (exige device). Voir §2.
+- **Refonte (splits)** : ✅ **serveur 100%** (`main.rs`/`dispatch`/`hello` + `player_state/`/`lanes_engine/`/`account/`) + **client vague device-free** (`store/`, `arenaTypes/`, `arenaRules/`, `sharedMatchUI/`) — **mergés + déployés + device-testés** (sync/persist OK, #3 pas de boucle, **0 perte / 0 doublon / 0 crash**). `cards.ts` skippé (table de données). **Reste = vague device-needed (13 god-components UI)** — §2.
+- **DRY** : ✅ **TOUS faits** — #2 (ModalShell), #3 (fingerprint dérivé), #4 (helper Redis), #5 (éco générée), #6 (bonus single-source) ; #1 (WS transitoire) **laissé tel quel** (divergence justifiée auth/anti-doublon/Promise — décision). §1.
 - **Traductions** : FR 100%, autres incomplètes (reporté — §4).
-- **Règles durables** (détail `HANDOFF.md` §4) : commits **sans trace IA**, auteur Alex, FR conventionnel · fichiers **<400 lignes** · `feat → develop → main` (Render déploie `main`) · **build + device AVANT merge/push**. *Exception en cours* : la branche `refactor` est en **auto-push** (splits verbatim vérifiés `tsc`+`build`, non déployés tant que pas mergés).
+- **Règles durables** (détail `HANDOFF.md` §4) : commits **sans trace IA**, auteur Alex, FR conventionnel · fichiers **<400 lignes** · `feat → develop → main` (Render déploie `main`) · **build + device-test AVANT merge vers `main`**.
 
 ---
 
@@ -138,8 +137,8 @@ adb shell monkey -p com.alex.rpsls -c android.intent.category.LAUNCHER 1
 ---
 
 ## 6. Ordre conseillé pour reprendre
-1. ✅ **`refactor` mergé dans `develop`** (15/06, FF `48c162f`, device-testé). **DRY terminé** : #4 `0dd3286`, #3 `5841217` (sur `refactor`, à device-tester), #1 laissé tel quel (décision). Reste à propager `develop`(+`refactor`) → `main` quand un déploiement est voulu (changements inertes / à device-tester d'abord pour #3).
-2. **Vague device-needed** (§2) — low-risk d'abord (`PlayMenu`/`ShopPage`/`DeckManager`/`MatchPrepScreen`), puis trancher les 2 décisions, puis high-risk avec playtest.
+1. ✅ **Refonte mergée `refactor → develop → main` + déployée + device-testée (15/06)** : splits serveur+client + DRY #3/#4. Sync/persist validés en live (#3 pas de boucle, 0 perte/doublon/crash). #1 laissé (décision).
+2. **➜ PROCHAIN : vague device-needed** (§2) — low-risk d'abord (`PlayMenu`/`ShopPage`/`DeckManager`/`MatchPrepScreen`), puis trancher les 2 décisions (RankedGame Plan A, ArenaGame/OnlinePage <600), puis high-risk avec playtest. Chaque split = build + device-test avant merge `main`.
 5. **Google** (§3) — config console + SHA-1, réactiver + test device.
 6. **Éco serveur-autoritaire** (`HANDOFF.md` §9-B) — gros chantier serveur (endpoints validés `buy_pack`/`craft`/`grant_match_reward`/`claim`).
 7. **Features spécifiées non construites** (`HANDOFF.md` §8-C) : livre de recettes fusion, carte « Brume », fusions doubles/triples, cartes « Sur Coup », tuto, bundle thème.
