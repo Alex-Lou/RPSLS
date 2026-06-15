@@ -503,39 +503,25 @@ export function setActiveClient(client: OnlineClient | null) {
   _activeClient = client;
 }
 
-/** Fingerprint of the fields we care about syncing. When it changes,
- *  we push state to the server. */
+/** Fingerprint of the player progression. When it changes, we push to the
+ *  server. DÉRIVÉ du payload `buildProgressFromPlayer` (au lieu de relister les
+ *  champs à la main) : ainsi le fingerprint ne peut JAMAIS diverger de ce qui est
+ *  réellement poussé — tout champ ajouté au payload est automatiquement couvert
+ *  (fini les « j'ai oublié de l'ajouter aux DEUX endroits »).
+ *
+ *  Trois champs sont NEUTRALISÉS (figés) car ils ne doivent pas déclencher de push :
+ *   - `updatedAt` : `Date.now()` à chaque build → sinon le fingerprint changerait
+ *     à chaque appel = push infini.
+ *   - `seasonStartedAt` : idem `Date.now()` quand aucune saison n'est posée.
+ *   - `history` : volumineux, et il co-varie déjà avec les champs de progression à
+ *     chaque match (ses deltas sont donc déjà captés) — garde le fingerprint léger. */
 function syncFingerprint(p: Player): string {
-  return [
-    p.xp, p.rankLp, p.eclats, p.dust, p.stars ?? 0, p.stats?.wins, p.stats?.losses,
-    (p.cardCollection ?? []).length, (p.claimedQuests ?? []).length, p.winStreak ?? 0,
-    // Classé own ladder + record — so a Classé match pushes to the cloud too.
-    p.classeLp ?? 1000, p.classeStats?.wins ?? 0, p.classeStats?.losses ?? 0,
-    p.arenaStats?.wins ?? 0, p.arenaStats?.losses ?? 0, p.arenaStats?.draws ?? 0,
-    // Sets premium possédés + maîtrise des cartes — pour qu'un achat de set OU un
-    // gain de maîtrise pousse au cloud sans dépendre d'un autre champ qui bouge en
-    // même temps. ownedPremiumSets n'était PAS dans le fingerprint → un achat ne se
-    // sync'ait QUE via la baisse de stars (fragile : un set gratuit/promo, ou un
-    // gain de maîtrise seul, serait silencieusement non sync'é). Audit achats 2026-06-14.
-    (p.ownedPremiumSets ?? []).join(","),
-    Object.values(p.cardMastery ?? {}).reduce((a, b) => a + (b ?? 0), 0),
-    // Cosmetics + prefs — so picking a theme/background/pad/avatar/difficulty pushes too.
-    p.themeId, p.backgroundId, p.padId, p.avatar, p.nickname,
-    p.difficulty, p.fontScale ?? 1, p.padChosen ?? false,
-    // Decks (Classé + Pro) — pour qu'une édition de deck pousse au cloud
-    // (Alex 2026-06-13 ; n'étaient PAS dans le fingerprint avant → un edit
-    // de deck ne se sync'ait qu'au prochain autre changement).
-    (p.rankedDeck ?? []).join(","), (p.arenaDeck ?? []).join(","),
-    // Défis du jour + progression pentagramme + Voie (réparés 2026-06-14) — pour
-    // qu'un défi réclamé/complété, un gain de byMove ou un choix de Voie poussent
-    // au cloud (sinon recordDailyComplete/choix Voie ne déclenchaient rien).
-    p.dailyClaims?.date ?? "", (p.dailyClaims?.ids ?? []).join(","),
-    (p.completedDailies ?? []).length,
-    Object.values(p.stats?.byMove ?? {}).reduce((a, b) => a + (b.picked ?? 0) + (b.won ?? 0), 0),
-    p.arenaAffinity ?? "",
-    // Abandons — pour qu'un forfait (dont le 1er, pénalité 0 → rankLp inchangé) pousse.
-    p.abandons?.count ?? 0, p.abandons?.lastAt ?? 0,
-  ].join("|");
+  return JSON.stringify({
+    ...buildProgressFromPlayer(p),
+    updatedAt: 0,
+    seasonStartedAt: 0,
+    history: [],
+  });
 }
 
 let _lastFingerprint = "";
