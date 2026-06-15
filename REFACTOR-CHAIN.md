@@ -15,8 +15,8 @@
 - **Branche de travail : `refactor`** (partie de `develop` = `main`). **AUTO-PUSH autorisé par Alex**
   pour chaque split vérifié (voir §4). La branche n'est PAS déployée → review « plus tard ».
 - **État des branches au moment du handoff** :
-  - `develop` = `main` = **`3efb5be`** (déployé Render, `/health` 200).
-  - `refactor` = **`f151521`** = `main` + **ProfilePage** (`ab080eb`) + **PlayGame** (`6f70457`, +cleanup `c5705bb`) + **ArenaLaneSlot** (`dde5505`) + **ArenaBoard** (`f151521`) — **4 splits EN ATTENTE device-test** avant prochain merge.
+  - `develop` = `main` = **`b42ea05`** (déployé Render, `/health` 200) — **lot des 4 splits MERGÉ + déployé 2026-06-15** (ProfilePage/PlayGame/ArenaLaneSlot/ArenaBoard, device-test « fonctionnel » Alex avant merge).
+  - `refactor` = **`60139a1`** = `main` + **ArenaGame** (`60139a1`) seul — **1 split EN ATTENTE device-test** (isolé exprès au-dessus de main avant d'attaquer les 2 plus gros).
 - **Workflow Alex** : il **build l'APK + teste sur son téléphone lui-même** ; toi tu codes + typecheck + build, tu pushes sur `refactor`, et le **merge vers `main` (= déploiement) attend son OK explicite** (voir §4 + §7).
 - **Les splits VERBATIM-mécaniques propres sont ÉPUISÉS.** Tout ce qui reste = **extraction soignée**
   (sortir des sous-composants/hooks d'un monolithe), pas du simple couper-coller. Voir §6.
@@ -170,12 +170,12 @@ Ordre recommandé (du moins au plus risqué). **Chacun exige un cycle device d'A
 
 | Fichier | Lignes | Risque | Notes / décision |
 |---|---|---|---|
-| ~~`pages/play/PlayGame.tsx`~~ | ~~1437~~ | — | ✅ **FAIT** (`6f70457`, 15 fichiers, EN ATTENTE device-test). |
-| ~~`arena/ArenaLaneSlot.tsx`~~ | ~~859~~ | — | ✅ **FAIT** (`dde5505`, 6 fichiers, vrai Pattern B, EN ATTENTE device-test). |
-| ~~`arena/ArenaBoard.tsx`~~ | ~~862~~ | — | ✅ **FAIT** (`f151521`, 5 fichiers, mix A+B, EN ATTENTE device-test). |
-| `arena/ArenaGame.tsx` | 909 | élevé | **NEXT.** **Décision #3** : extraction <600 sans forcer <400 si le hook/closures sont trop invasifs. |
+| ~~`pages/play/PlayGame.tsx`~~ | ~~1437~~ | — | ✅ **FAIT + MERGÉ main** (`6f70457`, 15 fichiers). |
+| ~~`arena/ArenaLaneSlot.tsx`~~ | ~~859~~ | — | ✅ **FAIT + MERGÉ main** (`dde5505`, 6 fichiers, vrai Pattern B). |
+| ~~`arena/ArenaBoard.tsx`~~ | ~~862~~ | — | ✅ **FAIT + MERGÉ main** (`f151521`, 5 fichiers, mix A+B). |
+| ~~`arena/ArenaGame.tsx`~~ | ~~909~~ | — | ✅ **FAIT** (`60139a1`, 7 fichiers, orchestr. 597 ; hooks `useArenaIntent`+`useArenaForge` + `prepareResolveStart` pur + présentationnel `BoardFillSlot`/`HeroHitFlash`. Combat resolution intacte dans l'orchestrateur). **EN ATTENTE device-test** (sur `refactor`, isolé au-dessus de main). Décision Alex appliquée = 2 hooks focalisés faible-risque (PAS le hook combat). |
 | `match/LanesMatchView.tsx` | 1459 | élevé | Vue de match partagée (timing/sync). |
-| `ranked/RankedGame.tsx` | 1768 | élevé | **Décision #2 (Alex)** : Plan A = extraire `useRankedMatch.ts` (~560 l, closures/timing les plus fragiles du repo) — **confirmer avant**. |
+| `ranked/RankedGame.tsx` | 1768 | élevé | **NEXT.** **Décision #2 (Alex)** : Plan A = extraire `useRankedMatch.ts` (~560 l, closures/timing les plus fragiles du repo) — **confirmer avant**. ⚠️ Même piège qu'ArenaGame : fichier logique-dense → présentationnel seul ne suffira pas pour <600, prévoir hooks focalisés. |
 | `pages/OnlinePage.tsx` | 2575 | TRÈS élevé | **Le plus gros du repo.** Sync WebSocket/reconnexion/watchdog. À faire en dernier, par étapes, watch Redis/logcat armé. |
 
 **Exemptés / décisions séparées :**
@@ -188,8 +188,8 @@ Ordre recommandé (du moins au plus risqué). **Chacun exige un cycle device d'A
 ---
 
 ## 7. ÉTAT MERGE / DÉPLOIEMENT
-- `refactor` (`f151521`) porte **ProfilePage** (`ab080eb`) + **PlayGame** (`6f70457` +cleanup `c5705bb`) +
-  **ArenaLaneSlot** (`dde5505`) + **ArenaBoard** (`f151521`) non encore mergés. Après device-test OK d'Alex →
+- **2026-06-15 : lot des 4 splits (ProfilePage/PlayGame/ArenaLaneSlot/ArenaBoard) MERGÉ + DÉPLOYÉ** → `main` = `b42ea05`, `/health` 200. Device-test « fonctionnel » d'Alex obtenu avant le merge.
+- `refactor` (`60139a1`) porte désormais **ArenaGame seul** (`60139a1`), isolé au-dessus de main pour son propre device-test (c'est le moteur de match Pro + 2 hooks extraits → à valider en jouant une partie Pro avant de stacker RankedGame/OnlinePage). Après device-test OK →
   FF-merge `refactor → develop → main` (commande en §4) + push → **Render redéploie automatiquement** depuis `main`.
 - ⚠️ Les splits client sont **100% frontend** : le redéploiement Render reconstruit un **binaire serveur identique**
   (zéro risque) ; le **vrai shipping du frontend = APK buildée localement par Alex**. Vérifier `/health` 200 après push
@@ -237,9 +237,23 @@ Jouer une partie Pro et vérifier sur les cases :
 4. **Défilé croupier** des cartes au step reveal-opp ; **bande Forge** (forge adverse / statut / TA forge : dépôt/fusion/récup).
 5. **Stickers de sorts** collés sur les lanes (éventail multi-cartes, croix de retrait avant lock) + **halos** de lane en combat.
 
+### 8.E — ArenaGame (Constellation Pro — moteur de match complet, à valider AVANT merge)
+Jouer **une partie Pro complète** couvre les 2 hooks extraits + le combat (resté inline) :
+1. **Mulligan T1** : rejeter 1-2 cartes (remplacement en place), « C'est parti ! ».
+2. **Plan** : invoquer un move sur une lane (drag + tap), caster des sorts (lane/hero/self/global), vérifier les **refus** (cap sorts, 1 carte=1 usage, redondance binaire Bastion/Aegis) → `useArenaIntent`.
+3. **Forge** : déposer une carte, fusionner, **récupérer** (gratuit pour un dépôt, −mana pour une fusion) → `useArenaForge`.
+4. **Lock → résolution** : preview adverse, défilé des steps, FX (impact/shake, heist, flash héros), exil des légendaires jouées, passage au tour suivant.
+5. **Fin** : KO ou mort subite → écran de fin, **Rejouer** (reset propre), forfait (burger) = défaite comptée.
+
 ---
 
 ## 9. PIÈGES SPÉCIFIQUES rencontrés (ne pas re-tomber dedans)
+- **Fichier LOGIQUE-dense (vs JSX-dense)** : les moteurs de match (ArenaGame, et à venir RankedGame/OnlinePage) ont
+  l'essentiel en état+handlers+effects, PAS en JSX → l'extraction présentationnelle seule NE suffit PAS pour <600
+  (ArenaGame restait ~750). Solution validée : extraire des **hooks focalisés FAIBLE risque** (ex. `useArenaIntent`/
+  `useArenaForge`) qui sont sémantiquement identiques à du `useState` inline, en **laissant la résolution de combat
+  (timing/closures fragiles) dans l'orchestrateur**. + un helper PUR (`prepareResolveStart`) pour le pré-calcul.
+  Demander à Alex avant (ça contredit « tout l'état reste »).
 - **i18n** : les alertes d'upload utilisent `t("profile.avatar.tooBig")` / `t("profile.avatar.invalid")` →
   NE PAS hardcoder en français lors d'une extraction (bug introduit puis corrigé sur StyleSection).
 - **Artefact `doesn'\''t`** dans `ranked/MatchPrepScreen/Coin.tsx` (commentaire) = escape foiré pré-existant,
