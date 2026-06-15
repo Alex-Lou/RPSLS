@@ -16,7 +16,7 @@
   pour chaque split vérifié (voir §4). La branche n'est PAS déployée → review « plus tard ».
 - **État des branches au moment du handoff** :
   - `develop` = `main` = **`3efb5be`** (déployé Render, `/health` 200).
-  - `refactor` = **`dde5505`** = `main` + **ProfilePage** (`ab080eb`) + **PlayGame** (`6f70457`, +cleanup `c5705bb`) + **ArenaLaneSlot** (`dde5505`) — **3 splits EN ATTENTE device-test** avant prochain merge.
+  - `refactor` = **`f151521`** = `main` + **ProfilePage** (`ab080eb`) + **PlayGame** (`6f70457`, +cleanup `c5705bb`) + **ArenaLaneSlot** (`dde5505`) + **ArenaBoard** (`f151521`) — **4 splits EN ATTENTE device-test** avant prochain merge.
 - **Workflow Alex** : il **build l'APK + teste sur son téléphone lui-même** ; toi tu codes + typecheck + build, tu pushes sur `refactor`, et le **merge vers `main` (= déploiement) attend son OK explicite** (voir §4 + §7).
 - **Les splits VERBATIM-mécaniques propres sont ÉPUISÉS.** Tout ce qui reste = **extraction soignée**
   (sortir des sous-composants/hooks d'un monolithe), pas du simple couper-coller. Voir §6.
@@ -121,7 +121,7 @@ apparaît en `[A]` sans pendant identique en `[B]` → tu as cassé quelque chos
 - `ranked/MatchPrepScreen.tsx` 641 → 6 (`4230ebd`, barrel re-exporte types `Arena`/`OnlinePrep`).
 - `arena/ArenaPlanPhase.tsx` 680 → 5 (`3efb5be`, **1re extraction Pattern B** : MovePicker/HandFanout/LockButton).
 
-### Client — EN ATTENTE device-test sur `refactor` (`dde5505`)
+### Client — EN ATTENTE device-test sur `refactor` (`f151521`)
 - `pages/ProfilePage.tsx` 1647 → **21 fichiers** (`ab080eb`, **dispatch complet**, tous <400, orchestrateur 47 l).
   Sections autonomes + cluster Style (StyleSection possède peek/premium-pending + BackgroundGrid/PadGrid/
   PadPreviewModal/BackdropPeekOverlay) + feuilles. **À device-tester** (cf. §8) avant de merger.
@@ -148,6 +148,19 @@ apparaît en `[A]` sans pendant identique en `[B]` → tu as cassé quelque chos
   helper uniquement, zéro className/style/valeur d'anim/logique). **À device-tester** (combat Pro : invocation, charge/
   slam, dégât+secousse+étincelles, soin +N, buff/debuff, Mascarade flip, esquive/bouclier/percé chips, halo Provoc,
   deflection Pierre, ciblage de sort sur slot, croix d'annulation d'invocation planifiée).
+- `arena/ArenaBoard.tsx` 862 → **5 fichiers** (`f151521`, dossier `ArenaBoard/` + barrel, ancien supprimé même
+  commit, conso unique `./ArenaBoard` dans ArenaGame ; barrel re-exporte aussi le type `ArenaBoardProps`).
+  **Mix Pattern A + B** : orchestrateur `ArenaBoard.tsx` (~390 l) garde props interface + état (`inspectOpp`,
+  `padShake` controls) + 2 `useEffect` (burger off + secousse combat) + helper `stickersForSide` + le render
+  (pad/portails opp-strip & inspect/reveal croupier/filigrane Voie/bande Forge) ; délègue à `LaneRow.tsx`
+  (rangée de 3 cases, déjà séparée) + `CenterStatus.tsx` (bandeau phase + Chip + IntentChips, déjà séparés) +
+  `ArenaBoardChips.tsx` (`AugurFlash`/`TauntBlockChip`/`AntiTauntChip` — 3 overlays inline extraits, présentationnels,
+  **même ordre/z-index**). tsc 0 + vite 0 + diff verbatim propre ([A] = 2 lignes de type chemin `../`→`../../` +
+  3 commentaires JSX→JSDoc ; [B] = sigs/props/invocations/barrel uniquement, zéro className/style/anim/logique).
+  CenterStatus & ArenaBoardChips importent `type ArenaBoardProps` depuis `./ArenaBoard` (type-only, pas de cycle
+  runtime). **À device-tester** (combat Pro : strip adverse en portal, secousse pad au combat, chips Augur/Pierre-
+  détourne/Provoc-annulée, défilé croupier au reveal, filigrane Voie, forge dépôt/fusion/récup, stickers de sorts
+  sur lanes + éventail multi-cartes, halos de lane).
 
 ---
 
@@ -159,8 +172,8 @@ Ordre recommandé (du moins au plus risqué). **Chacun exige un cycle device d'A
 |---|---|---|---|
 | ~~`pages/play/PlayGame.tsx`~~ | ~~1437~~ | — | ✅ **FAIT** (`6f70457`, 15 fichiers, EN ATTENTE device-test). |
 | ~~`arena/ArenaLaneSlot.tsx`~~ | ~~859~~ | — | ✅ **FAIT** (`dde5505`, 6 fichiers, vrai Pattern B, EN ATTENTE device-test). |
-| `arena/ArenaBoard.tsx` | 861 | élevé | **NEXT.** Plateau Arena (parent de ArenaLaneSlot). |
-| `arena/ArenaGame.tsx` | 909 | élevé | **Décision #3** : extraction <600 sans forcer <400 si le hook/closures sont trop invasifs. |
+| ~~`arena/ArenaBoard.tsx`~~ | ~~862~~ | — | ✅ **FAIT** (`f151521`, 5 fichiers, mix A+B, EN ATTENTE device-test). |
+| `arena/ArenaGame.tsx` | 909 | élevé | **NEXT.** **Décision #3** : extraction <600 sans forcer <400 si le hook/closures sont trop invasifs. |
 | `match/LanesMatchView.tsx` | 1459 | élevé | Vue de match partagée (timing/sync). |
 | `ranked/RankedGame.tsx` | 1768 | élevé | **Décision #2 (Alex)** : Plan A = extraire `useRankedMatch.ts` (~560 l, closures/timing les plus fragiles du repo) — **confirmer avant**. |
 | `pages/OnlinePage.tsx` | 2575 | TRÈS élevé | **Le plus gros du repo.** Sync WebSocket/reconnexion/watchdog. À faire en dernier, par étapes, watch Redis/logcat armé. |
@@ -175,9 +188,9 @@ Ordre recommandé (du moins au plus risqué). **Chacun exige un cycle device d'A
 ---
 
 ## 7. ÉTAT MERGE / DÉPLOIEMENT
-- `refactor` (`dde5505`) porte **ProfilePage** (`ab080eb`) + **PlayGame** (`6f70457` +cleanup `c5705bb`) +
-  **ArenaLaneSlot** (`dde5505`) non encore mergés. Après device-test OK d'Alex → FF-merge `refactor → develop → main`
-  (commande en §4) + push → **Render redéploie automatiquement** depuis `main`.
+- `refactor` (`f151521`) porte **ProfilePage** (`ab080eb`) + **PlayGame** (`6f70457` +cleanup `c5705bb`) +
+  **ArenaLaneSlot** (`dde5505`) + **ArenaBoard** (`f151521`) non encore mergés. Après device-test OK d'Alex →
+  FF-merge `refactor → develop → main` (commande en §4) + push → **Render redéploie automatiquement** depuis `main`.
 - ⚠️ Les splits client sont **100% frontend** : le redéploiement Render reconstruit un **binaire serveur identique**
   (zéro risque) ; le **vrai shipping du frontend = APK buildée localement par Alex**. Vérifier `/health` 200 après push
   (`curl https://rpsls-server-tptj.onrender.com/health`).
@@ -185,7 +198,7 @@ Ordre recommandé (du moins au plus risqué). **Chacun exige un cycle device d'A
 
 ---
 
-## 8. DEVICE-TEST à faire valider à Alex avant merge (3 splits en attente)
+## 8. DEVICE-TEST à faire valider à Alex avant merge (4 splits en attente)
 
 ### 8.A — ProfilePage
 Page Profil rendue → cibler surtout le **cluster Style** (le plus interconnecté) :
@@ -215,6 +228,14 @@ Jouer une partie Pro et vérifier sur les cases :
 3. **Passifs/statuts** : badges 🛡 Provoc (+ halo doré pulsé), 🌿 Étouffe, ⚔ Tranchant, ✨ Esquive, 🧬 Logique, 🛡️/⚓/⚔️ sorts ;
    chips save « 🛡️ ABSORBÉ » / « ✨ ESQUIVÉ » ; « 🩸 Bouclier percé » à la mort sous bouclier ; **Mascarade** = flip du glyphe.
 4. **Ciblage** : slot vide/créature en cible valide → anneau ambre pulsé + label « ✦ … » cliquable ; pulse de **déflexion** Pierre.
+
+### 8.D — ArenaBoard (Constellation Pro — plateau entier)
+1. **Strip adverse** en portal (fixed en haut, nom/portrait CPU réels, burger inline) + fiche LECTURE SEULE d'une carte
+   adverse révélée par Augure (long-press).
+2. **Secousse du pad** à chaque tick de combat (sans remount des lanes) ; **filigrane de la Voie** au centre hors reveal.
+3. **Chips centraux** : Augur (« Main révélée »), Pierre protège (« Attaque détournée »), Provoc annulée (Étouffe/Logique).
+4. **Défilé croupier** des cartes au step reveal-opp ; **bande Forge** (forge adverse / statut / TA forge : dépôt/fusion/récup).
+5. **Stickers de sorts** collés sur les lanes (éventail multi-cartes, croix de retrait avant lock) + **halos** de lane en combat.
 
 ---
 
