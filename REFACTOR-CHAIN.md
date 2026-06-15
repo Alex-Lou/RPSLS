@@ -16,7 +16,7 @@
   pour chaque split vérifié (voir §4). La branche n'est PAS déployée → review « plus tard ».
 - **État des branches au moment du handoff** :
   - `develop` = `main` = **`3efb5be`** (déployé Render, `/health` 200).
-  - `refactor` = **`6f70457`** = `main` + **ProfilePage** (`ab080eb`) + **PlayGame** (`6f70457`) — **2 splits EN ATTENTE device-test** avant prochain merge.
+  - `refactor` = **`dde5505`** = `main` + **ProfilePage** (`ab080eb`) + **PlayGame** (`6f70457`, +cleanup `c5705bb`) + **ArenaLaneSlot** (`dde5505`) — **3 splits EN ATTENTE device-test** avant prochain merge.
 - **Workflow Alex** : il **build l'APK + teste sur son téléphone lui-même** ; toi tu codes + typecheck + build, tu pushes sur `refactor`, et le **merge vers `main` (= déploiement) attend son OK explicite** (voir §4 + §7).
 - **Les splits VERBATIM-mécaniques propres sont ÉPUISÉS.** Tout ce qui reste = **extraction soignée**
   (sortir des sous-composants/hooks d'un monolithe), pas du simple couper-coller. Voir §6.
@@ -121,7 +121,7 @@ apparaît en `[A]` sans pendant identique en `[B]` → tu as cassé quelque chos
 - `ranked/MatchPrepScreen.tsx` 641 → 6 (`4230ebd`, barrel re-exporte types `Arena`/`OnlinePrep`).
 - `arena/ArenaPlanPhase.tsx` 680 → 5 (`3efb5be`, **1re extraction Pattern B** : MovePicker/HandFanout/LockButton).
 
-### Client — EN ATTENTE device-test sur `refactor` (`6f70457`)
+### Client — EN ATTENTE device-test sur `refactor` (`dde5505`)
 - `pages/ProfilePage.tsx` 1647 → **21 fichiers** (`ab080eb`, **dispatch complet**, tous <400, orchestrateur 47 l).
   Sections autonomes + cluster Style (StyleSection possède peek/premium-pending + BackgroundGrid/PadGrid/
   PadPreviewModal/BackdropPeekOverlay) + feuilles. **À device-tester** (cf. §8) avant de merger.
@@ -135,6 +135,19 @@ apparaît en `[A]` sans pendant identique en `[B]` → tu as cassé quelque chos
   membres d'import multi-ligne→mono-ligne + fermetures `../../`→`../../../` ; [B] = barrel + fermetures `../../../`).
   Strings FR en dur d'AtoutPicker/AtoutBar **préservées verbatim** (pré-existantes). **À device-tester** (partie
   locale solo/hotseat/Classé : pick→countdown→reveal→fin, atouts Lecture/Va-banque/Contre/Garde, timeout/forfait).
+  **Cleanup suivi `c5705bb`** : prop `mood` mort retiré de `Header` (jamais lu, neutre runtime ; autorisé par Alex).
+- `arena/ArenaLaneSlot.tsx` 859 → **6 fichiers** (`dde5505`, dossier `ArenaLaneSlot/` + barrel, ancien supprimé même
+  commit, conso unique `./ArenaLaneSlot` dans ArenaBoard ; barrel re-exporte aussi le type `ArenaLaneSlotProps`).
+  **VRAI Pattern B** (monolithe unique, 1re extraction de la chaîne Arena) : orchestrateur `ArenaLaneSlot.tsx` (~280 l)
+  garde **les 10 états + 4 refs + les 3 `useEffect` de détection** (dégât/soin/bouclier/esquive/mort/déguisement/buff/
+  debuff — logique sensible : refs prev/current + setTimeout, ne BOUGE PAS) puis délègue à 3 rendus présentationnels :
+  `CreatureSlot.tsx` (~430, carte créature, overlays NON réordonnés pour préserver l'empilement DOM) + `PlannedSlot.tsx`
+  (aperçu fantôme) + `EmptySlot.tsx` (vide + death-ghost + « bouclier percé »). Helper PUR `creatureSlotAnim.ts`
+  (`reactAnim` charge/hit/debuff/heal/buff/idle, sans état/ref) → CreatureSlot sous 450. tsc 0 + vite 0 + diff verbatim
+  propre ([A] = 1 ligne `const reactAnim = chargeAttack`→`return chargeAttack` dans le helper ; [B] = sigs/props/barrel/
+  helper uniquement, zéro className/style/valeur d'anim/logique). **À device-tester** (combat Pro : invocation, charge/
+  slam, dégât+secousse+étincelles, soin +N, buff/debuff, Mascarade flip, esquive/bouclier/percé chips, halo Provoc,
+  deflection Pierre, ciblage de sort sur slot, croix d'annulation d'invocation planifiée).
 
 ---
 
@@ -145,8 +158,8 @@ Ordre recommandé (du moins au plus risqué). **Chacun exige un cycle device d'A
 | Fichier | Lignes | Risque | Notes / décision |
 |---|---|---|---|
 | ~~`pages/play/PlayGame.tsx`~~ | ~~1437~~ | — | ✅ **FAIT** (`6f70457`, 15 fichiers, EN ATTENTE device-test). |
-| `arena/ArenaLaneSlot.tsx` | 859 | élevé | **NEXT.** Feuille de la chaîne Arena — faire **avant** ArenaBoard/ArenaGame (enfant→parent). |
-| `arena/ArenaBoard.tsx` | 861 | élevé | Plateau Arena. |
+| ~~`arena/ArenaLaneSlot.tsx`~~ | ~~859~~ | — | ✅ **FAIT** (`dde5505`, 6 fichiers, vrai Pattern B, EN ATTENTE device-test). |
+| `arena/ArenaBoard.tsx` | 861 | élevé | **NEXT.** Plateau Arena (parent de ArenaLaneSlot). |
 | `arena/ArenaGame.tsx` | 909 | élevé | **Décision #3** : extraction <600 sans forcer <400 si le hook/closures sont trop invasifs. |
 | `match/LanesMatchView.tsx` | 1459 | élevé | Vue de match partagée (timing/sync). |
 | `ranked/RankedGame.tsx` | 1768 | élevé | **Décision #2 (Alex)** : Plan A = extraire `useRankedMatch.ts` (~560 l, closures/timing les plus fragiles du repo) — **confirmer avant**. |
@@ -162,9 +175,9 @@ Ordre recommandé (du moins au plus risqué). **Chacun exige un cycle device d'A
 ---
 
 ## 7. ÉTAT MERGE / DÉPLOIEMENT
-- `refactor` (`6f70457`) porte **ProfilePage** (`ab080eb`) + **PlayGame** (`6f70457`) non encore mergés. Après
-  device-test OK d'Alex → FF-merge `refactor → develop → main` (commande en §4) + push → **Render redéploie
-  automatiquement** depuis `main`.
+- `refactor` (`dde5505`) porte **ProfilePage** (`ab080eb`) + **PlayGame** (`6f70457` +cleanup `c5705bb`) +
+  **ArenaLaneSlot** (`dde5505`) non encore mergés. Après device-test OK d'Alex → FF-merge `refactor → develop → main`
+  (commande en §4) + push → **Render redéploie automatiquement** depuis `main`.
 - ⚠️ Les splits client sont **100% frontend** : le redéploiement Render reconstruit un **binaire serveur identique**
   (zéro risque) ; le **vrai shipping du frontend = APK buildée localement par Alex**. Vérifier `/health` 200 après push
   (`curl https://rpsls-server-tptj.onrender.com/health`).
@@ -172,7 +185,7 @@ Ordre recommandé (du moins au plus risqué). **Chacun exige un cycle device d'A
 
 ---
 
-## 8. DEVICE-TEST à faire valider à Alex avant merge (2 splits en attente)
+## 8. DEVICE-TEST à faire valider à Alex avant merge (3 splits en attente)
 
 ### 8.A — ProfilePage
 Page Profil rendue → cibler surtout le **cluster Style** (le plus interconnecté) :
@@ -191,6 +204,17 @@ Page Profil rendue → cibler surtout le **cluster Style** (le plus interconnect
    Va-banque (manche à 2 pts), Contre (re-tirage adverse auto), Garde (défaite→nul) → notes d'atout au reveal.
 5. **Quit** : bouton retour + back Android → modale de confirmation (Classé confirme même à 0-0) → forfait enregistré.
 6. **Contexte défi du jour** : bandeau quest visible + bonus XP appliqué au 1er match seulement.
+
+### 8.C — ArenaLaneSlot (Constellation Pro — rendu d'une case de lane en combat)
+Jouer une partie Pro et vérifier sur les cases :
+1. **Invocation** : le glyphe JAILLIT (offset + rotation + overshoot spring) ; aperçu fantôme (pointillés + « en attente »)
+   avant lock ; **croix rouge** d'annulation d'une invocation planifiée ; « ↻ Remplacer » si on re-cible une lane planifiée.
+2. **Combat** : charge/SLAM de l'attaquant (lunge + burst + onde de choc) ; **dégât** = secousse + flash rouge + étincelles
+   + popup « −N » + barre PV qui descend ; **soin** = floraison émeraude + « +N » ; **buff** (ATK↑/bouclier) = pop doré-vert ;
+   **debuff** (Curse −ATK / Toile) = tassement violet + badge 🕸.
+3. **Passifs/statuts** : badges 🛡 Provoc (+ halo doré pulsé), 🌿 Étouffe, ⚔ Tranchant, ✨ Esquive, 🧬 Logique, 🛡️/⚓/⚔️ sorts ;
+   chips save « 🛡️ ABSORBÉ » / « ✨ ESQUIVÉ » ; « 🩸 Bouclier percé » à la mort sous bouclier ; **Mascarade** = flip du glyphe.
+4. **Ciblage** : slot vide/créature en cible valide → anneau ambre pulsé + label « ✦ … » cliquable ; pulse de **déflexion** Pierre.
 
 ---
 
