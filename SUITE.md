@@ -30,9 +30,10 @@
 - **#6 Bonus de bienvenue single-source** dans `economy.ts` (affichage `AuthGate` ⇄ don serveur `account/bonus.rs`).
 - **#4 Helper Redis Upstash** (`player_state/redis.rs`) : `pipeline_send(cmds) -> Option<reqwest::Result<Response>>` centralise le POST `/pipeline` (appliqué à `delete_player`/`get_raw`/`set_nx`/`del` ; `save` laissé explicite — early-return config + logging body d'erreur). **Comportement identique** (warns `set_nx` + logique NX/parse inchangés). `cargo test` 24/24, clippy propre. Commit `0dd3286` (sur `refactor`, inerte = behavior-identical, déploiera au prochain merge `main`).
 
-### ⏳ Reste à faire (⚠️ device-verify — touchent les flux de sync client)
-1. **#3 — Fingerprint progression** (`online/playerSync.ts::syncFingerprint`) : la **mitigation est faite** (champs `ownedPremiumSets`/`cardMastery`/`abandons` ajoutés au fingerprint) ; reste à **dériver** le fingerprint du payload `buildProgressFromPlayer` au lieu de relister les champs à la main. ⚠️ change le déclenchement du sync → device-verify.
-2. **#1 — WS transitoire** : `online/transientSession.ts` extrait déjà `resolveWsUrl`/`helloFrame` (partagés par `accountAuth.ts` + `bootSync.ts`), mais chacun garde son propre `new WebSocket` + cycle. **Finir l'unification** (1 helper connect→hello→state_loaded→sync→close, aussi pour `playerSync.ts::pushPlayerStateOneShot`). ⚠️ flux auth/sync online → device-verify obligatoire.
+- **#3 Fingerprint progression** (`online/playerSync.ts::syncFingerprint`) : **dérivé** du payload `buildProgressFromPlayer` (zéro drift — tout champ ajouté au payload est auto-couvert) ; `updatedAt`/`seasonStartedAt`/`history` neutralisés (sinon push infini/inutile). Commit `5841217` (sur `refactor`). ⚠️ **à device-tester** : un match/achat pousse bien, PAS de push en boucle.
+- **#1 WS transitoire** : **laissé tel quel (décision Alex 15/06)**. L'extraction sûre est faite (`resolveWsUrl`/`helloFrame`) ; le reste est une **divergence justifiée** — `accountAuth` (Promise + credential + sécu), `bootSync` (récup anti-doublon claim-mismatch = intégrité données, device-test-rare), `pushPlayerStateOneShot` (trivial). Forcer un harness = factorisation prématurée sur des chemins critiques pour ~0 gain de lignes.
+
+> **DRY terminé** (#1→#6 traités). Reste produit = vague de splits device-needed, éco §9-B, Google, traductions, features §8-C — voir §6.
 
 ---
 
@@ -137,9 +138,8 @@ adb shell monkey -p com.alex.rpsls -c android.intent.category.LAUNCHER 1
 ---
 
 ## 6. Ordre conseillé pour reprendre
-1. ✅ **`refactor` mergé dans `develop`** (15/06, FF `48c162f`, device-testé). + **DRY #4** fait (`0dd3286`, sur `refactor`). Reste à propager `develop`(+`refactor`) → `main` quand un déploiement est voulu (les changements sont inertes/behavior-identical, pas d'urgence).
+1. ✅ **`refactor` mergé dans `develop`** (15/06, FF `48c162f`, device-testé). **DRY terminé** : #4 `0dd3286`, #3 `5841217` (sur `refactor`, à device-tester), #1 laissé tel quel (décision). Reste à propager `develop`(+`refactor`) → `main` quand un déploiement est voulu (changements inertes / à device-tester d'abord pour #3).
 2. **Vague device-needed** (§2) — low-risk d'abord (`PlayMenu`/`ShopPage`/`DeckManager`/`MatchPrepScreen`), puis trancher les 2 décisions, puis high-risk avec playtest.
-3. **DRY #1/#3** (au passage des fichiers concernés, device-verify).
 5. **Google** (§3) — config console + SHA-1, réactiver + test device.
 6. **Éco serveur-autoritaire** (`HANDOFF.md` §9-B) — gros chantier serveur (endpoints validés `buy_pack`/`craft`/`grant_match_reward`/`claim`).
 7. **Features spécifiées non construites** (`HANDOFF.md` §8-C) : livre de recettes fusion, carte « Brume », fusions doubles/triples, cartes « Sur Coup », tuto, bundle thème.
