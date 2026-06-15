@@ -16,7 +16,7 @@
   pour chaque split vérifié (voir §4). La branche n'est PAS déployée → review « plus tard ».
 - **État des branches au moment du handoff** :
   - `develop` = `main` = **`3efb5be`** (déployé Render, `/health` 200).
-  - `refactor` = **`ab080eb`** = `main` + **ProfilePage** (1 split **EN ATTENTE device-test** avant prochain merge).
+  - `refactor` = **`6f70457`** = `main` + **ProfilePage** (`ab080eb`) + **PlayGame** (`6f70457`) — **2 splits EN ATTENTE device-test** avant prochain merge.
 - **Workflow Alex** : il **build l'APK + teste sur son téléphone lui-même** ; toi tu codes + typecheck + build, tu pushes sur `refactor`, et le **merge vers `main` (= déploiement) attend son OK explicite** (voir §4 + §7).
 - **Les splits VERBATIM-mécaniques propres sont ÉPUISÉS.** Tout ce qui reste = **extraction soignée**
   (sortir des sous-composants/hooks d'un monolithe), pas du simple couper-coller. Voir §6.
@@ -121,10 +121,20 @@ apparaît en `[A]` sans pendant identique en `[B]` → tu as cassé quelque chos
 - `ranked/MatchPrepScreen.tsx` 641 → 6 (`4230ebd`, barrel re-exporte types `Arena`/`OnlinePrep`).
 - `arena/ArenaPlanPhase.tsx` 680 → 5 (`3efb5be`, **1re extraction Pattern B** : MovePicker/HandFanout/LockButton).
 
-### Client — EN ATTENTE device-test sur `refactor` (`ab080eb`)
+### Client — EN ATTENTE device-test sur `refactor` (`6f70457`)
 - `pages/ProfilePage.tsx` 1647 → **21 fichiers** (`ab080eb`, **dispatch complet**, tous <400, orchestrateur 47 l).
   Sections autonomes + cluster Style (StyleSection possède peek/premium-pending + BackgroundGrid/PadGrid/
   PadPreviewModal/BackdropPeekOverlay) + feuilles. **À device-tester** (cf. §8) avant de merger.
+- `pages/play/PlayGame.tsx` 1437 → **15 fichiers** (`6f70457`, dossier `PlayGame/` + barrel `index.ts`, ancien
+  supprimé même commit). **Pattern A de fait** (pas B) : le fichier était DÉJÀ découpé en 13 fonctions top-level
+  séparées, tout l'état de match + handlers vivaient déjà dans `Game` → simple déplacement verbatim en fichiers,
+  aucune logique déplacée. Orchestrateur `PlayGame.tsx` ~440 l (état + handlers + composition, `Phase` interne) ;
+  `types.ts` (`Streaks`, traverse vers EndPanel) ; sous-composants présentationnels : `Header`/`MatchFacts`/
+  `PickPanel`(+`PICK_TIMEOUT_MS`)/`PickHandButton`/`PassPanel`/`Countdown`(+consts)/`RevealPanel`/`RevealHand`/
+  `ParticleBurst`/`AtoutPicker`/`AtoutBar`/`EndPanel`. tsc 0 + vite build 0 + diff verbatim propre ([A] = uniquement
+  membres d'import multi-ligne→mono-ligne + fermetures `../../`→`../../../` ; [B] = barrel + fermetures `../../../`).
+  Strings FR en dur d'AtoutPicker/AtoutBar **préservées verbatim** (pré-existantes). **À device-tester** (partie
+  locale solo/hotseat/Classé : pick→countdown→reveal→fin, atouts Lecture/Va-banque/Contre/Garde, timeout/forfait).
 
 ---
 
@@ -134,8 +144,8 @@ Ordre recommandé (du moins au plus risqué). **Chacun exige un cycle device d'A
 
 | Fichier | Lignes | Risque | Notes / décision |
 |---|---|---|---|
-| `pages/play/PlayGame.tsx` | 1437 | moyen | **NEXT recommandé.** Orchestrateur de partie locale. |
-| `arena/ArenaLaneSlot.tsx` | 859 | élevé | Feuille de la chaîne Arena — faire **avant** ArenaBoard/ArenaGame (enfant→parent). |
+| ~~`pages/play/PlayGame.tsx`~~ | ~~1437~~ | — | ✅ **FAIT** (`6f70457`, 15 fichiers, EN ATTENTE device-test). |
+| `arena/ArenaLaneSlot.tsx` | 859 | élevé | **NEXT.** Feuille de la chaîne Arena — faire **avant** ArenaBoard/ArenaGame (enfant→parent). |
 | `arena/ArenaBoard.tsx` | 861 | élevé | Plateau Arena. |
 | `arena/ArenaGame.tsx` | 909 | élevé | **Décision #3** : extraction <600 sans forcer <400 si le hook/closures sont trop invasifs. |
 | `match/LanesMatchView.tsx` | 1459 | élevé | Vue de match partagée (timing/sync). |
@@ -152,8 +162,9 @@ Ordre recommandé (du moins au plus risqué). **Chacun exige un cycle device d'A
 ---
 
 ## 7. ÉTAT MERGE / DÉPLOIEMENT
-- `refactor` (`ab080eb`) porte **ProfilePage** non encore mergé. Après device-test OK d'Alex →
-  FF-merge `refactor → develop → main` (commande en §4) + push → **Render redéploie automatiquement** depuis `main`.
+- `refactor` (`6f70457`) porte **ProfilePage** (`ab080eb`) + **PlayGame** (`6f70457`) non encore mergés. Après
+  device-test OK d'Alex → FF-merge `refactor → develop → main` (commande en §4) + push → **Render redéploie
+  automatiquement** depuis `main`.
 - ⚠️ Les splits client sont **100% frontend** : le redéploiement Render reconstruit un **binaire serveur identique**
   (zéro risque) ; le **vrai shipping du frontend = APK buildée localement par Alex**. Vérifier `/health` 200 après push
   (`curl https://rpsls-server-tptj.onrender.com/health`).
@@ -161,13 +172,25 @@ Ordre recommandé (du moins au plus risqué). **Chacun exige un cycle device d'A
 
 ---
 
-## 8. DEVICE-TEST de ProfilePage (à faire valider à Alex avant merge)
+## 8. DEVICE-TEST à faire valider à Alex avant merge (2 splits en attente)
+
+### 8.A — ProfilePage
 Page Profil rendue → cibler surtout le **cluster Style** (le plus interconnecté) :
 1. **Apparences** : tap un fond → peek plein écran → « Choisir » / « Fermer » (revert) ; importer une image
    (bibliothèque, max 6) ; fond **premium non possédé** → peek « aperçu premium » → « Acheter » ouvre la modale.
 2. **Pads** : tap un pad → aperçu → « Choisir ce tapis » ; pad premium verrouillé → modale ; importer un tapis.
 3. **Slider d'intensité** (premium possédé) : vertical en peek (droite) + carte horizontale sous le Style.
 4. Reste (pseudo+edit, avatar+upload, difficulté, haptics+test, accessibilité, confidentialité, reset) : s'affiche + réagit.
+
+### 8.B — PlayGame (partie locale solo / hotseat / Classé 1v1)
+1. **Solo vs CPU** : pick une main → countdown 5 temps (haptique par beat) → reveal (verbe + particules + flash gagnant)
+   → « Suivant » → manche suivante → écran de fin (XP/LP/éclats, bonus daily/streak) → « Rejouer » re-roll humeur.
+2. **Hotseat** : J1 pick → écran « passe le tel » → J2 pick (avec timer) → countdown → reveal ; timeout J2 = J1 gagne.
+3. **Timeout solo** : laisser le timer J1 expirer (hotseat) / 3 timeouts = forfait → fin de match.
+4. **Classé 1v1** (`withAtouts`) : picker d'atouts (choisir 2) → barre d'atouts en match → Lecture (révèle le coup CPU),
+   Va-banque (manche à 2 pts), Contre (re-tirage adverse auto), Garde (défaite→nul) → notes d'atout au reveal.
+5. **Quit** : bouton retour + back Android → modale de confirmation (Classé confirme même à 0-0) → forfait enregistré.
+6. **Contexte défi du jour** : bandeau quest visible + bonus XP appliqué au 1er match seulement.
 
 ---
 
