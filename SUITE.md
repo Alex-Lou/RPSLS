@@ -28,11 +28,11 @@
 - **#2 `<ModalShell>`** (`app/src/ui/ModalShell.tsx`) : overlay + panneau ressort + close-backdrop partagés.
 - **#5 Barèmes éco GÉNÉRÉS** : `scripts/gen-economy-meta.mjs` → `crates/rpsls-server/economy_meta.json` (`include_str!` dans `economy.rs`). **Relancer le générateur après toute modif de barème TS** (`economy.ts`).
 - **#6 Bonus de bienvenue single-source** dans `economy.ts` (affichage `AuthGate` ⇄ don serveur `account/bonus.rs`).
+- **#4 Helper Redis Upstash** (`player_state/redis.rs`) : `pipeline_send(cmds) -> Option<reqwest::Result<Response>>` centralise le POST `/pipeline` (appliqué à `delete_player`/`get_raw`/`set_nx`/`del` ; `save` laissé explicite — early-return config + logging body d'erreur). **Comportement identique** (warns `set_nx` + logique NX/parse inchangés). `cargo test` 24/24, clippy propre. Commit `0dd3286` (sur `refactor`, inerte = behavior-identical, déploiera au prochain merge `main`).
 
-### ⏳ Reste à faire
-1. **#4 — Helper Redis Upstash** (`crates/rpsls-server/src/player_state/redis.rs`) : ~7 sites répètent `format!("{url}/pipeline")` + `bearer_auth(token)` + `json(&cmds)` + `send`. Extraire `redis_pipeline(cmds) -> Option<Value>`. ⚠️ chemin **persistance argent** → mécanique strict + `cargo test` vert + redéploie. **➜ VÉRIFIABLE SANS DEVICE** (bon prochain pas).
-2. **#3 — Fingerprint progression** (`online/playerSync.ts::syncFingerprint`) : la **mitigation est faite** (champs `ownedPremiumSets`/`cardMastery`/`abandons` ajoutés au fingerprint) ; reste à **dériver** le fingerprint du payload `buildProgressFromPlayer` au lieu de relister les champs à la main. ⚠️ change le déclenchement du sync → device-verify.
-3. **#1 — WS transitoire** : `online/transientSession.ts` extrait déjà `resolveWsUrl`/`helloFrame` (partagés par `accountAuth.ts` + `bootSync.ts`), mais chacun garde son propre `new WebSocket` + cycle. **Finir l'unification** (1 helper connect→hello→state_loaded→sync→close, aussi pour `playerSync.ts::pushPlayerStateOneShot`). ⚠️ flux auth/sync online → device-verify obligatoire.
+### ⏳ Reste à faire (⚠️ device-verify — touchent les flux de sync client)
+1. **#3 — Fingerprint progression** (`online/playerSync.ts::syncFingerprint`) : la **mitigation est faite** (champs `ownedPremiumSets`/`cardMastery`/`abandons` ajoutés au fingerprint) ; reste à **dériver** le fingerprint du payload `buildProgressFromPlayer` au lieu de relister les champs à la main. ⚠️ change le déclenchement du sync → device-verify.
+2. **#1 — WS transitoire** : `online/transientSession.ts` extrait déjà `resolveWsUrl`/`helloFrame` (partagés par `accountAuth.ts` + `bootSync.ts`), mais chacun garde son propre `new WebSocket` + cycle. **Finir l'unification** (1 helper connect→hello→state_loaded→sync→close, aussi pour `playerSync.ts::pushPlayerStateOneShot`). ⚠️ flux auth/sync online → device-verify obligatoire.
 
 ---
 
@@ -137,10 +137,9 @@ adb shell monkey -p com.alex.rpsls -c android.intent.category.LAUNCHER 1
 ---
 
 ## 6. Ordre conseillé pour reprendre
-1. **Merger `refactor`** : build + device-test les 4 splits client (verbatim = comportement identique) → FF `refactor → develop → main`.
-2. **DRY #4** (helper Redis, serveur, `cargo`-vérifié, **sans device**) — prochain pas verifiable propre.
-3. **Vague device-needed** (§2) — low-risk d'abord (`PlayMenu`/`ShopPage`/`DeckManager`/`MatchPrepScreen`), puis trancher les 2 décisions, puis high-risk avec playtest.
-4. **DRY #1/#3** (au passage des fichiers concernés, device-verify).
+1. ✅ **`refactor` mergé dans `develop`** (15/06, FF `48c162f`, device-testé). + **DRY #4** fait (`0dd3286`, sur `refactor`). Reste à propager `develop`(+`refactor`) → `main` quand un déploiement est voulu (les changements sont inertes/behavior-identical, pas d'urgence).
+2. **Vague device-needed** (§2) — low-risk d'abord (`PlayMenu`/`ShopPage`/`DeckManager`/`MatchPrepScreen`), puis trancher les 2 décisions, puis high-risk avec playtest.
+3. **DRY #1/#3** (au passage des fichiers concernés, device-verify).
 5. **Google** (§3) — config console + SHA-1, réactiver + test device.
 6. **Éco serveur-autoritaire** (`HANDOFF.md` §9-B) — gros chantier serveur (endpoints validés `buy_pack`/`craft`/`grant_match_reward`/`claim`).
 7. **Features spécifiées non construites** (`HANDOFF.md` §8-C) : livre de recettes fusion, carte « Brume », fusions doubles/triples, cartes « Sur Coup », tuto, bundle thème.
