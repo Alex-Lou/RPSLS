@@ -361,7 +361,6 @@ export function Game({
         target={target(match)}
         streakA={streaks.a}
         streakB={streaks.b}
-        mood={!isHotseat ? mood : null}
         onQuit={handleQuit}
       />
 

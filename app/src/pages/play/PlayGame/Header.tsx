@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { GameMode } from "../../../types";
-import { AiMood } from "../../../engine/game";
 import { useT } from "../../../i18n";
 import {
   MatchScoreBar,
@@ -17,7 +16,7 @@ export function Header({
   mode: GameMode;
   labelA: string; labelB: string; scoreA: number; scoreB: number;
   target: number; streakA: number; streakB: number;
-  mood: AiMood | null; onQuit: () => void;
+  onQuit: () => void;
 }) {
   const t = useT();
   const [confirmQuit, setConfirmQuit] = useState(false);
