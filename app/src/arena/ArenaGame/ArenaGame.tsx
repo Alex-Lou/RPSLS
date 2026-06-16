@@ -98,12 +98,20 @@ export function ArenaGame({
     ),
   ));
   // Constellation Pro v2 Couche 1 — Affinité du joueur passée au moteur.
-  // Le CPU prend une Affinité ALÉATOIRE à chaque match pour la symétrie
-  // (Constellation 3⭐ s'allume aussi côté opp) — pas d'adaptive selon
-  // le joueur pour garder une part d'imprévisibilité.
+  // Le CPU prend une Affinité ALÉATOIRE à chaque match (Constellation 3⭐
+  // s'allume aussi côté opp) — pas d'adaptive selon le joueur pour garder une
+  // part d'imprévisibilité, MAIS jamais la même Voie que le joueur (Alex
+  // 2026-06-16 anti-miroir : éviter le plateau « dupliqué » 3 pierres vs
+  // 3 pierres). Re-tiré à chaque remount (rematch via ArenaPage) ; le
+  // soft-reset local réutilise la valeur, déjà ≠ joueur.
   const playerAffinity = useRef(player.arenaAffinity);
   const cpuAffinity = useRef<Move>(
-    (["rock", "paper", "scissors", "lizard", "spock"] as const)[Math.floor(Math.random() * 5)],
+    (() => {
+      const pool = (["rock", "paper", "scissors", "lizard", "spock"] as const).filter(
+        (m) => m !== player.arenaAffinity,
+      );
+      return pool[Math.floor(Math.random() * pool.length)];
+    })(),
   );
   // Persona CPU random au match start (Alex 2026-06-11). Reste constante tout
   // le match pour que le feeling de l'opp soit cohérent.
