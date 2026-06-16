@@ -15,8 +15,8 @@
 - **Branche de travail : `refactor`** (partie de `develop` = `main`). **AUTO-PUSH autorisé par Alex**
   pour chaque split vérifié (voir §4). La branche n'est PAS déployée → review « plus tard ».
 - **État des branches au moment du handoff** :
-  - `develop` = `main` = **`b42ea05`** (déployé Render, `/health` 200) — **lot des 4 splits MERGÉ + déployé 2026-06-15** (ProfilePage/PlayGame/ArenaLaneSlot/ArenaBoard, device-test « fonctionnel » Alex avant merge).
-  - `refactor` = **`60139a1`** = `main` + **ArenaGame** (`60139a1`) seul — **1 split EN ATTENTE device-test** (isolé exprès au-dessus de main avant d'attaquer les 2 plus gros).
+  - `develop` = `main` = **`eb3a1d7`** (déployé Render, `/health` 200) — **5 splits MERGÉS + déployés 2026-06-15/16** (ProfilePage/PlayGame/ArenaLaneSlot/ArenaBoard puis **ArenaGame** `eb3a1d7`, tous device-test « fonctionnel » Alex avant merge).
+  - `refactor` = **`87bf410`** = `main` + **RankedGame** (split `16cc7ba` rename incomplet → complété `87bf410`) — **1 split EN ATTENTE device-test**. ⚠️ RankedGame = **EXCEPTION ASSUMÉE** : orchestrateur 1341 l (au-dessus du plafond 600), cœur timing/combat non extractible verbatim ; seul le sûr a été sorti (helpers/data/2 overlays + hooks usePickPhase/useV3BonusState).
 - **Workflow Alex** : il **build l'APK + teste sur son téléphone lui-même** ; toi tu codes + typecheck + build, tu pushes sur `refactor`, et le **merge vers `main` (= déploiement) attend son OK explicite** (voir §4 + §7).
 - **Les splits VERBATIM-mécaniques propres sont ÉPUISÉS.** Tout ce qui reste = **extraction soignée**
   (sortir des sous-composants/hooks d'un monolithe), pas du simple couper-coller. Voir §6.
@@ -174,8 +174,8 @@ Ordre recommandé (du moins au plus risqué). **Chacun exige un cycle device d'A
 | ~~`arena/ArenaLaneSlot.tsx`~~ | ~~859~~ | — | ✅ **FAIT + MERGÉ main** (`dde5505`, 6 fichiers, vrai Pattern B). |
 | ~~`arena/ArenaBoard.tsx`~~ | ~~862~~ | — | ✅ **FAIT + MERGÉ main** (`f151521`, 5 fichiers, mix A+B). |
 | ~~`arena/ArenaGame.tsx`~~ | ~~909~~ | — | ✅ **FAIT** (`60139a1`, 7 fichiers, orchestr. 597 ; hooks `useArenaIntent`+`useArenaForge` + `prepareResolveStart` pur + présentationnel `BoardFillSlot`/`HeroHitFlash`. Combat resolution intacte dans l'orchestrateur). **EN ATTENTE device-test** (sur `refactor`, isolé au-dessus de main). Décision Alex appliquée = 2 hooks focalisés faible-risque (PAS le hook combat). |
-| `match/LanesMatchView.tsx` | 1459 | élevé | Vue de match partagée (timing/sync). |
-| `ranked/RankedGame.tsx` | 1768 | élevé | **NEXT.** **Décision #2 (Alex)** : Plan A = extraire `useRankedMatch.ts` (~560 l, closures/timing les plus fragiles du repo) — **confirmer avant**. ⚠️ Même piège qu'ArenaGame : fichier logique-dense → présentationnel seul ne suffira pas pour <600, prévoir hooks focalisés. |
+| ~~`ranked/RankedGame.tsx`~~ | ~~1768~~ | — | ✅ **FAIT (EXCEPTION)** (`16cc7ba`+`87bf410`, 9 fichiers). Analyse multi-agents : <600 IMPOSSIBLE sans réécrire le cœur de résolution fragile (lecture battle.* périmée + setTimeout chains). Décision Alex = **passe verbatim sûre seulement** → orchestrateur **1341 l** (exception documentée), cœur intact via `git mv`. EN ATTENTE device-test. |
+| `match/LanesMatchView.tsx` | 1459 | élevé | **NEXT.** Vue de match partagée (timing/sync). Probablement même profil logique-dense → prévoir l'analyse multi-agents + hooks focalisés / exception. |
 | `pages/OnlinePage.tsx` | 2575 | TRÈS élevé | **Le plus gros du repo.** Sync WebSocket/reconnexion/watchdog. À faire en dernier, par étapes, watch Redis/logcat armé. |
 
 **Exemptés / décisions séparées :**
@@ -188,9 +188,9 @@ Ordre recommandé (du moins au plus risqué). **Chacun exige un cycle device d'A
 ---
 
 ## 7. ÉTAT MERGE / DÉPLOIEMENT
-- **2026-06-15 : lot des 4 splits (ProfilePage/PlayGame/ArenaLaneSlot/ArenaBoard) MERGÉ + DÉPLOYÉ** → `main` = `b42ea05`, `/health` 200. Device-test « fonctionnel » d'Alex obtenu avant le merge.
-- `refactor` (`60139a1`) porte désormais **ArenaGame seul** (`60139a1`), isolé au-dessus de main pour son propre device-test (c'est le moteur de match Pro + 2 hooks extraits → à valider en jouant une partie Pro avant de stacker RankedGame/OnlinePage). Après device-test OK →
-  FF-merge `refactor → develop → main` (commande en §4) + push → **Render redéploie automatiquement** depuis `main`.
+- **2026-06-15/16 : 5 splits MERGÉS + DÉPLOYÉS** → `main` = `eb3a1d7`, `/health` 200 (ProfilePage/PlayGame/ArenaLaneSlot/ArenaBoard puis ArenaGame, device-test « fonctionnel » Alex avant chaque merge ; APK device installée).
+- `refactor` (`87bf410`) porte désormais **RankedGame seul** (exception assumée 1341 l), isolé au-dessus de main pour son propre device-test (moteur de match Classé : valider une partie Classé complète — cf. §8.F — avant de stacker LanesMatchView/OnlinePage). Après device-test OK →
+  FF-merge `refactor → develop → main` (commande en §4) + push → **Render redéploie automatiquement** depuis `main`. ⚠️ Le split RankedGame est en **2 commits** (`16cc7ba` rename incomplet + `87bf410` complétion) — le `git add` avait avorté sur l'ancien chemin post-`git mv` ; le TIP est correct, l'intermédiaire `16cc7ba` seul ne compile pas (ne jamais checkout pile dessus).
 - ⚠️ Les splits client sont **100% frontend** : le redéploiement Render reconstruit un **binaire serveur identique**
   (zéro risque) ; le **vrai shipping du frontend = APK buildée localement par Alex**. Vérifier `/health` 200 après push
   (`curl https://rpsls-server-tptj.onrender.com/health`).
@@ -244,6 +244,14 @@ Jouer **une partie Pro complète** couvre les 2 hooks extraits + le combat (rest
 3. **Forge** : déposer une carte, fusionner, **récupérer** (gratuit pour un dépôt, −mana pour une fusion) → `useArenaForge`.
 4. **Lock → résolution** : preview adverse, défilé des steps, FX (impact/shake, heist, flash héros), exil des légendaires jouées, passage au tour suivant.
 5. **Fin** : KO ou mort subite → écran de fin, **Rejouer** (reset propre), forfait (burger) = défaite comptée.
+
+### 8.F — RankedGame (Constellation Classé — moteur de match, à valider AVANT merge)
+Jouer **une partie Classé complète** couvre les 2 hooks extraits (`usePickPhase` + `useV3BonusState`) + le cœur timing resté inline :
+1. **Picks** : poser/retirer les 3 moves RPSLS sur les lanes (FORCE/SAGESSE/RUSE) → `usePickPhase`.
+2. **Cartes bonus V3** : jouer Braise/Sablier/Cascade/Écho/Ancre/Gaïa/Mascarade/Genèse/etc. et vérifier que les chips d'état (mana bonus prochain round, stacks Braise, cascade armée…) s'affichent → `useV3BonusState`.
+3. **Lock → reveal → résolution** : suspense reveal, score des manches, **Riposte** (rejoue une lane perdue), **Mort subite** (égalité parfaite → duel).
+4. **Pause de manche / draw** : pioche, mana qui monte, look-ahead Boussole/Phare.
+5. **Fin de match** : récap des cartes, LP, rematch.
 
 ---
 
