@@ -1,0 +1,1 @@
+export { RankedGame } from "./RankedGame";

@@ -11,53 +11,47 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { motion } from "motion/react";
-import type { AiMood, Move } from "../engine/game";
-import { useStore } from "../store/store";
+import type { AiMood, Move } from "../../engine/game";
+import { useStore } from "../../store/store";
 import {
   resolveLanesRound,
   rpslsBeats,
   type RoundOutcome,
-} from "../engine/lanesEngine";
-import { detectPlayerCombo, shuffleLaneIdentities } from "../engine/lanesCombos";
-import { eclatsReward } from "../engine/economy";
+} from "../../engine/lanesEngine";
+import { detectPlayerCombo, shuffleLaneIdentities } from "../../engine/lanesCombos";
+import { eclatsReward } from "../../engine/economy";
 import {
   hapticLock, hapticMatchStart, hapticMatchWin, hapticMatchLoss,
   hapticTap, hapticWin, hapticLoss,
-} from "../haptic";
-import type { LanePlay, PlayerSlot } from "../online/online";
+} from "../../haptic";
+import type { LanePlay, PlayerSlot } from "../../online/online";
 import {
   RankedMatchView,
   type RankedMatchInfo,
   type RankedRoundData,
   type RankedRoundResultData,
   type RankedEndData,
-} from "./RankedMatchView";
+} from "../RankedMatchView";
 import {
   applyCardEffects, applyVortex, computeRoundBonuses, finalRoundWinner,
-} from "./rankedRules";
+} from "../rankedRules";
 import {
-  starterDeck, shuffle, drawN, HAND_CAP, STARTING_HAND, CARDS, discardRandom,
-  isPassiveCard,
-} from "./cards";
-import { cpuRankedDecision } from "./rankedAI";
+  shuffle, drawN, HAND_CAP, STARTING_HAND, CARDS, discardRandom,
+} from "../cards";
+import { cpuRankedDecision } from "../rankedAI";
 import type {
   CardId, CpuRoundDecision, LaneTarget, PlayedCard,
   RankedBattleState,
-} from "./rankedTypes";
+} from "../rankedTypes";
+import { makeBattle, pickSacrifice, nextRarityUp, removeFirst } from "./rankedGameHelpers";
+import { COUNTER_MOVE, BASE_CPU_HAND_POOL, STEALABLE_FROM_CPU } from "./rankedGameData";
+import { RiposteOverlay } from "./RiposteOverlay";
+import { SuddenDeathOverlay } from "./SuddenDeathOverlay";
+import { usePickPhase } from "./usePickPhase";
+import { useV3BonusState } from "./useV3BonusState";
 
 const LANE_COUNT = 3;
 const PICK_DEADLINE_MS = 20_000;
-
-/** Canonical RPSLS counters — used by Le Choix de Schrödinger to compute
- *  the "superposed" second move for each lane. */
-const COUNTER_MOVE: Record<Move, Move> = {
-  rock: "paper",
-  paper: "scissors",
-  scissors: "rock",
-  lizard: "rock",
-  spock: "lizard",
-};
 const ROUND_PAUSE_MS = 7_500;
 const REVEAL_SUSPENSE_MS = 1_400;
 const MATCH_FOUND_SPLASH_MS = 2_500;
@@ -69,75 +63,6 @@ const MAX_MANA = 4;
 const SUDDEN_DEATH_PRE_MS = 1_500;
 const SUDDEN_DEATH_POST_MS = 2_200;
 const SUDDEN_DEATH_DUEL_TIE_MS = 1_700;
-
-/** CPU's notional hand pool — the cards the AI may consider each round. The
- *  CPU doesn't track a real deck/hand, but we filter one-shots out across the
- *  match so it can't replay an epic/legendary it already played. */
-const BASE_CPU_HAND_POOL: CardId[] = [
-  "aegis", "surge", "augur", "curse", "precision", "riposte",
-  "heist", "tide", "vortex",
-  // Bonus Lot 1 actives the CPU can throw (passives are player-only).
-  "sangsue", "rempart", "trou-noir",
-  // V3 actives the CPU can also play (simpler effects only — anything
-  // requiring a player-side modal stays off the CPU's menu).
-  "sablier", "remanence", "braise", "crepuscule", "cascade",
-  "fardeau", "benediction",
-];
-
-/** Pool the player draws from when a successful Heist nets them a card. Heist
- *  itself is excluded (you can't steal someone's one-shot they've already
- *  burned). */
-const STEALABLE_FROM_CPU: CardId[] = [
-  "aegis", "surge", "augur", "curse", "precision", "riposte", "tide", "vortex",
-];
-
-function makeBattle(savedDeck?: string[]): RankedBattleState {
-  const cleaned = (savedDeck ?? []).filter(
-    (id): id is CardId => Object.prototype.hasOwnProperty.call(CARDS, id),
-  );
-  const source = cleaned.length > 0 ? cleaned : starterDeck();
-  // Passives are pulled OUT of the draw pile — they're always-on for the whole
-  // match and never enter the hand. Everything else is the shuffled draw deck.
-  const passives = source.filter(isPassiveCard);
-  const drawSource = source.filter((id) => !isPassiveCard(id));
-  return {
-    deck: shuffle(drawSource),
-    hand: [],
-    discard: [],
-    usedOneShotCards: [],
-    passives,
-    oppHandSize: STARTING_HAND,
-    roundWinsA: 0,
-    roundWinsB: 0,
-    roundsPlayed: 0,
-    bonusHistory: [],
-  };
-}
-
-/** Pick the lowest-rarity (then random) sacrificial card in a hand, excluding
- *  the card being played itself. Used by Métamorphose. */
-function pickSacrifice(hand: CardId[], exclude: CardId): CardId | null {
-  const pool = hand.filter((c) => c !== exclude);
-  if (pool.length === 0) return null;
-  const order: CardId[] = pool.slice().sort((a, b) => {
-    const ra = ["common", "rare", "epic", "legendary"].indexOf(CARDS[a].rarity);
-    const rb = ["common", "rare", "epic", "legendary"].indexOf(CARDS[b].rarity);
-    return ra - rb;
-  });
-  return order[0];
-}
-
-/** Rarity ladder: returns the rarity one tier above (legendary loops to itself
- *  per the design — sacrificing a legendary draws TWO of the same tier). */
-function nextRarityUp(r: "common" | "rare" | "epic" | "legendary"): "common" | "rare" | "epic" | "legendary" {
-  return r === "common" ? "rare" : r === "rare" ? "epic" : "legendary";
-}
-
-function removeFirst<T>(arr: T[], v: T): T[] {
-  const i = arr.indexOf(v);
-  if (i === -1) return arr;
-  return [...arr.slice(0, i), ...arr.slice(i + 1)];
-}
 
 export function RankedGame({
   winTo, opponentName = "CPU", onQuit, onMatchResult,
@@ -169,7 +94,7 @@ export function RankedGame({
 
   /* ──────────── State ──────────── */
   const [round, setRound] = useState<RankedRoundData | null>(null);
-  const [picks, setPicks] = useState<[Move | null, Move | null, Move | null]>([null, null, null]);
+  const { picks, setPicks, handlePickMove, handleClearLane } = usePickPhase();
   const [cardPlayed, setCardPlayed] = useState<PlayedCard | null>(null);
   /** Rolling log of every card actually played per side — used by the
    *  end-of-match "Cartes utilisées" recap so the player reads each card's
@@ -231,98 +156,25 @@ export function RankedGame({
   const compensationDrawNextRef = useRef(false);
   /** CPU one-shots burned this match — filtered out of BASE_CPU_HAND_POOL. */
   const cpuOneShotsRef = useRef<CardId[]>([]);
-  /** Mascarade (Bluff): when set, the NEXT round's CPU decision is computed
-   *  from an empty history so the hard AI can't read the player's habits —
-   *  the player's disinformation lands one round later (consumed at draw). */
-  const mascaradePoisonRef = useRef(false);
-  const [mascaradePoison, setMascaradePoisonState] = useState(false);
-  const setMascaradePoison = (b: boolean) => {
-    mascaradePoisonRef.current = b;
-    setMascaradePoisonState(b);
-  };
-
-  /* ──────────── V3 bonus-card state ──────────── */
-  /** Braise (Ember): once played, each subsequent ROUND LOST shaves 1 mana off
-   *  the cost of your next card (cumulative, min cost = 1). The discount is
-   *  reset to 0 every time a card is actually played. Ref + state mirror —
-   *  the ref lives across renders for synchronous logic; the state drives the
-   *  CardHand pip/playable display so the player SEES the discount. */
-  const braiseActiveRef = useRef(false);
-  const braiseStacksRef = useRef(0);
-  const [braiseStacks, setBraiseStacksState] = useState(0);
-  // Helper so the ref and the state never drift.
-  const setBraiseStacks = (n: number) => {
-    braiseStacksRef.current = n;
-    setBraiseStacksState(n);
-  };
-  /** Extra mana granted at the start of the NEXT round only — fed by Offre
-   *  (+2), Sablier (+1). Consumed in startNextRound. Ref + state mirror so
-   *  the UI can show "+N mana prochain round" as a chip. */
-  const bonusManaNextRoundRef = useRef(0);
-  const [bonusManaNext, setBonusManaNextState] = useState(0);
-  const setBonusManaNext = (n: number) => {
-    bonusManaNextRoundRef.current = n;
-    setBonusManaNextState(n);
-  };
-  /** Permanent mana-cap boost from Marchand d'Âmes (+3, repeatable). */
-  const manaMaxBoostRef = useRef(0);
-  /** Cascade armed this round: after resolve, fill hand to 3 on win / dump
-   *  hand on loss. Ref + state mirror for the chip. */
-  const cascadeArmedRef = useRef(false);
-  const [cascadeArmed, setCascadeArmedState] = useState(false);
-  const setCascadeArmed = (b: boolean) => {
-    cascadeArmedRef.current = b;
-    setCascadeArmedState(b);
-  };
-  /** Cascade just paid off: next round's draws are free (mana-discounted).
-   *  Implemented by clearing the cost of the first card played next round. */
-  const cascadeFreeNextRoundRef = useRef(false);
-  /** Écho temporel: if armed and the round ends in YOUR loss, the result is
-   *  rewritten as a draw — your card is refunded, no discard penalty. The
-   *  CPU isn't actually rewound (their cards are kept) — it's a "stop-loss". */
-  const echoActiveRef = useRef(false);
-  const [echoActive, setEchoActiveState] = useState(false);
-  const setEchoActive = (b: boolean) => {
-    echoActiveRef.current = b;
-    setEchoActiveState(b);
-  };
-  /** Ancre temporelle snapshot: state to restore if you lose the next 2 rounds.
-   *  Cleared if you win any of them. */
-  const anchorSnapshotRef = useRef<{
-    winsA: number; winsB: number;
-    hand: CardId[]; deck: CardId[]; discard: CardId[]; usedOneShotCards: CardId[];
-  } | null>(null);
-  /** Rounds left on the anchor watch (2 → 1 → 0). */
-  const anchorRoundsLeftRef = useRef(0);
-  const [anchorRoundsLeft, setAnchorRoundsLeftState] = useState(0);
-  const setAnchorRoundsLeft = (n: number) => {
-    anchorRoundsLeftRef.current = n;
-    setAnchorRoundsLeftState(n);
-  };
-  /** Anchor loss-streak counter — increments per loss while watching, restores at 2. */
-  const anchorLossStreakRef = useRef(0);
-  /** Gaïa (Bouclier de Gaïa): passive, charged at match start if equipped.
-   *  Consumed once per match the first time the round would be a loss. */
-  const gaiaChargedRef = useRef(false);
-  const [gaiaCharged, setGaiaChargedState] = useState(false);
-  const setGaiaCharged = (b: boolean) => {
-    gaiaChargedRef.current = b;
-    setGaiaChargedState(b);
-  };
-  /** Once-per-match limiter for Paradoxe Temporel. */
-  const paradoxeUsedRef = useRef(false);
-  /** Once-per-match limiter for Genèse. */
-  const genesisUsedRef = useRef(false);
-  /** Fardeau (Burden): force the CPU to play this card NEXT round (consumed). */
-  const fardeauNextCpuRef = useRef<CardId | null>(null);
-  /** Previous round's CPU picks — used by Rémanence to summon the ghost of the
-   *  opponent's last move on a chosen lane. */
-  const prevOppPicksRef = useRef<Move[] | null>(null);
-  /** Oracle Inverse (Mind Reader): the 3 random CPU-hand cards revealed this
-   *  round. Shown as a soft chip strip during pick phase. Cleared at next round. */
-  const [oppHandRevealed, setOppHandRevealed] = useState<CardId[] | null>(null);
-  /** Genèse pending reset — applied at the start of next round. */
-  const genesisPendingRef = useRef(false);
+  // État des cartes bonus V3 (+ Mascarade) extrait dans useV3BonusState :
+  // déclarations PURES (refs/states + setters combinés), destructurées ici aux
+  // MÊMES noms → le cœur de match (startNextRound/resolveAndAdvance/rematch)
+  // reste byte-identique. Le SÉQUENÇAGE des resets reste piloté ci-dessous.
+  const {
+    mascaradePoisonRef, mascaradePoison, setMascaradePoison,
+    braiseActiveRef, braiseStacksRef, braiseStacks, setBraiseStacks,
+    bonusManaNextRoundRef, bonusManaNext, setBonusManaNext,
+    manaMaxBoostRef,
+    cascadeArmedRef, cascadeArmed, setCascadeArmed,
+    cascadeFreeNextRoundRef,
+    echoActiveRef, echoActive, setEchoActive,
+    anchorSnapshotRef, anchorRoundsLeftRef, anchorRoundsLeft, setAnchorRoundsLeft,
+    anchorLossStreakRef,
+    gaiaChargedRef, gaiaCharged, setGaiaCharged,
+    paradoxeUsedRef, genesisUsedRef, fardeauNextCpuRef, prevOppPicksRef,
+    oppHandRevealed, setOppHandRevealed,
+    genesisPendingRef,
+  } = useV3BonusState();
 
   /* ──────────── Lifecycle ──────────── */
   useEffect(() => {
@@ -493,22 +345,6 @@ export function RankedGame({
 
   /* ──────────── Player actions ──────────── */
 
-  function handlePickMove(mv: Move) {
-    setPicks((cur) => {
-      const i = cur.findIndex((p) => p === null);
-      if (i === -1) return cur;
-      const next = cur.slice() as [Move | null, Move | null, Move | null];
-      next[i] = mv;
-      return next;
-    });
-  }
-  function handleClearLane(lane: LaneTarget) {
-    setPicks((cur) => {
-      const next = cur.slice() as [Move | null, Move | null, Move | null];
-      next[lane] = null;
-      return next;
-    });
-  }
   function handlePlayCard(card: PlayedCard) {
     setCardPlayed(card);
     if (card.id === "augur") {
@@ -1502,267 +1338,3 @@ export function RankedGame({
   );
 }
 
-/* ──────────── Riposte sub-phase UI ──────────── */
-
-import { MoveGlyph, MOVE_PALETTE } from "../icons";
-
-const LANE_LABEL = ["FORCE", "SAGESSE", "RUSE"] as const;
-const RANKED_MOVES: Move[] = ["rock", "paper", "scissors", "lizard", "spock"];
-
-function RiposteOverlay({
-  data,
-  onPick,
-}: {
-  data: { lane: LaneTarget; phase: "pick" | "reveal"; playerMove?: Move; cpuMove?: Move; flipped?: boolean };
-  onPick: (mv: Move) => void;
-}) {
-  const verdict = data.phase === "reveal" && data.playerMove && data.cpuMove
-    ? data.flipped ? "win"
-      : data.playerMove === data.cpuMove ? "draw"
-      : "loss"
-    : null;
-  return (
-    <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md px-4">
-      <div className="text-[10px] sm:text-xs uppercase tracking-[0.4em] text-amber-300 mb-1.5">
-        Riposte
-      </div>
-      <div className="text-2xl sm:text-3xl font-extrabold text-white mb-1 text-center">
-        Rejoue la lane {LANE_LABEL[data.lane]}
-      </div>
-      <div className="text-xs sm:text-sm text-ink-muted mb-6 max-w-xs text-center">
-        Gagne ce duel pour flipper la défaite en victoire.
-      </div>
-      {data.phase === "pick" && (
-        <div className="grid grid-cols-5 gap-2 w-full max-w-md">
-          {RANKED_MOVES.map((mv) => {
-            const pal = MOVE_PALETTE[mv];
-            return (
-              <button
-                key={mv}
-                onClick={() => onPick(mv)}
-                className={
-                  "aspect-[4/5] rounded-xl flex flex-col items-center justify-center gap-1 py-1.5 transition active:scale-92 " +
-                  "bg-gradient-to-br " + pal.from + " " + pal.to + " ring-2 " + pal.ring + " " + pal.glow +
-                  " text-zinc-900 shadow-md"
-                }
-              >
-                <MoveGlyph move={mv} className="w-7 h-7" />
-                <span className="text-[8px] uppercase tracking-wider font-bold leading-none">{mv}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {data.phase === "reveal" && data.playerMove && data.cpuMove && (
-        <div className="flex flex-col items-center gap-4">
-          <div className="flex items-center gap-6">
-            <div className="flex flex-col items-center gap-1">
-              <span className="text-[10px] uppercase tracking-wider text-emerald-300">Toi</span>
-              <div className={"w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br " +
-                MOVE_PALETTE[data.playerMove].from + " " + MOVE_PALETTE[data.playerMove].to +
-                " ring-2 " + MOVE_PALETTE[data.playerMove].ring}>
-                <MoveGlyph move={data.playerMove} className="w-9 h-9" />
-              </div>
-            </div>
-            <div className="text-3xl font-black text-ink-faint">vs</div>
-            <div className="flex flex-col items-center gap-1">
-              <span className="text-[10px] uppercase tracking-wider text-rose-300">CPU</span>
-              <div className={"w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br " +
-                MOVE_PALETTE[data.cpuMove].from + " " + MOVE_PALETTE[data.cpuMove].to +
-                " ring-2 " + MOVE_PALETTE[data.cpuMove].ring}>
-                <MoveGlyph move={data.cpuMove} className="w-9 h-9" />
-              </div>
-            </div>
-          </div>
-          <div className={
-            "text-xl sm:text-2xl font-black " +
-            (verdict === "win" ? "text-emerald-300" :
-             verdict === "loss" ? "text-rose-300" : "text-ink-muted")
-          }>
-            {verdict === "win" ? "Lane flippée — victoire !"
-              : verdict === "loss" ? "Riposte perdue, défaite conservée."
-              : "Égalité — la défaite reste."}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ──────────── Sudden-death sub-phase UI ──────────── */
-
-function SuddenDeathOverlay({
-  data,
-  onPick,
-}: {
-  data: { phase: "pick" | "reveal"; round: number; playerMove?: Move; cpuMove?: Move; winner?: "a" | "b" | null };
-  onPick: (mv: Move) => void;
-}) {
-  const verdict = data.phase === "reveal"
-    ? data.winner === "a" ? "win" : data.winner === "b" ? "loss" : "draw"
-    : null;
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.22 }}
-      className="fixed inset-0 z-40 flex flex-col items-center justify-center backdrop-blur-md px-4 overflow-hidden"
-    >
-      {/* Dramatic backdrop: throbbing red/gold radial that signals high
-       *  stakes. The blackout layer fades in over it so the rest of the UI
-       *  reads "frozen" but the duel arena reads "alive". */}
-      <motion.div
-        aria-hidden
-        className="absolute inset-0 pointer-events-none"
-        animate={{
-          background: [
-            "radial-gradient(60% 50% at 50% 50%, rgba(244,63,94,0.55) 0%, rgba(0,0,0,0.92) 70%)",
-            "radial-gradient(72% 60% at 50% 50%, rgba(251,191,36,0.55) 0%, rgba(0,0,0,0.92) 70%)",
-            "radial-gradient(60% 50% at 50% 50%, rgba(244,63,94,0.55) 0%, rgba(0,0,0,0.92) 70%)",
-          ],
-        }}
-        transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
-      />
-      {/* Lightning spark layer — 6 thin rays converging from the edges,
-       *  each rotating + fading on its own period. Pure decoration; pointer-
-       *  events-none so it never blocks the picker below. */}
-      <div className="absolute inset-0 pointer-events-none" aria-hidden>
-        {[0, 60, 120, 180, 240, 300].map((deg, i) => (
-          <motion.div
-            key={deg}
-            className="absolute top-1/2 left-1/2 origin-left"
-            style={{
-              width: "55vw", height: 2,
-              background: "linear-gradient(90deg, rgba(252,211,77,0.0) 0%, rgba(252,211,77,0.85) 60%, rgba(244,63,94,0.95) 100%)",
-              transform: `rotate(${deg}deg)`,
-              filter: "blur(0.5px)",
-            }}
-            animate={{ opacity: [0, 0.9, 0], scaleX: [0.2, 1.05, 0.2] }}
-            transition={{ duration: 1.8, repeat: Infinity, delay: i * 0.15, ease: "easeOut" }}
-          />
-        ))}
-      </div>
-      {/* Title — bigger, with a continuous wobble to signal "live event". */}
-      <motion.div
-        initial={{ scale: 0.4, opacity: 0, rotate: -6 }}
-        animate={{
-          scale: [0.4, 1.25, 1, 1.04, 1],
-          opacity: 1,
-          rotate: [-6, 5, 0, -2, 0],
-        }}
-        transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
-        className="relative text-4xl sm:text-6xl font-black tracking-[0.14em] mb-1.5 text-center bg-gradient-to-br from-amber-300 via-rose-400 to-fuchsia-400 bg-clip-text text-transparent"
-        style={{ filter: "drop-shadow(0 2px 22px rgba(244,63,94,0.75))" }}
-      >
-        ⚡ MORT SUBITE ⚡
-      </motion.div>
-      <motion.div
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.45, duration: 0.3 }}
-        className="relative text-xs sm:text-sm text-amber-200/90 mb-6 max-w-xs text-center font-bold tracking-wider"
-      >
-        Match point des deux côtés — un seul coup décide tout.
-      </motion.div>
-      {data.phase === "pick" && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.65, duration: 0.3 }}
-          className="relative grid grid-cols-5 gap-2 w-full max-w-md"
-        >
-          {RANKED_MOVES.map((mv, i) => {
-            const pal = MOVE_PALETTE[mv];
-            return (
-              <motion.button
-                key={mv}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.55 + i * 0.05, duration: 0.2 }}
-                onClick={() => onPick(mv)}
-                className={
-                  "aspect-[4/5] rounded-xl flex flex-col items-center justify-center gap-1 py-1.5 transition active:scale-92 " +
-                  "bg-gradient-to-br " + pal.from + " " + pal.to + " ring-2 " + pal.ring + " " + pal.glow +
-                  " text-zinc-900 shadow-md"
-                }
-              >
-                <MoveGlyph move={mv} className="w-7 h-7" />
-                <span className="text-[8px] uppercase tracking-wider font-bold leading-none">{mv}</span>
-              </motion.button>
-            );
-          })}
-        </motion.div>
-      )}
-      {data.phase === "reveal" && data.playerMove && data.cpuMove && (
-        <div className="flex flex-col items-center gap-4">
-          <div className="flex items-center gap-6">
-            <motion.div
-              initial={{ opacity: 0, x: -20, scale: 0.7 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              transition={{ duration: 0.25 }}
-              className="flex flex-col items-center gap-1"
-            >
-              <span className="text-[10px] uppercase tracking-wider text-emerald-300">Toi</span>
-              <div className={"w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br " +
-                MOVE_PALETTE[data.playerMove].from + " " + MOVE_PALETTE[data.playerMove].to +
-                " ring-2 " + MOVE_PALETTE[data.playerMove].ring}>
-                <MoveGlyph move={data.playerMove} className="w-9 h-9" />
-              </div>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: [0.5, 1.3, 1] }}
-              transition={{ delay: 0.15, duration: 0.35 }}
-              className="text-3xl font-black text-ink-faint"
-            >
-              vs
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, x: 20, scale: 0.7 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              transition={{ duration: 0.25 }}
-              className="flex flex-col items-center gap-1"
-            >
-              <span className="text-[10px] uppercase tracking-wider text-rose-300">CPU</span>
-              <div className={"w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br " +
-                MOVE_PALETTE[data.cpuMove].from + " " + MOVE_PALETTE[data.cpuMove].to +
-                " ring-2 " + MOVE_PALETTE[data.cpuMove].ring}>
-                <MoveGlyph move={data.cpuMove} className="w-9 h-9" />
-              </div>
-            </motion.div>
-          </div>
-          <motion.div
-            key={verdict ?? "none"}
-            initial={{ opacity: 0, scale: 0.6, y: 8 }}
-            animate={{
-              opacity: 1,
-              scale: verdict === "draw" ? 1 : [0.6, 1.25, 1],
-              y: 0,
-              x: verdict === "win" ? [0, -3, 3, -2, 2, 0] : verdict === "loss" ? [0, 2, -2, 1, -1, 0] : 0,
-            }}
-            transition={{ delay: 0.35, duration: verdict === "draw" ? 0.25 : 0.5, type: "spring", stiffness: 240, damping: 14 }}
-            className={
-              "text-xl sm:text-3xl font-black tracking-wide text-center px-3 py-1 rounded-lg " +
-              (verdict === "win"
-                ? "text-emerald-200 bg-emerald-500/15 ring-1 ring-emerald-400/40"
-                : verdict === "loss"
-                ? "text-rose-200 bg-rose-500/15 ring-1 ring-rose-400/40"
-                : "text-ink-muted")
-            }
-            style={
-              verdict === "win"
-                ? { filter: "drop-shadow(0 0 18px rgba(52,211,153,0.55))" }
-                : verdict === "loss"
-                ? { filter: "drop-shadow(0 0 14px rgba(244,63,94,0.45))" }
-                : undefined
-            }
-          >
-            {verdict === "win" ? "Tu remportes la manche !"
-              : verdict === "loss" ? "Manche perdue en mort subite."
-              : "Encore égalité — on rejoue !"}
-          </motion.div>
-        </div>
-      )}
-    </motion.div>
-  );
-}
