@@ -15,8 +15,8 @@
 - **Branche de travail : `refactor`** (partie de `develop` = `main`). **AUTO-PUSH autorisé par Alex**
   pour chaque split vérifié (voir §4). La branche n'est PAS déployée → review « plus tard ».
 - **État des branches au moment du handoff** :
-  - `develop` = `main` = **`eb3a1d7`** (déployé Render, `/health` 200) — **5 splits MERGÉS + déployés 2026-06-15/16** (ProfilePage/PlayGame/ArenaLaneSlot/ArenaBoard puis **ArenaGame** `eb3a1d7`, tous device-test « fonctionnel » Alex avant merge).
-  - `refactor` = **`87bf410`** = `main` + **RankedGame** (split `16cc7ba` rename incomplet → complété `87bf410`) — **1 split EN ATTENTE device-test**. ⚠️ RankedGame = **EXCEPTION ASSUMÉE** : orchestrateur 1341 l (au-dessus du plafond 600), cœur timing/combat non extractible verbatim ; seul le sûr a été sorti (helpers/data/2 overlays + hooks usePickPhase/useV3BonusState).
+  - `develop` = `main` = **`41c74b2`** (déployé Render, `/health` 200) — **6 splits MERGÉS + déployés 2026-06-15/16** : ProfilePage/PlayGame/ArenaLaneSlot/ArenaBoard/ArenaGame, puis **RankedGame** `41c74b2` (exception assumée 1341 l), tous device-test « fonctionnel » Alex avant merge.
+  - `refactor` = **`06b6206`** = `main` + **LanesMatchView** (`06b6206`) — **1 split EN ATTENTE device-test**. ✅ PAS d'exception : fichier JSX-dense → split présentationnel pur (types/data + atomes + 3 stages + HelpModal), orchestrateur **235 l (<400)**, timing fragile (TimerBar interval / RevealStage cascade) parti VERBATIM avec son composant. Fichiers feuilles créés via workflow d'extraction parallèle (10 agents), diff verbatim propre (seule perte = 1 commentaire vestigial AmbientFlavor).
 - **Workflow Alex** : il **build l'APK + teste sur son téléphone lui-même** ; toi tu codes + typecheck + build, tu pushes sur `refactor`, et le **merge vers `main` (= déploiement) attend son OK explicite** (voir §4 + §7).
 - **Les splits VERBATIM-mécaniques propres sont ÉPUISÉS.** Tout ce qui reste = **extraction soignée**
   (sortir des sous-composants/hooks d'un monolithe), pas du simple couper-coller. Voir §6.
@@ -175,8 +175,8 @@ Ordre recommandé (du moins au plus risqué). **Chacun exige un cycle device d'A
 | ~~`arena/ArenaBoard.tsx`~~ | ~~862~~ | — | ✅ **FAIT + MERGÉ main** (`f151521`, 5 fichiers, mix A+B). |
 | ~~`arena/ArenaGame.tsx`~~ | ~~909~~ | — | ✅ **FAIT** (`60139a1`, 7 fichiers, orchestr. 597 ; hooks `useArenaIntent`+`useArenaForge` + `prepareResolveStart` pur + présentationnel `BoardFillSlot`/`HeroHitFlash`. Combat resolution intacte dans l'orchestrateur). **EN ATTENTE device-test** (sur `refactor`, isolé au-dessus de main). Décision Alex appliquée = 2 hooks focalisés faible-risque (PAS le hook combat). |
 | ~~`ranked/RankedGame.tsx`~~ | ~~1768~~ | — | ✅ **FAIT (EXCEPTION)** (`16cc7ba`+`87bf410`, 9 fichiers). Analyse multi-agents : <600 IMPOSSIBLE sans réécrire le cœur de résolution fragile (lecture battle.* périmée + setTimeout chains). Décision Alex = **passe verbatim sûre seulement** → orchestrateur **1341 l** (exception documentée), cœur intact via `git mv`. EN ATTENTE device-test. |
-| `match/LanesMatchView.tsx` | 1459 | élevé | **NEXT.** Vue de match partagée (timing/sync). Probablement même profil logique-dense → prévoir l'analyse multi-agents + hooks focalisés / exception. |
-| `pages/OnlinePage.tsx` | 2575 | TRÈS élevé | **Le plus gros du repo.** Sync WebSocket/reconnexion/watchdog. À faire en dernier, par étapes, watch Redis/logcat armé. |
+| ~~`match/LanesMatchView.tsx`~~ | ~~1459~~ | — | ✅ **FAIT** (`06b6206`, 12 fichiers, présentationnel pur, orchestrateur 235 <400, PAS d'exception). EN ATTENTE device-test. Analyse multi-agents → JSX-dense ; extraction des feuilles via workflow parallèle (10 agents) + orchestrateur/barrel à la main. |
+| `pages/OnlinePage.tsx` | 2575 | TRÈS élevé | **DERNIER. NEXT.** Le plus gros du repo. Sync WebSocket/reconnexion/watchdog. Lancer l'analyse multi-agents d'abord (probable logique-dense → exception possible), watch Redis/logcat armé pour le device-test. |
 
 **Exemptés / décisions séparées :**
 - `i18n/locales/*.ts` (en/fr/es/it/de/pt/ru/tr, ~740-1140 l chacun) = **fichiers DATA → EXEMPTS** du refactor.
