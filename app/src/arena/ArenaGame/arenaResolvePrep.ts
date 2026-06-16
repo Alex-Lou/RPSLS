@@ -37,16 +37,21 @@ export function prepareResolveStart(board: BoardState, intent: TurnIntent, cpuIn
   const bSpent = removeSpentCardsDetailed(board.b.hand, safeCpuIntent);
   // ÉCONOMIE expert (Alex 2026-06-13) : les LÉGENDAIRES jouées sont EXILÉES
   // (jamais reshufflées → 1 usage/partie, elles redeviennent des MOMENTS).
+  // Idem les cartes de FUSION (Alex 2026-06-16) : forgées en partie, jouées
+  // une fois puis exilées — il faut re-forger la recette pour les rejouer.
+  // Sinon elles recyclaient via la défausse et réapparaissaient chaque tour
+  // (kind:"fusion" est déjà exclu des decks/draft, cf. isDeckable).
   // Le reste recycle via la défausse comme avant. L'exil sanctionne le CAST
   // — une légendaire défaussée sans être jouée (Juge) recycle normalement.
+  const isOneShot = (c: CardId) => CARDS[c]?.rarity === "legendary" || CARDS[c]?.kind === "fusion";
   const splitSpent = (spent: CardId[]) => ({
-    toDiscard: spent.filter((c) => CARDS[c]?.rarity !== "legendary"),
-    toExile: spent.filter((c) => CARDS[c]?.rarity === "legendary"),
+    toDiscard: spent.filter((c) => !isOneShot(c)),
+    toExile: spent.filter((c) => isOneShot(c)),
   });
   const aSplit = splitSpent(aSpent.spent);
   const bSplit = splitSpent(bSpent.spent);
-  if (aSplit.toExile.length > 0) alog("hand", `a EXIL légendaire : [${aSplit.toExile.join(",")}] (1 usage par partie)`);
-  if (bSplit.toExile.length > 0) alog("hand", `b EXIL légendaire : [${bSplit.toExile.join(",")}] (1 usage par partie)`);
+  if (aSplit.toExile.length > 0) alog("hand", `a EXIL [${aSplit.toExile.join(",")}] (légendaire/fusion, 1 usage par partie)`);
+  if (bSplit.toExile.length > 0) alog("hand", `b EXIL [${bSplit.toExile.join(",")}] (légendaire/fusion, 1 usage par partie)`);
   const startBoard: BoardState = {
     ...board,
     a: { ...board.a, hand: aSpent.hand, discard: [...board.a.discard, ...aSplit.toDiscard], exiled: [...board.a.exiled, ...aSplit.toExile] },
