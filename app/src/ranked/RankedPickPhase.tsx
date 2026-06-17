@@ -13,6 +13,7 @@ import { hapticAlert, hapticTap } from "../haptic";
 import { hapticTick, PickShock } from "../match/sharedMatchUI";
 import { useT } from "../i18n";
 import { LanesBoard } from "./LanesBoard";
+import { BoardFillSlot } from "../arena/ArenaGame/BoardFillSlot";
 import { CardHand } from "./CardHand";
 import { ManaBar } from "./ManaBar";
 import { CARDS } from "./cards";
@@ -159,7 +160,7 @@ export function RankedPickPhase({
   })();
 
   return (
-    <div className="w-full flex flex-col items-center gap-1.5 sm:gap-3 pb-2 sm:pb-3">
+    <div className="w-full flex-1 min-h-0 flex flex-col items-center gap-1.5 sm:gap-3 pb-2 sm:pb-3">
       {showTimer && <TimerBar startedAt={startedAt} durationMs={deadlineMs} />}
 
       {/* Targeting hint — rendered in a FIXED-height slot (always reserved)
@@ -187,26 +188,32 @@ export function RankedPickPhase({
         </AnimatePresence>
       </div>
 
-      {/* Board — natural height; the parent stage scrolls if the whole pick
-          phase exceeds the viewport, so nothing gets clipped. */}
-      <div className="w-full flex items-center justify-center">
-        <LanesBoard
-          youName={youName}
-          opponentName={opponentName}
-          picks={picks}
-          oppPicks={null}
-          augurRevealed={augurRevealed}
-          oracleRevealed={oracleRevealed}
-          myCard={cardPlayed}
-          oppCard={null}
-          mode="picking"
-          oppHandSize={oppHandSize}
-          compassPeek={compassRevealed}
-          onLaneClick={handleMyLaneTap}
-          onOppLaneClick={handleOppLaneTap}
-          augurTargeting={isAugurTargeting || isOracleTargeting}
-        />
-      </div>
+      {/* Board — figé par BoardFillSlot : il mesure la hauteur dispo et la pose
+          en px sur le board (cadre fixe comme en Pro). Le board est DANS le slot
+          mesuré ; le mobilier (chips/mana/main/picker/Lock) reste DEHORS, en
+          siblings sous lui → leur apparition/disparition ne re-scale plus tout
+          l'écran (fix du pad qui « paniquait »). */}
+      <BoardFillSlot>
+        {(slotH) => (
+          <LanesBoard
+            fillHeight={slotH}
+            youName={youName}
+            opponentName={opponentName}
+            picks={picks}
+            oppPicks={null}
+            augurRevealed={augurRevealed}
+            oracleRevealed={oracleRevealed}
+            myCard={cardPlayed}
+            oppCard={null}
+            mode="picking"
+            oppHandSize={oppHandSize}
+            compassPeek={compassRevealed}
+            onLaneClick={handleMyLaneTap}
+            onOppLaneClick={handleOppLaneTap}
+            augurTargeting={isAugurTargeting || isOracleTargeting}
+          />
+        )}
+      </BoardFillSlot>
 
       {/* Strip: Boussole reveal + passives + Oracle Inverse peek + Braise
           discount + cross-round V3 effects. Every chip is a compact pill so

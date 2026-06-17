@@ -236,21 +236,14 @@ export function RankedMatchView({
         </div>
       )}
 
-      {/* ScaleToFit guarantees the IN-MATCH phases (board + cards + picker +
-          LOCK) always fit the available height — the player NEVER scrolls to
-          reach the Lock button; it shrinks uniformly on short screens
-          instead. Only mounted during the active gameplay phases. */}
-      {phase !== "match-end" && (
-      <ScaleToFit className="relative">
-        <div className="w-full flex flex-col items-center py-1">
-        {phase === "matched" && !showSplash && (
-          <div className="flex flex-col items-center gap-3 max-w-sm px-4">
-            <div className="text-sm text-ink-muted">{t("lanes.preparingFirstRound")}</div>
-            <LoadingTip category="strategy" rotateMs={4000} className="justify-center text-center" />
-          </div>
-        )}
-
-        {phase === "picking" && round && (
+      {/* PICK PHASE — gère SA PROPRE hauteur (hors ScaleToFit). Le board est
+          enveloppé dans BoardFillSlot (cadre fixe, scale-down seulement s'il
+          déborde) et le mobilier (chips/mana/main/picker/Lock) reste DEHORS du
+          slot mesuré — même découpe qu'en Constellation Pro (ArenaGame). Ça
+          empêche tout le sous-arbre de se re-scaler (« le pad panique ») quand
+          des chips apparaissent/disparaissent en cours de manche. */}
+      {phase === "picking" && round && (
+        <div className="relative flex-1 min-h-0 w-full flex flex-col">
           <RankedPickPhase
             youName={nickname}
             opponentName={match.opponent}
@@ -278,6 +271,19 @@ export function RankedMatchView({
             onLock={onLock}
             revealAugurFor={revealAugurFor}
           />
+        </div>
+      )}
+
+      {/* MATCHED + REVEAL gardent ScaleToFit — contenu à hauteur quasi-statique
+          qui doit juste ne jamais déborder le score/Lock sur petit écran. */}
+      {(phase === "matched" || phase === "reveal") && (
+      <ScaleToFit className="relative">
+        <div className="w-full flex flex-col items-center py-1">
+        {phase === "matched" && !showSplash && (
+          <div className="flex flex-col items-center gap-3 max-w-sm px-4">
+            <div className="text-sm text-ink-muted">{t("lanes.preparingFirstRound")}</div>
+            <LoadingTip category="strategy" rotateMs={4000} className="justify-center text-center" />
+          </div>
         )}
 
         {phase === "reveal" && lastResult && !revealReady && <RevealCountdown />}

@@ -59,23 +59,33 @@ export interface LanesBoardProps {
   onLaneClick?: (lane: LaneTarget) => void;
   onOppLaneClick?: (lane: LaneTarget) => void;
   augurTargeting?: boolean;
+  /** When provided (the pick phase wraps the board in BoardFillSlot), the board
+   *  pins itself to this measured px height and centres its content — a fixed
+   *  frame like Constellation Pro, so chips appearing/disappearing below no
+   *  longer make the layout rescale. Omitted (reveal phase, default) → natural
+   *  height, identical to before. */
+  fillHeight?: number;
 }
 
 export function LanesBoard({
   youName, opponentName,
   picks, oppPicks, augurRevealed, oracleRevealed,
   myCard, oppCard, mode, laneResults, oppHandSize, compassPeek,
-  onLaneClick, onOppLaneClick, augurTargeting = false,
+  onLaneClick, onOppLaneClick, augurTargeting = false, fillHeight,
 }: LanesBoardProps) {
   // The pad is the player's own — unless a coin-flipped arena overrides it
   // for this duel (see ranked/arena.tsx).
   const padId = useArenaPad(useStore((s) => s.player.padId));
   return (
     <div
-      className="relative w-full max-w-2xl rounded-2xl overflow-hidden
-                 border border-emerald-900/40
-                 shadow-[inset_0_0_36px_rgba(0,0,0,0.55)]
-                 [@media(max-height:560px)]:max-w-md"
+      className={
+        "relative w-full max-w-2xl rounded-2xl overflow-hidden " +
+        "border border-emerald-900/40 " +
+        "shadow-[inset_0_0_36px_rgba(0,0,0,0.55)] " +
+        "[@media(max-height:560px)]:max-w-md" +
+        (fillHeight ? " flex flex-col justify-center" : "")
+      }
+      style={fillHeight ? { minHeight: fillHeight } : undefined}
     >
       {/* Battle-pad backdrop — the user-chosen pad IS the visible surface the
           lanes sit on. Fully opaque so the chosen theme actually shows. */}
