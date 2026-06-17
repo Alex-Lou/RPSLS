@@ -9,6 +9,20 @@
 
 ---
 
+## ✅ AVANCEMENT (session 2026-06-17, branche `feat/gameplay-polish`)
+
+> 3 fixes device-testés OK par Alex (sur goya `CMJFT4IN6HFYA6OV`) + audit multi-agents « intact », **commités + poussés**. **Merge `main` (= déploiement Render) en attente du « oui » explicite d'Alex.**
+
+- **[Pro-26]** ✅ FAIT (`ffb5b89`) — exil au cast des cartes `kind:"fusion"` (`arenaResolvePrep.ts`, helper `isOneShot`). Ne réapparaissent plus chaque tour ; re-forger pour rejouer.
+- **[Pro-22/30]** ✅ FAIT (`6ae542e`) — décision Alex « **empêcher le miroir** » : le CPU tire une Voie ≠ joueur (`ArenaGame.tsx`, filtre dans l'init `useRef` ; couvre init + rematch).
+- **[Ranked-1]** ✅ FAIT (`679689a`) — port `BoardFillSlot` au Classé (cadre fixe, le pad ne « panique » plus). Layout-only : `LanesBoard` (prop `fillHeight`), `RankedPickPhase` (board dans `BoardFillSlot`, mobilier en siblings), `RankedMatchView` (phase pick sortie de `ScaleToFit`). Moteur de résolution intact (audit 3 agents).
+- **[Pro-20/25]** ✅ RÉSOLU sans code — déjà corrigé avant le refactor (`e809702` « toucher tap=jouer ») ; l'entrée décrivait un état périmé. Confirmé device par Alex.
+- **[Pro-3]** ✅ DÉJÀ FAIT (vérifié) — Razzia (vol forge) + récup fusion = 1 mana câblés. Bémol noté : le CPU ne joue pas Razzia → menace de vol online-only ; enhancement CPU optionnel **non demandé** par Alex (à reproposer si besoin).
+- **[Ranked-3]** ✅ CONFIRMÉ (Option A) — règle gardée : la carte quitte la main à l'usage ; communes/rares recyclent via la défausse ; épiques/légendaires = usage unique. La sous-question « fusion always-exile » = couverte par Pro-26.
+- **[Pro-9]** (livre de recettes) & **[Pro-10/11]** (Télépathie/Prophétie « live ») → **DÉFÉRÉS** (gros, multi-session, dépendent de l'online §7 / éco). ⚠️ Pro-10/11 sont des cartes **du Classé** (pas du Pro) ; la version « révélation live » n'a de sens qu'**en online** (pas branché).
+
+---
+
 ## 0. AVANT DE CODER — règles & workflow (lire en entier)
 
 - **🔒 RÈGLES DE CODE D'ALEX (dans `~/.claude/CLAUDE.md` global, chargées auto — ELLES PRIMENT SUR TOUT).** À appliquer par défaut : **SOLID / SRP, DRY-avec-prudence** (ne pas factoriser prématurément 2 codes qui divergeront), **KISS / YAGNI**, fail-fast ; **séparer UI / logique métier / API / persistance / auth / config** (ne jamais mélanger métier et technique) ; modules petits/cohérents/testables, **< 400 lignes idéal** (dispatch en dossiers) ; sécurité (jamais confiance aux entrées, échapper l'affiché, moindre privilège, pas de secrets loggés) ; **NE TOUCHE PAS au code non lié** (note-le en fin, ne le modifie pas). **Demande, ne suppose pas** : confirme toute ambiguïté/tension AVANT de coder. Règle de décision (plusieurs solutions) : 1) la plus sûre, 2) la plus simple, 3) la plus lisible, 4) la plus testable, 5) la plus évolutive. **Commits SANS trace IA** (pas de Co-Authored-By/🤖, auteur = Alex, messages FR conventional). **Finis chaque tâche** par : Fichiers modifiés / Ce qui a changé / Fichiers intentionnellement non touchés / Suivi nécessaire.
