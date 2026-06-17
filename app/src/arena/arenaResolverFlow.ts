@@ -98,13 +98,20 @@ export interface ResolverFlowArgs {
 export const REVEAL_MS = 1_500;
 export const SPELLS_MS = 1_200;
 export const SUMMONS_MS = 1_000;
-export const COMBAT_MS = 3_000;
+// COMBAT_MS = délai avant le SETTLE, compté depuis le DÉBUT du combat. DOIT être
+// ≥ la durée réelle des 3 lanes re-timées (≈ 3*LANE_CHARGE + 3*LANE_PAUSE + 100
+// ≈ 3220ms) sinon le SETTLE coupe la 3e lane. Audit anim 2026-06-17 : 3000→3600.
+export const COMBAT_MS = 3_600;
 export const SETTLE_MS = 1_500;
-// Round 9 fix Alex point #1 : anim attaque lane lag un peu — accélération
-// du charge (520→380ms) + pause inter-lane (320→200ms). Plus snappy sans
-// sacrifier la lisibilité du combat.
-const LANE_CHARGE_MS = 380;
-const LANE_PAUSE_MS = 200;
+// Audit anim 2026-06-17 (Build A) — refonte du rythme de combat. Le beat d'une
+// lane DOIT être ≥ la durée de la charge (720ms, CreatureSlot) sinon le slam est
+// COUPÉ à mi-course (~53%) et la lane suivante s'empile par-dessus = le
+// « chevauchement/trop rapide » signalé. 380→560 (l'apex du slam ≈308ms tombe
+// sur LANE_CHARGE_MS*0.55) ; pause inter-lane 200→480 pour que la traîne
+// (dmgPop/hitShake) d'une lane retombe AVANT que la suivante charge. Objectif :
+// un seul échange lisible à la fois.
+const LANE_CHARGE_MS = 560;
+const LANE_PAUSE_MS = 480;
 // Alex 2026-06-12 : pause sur le board final (coup fatal + HP à 0 visibles)
 // AVANT d'afficher l'écran victoire/défaite — sinon la bascule est trop brusque
 // juste après le combat de la 3e lane.
@@ -248,9 +255,12 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
               const bypass = findAntiTauntBypass("b");
               if (bypass) setAntiTaunt({ bypassedSide: "b", rockLane: bypass.rockLane, cause: bypass.cause, key: Date.now() });
               setHeroHit({ side: "opp", lane: laneIdx, key: Date.now() });
-              // IMPACT FX si coup PUISSANT (≥4) ou FATAL au héros adverse.
+              // IMPACT FX plein-écran RÉSERVÉ au coup FATAL (Audit anim Build A).
+              // Avant : ≥4 dégâts le déclenchait → 1-3 entailles plein-écran +
+              // screenShake cumulé au padShake PAR TOUR = « mush/instable ». Le
+              // feedback normal passe par la signature par-move (cue de lane).
               const dmgB = splashAtoB > 0 ? splashAtoB : atkA;
-              const powB = b.b.hp - dmgB <= 0 ? "fatal" : dmgB >= 4 ? "strong" : null;
+              const powB = b.b.hp - dmgB <= 0 ? "fatal" : null;
               if (powB && lane.a && setImpactFX) setImpactFX({ move: lane.a.move, power: powB, key: Date.now() });
             }
             if (aDeflectorLane !== null) {
@@ -260,7 +270,7 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
               if (bypass) setAntiTaunt({ bypassedSide: "a", rockLane: bypass.rockLane, cause: bypass.cause, key: Date.now() + 1 });
               setHeroHit({ side: "you", lane: laneIdx, key: Date.now() + 1 });
               const dmgA = splashBtoA > 0 ? splashBtoA : atkB;
-              const powA = b.a.hp - dmgA <= 0 ? "fatal" : dmgA >= 4 ? "strong" : null;
+              const powA = b.a.hp - dmgA <= 0 ? "fatal" : null; // plein-écran fatal-only (Audit anim Build A)
               if (powA && lane.b && setImpactFX) setImpactFX({ move: lane.b.move, power: powA, key: Date.now() + 1 });
             }
           }, LANE_CHARGE_MS * 0.55);
