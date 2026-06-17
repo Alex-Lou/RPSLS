@@ -120,13 +120,21 @@ const VICTORY_REVEAL_MS = 1_600;
 /** Run the sequenced resolver. Schedules a chain of setTimeouts that drive
  *  the visual flow. Returns nothing — the caller's React state is the only
  *  observable side-effect. */
-export function runResolverFlow(args: ResolverFlowArgs): void {
+export function runResolverFlow(args: ResolverFlowArgs): () => void {
   const {
     startBoard, playerIntent, cpuIntent,
     setBoard, setOppPreview, setPlayerPreview, setResolveStep,
     setCombatLane, setHeroHit, setTauntBlock, setAntiTaunt, setSpellFX, setImpactFX,
     onSettle, onAdvanceTurn, onMatchEnd,
   } = args;
+
+  // Annulation (Audit anim Build A — fuite mémoire). Le résolveur programme une
+  // chaîne de setTimeout sur ~9s ; si le joueur forfait/quitte/rematch ou que le
+  // composant se démonte PENDANT, la chaîne continuait (setState post-unmount +
+  // onAdvanceTurn/onMatchEnd pouvait RELANCER une partie quittée). Flag `aborted`
+  // vérifié en tête de CHAQUE callback → la chaîne s'arrête net. runResolverFlow
+  // renvoie un cancel() que ArenaGame appelle au unmount / forfait.
+  let aborted = false;
 
   // ─── Step 0: REVEAL ───
   setOppPreview(cpuIntent);
@@ -135,6 +143,7 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
 
   // ─── Step 1: SPELLS ─── (fairness fix #1: intercalate sides by priority)
   window.setTimeout(() => {
+    if (aborted) return;
     let b = startBoard;
     b = applyAllSpells(b, playerIntent, cpuIntent);
     setBoard(b);
@@ -153,6 +162,7 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
 
     // ─── Step 2: SUMMONS ───
     window.setTimeout(() => {
+      if (aborted) return;
       b = applySummons(b, playerIntent, "a");
       b = applySummons(b, cpuIntent, "b");
       setBoard(b);
@@ -163,8 +173,10 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
 
       // ─── Step 3: COMBAT — lane by lane ───
       window.setTimeout(() => {
+        if (aborted) return;
         setResolveStep("combat");
         const runLane = (laneIdx: 0 | 1 | 2) => {
+          if (aborted) return;
           const lane = b.lanes[laneIdx];
           const aHitsB = !!lane.a && !lane.b;
           const bHitsA = !!lane.b && !lane.a;
@@ -248,6 +260,7 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
           // Mid-charge: flash the targeted hero BEFORE damage is committed,
           // OR pop the taunt block if the attack will be deflected.
           window.setTimeout(() => {
+            if (aborted) return;
             if (bDeflectorLane !== null) {
               setTauntBlock({ defenderSide: "b", rockLane: bDeflectorLane, key: Date.now() });
             } else if (aHitsHeroBForReal) {
@@ -275,6 +288,7 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
             }
           }, LANE_CHARGE_MS * 0.55);
           window.setTimeout(() => {
+            if (aborted) return;
             const prevB = b;
             // Wrap resolveLaneCombatAt in try-catch. Si le combat throw
             // silencieusement (ce qu'on suspecte pour le bug L2 rock vs
@@ -316,6 +330,7 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
         // After all 3 lanes — cleanup + HP check + draw detection.
         const TOTAL_COMBAT_MS = LANE_CHARGE_MS * 3 + LANE_PAUSE_MS * 2 + 200;
         window.setTimeout(() => {
+          if (aborted) return;
           b = endOfTurnCleanup(b);
           const prePhase = b.phase; // phase de jeu AVANT tout flip match-end (pour l'écran d'attente du coup fatal)
           if (b.a.hp <= 0 && b.b.hp <= 0) {
@@ -361,6 +376,7 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
             // différé) → pas de picker pendant la révélation.
             setBoard({ ...b, phase: prePhase });
             window.setTimeout(() => {
+              if (aborted) return;
               setBoard(b); // phase match-end → ArenaMatchEnd s'affiche enfin
               const playerWon = bDead && !aDead;
               onMatchEnd(playerWon);
@@ -372,9 +388,11 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
 
         // ─── Step 4: SETTLE ───
         window.setTimeout(() => {
+          if (aborted) return;
           setResolveStep("settle");
           onSettle(b);
           window.setTimeout(() => {
+            if (aborted) return;
             setResolveStep(null);
             // 🔴 Le garde DOIT couvrir sudden-death : sans ça, onAdvanceTurn
             // repassait le board en "planning" ~3s après le déclenchement du
@@ -387,4 +405,6 @@ export function runResolverFlow(args: ResolverFlowArgs): void {
       }, SUMMONS_MS);
     }, SPELLS_MS);
   }, REVEAL_MS);
+
+  return () => { aborted = true; };
 }

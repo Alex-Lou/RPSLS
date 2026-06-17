@@ -267,10 +267,18 @@ export function ArenaGame({
   // Declared BEFORE handleForfeit so the closure binds the real ref.
   const matchEndedRef = useRef(false);
 
+  // Handle d'annulation du résolveur en cours (Audit anim Build A — fuite mémoire).
+  // runResolverFlow programme ~9s de setTimeout ; on garde son cancel() pour
+  // couper la chaîne au forfait / rematch / unmount, sinon elle continue sur un
+  // composant démonté et peut relancer une partie quittée.
+  const resolverCancelRef = useRef<null | (() => void)>(null);
+  useEffect(() => () => { resolverCancelRef.current?.(); }, []);
+
   /** Forfeit handler: records a LOSS on arenaStats + bounces back out.
    *  Set `matchEndedRef` so the existing match-end useEffect doesn't
    *  also try to record an outcome (would double-count). */
   function handleForfeit() {
+    resolverCancelRef.current?.(); // coupe net la résolution en vol (anti-fuite)
     if (matchEndedRef.current) { onQuit(); return; }
     matchEndedRef.current = true;
     hapticMatchLoss();
@@ -396,7 +404,7 @@ export function ArenaGame({
     // Pré-calcul PUR extrait dans arenaResolvePrep (troncature/dépense/exil/startBoard ; flux de résolution = ici).
     const { startBoard, safeIntent, safeCpuIntent } = prepareResolveStart(board, intent, cpuIntent);
 
-    runResolverFlow({
+    resolverCancelRef.current = runResolverFlow({
       startBoard,
       playerIntent: safeIntent,
       cpuIntent: safeCpuIntent,
@@ -451,6 +459,7 @@ export function ArenaGame({
         board={board}
         onQuit={onQuit}
         onRematch={() => {
+          resolverCancelRef.current?.(); // coupe toute chaîne résiduelle (anti double-pilotage)
           // Bubble up to ArenaPage so a FRESH coin flip + new theme + new
           // CPU persona is picked for the rematch (Alex: "rematch doit refaire
           // le coin pour éventuellement changer de thème"). If no parent
