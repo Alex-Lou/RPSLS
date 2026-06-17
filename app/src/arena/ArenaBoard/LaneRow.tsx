@@ -6,11 +6,12 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { ArenaLaneSlot } from "../ArenaLaneSlot";
+import { ScissorsLaneFlourish } from "../ArenaCreatureFX";
 import { CardSlot } from "../../ranked/CardSlot";
 import type { BoardState, LaneIndex, Side, TurnIntent } from "../arenaTypes";
 
 export function LaneRow({
-  lanes, renderSide, intent, isPlayer, combatLane = null,
+  lanes, renderSide, intent, isPlayer, combatLane = null, combatChargers = [],
   validLanes = [false, false, false], targetLabel = "", onLaneTap,
   stickers = [], summoningMove = false,
   deflectingRockLane = null,
@@ -23,6 +24,8 @@ export function LaneRow({
   intent: TurnIntent | null;
   isPlayer: boolean;
   combatLane?: LaneIndex | null;
+  /** Camps qui chargent sur la lane en combat (attaquant-seul, Alex 2026-06-17). */
+  combatChargers?: ("a" | "b")[];
   validLanes?: boolean[];
   targetLabel?: string;
   onLaneTap?: (lane: LaneIndex) => void;
@@ -64,6 +67,14 @@ export function LaneRow({
         const c = lanes[lane][renderSide];
         const plannedSummon = intent?.summons.find((s) => s.lane === lane) ?? null;
         const inCombat = combatLane === lane;
+        // chargeAttack = seul l'ATTAQUANT du camp charge (anti-mush). Le halo de
+        // lane + le padShake gardent `inCombat` (toute la lane s'allume).
+        const charges = inCombat && combatChargers.includes(renderSide);
+        // Cue Ciseaux rendu sur la lane ATTAQUÉE (Alex 2026-06-17) : si la
+        // créature ADVERSE de cette lane charge ET est un Ciseaux, le coup de
+        // lame s'affiche sur CE slot (la cible) — pas sur l'attaquant.
+        const incomingAttacker = lanes[lane][oppSideKey];
+        const incomingScissors = inCombat && combatChargers.includes(oppSideKey) && incomingAttacker?.move === "scissors";
         const valid = validLanes[i] ?? false;
         const laneStickers = stickers.filter((s) => s.lane === lane);
         // Only Pierre cares about suppression today (Étouffe). Other innate
@@ -108,7 +119,7 @@ export function LaneRow({
               plannedSummon={plannedSummon}
               isPlayer={isPlayer}
               showPlanned={!!intent}
-              chargeAttack={inCombat}
+              chargeAttack={charges}
               clickable={valid}
               clickableLabel={
                 // "↻ Remplacer" si on est en mode summon ET le slot a déjà
@@ -120,6 +131,10 @@ export function LaneRow({
               passiveSuppressed={suppressed}
               deflectingPulse={deflectingRockLane === lane ? deflectKey ?? 0 : null}
             />
+            {/* ✂ Coup de lame Ciseaux sur la lane ATTAQUÉE (la cible). */}
+            <AnimatePresence>
+              {incomingScissors && <ScissorsLaneFlourish key={`scissors-${i}`} />}
+            </AnimatePresence>
             {/* Card stickers — small CardSlot badges showing which spells
              *  hit this lane this turn (mirrors Ranked LanesBoard pattern).
              *  Owner "you" gets a swoop-from-hand entry anim so the player

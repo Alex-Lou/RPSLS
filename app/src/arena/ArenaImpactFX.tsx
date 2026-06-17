@@ -78,13 +78,17 @@ function ScissorsSlash({ fatal }: { fatal: boolean }) {
           style={{ rotate: "-26deg", background: "linear-gradient(to right, transparent, #fff 25%, #fff 75%, transparent)", boxShadow: `0 0 26px 7px ${glow}` }}
         />
       </div>
-      {/* Fissures radiantes (écran cassé) */}
+      {/* Fissures radiantes (écran cassé) — STAGGER (Alex 2026-06-17, Pro-37) :
+          elles jaillissent l'une APRÈS l'autre pour « respirer » (radiation
+          séquentielle) au lieu de claquer toutes ensemble = effet moins
+          saccadé. Reste dans l'enveloppe ~0.6s (delay max 0.32 + durée 0.3)
+          pour ne pas allonger la séquence. */}
       {CRACKS.map((deg, i) => (
         <motion.div
           key={i}
           initial={{ opacity: 0, scaleY: 0 }}
-          animate={{ opacity: [0, 0, 0.9, 0], scaleY: [0, 0, 1, 1] }}
-          transition={{ duration: 0.6, times: [0, 0.28, 0.46, 1], ease: "easeOut" }}
+          animate={{ opacity: [0, 0.9, 0], scaleY: [0, 1, 1] }}
+          transition={{ duration: 0.3, delay: 0.12 + i * 0.04, times: [0, 0.45, 1], ease: "easeOut" }}
           className="absolute left-1/2 top-1/2 w-[2px] h-[55%] origin-top"
           style={{ rotate: `${deg}deg`, background: `linear-gradient(to bottom, ${glow}, transparent)` }}
         />

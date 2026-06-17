@@ -66,6 +66,10 @@ export interface ResolverFlowArgs {
   setPlayerPreview: (i: TurnIntent | null) => void;
   setResolveStep: (s: ResolveStep | null) => void;
   setCombatLane: (l: LaneIndex | null) => void;
+  /** Camps qui CHARGENT sur la lane en combat (anti-mush, Alex 2026-06-17) :
+   *  seul l'attaquant fonce ; le défenseur garde sa réaction au dégât.
+   *  Optionnel (tests/headless). */
+  setCombatChargers?: (sides: ("a" | "b")[]) => void;
   setHeroHit: (h: { side: "you" | "opp"; lane: LaneIndex; key: number } | null) => void;
   /** Set when an undefended-lane attack is DEFLECTED by a taunt creature.
    *  `defenderSide` owns the taunt. `rockLane` is the lane of the Pierre
@@ -124,7 +128,7 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
   const {
     startBoard, playerIntent, cpuIntent,
     setBoard, setOppPreview, setPlayerPreview, setResolveStep,
-    setCombatLane, setHeroHit, setTauntBlock, setAntiTaunt, setSpellFX, setImpactFX,
+    setCombatLane, setCombatChargers, setHeroHit, setTauntBlock, setAntiTaunt, setSpellFX, setImpactFX,
     onSettle, onAdvanceTurn, onMatchEnd,
   } = args;
 
@@ -256,6 +260,14 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
           const bHitsHeroAForReal = (bHitsA && atkB > 0) || splashBtoA > 0;
           const bDeflectorLane = aReachesHeroB ? findDeflectorLane("b") : null;
           const aDeflectorLane = bReachesHeroA ? findDeflectorLane("a") : null;
+          // Anti-mush (Alex 2026-06-17) : seul l'ATTAQUANT charge — le défenseur
+          // garde sa réaction hitShake au moment du dégât → séquence lisible
+          // « fonce → encaisse ». Vainqueur du counter, ou créature seule ; trade
+          // sans counter (même symbole / pas de relation) = les 2 (vrai clash).
+          const chargers: ("a" | "b")[] = bothPresent
+            ? (counterAB && !counterBA ? ["a"] : counterBA && !counterAB ? ["b"] : ["a", "b"])
+            : lane.a ? ["a"] : lane.b ? ["b"] : [];
+          setCombatChargers?.(chargers);
           setCombatLane(laneIdx);
           // Mid-charge: flash the targeted hero BEFORE damage is committed,
           // OR pop the taunt block if the attack will be deflected.

@@ -318,6 +318,7 @@ export function ArenaPlanPhase({
           hero={me}
           board={board}
           side="you"
+          calm={disabled}
           turn={board.turn}
           name={playerName}
           avatar={playerAvatar}

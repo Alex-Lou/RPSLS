@@ -156,3 +156,40 @@ export function CreatureHealBloom() {
     </motion.div>
   );
 }
+
+/** ✂ TRANCHANT (Ciseaux) — cue de lane LÉGER quand une créature Ciseaux
+ *  attaque : DEUX entailles diagonales (lecture « double lame ») qui balaient
+ *  la case. Donne la signature « tranchant » dès la 1ʳᵉ manche, distincte de
+ *  l'entaille PLEIN ÉCRAN (ArenaImpactFX) réservée aux gros coups (≥4/fatal).
+ *  ZÉRO emoji (règle dure Alex). One-shot, 100% transform/opacity, leak-free.
+ *  (Alex 2026-06-17, Pro-37.) */
+export function ScissorsLaneFlourish() {
+  // Lames ACIER qui BALAIENT la case en X — VRAI mouvement (translateX) au lieu
+  // d'un trait fixe, plus grosses (5/4px) + contraste fort (cyan/blanc + bord
+  // sombre + lueur cyan) pour TRANCHER sur l'éclat doré de charge. Calé pour
+  // culminer ~à l'apex du slam. (Alex 2026-06-17 « punchy ».)
+  const BLADE_BG = "linear-gradient(to right, transparent, #e0f2fe 32%, #ffffff 50%, #e0f2fe 68%, transparent)";
+  const BLADE_SHADOW = "0 0 16px 3px rgba(56,189,248,0.95), 0 0 5px 1px rgba(2,6,23,0.85)";
+  return (
+    <div className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden" style={{ zIndex: 34 }} aria-hidden>
+      {/* Lame 1 (descendante) — balaie gauche→droite en traversant la case. */}
+      <motion.div
+        initial={{ opacity: 0, x: "-125%" }}
+        animate={{ opacity: [0, 1, 1, 0], x: ["-125%", "-8%", "8%", "125%"] }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.42, times: [0, 0.32, 0.56, 1], ease: "easeOut", delay: 0.06 }}
+        className="absolute left-0 right-0 top-1/2 -mt-[3px] h-[6px] origin-center"
+        style={{ rotate: "-24deg", background: BLADE_BG, boxShadow: BLADE_SHADOW }}
+      />
+      {/* Lame 2 (montante) — croise la première en X, juste après. */}
+      <motion.div
+        initial={{ opacity: 0, x: "-125%" }}
+        animate={{ opacity: [0, 1, 1, 0], x: ["-125%", "-8%", "8%", "125%"] }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.40, times: [0, 0.34, 0.56, 1], ease: "easeOut", delay: 0.16 }}
+        className="absolute left-0 right-0 top-1/2 -mt-[2.5px] h-[5px] origin-center"
+        style={{ rotate: "24deg", background: BLADE_BG, boxShadow: BLADE_SHADOW }}
+      />
+    </div>
+  );
+}

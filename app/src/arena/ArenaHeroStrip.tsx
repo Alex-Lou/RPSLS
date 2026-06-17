@@ -56,10 +56,13 @@ export interface ArenaHeroStripProps {
   /** Long-press sur une carte ADVERSE révélée (Augure) → ouvre sa fiche
    *  (lecture seule). Alex 2026-06-13 : apprendre ce que l'adversaire joue. */
   onInspectCard?: (id: CardId) => void;
+  /** Pendant la résolution (calm=true) : gèle l'aura de Voie idle pour rendre le
+   *  budget GPU aux anims de combat (Alex 2026-06-17 perf « ça fait planter »). */
+  calm?: boolean;
 }
 
 export function ArenaHeroStrip({
-  hero, side, turn, name, avatar, incomingAttackKey, augurRevealed, pendingUtility, onRemoveUtility, onInspectCard,
+  hero, side, turn, name, avatar, incomingAttackKey, augurRevealed, pendingUtility, onRemoveUtility, onInspectCard, calm = false,
 }: ArenaHeroStripProps) {
   const t = useT();
   // Long-press sur une carte adverse révélée (Augure) → fiche lecture seule.
@@ -118,7 +121,7 @@ export function ArenaHeroStrip({
       {/* Aura de Voie pour LES DEUX camps (Alex 2026-06-13 : « le strip de
        *  chacun doit être robuste et vivant ») — chacun dans SON univers (sa
        *  propre affinité). L'adversaire n'est plus « à poil ». */}
-      {hero.affinity && <VoieAura affinity={hero.affinity} />}
+      {hero.affinity && <VoieAura affinity={hero.affinity} side={side} calm={calm} />}
       {/* Augur peek — overlay FULL WIDTH du strip outer (Alex 2026-06-11) :
        *  le rendu était dans le portrait div w-16 → cartes invisibles car
        *  l'overlay débordait. Ici on a tout l'espace du strip. */}
@@ -218,6 +221,7 @@ export function ArenaHeroStrip({
             affinity={hero.affinity}
             side={side}
             finisherUnlocked={hero.finisherUnlocked}
+            calm={calm}
           />
         )}
         {/* Ligne 2 — barre de vie. */}

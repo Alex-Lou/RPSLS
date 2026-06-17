@@ -209,6 +209,10 @@ export function ArenaGame({
    *  per-lane "charge → impact → retreat" animation on its creatures.
    *  Only ONE lane is "live" at a time so the player's eye lands on it. */
   const [combatLane, setCombatLane] = useState<LaneIndex | null>(null);
+  // Camps qui CHARGENT sur la lane en combat (Alex 2026-06-17 anti-mush) : seul
+  // l'attaquant fonce, le défenseur garde sa réaction au dégât. Trade sans
+  // counter = les 2 (clash). Calculé par arenaResolverFlow.runLane.
+  const [combatChargers, setCombatChargers] = useState<("a" | "b")[]>([]);
   /** Hero-hit pulse: set briefly when an undefended-lane attack lands on a
    *  hero. Drives the dramatic HP-bar flash on the hit hero strip. Keyed by
    *  side + lane so consecutive hits on the same hero re-trigger the anim. */
@@ -413,6 +417,7 @@ export function ArenaGame({
       setPlayerPreview,
       setResolveStep,
       setCombatLane,
+      setCombatChargers,
       setHeroHit,
       setTauntBlock,
       setAntiTaunt,
@@ -533,6 +538,7 @@ export function ArenaGame({
             playerPreview={playerPreview}
             resolveStep={resolveStep}
             combatLane={combatLane}
+            combatChargers={combatChargers}
             heroHit={heroHit}
             tauntBlock={tauntBlock}
             antiTaunt={antiTaunt}

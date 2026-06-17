@@ -1,11 +1,12 @@
 /**
  * ArenaVoieAura — identité visuelle PERSO du joueur selon sa Voie.
  *
- * Rendu UNIQUEMENT sur le strip "you" (jamais l'adversaire, jamais partagé
- * comme les apparences/thèmes/pads — c'est une signature privée du joueur,
- * Alex 2026-06-12). Un calque animé `absolute inset-0` derrière le HUD perso :
- * teinte de base + "spine" (liseré) signature + un motif ambiant unique par
- * Voie. Alpha volontairement basse pour garder HP/mana parfaitement lisibles,
+ * Rendu sur les DEUX strips (Alex 2026-06-13). La teinte DOMINANTE signe le
+ * CAMP (toi = émeraude, opp = rouge — Alex 2026-06-17 : lecture d'appartenance
+ * immédiate, indépendante de la Voie) ; le MOTIF ambiant animé garde l'identité
+ * de la VOIE. Un calque animé `absolute inset-0` derrière le HUD : teinte de
+ * base + "spine" (liseré) de CAMP + un motif par Voie. Alpha volontairement
+ * basse pour garder HP/mana parfaitement lisibles,
  * et `pointer-events-none` + inset-0 pour ZÉRO impact sur la hauteur du strip
  * (le pad reste stable).
  *
@@ -28,36 +29,22 @@ interface VoieTheme {
   glow: string;
 }
 
-const VOIE_THEME: Record<Move, VoieTheme> = {
-  // Montagne — granite chaud, stone + ambre.
-  rock: {
-    spine: "linear-gradient(180deg, #d6d3d1, #b45309)",
-    base: "linear-gradient(110deg, rgba(120,113,108,0.20) 0%, rgba(68,64,60,0.10) 55%, rgba(180,83,9,0.10) 100%)",
-    glow: "inset 0 0 18px -6px rgba(214,211,209,0.5)",
-  },
-  // Forêt — émeraude vivante.
-  paper: {
+// CAMP, pas Voie (Alex 2026-06-17) : la teinte DOMINANTE du strip signe le
+// CAMP (toi = émeraude, opp = rouge) pour une lecture d'appartenance immédiate,
+// INDÉPENDAMMENT de la Voie (avant, une Voie Tranchant teintait tout le strip
+// joueur en rouge → confusion « moi en rouge »). L'identité de Voie reste
+// portée par le MOTIF animé (VoieMotif) + le label « Voie de X » du badge
+// Constellation. Émeraude/rose = cohérent avec le tint des créatures (player/opp).
+const OWNERSHIP_THEME: Record<"you" | "opp", VoieTheme> = {
+  you: {
     spine: "linear-gradient(180deg, #6ee7b7, #059669)",
     base: "linear-gradient(110deg, rgba(16,185,129,0.18) 0%, rgba(5,150,105,0.08) 60%, rgba(4,120,87,0.10) 100%)",
     glow: "inset 0 0 18px -6px rgba(52,211,153,0.55)",
   },
-  // Tranchant — acier + cramoisi.
-  scissors: {
+  opp: {
     spine: "linear-gradient(180deg, #fda4af, #be123c)",
     base: "linear-gradient(110deg, rgba(244,63,94,0.16) 0%, rgba(113,113,122,0.06) 55%, rgba(159,18,57,0.10) 100%)",
     glow: "inset 0 0 18px -6px rgba(251,113,133,0.5)",
-  },
-  // Mirage — iridescent violet→cyan.
-  lizard: {
-    spine: "linear-gradient(180deg, #c4b5fd, #22d3ee)",
-    base: "linear-gradient(110deg, rgba(167,139,250,0.16) 0%, rgba(34,211,238,0.12) 60%, rgba(192,132,252,0.10) 100%)",
-    glow: "inset 0 0 18px -6px rgba(167,139,250,0.55)",
-  },
-  // Cosmos — indigo profond stellaire.
-  spock: {
-    spine: "linear-gradient(180deg, #a5b4fc, #38bdf8)",
-    base: "linear-gradient(110deg, rgba(99,102,241,0.18) 0%, rgba(30,27,75,0.10) 55%, rgba(56,189,248,0.10) 100%)",
-    glow: "inset 0 0 18px -6px rgba(129,140,248,0.55)",
   },
 };
 
@@ -69,29 +56,33 @@ const STARS: Array<[number, number, number]> = [
 ];
 const LEAVES = [16, 40, 60, 82]; // positions X% des feuilles
 
-export function VoieAura({ affinity }: { affinity: Move }) {
-  const th = VOIE_THEME[affinity];
+export function VoieAura({ affinity, side, calm = false }: { affinity: Move; side: "you" | "opp"; calm?: boolean }) {
+  const th = OWNERSHIP_THEME[side];
   return (
     <div
       className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none"
       style={{ zIndex: 0, boxShadow: th.glow, border: "1px solid rgba(255,255,255,0.05)" }}
       aria-hidden
     >
-      {/* Teinte de base qui "respire" lentement. */}
+      {/* Teinte de base qui "respire" lentement. GELÉE pendant la résolution
+          (calm) pour rendre le budget GPU aux anims de combat — Alex 2026-06-17
+          « ça fait planter / le joueur ne voit rien ». */}
       <motion.div
         className="absolute inset-0"
         style={{ background: th.base }}
-        animate={{ opacity: [0.75, 1, 0.75] }}
-        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+        animate={calm ? { opacity: 0.9 } : { opacity: [0.75, 1, 0.75] }}
+        transition={calm ? { duration: 0 } : { duration: 6, repeat: Infinity, ease: "easeInOut" }}
       />
       {/* Liseré signature à gauche. */}
       <motion.div
         className="absolute left-0 top-0 bottom-0 w-[3px]"
         style={{ background: th.spine }}
-        animate={{ opacity: [0.65, 1, 0.65] }}
-        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+        animate={calm ? { opacity: 0.85 } : { opacity: [0.65, 1, 0.65] }}
+        transition={calm ? { duration: 0 } : { duration: 3, repeat: Infinity, ease: "easeInOut" }}
       />
-      <VoieMotif affinity={affinity} />
+      {/* Motif animé (le plus coûteux : 3-8 nœuds en boucle) — COUPÉ pendant la
+          résolution pour libérer le GPU. */}
+      {!calm && <VoieMotif affinity={affinity} />}
     </div>
   );
 }

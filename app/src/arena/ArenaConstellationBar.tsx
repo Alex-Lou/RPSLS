@@ -26,12 +26,15 @@ interface ArenaConstellationBarProps {
   side: "you" | "opp";
   /** Flag "Finisher débloqué" (passé 3/3 au moins une fois ce match). */
   finisherUnlocked?: boolean;
+  /** Pendant la résolution : gèle les pulses idle (étoiles + finisher) pour
+   *  rendre le budget GPU aux anims de combat (Alex 2026-06-17 perf). */
+  calm?: boolean;
 }
 
 const STAR_COUNT = 3;
 
 export function ArenaConstellationBar({
-  count, affinity, side, finisherUnlocked,
+  count, affinity, side, finisherUnlocked, calm = false,
 }: ArenaConstellationBarProps) {
   const filledCount = Math.min(STAR_COUNT, count);
   const isComplete = filledCount >= STAR_COUNT;
@@ -101,20 +104,24 @@ export function ArenaConstellationBar({
               initial={false}
               animate={
                 filled
-                  ? {
-                      scale: isComplete ? [1, 1.22, 1] : (filledCount === 2 ? [1, 1.1, 1] : 1),
-                      filter: isComplete
-                        ? [
-                            `drop-shadow(0 0 3px ${accentColor})`,
-                            `drop-shadow(0 0 9px ${accentColor})`,
-                            `drop-shadow(0 0 3px ${accentColor})`,
-                          ]
-                        : `drop-shadow(0 0 ${starGlowPx}px ${accentColor})`,
-                    }
+                  ? (calm
+                      ? { scale: 1, filter: `drop-shadow(0 0 ${starGlowPx}px ${accentColor})` }
+                      : {
+                          scale: isComplete ? [1, 1.22, 1] : (filledCount === 2 ? [1, 1.1, 1] : 1),
+                          filter: isComplete
+                            ? [
+                                `drop-shadow(0 0 3px ${accentColor})`,
+                                `drop-shadow(0 0 9px ${accentColor})`,
+                                `drop-shadow(0 0 3px ${accentColor})`,
+                              ]
+                            : `drop-shadow(0 0 ${starGlowPx}px ${accentColor})`,
+                        })
                   : { scale: 1, filter: "none" }
               }
               transition={
-                isComplete
+                calm
+                  ? { duration: 0 }
+                  : isComplete
                   ? { duration: 1.4, repeat: Infinity, ease: "easeInOut", delay: i * 0.16 }
                   : filledCount === 2
                   ? { duration: 2.0, repeat: Infinity, ease: "easeInOut", delay: i * 0.2 }
@@ -135,11 +142,11 @@ export function ArenaConstellationBar({
       {finisherUnlocked && (
         <motion.span
           initial={{ opacity: 0, scale: 0.5 }}
-          animate={{
+          animate={calm ? { opacity: 0.95, scale: 1 } : {
             opacity: [0.9, 1, 0.9],
             scale: [1, 1.05, 1],
           }}
-          transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+          transition={calm ? { duration: 0 } : { duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
           className="text-[8px] uppercase tracking-wide font-black text-amber-200"
           style={{ textShadow: `0 0 8px ${accentColor}, 0 0 4px #fbbf24` }}
         >

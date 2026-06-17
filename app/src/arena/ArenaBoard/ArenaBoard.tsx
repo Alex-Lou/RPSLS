@@ -62,6 +62,7 @@ export interface ArenaBoardProps {
   /** Which lane is currently animating its combat (0/1/2) or null when no
    *  lane is "live". Drives the per-lane charge anim. */
   combatLane?: LaneIndex | null;
+  combatChargers?: ("a" | "b")[];
   /** Hero-hit flash event — set briefly when a creature lands an attack
    *  on a hero. The targeted side's HP bar flashes white→red dramatically. */
   heroHit?: { side: "you" | "opp"; lane: LaneIndex; key: number } | null;
@@ -115,7 +116,7 @@ export interface ArenaBoardProps {
   fillHeight?: number;
 }
 
-export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPreview, resolveStep, combatLane = null, heroHit = null, tauntBlock = null, antiTaunt = null, spellFX = null, oppName, oppAvatar, targeting, onLaneTap, onRemoveSpell, onRemoveSummon, forgeYou = null, forgeOpp = null, onForgeTap, forgeFlashKey = null, forgeRecoverKey = null, forgeHighlight = null, fillHeight }: ArenaBoardProps) {
+export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPreview, resolveStep, combatLane = null, combatChargers = [], heroHit = null, tauntBlock = null, antiTaunt = null, spellFX = null, oppName, oppAvatar, targeting, onLaneTap, onRemoveSpell, onRemoveSummon, forgeYou = null, forgeOpp = null, onForgeTap, forgeFlashKey = null, forgeRecoverKey = null, forgeHighlight = null, fillHeight }: ArenaBoardProps) {
   // SECOUSSE D'IMPACT (Alex 2026-06-12) : à chaque tick de combat (combatLane
   // change), le pad tremble brièvement, calé sur l'apex du slam (~0.3s après
   // le départ de la charge). Animation controls = pas de remount des lanes.
@@ -219,6 +220,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
               augurRevealed={playerSide === "a" ? board.augurRevealedB : board.augurRevealedA}
               pendingUtility={oppPreview?.spells.filter((s) => s.kind !== "lane")}
               onInspectCard={setInspectOpp}
+              calm={resolveStep !== null}
             />
           </div>
         </div>,
@@ -330,6 +332,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
           intent={oppPreview ?? null}
           isPlayer={false}
           combatLane={combatLane}
+          combatChargers={combatChargers}
           validLanes={[0, 1, 2].map((i) => isValidLaneTarget(targeting ?? null, oppSide, i as LaneIndex, laneShape, playerSide))}
           targetLabel={targetLabel}
           onLaneTap={onLaneTap ? (l) => onLaneTap(l, oppSide) : undefined}
@@ -380,6 +383,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
           intent={intent}
           isPlayer={true}
           combatLane={combatLane}
+          combatChargers={combatChargers}
           validLanes={[0, 1, 2].map((i) => isValidLaneTarget(targeting ?? null, playerSide, i as LaneIndex, laneShape, playerSide))}
           targetLabel={targetLabel}
           onLaneTap={onLaneTap ? (l) => onLaneTap(l, playerSide) : undefined}
