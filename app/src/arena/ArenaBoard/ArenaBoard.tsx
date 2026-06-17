@@ -157,7 +157,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
    *  top-* for "opp" owner so both can be on the same lane without overlap. */
   const oppSide: Side = playerSide === "a" ? "b" : "a";
   function stickersForSide(rowSide: Side) {
-    const out: Array<{ lane: LaneIndex; id: import("../../ranked/rankedTypes").CardId; owner: "you" | "opp"; position: "tl" | "tr" | "bl" | "br"; idx: number }> = [];
+    const out: Array<{ lane: LaneIndex; id: import("../../ranked/rankedTypes").CardId; owner: "you" | "opp"; position: "tl" | "tr" | "bl" | "br"; idx: number; name: string }> = [];
     // Player stickers go TOP-LEFT (Alex 2026-06-11) : les minis des sorts
     // lane-target planifiés se collent au coin sup-gauche de la lane ciblée,
     // en éventail si plusieurs. idx = index dans intent.spells pour la
@@ -167,14 +167,14 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
       if (s.kind !== "lane") return;
       const tgt = LANE_SPELL_TARGET_SIDE[s.id] ?? "my-creature";
       const targetSide: Side = tgt === "opp-creature" ? oppSide : playerSide;
-      if (targetSide === rowSide) out.push({ lane: s.lane, id: s.id, owner: "you", position: "tl", idx: i });
+      if (targetSide === rowSide) out.push({ lane: s.lane, id: s.id, owner: "you", position: "tl", idx: i, name: t(CARDS[s.id].nameKey) });
     });
     const cpuSpells = oppPreview?.spells ?? [];
     cpuSpells.forEach((s, i) => {
       if (s.kind !== "lane") return;
       const tgt = LANE_SPELL_TARGET_SIDE[s.id] ?? "my-creature";
       const targetSide: Side = tgt === "opp-creature" ? playerSide : oppSide;
-      if (targetSide === rowSide) out.push({ lane: s.lane, id: s.id, owner: "opp", position: "br", idx: i });
+      if (targetSide === rowSide) out.push({ lane: s.lane, id: s.id, owner: "opp", position: "br", idx: i, name: t(CARDS[s.id].nameKey) });
     });
     return out;
   }

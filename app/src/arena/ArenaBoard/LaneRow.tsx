@@ -6,7 +6,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { ArenaLaneSlot } from "../ArenaLaneSlot";
-import { ScissorsLaneFlourish } from "../ArenaCreatureFX";
+import { MoveAttackCue } from "../ArenaCreatureFX";
 import { CardSlot } from "../../ranked/CardSlot";
 import type { BoardState, LaneIndex, Side, TurnIntent } from "../arenaTypes";
 
@@ -32,7 +32,7 @@ export function LaneRow({
   /** Card stickers to render in the corner of the targeted slot — same
    *  pattern as Ranked's CardSlot. Computed in the parent so both rows
    *  stay in sync. idx = position dans intent.spells (pour suppression). */
-  stickers?: Array<{ lane: LaneIndex; id: import("../../ranked/rankedTypes").CardId; owner: "you" | "opp"; position: "tl" | "tr" | "bl" | "br"; idx: number }>;
+  stickers?: Array<{ lane: LaneIndex; id: import("../../ranked/rankedTypes").CardId; owner: "you" | "opp"; position: "tl" | "tr" | "bl" | "br"; idx: number; name: string }>;
   /** Retire un sort planifié par index (tap sur un sticker joueur). */
   onRemoveSticker?: (idx: number) => void;
   /** Annule l'invocation planifiée sur la lane (croix du ghost, joueur only). */
@@ -70,11 +70,11 @@ export function LaneRow({
         // chargeAttack = seul l'ATTAQUANT du camp charge (anti-mush). Le halo de
         // lane + le padShake gardent `inCombat` (toute la lane s'allume).
         const charges = inCombat && combatChargers.includes(renderSide);
-        // Cue Ciseaux rendu sur la lane ATTAQUÉE (Alex 2026-06-17) : si la
-        // créature ADVERSE de cette lane charge ET est un Ciseaux, le coup de
-        // lame s'affiche sur CE slot (la cible) — pas sur l'attaquant.
+        // Cue d'attaque PAR MOVE rendu sur la lane ATTAQUÉE (Alex 2026-06-17) :
+        // si la créature ADVERSE de cette lane charge, son cue (relatif à son
+        // move) s'affiche sur CE slot (la cible) — pas sur l'attaquant.
         const incomingAttacker = lanes[lane][oppSideKey];
-        const incomingScissors = inCombat && combatChargers.includes(oppSideKey) && incomingAttacker?.move === "scissors";
+        const incomingAttack = inCombat && combatChargers.includes(oppSideKey) && !!incomingAttacker;
         const valid = validLanes[i] ?? false;
         const laneStickers = stickers.filter((s) => s.lane === lane);
         // Only Pierre cares about suppression today (Étouffe). Other innate
@@ -131,10 +131,25 @@ export function LaneRow({
               passiveSuppressed={suppressed}
               deflectingPulse={deflectingRockLane === lane ? deflectKey ?? 0 : null}
             />
-            {/* ✂ Coup de lame Ciseaux sur la lane ATTAQUÉE (la cible). */}
+            {/* Cue d'attaque (par move) sur la lane ATTAQUÉE (la cible). */}
             <AnimatePresence>
-              {incomingScissors && <ScissorsLaneFlourish key={`scissors-${i}`} />}
+              {incomingAttack && incomingAttacker && <MoveAttackCue key={`atk-${i}`} move={incomingAttacker.move} />}
             </AnimatePresence>
+            {/* Nom de la carte/effet jouée sur la lane — AU-DESSUS de MA lane,
+             *  EN-DESSOUS de la lane adverse (Alex 2026-06-17) : suivre les
+             *  effets des 2 camps, compact, sans encombrer le centre du pad. */}
+            {laneStickers.length > 0 && (
+              <div className={"absolute left-0 right-0 flex flex-col items-center gap-px px-0.5 pointer-events-none z-30 " + (isPlayer ? "bottom-full mb-0.5" : "top-full mt-0.5")}>
+                {laneStickers.map((s) => (
+                  <span
+                    key={`name-${s.id}-${s.idx}`}
+                    className={"max-w-full truncate px-1 py-px rounded text-[8px] font-bold uppercase tracking-wide leading-tight shadow " + (s.owner === "you" ? "bg-emerald-600/90 text-emerald-50" : "bg-rose-600/90 text-rose-50")}
+                  >
+                    {s.name}
+                  </span>
+                ))}
+              </div>
+            )}
             {/* Card stickers — small CardSlot badges showing which spells
              *  hit this lane this turn (mirrors Ranked LanesBoard pattern).
              *  Owner "you" gets a swoop-from-hand entry anim so the player
