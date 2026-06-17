@@ -93,7 +93,11 @@ export function ArenaPlanPhase({
   // Offre) → utilisable DÈS CE TOUR (Alex 2026-06-13).
   const manaBudget = me.mana + intentManaGrant(intent);
   const manaLeft = manaBudget - intentCost;
-  const canLock = !disabled && intentCost <= manaBudget;
+  // Tu peux TOUJOURS finir ton tour (Alex 2026-06-17) : le Lock n'est PLUS gaté
+  // sur le mana (avant : bouton mort silencieux si intent inabordable). Si
+  // l'intent dépasse le budget, handleLockTurn retire les cartes en trop avant
+  // de résoudre. L'abordabilité reste imposée à l'AJOUT (pickMoveToSummon/playCard).
+  const canLock = !disabled;
   // `targeting` + `onSetTargeting` are LIFTED to ArenaGame (so the board
   // can also commit lane taps). The local setTargeting alias below keeps
   // the rest of this file readable.

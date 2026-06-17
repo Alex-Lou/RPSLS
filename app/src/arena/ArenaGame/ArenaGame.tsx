@@ -400,13 +400,27 @@ export function ArenaGame({
   function handleLockTurn() {
     if (resolving) return;
     if (board.phase !== "planning") return;
-    if (intentCost(intent) > board.a.mana + intentManaGrant(intent)) return;
+    // Tu peux TOUJOURS finir ton tour (Alex 2026-06-17 « grave erreur » : le Lock
+    // se bloquait SILENCIEUSEMENT quand l'intent devenait inabordable — ex. après
+    // retrait d'une carte qui DONNAIT du mana, Sablier/Offre). On ne bloque plus :
+    // si l'intent dépasse le budget, on retire les DERNIÈRES cartes en trop
+    // jusqu'à ce que ce soit payable → jamais de bouton mort, et zéro overspend
+    // (le moteur débite le mana sans clamp, cf. resolver.ts).
+    let safe = intent;
+    while (
+      intentCost(safe) > board.a.mana + intentManaGrant(safe) &&
+      (safe.spells.length > 0 || safe.summons.length > 0)
+    ) {
+      safe = safe.spells.length > 0
+        ? { ...safe, spells: safe.spells.slice(0, -1) }
+        : { ...safe, summons: safe.summons.slice(0, -1) };
+    }
     hapticLock();
     setResolving(true);
 
     const cpuIntent = cpuArenaDecision(board, "b", difficulty);
     // Pré-calcul PUR extrait dans arenaResolvePrep (troncature/dépense/exil/startBoard ; flux de résolution = ici).
-    const { startBoard, safeIntent, safeCpuIntent } = prepareResolveStart(board, intent, cpuIntent);
+    const { startBoard, safeIntent, safeCpuIntent } = prepareResolveStart(board, safe, cpuIntent);
 
     resolverCancelRef.current = runResolverFlow({
       startBoard,
