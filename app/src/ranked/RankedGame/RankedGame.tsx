@@ -52,7 +52,7 @@ import { useV3BonusState } from "./useV3BonusState";
 
 const LANE_COUNT = 3;
 const PICK_DEADLINE_MS = 20_000;
-const ROUND_PAUSE_MS = 7_500;
+const ROUND_PAUSE_MS = 5_500; // Alex 2026-06-17 (Ranked-2) : -2s vs origine (7.5s), attente post-manche réduite (4.5s trop rapide)
 const REVEAL_SUSPENSE_MS = 1_400;
 const MATCH_FOUND_SPLASH_MS = 2_500;
 const MAX_MANA = 4;
