@@ -158,7 +158,13 @@ export function LaneRow({
                   // petite croix tant que pas locké »). Post-lock c'est
                   // combatLane/resolving qui bloquent côté plan phase. Le breach
                   // « voir l'effet PUIS retirer » est post-lock — déjà interdit.
-                  const removable = s.owner === "you" && !!onRemoveSticker && combatLane === null;
+                  // `&& !valid` (Alex 2026-06-17) : si cette lane est une CIBLE
+                  // valide du ciblage en cours, le sticker (overlay z-22 plein
+                  // cadre, pointer-events-auto) NE DOIT PAS capter le tap — sinon
+                  // il bloque SILENCIEUSEMENT la pose d'un 2e sort sur une lane
+                  // qui en a déjà un (ex. Aegis + Frappe parfaite sur la même
+                  // créature). Hors ciblage (valid=false), il reste retirable au tap.
+                  const removable = s.owner === "you" && !!onRemoveSticker && combatLane === null && !valid;
                   out.push(
                     <div
                       key={`${s.id}-${idx}-${s.position}`}
