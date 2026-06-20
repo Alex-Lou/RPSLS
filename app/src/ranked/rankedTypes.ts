@@ -68,6 +68,12 @@ export interface RankedCard {
   target: "lane" | "lane-reveal" | "lane-reveal-all" | "lane-copy" | "lane-rotate" | "self" | "gamble" | "none";
   /** Defaults to "active" when omitted. */
   kind?: CardKind;
+  /** VOIE SIGNATURE (Constellation Pro, Alex 2026-06-17 « Voies = archétypes »).
+   *  Si présent, cette carte appartient THÉMATIQUEMENT à cette Voie : le deck
+   *  Arena la PRIORISE quand c'est ta Voie et ne l'injecte JAMAIS pour une autre
+   *  (cf. arenaDecks.buildPlayerDeck + arenaVoies/VOIE_DEF). Absent = NEUTRE
+   *  (jouable par toutes les Voies). Inerte hors Arena. Cf. VOIE-ARCHETYPES.md. */
+  voie?: Move;
   palette: string;
   glyph: string;
   nameKey: string;

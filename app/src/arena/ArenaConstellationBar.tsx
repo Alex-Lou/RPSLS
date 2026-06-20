@@ -29,17 +29,24 @@ interface ArenaConstellationBarProps {
   /** Pendant la résolution : gèle les pulses idle (étoiles + finisher) pour
    *  rendre le budget GPU aux anims de combat (Alex 2026-06-17 perf). */
   calm?: boolean;
+  /** Voie ADVERSE encore CACHÉE (révélation progressive, Alex 2026-06-17 rethink
+   *  Phase 0) : avant sa 1ʳᵉ étoile, on n'affiche ni glyphe ni nom de Voie et la
+   *  couleur reste neutre — seul un « ? » + des étoiles anonymes. Dévoilé dès la
+   *  1ʳᵉ invocation du symbole d'Affinité. Cf. ARENA-RETHINK.md. */
+  concealed?: boolean;
 }
 
 const STAR_COUNT = 3;
 
 export function ArenaConstellationBar({
-  count, affinity, side, finisherUnlocked, calm = false,
+  count, affinity, side, finisherUnlocked, calm = false, concealed = false,
 }: ArenaConstellationBarProps) {
   const filledCount = Math.min(STAR_COUNT, count);
   const isComplete = filledCount >= STAR_COUNT;
   const pal = affinity ? MOVE_PALETTE[affinity] : null;
-  const accentColor = pal?.hex ?? "#a78bfa"; // violet par défaut
+  // Voie adverse cachée → couleur NEUTRE (ardoise) pour ne pas fuiter l'affinité
+  // par la teinte (bg/bord/étoiles). Révélée → couleur signature de la Voie.
+  const accentColor = concealed ? "#94a3b8" : (pal?.hex ?? "#a78bfa"); // violet par défaut
 
   // Pas d'affichage si le hero n'a pas choisi d'Affinité — le compteur
   // n'aurait aucun sens.
@@ -72,25 +79,40 @@ export function ArenaConstellationBar({
           ? `0 0 22px -1px ${accentColor}cc, 0 0 8px ${accentColor}88, inset 0 0 12px color-mix(in oklab, ${accentColor} 40%, transparent)`
           : `0 0 ${4 + glowIntensity * 10}px -1px ${accentColor}${Math.round(glowIntensity * 200 + 30).toString(16).padStart(2, "0")}, 0 1px 3px rgba(0,0,0,0.4)`,
       }}
-      aria-label={`Constellation ${filledCount} sur ${STAR_COUNT}`}
+      aria-label={concealed ? "Voie adverse cachée" : `Constellation ${filledCount} sur ${STAR_COUNT}`}
     >
-      <MoveGlyph
-        move={affinity}
-        className="w-3 h-3 shrink-0 opacity-90 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
-      />
+      {/* Voie adverse cachée → « ? » neutre au lieu du glyphe d'affinité (qui
+       *  trahirait la Voie). Révélée → glyphe signature. */}
+      {concealed ? (
+        <span
+          className="w-3 h-3 shrink-0 flex items-center justify-center text-[11px] font-black leading-none opacity-80"
+          style={{ color: accentColor }}
+          aria-hidden
+        >
+          ?
+        </span>
+      ) : (
+        <MoveGlyph
+          move={affinity}
+          className="w-3 h-3 shrink-0 opacity-90 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
+        />
+      )}
       {/* Round 9 fix Alex point #2 : label texte "Voie de X" pour que le
        *  joueur SACHE quel style l'autre a choisi (et donc quels bonus
-       *  s'appliquent aux créatures opp). */}
-      <span
-        className="text-[8px] uppercase tracking-wide font-bold leading-none"
-        style={{ color: accentColor }}
-      >
-        {affinity === "rock" ? "Montagne" :
-         affinity === "paper" ? "Forêt" :
-         affinity === "scissors" ? "Tranchant" :
-         affinity === "lizard" ? "Mirage" :
-         "Cosmos"}
-      </span>
+       *  s'appliquent aux créatures opp). CACHÉ tant que la Voie adverse n'est
+       *  pas révélée (Alex 2026-06-17 rethink Phase 0). */}
+      {!concealed && (
+        <span
+          className="text-[8px] uppercase tracking-wide font-bold leading-none"
+          style={{ color: accentColor }}
+        >
+          {affinity === "rock" ? "Montagne" :
+           affinity === "paper" ? "Forêt" :
+           affinity === "scissors" ? "Tranchant" :
+           affinity === "lizard" ? "Mirage" :
+           "Cosmos"}
+        </span>
+      )}
       <div className="flex items-center gap-0.5">
         {Array.from({ length: STAR_COUNT }).map((_, i) => {
           const filled = i < filledCount;

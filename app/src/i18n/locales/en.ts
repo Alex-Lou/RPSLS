@@ -395,7 +395,7 @@ const en: Record<string, string> = {
   "arena.cards.prescience.desc": "Draw 2 cards.",
   "arena.cards.surge.desc": "+3 ATK this turn to your targeted creature. Spock ignores it (Detached).",
   "arena.cards.curse.desc": "−2 ATK this turn to the targeted enemy creature. Blocked by Anchor and by Spock (Logic).",
-  "arena.cards.mirror.desc": "Copy the enemy creature on the targeted lane onto YOUR side (your half must be empty). The copy arrives fresh and gets your Path bonus.",
+  "arena.cards.mirror.desc": "Copy the enemy creature on the targeted lane onto YOUR side (your half must be empty) WITH its current stats (HP + ATK buffs) — a buffed 4/4 becomes your 4/4. Special abilities (shield, dodge) not copied.",
   "arena.cards.augur.desc": "Reveal 4 cards of the opponent's hand this turn.",
   "arena.cards.heist.desc": "Steal one random card from the opponent's hand. If their hand is empty, deal 3 damage to their hero instead.",
   "arena.cards.razzia.desc": "Steal the card on the opponent's FORGE (a deposited ingredient OR an un-recovered forged card) → into your hand. Empty enemy forge: no effect. Legendary: one use per game.",

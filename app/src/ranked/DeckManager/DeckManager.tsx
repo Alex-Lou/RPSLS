@@ -65,6 +65,12 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
   const [inDeckOnly, setInDeckOnly] = useState(false);
   const [passiveOnly, setPassiveOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  // VOIE (arène, Alex 2026-06-17 « n'afficher que les cartes de la voie ») :
+  // quand actif (défaut en arène), la collection ne montre que TES cartes de Voie
+  // (signatures voie===affinity + NEUTRES voie absente) et masque les autres
+  // Voies. Toggle via la chip « Ma Voie ». arenaAffinity = la Voie choisie.
+  const arenaAffinity = player.arenaAffinity;
+  const [voieOnly, setVoieOnly] = useState(mode === "arena");
 
   const equipped = deck.filter(Boolean).length;
 
@@ -203,6 +209,9 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
       if (ownedOnly && !collection.includes(id)) return false;
       if (inDeckOnly && !usedInDeck.has(id)) return false;
       if (passiveOnly && !isPassiveCard(id)) return false;
+      // VOIE (arène) : masque les cartes d'une AUTRE Voie ; garde tes signatures
+      // (voie===affinity) + les neutres (voie absente).
+      if (mode === "arena" && voieOnly && arenaAffinity && card.voie !== undefined && card.voie !== arenaAffinity) return false;
       if (q) {
         const name = t(card.nameKey).toLowerCase();
         if (!name.includes(q) && !id.toLowerCase().includes(q)) return false;
@@ -228,7 +237,7 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
     return [1, 2, 3, 4]
       .filter((c) => groups[c]?.length)
       .map((c) => ({ cost: c, ids: groups[c] }));
-  }, [rarityFilter, ownedOnly, inDeckOnly, passiveOnly, searchQuery, collection, usedInDeck, t]);
+  }, [rarityFilter, ownedOnly, inDeckOnly, passiveOnly, voieOnly, arenaAffinity, mode, searchQuery, collection, usedInDeck, t]);
 
   const totalShown = groupedByMana.reduce((sum, g) => sum + g.ids.length, 0);
   const anyFilterActive = rarityFilter !== "all" || ownedOnly || inDeckOnly || passiveOnly || searchQuery.length > 0;
@@ -398,6 +407,16 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
                       clean in the default state. py-0.5 keeps the active ring
                       from clipping at the top edge. */}
                   <div className="flex items-center gap-1.5 flex-wrap py-0.5">
+                    {/* MA VOIE (arène) : n'affiche que les cartes de ta Voie +
+                        neutres (Alex 2026-06-17). Actif par défaut, en tête. */}
+                    {mode === "arena" && arenaAffinity && (
+                      <FilterChip
+                        active={voieOnly}
+                        onClick={() => { hapticTap(); setVoieOnly((v) => !v); }}
+                        icon="✦"
+                        label="Ma Voie"
+                      />
+                    )}
                     <FilterChip
                       active={ownedOnly}
                       onClick={() => { hapticTap(); setOwnedOnly((v) => !v); }}

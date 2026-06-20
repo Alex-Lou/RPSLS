@@ -56,7 +56,7 @@ const STARS: Array<[number, number, number]> = [
 ];
 const LEAVES = [16, 40, 60, 82]; // positions X% des feuilles
 
-export function VoieAura({ affinity, side, calm = false }: { affinity: Move; side: "you" | "opp"; calm?: boolean }) {
+export function VoieAura({ affinity, side, calm = false, concealed = false }: { affinity: Move; side: "you" | "opp"; calm?: boolean; concealed?: boolean }) {
   const th = OWNERSHIP_THEME[side];
   return (
     <div
@@ -81,8 +81,11 @@ export function VoieAura({ affinity, side, calm = false }: { affinity: Move; sid
         transition={calm ? { duration: 0 } : { duration: 3, repeat: Infinity, ease: "easeInOut" }}
       />
       {/* Motif animé (le plus coûteux : 3-8 nœuds en boucle) — COUPÉ pendant la
-          résolution pour libérer le GPU. */}
-      {!calm && <VoieMotif affinity={affinity} />}
+          résolution pour libérer le GPU. COUPÉ AUSSI si la Voie adverse est
+          encore cachée (Alex 2026-06-17 rethink Phase 0) : le motif est
+          spécifique à la Voie (lames=Tranchant, feuilles=Forêt…), il la
+          trahirait. Seuls la teinte de CAMP + le liseré restent (zéro info Voie). */}
+      {!calm && !concealed && <VoieMotif affinity={affinity} />}
     </div>
   );
 }

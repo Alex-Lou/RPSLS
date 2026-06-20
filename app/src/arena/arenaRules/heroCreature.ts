@@ -128,6 +128,20 @@ export function healCreature(c: Creature, amount: number): Creature {
  *    Fanaison OFF en continu (le wilt ne s'incrémente plus du tout). Avant,
  *    le finisher ne faisait qu'un reset one-shot et les Feuilles re-fanaient
  *    dès le tour suivant, contrairement au texte de la carte. */
+/** STRATES — Voie de la Montagne (Alex 2026-06-17, pilote « Voies = archétypes »).
+ *  Une PIERRE du joueur Montagne qui a TENU un tour (a survécu au combat ET
+ *  n'était pas fraîchement posée) gagne +1 ATK PERMANENT (voieAtkBonus), cap +3.
+ *  « La défense produit l'offensive » : le mur qui tient grossit en menace. 100%
+ *  ADDITIF (ne change jamais l'issue du combat) → faible risque. `wasFreshlySummoned`
+ *  = c.summonedThisTurn AVANT endOfTurnReset (sinon une Pierre gagnerait une Strate
+ *  le tour même de son arrivée). voieAtkBonus est porté par creatureEffectiveAtk +
+ *  persiste tour à tour → l'ATK affichée monte d'elle-même (cue lisible). */
+export const STRATE_CAP = 3;
+export function gainStrateIfHeld(c: Creature, ownerAffinity: Move | undefined, wasFreshlySummoned: boolean): Creature {
+  if (ownerAffinity !== "rock" || c.move !== "rock" || wasFreshlySummoned || c.voieAtkBonus >= STRATE_CAP) return c;
+  return { ...c, voieAtkBonus: c.voieAtkBonus + 1 };
+}
+
 export function endOfTurnReset(c: Creature, vergerActive = false): Creature {
   // Lot B Round 8 — Voie Feuille slow wilt (Fanaison ÷ 2) :
   //   voieFeuille=true + wiltSkipNext=true  → SKIP wilt ce tour, flip à false

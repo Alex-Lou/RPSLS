@@ -322,7 +322,25 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
     // bonus (mutual destruction = double récompense, agressivité OK).
     const heroA = !newB ? { ...board.a, killBonusPending: true } : board.a;
     const heroB = !newA ? { ...board.b, killBonusPending: true } : board.b;
-    return { ...board, lanes, a: heroA, b: heroB };
+    // SPLASH EN MIROIR (Alex 2026-06-17) : si une créature en TUE une autre avec
+    // un SURPLUS d'ATK (atk > PV de la cible — ex. ma Pierre buffée vs sa Pierre),
+    // le résidu DÉBORDE sur le héros adverse. Rend le combat miroir COHÉRENT avec
+    // la poursuite des counter-kills (qui débordent déjà). Déviable par une Provoc
+    // (Pierre) adverse, exactement comme le splash de poursuite.
+    let out: BoardState = { ...board, lanes, a: heroA, b: heroB };
+    const spA = !newB ? Math.max(0, atkA - cb.hp) : 0; // A a tué B → surplus → héros B
+    const spB = !newA ? Math.max(0, atkB - ca.hp) : 0; // B a tué A → surplus → héros A
+    if (spA > 0) {
+      const d = findDeflector(out, "b");
+      out = d ? consumeProvocation(out, d) : { ...out, b: damageHero(out.b, spA) };
+      alog("combat", `L${laneIdx} MIROIR A tue B, surplus ${spA} → ${d ? `DÉVIÉ L${d.lane}` : "héros b"}`);
+    }
+    if (spB > 0) {
+      const d = findDeflector(out, "a");
+      out = d ? consumeProvocation(out, d) : { ...out, a: damageHero(out.a, spB) };
+      alog("combat", `L${laneIdx} MIROIR B tue A, surplus ${spB} → ${d ? `DÉVIÉ L${d.lane}` : "héros a"}`);
+    }
+    return out;
   }
 
   // TAUNT (Provocation) — findDeflector + hasAntiTaunt + consumeProvocation

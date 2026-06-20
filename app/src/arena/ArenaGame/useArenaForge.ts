@@ -79,6 +79,16 @@ export function useArenaForge({
     }
     const forge = board.forgeA ?? null;
     if (forge) {
+      // ANTI-DOUBLON au RETRAIT (Alex 2026-06-17 « frappe parfaite revient tout
+      // seul ») : impossible de récupérer une carte qu'on a DÉJÀ en main — sinon
+      // on accumule 2 exemplaires (le recover court-circuitait l'anti-doublon de
+      // la pioche). La carte reste sur la forge tant que la copie en main n'est
+      // pas jouée → fini les fusions qui s'empilent dans la main.
+      if (board.a.hand.includes(forge)) {
+        alog("hand", `Récupérer « ${cardFr(forge)} » bloqué : tu as déjà cette carte en main (anti-doublon). Joue-la d'abord — la forge la garde.`);
+        hapticAlert();
+        return;
+      }
       // RÉCUP : SEULE une carte FUSIONNÉE (le payoff, kind:"fusion") coûte
       // FORGE_RECOVER_COST mana (Alex 2026-06-13, option B « plus legit ») →
       // EMPÊCHEMENT (mana serré → fusion coincée sur la forge) + fenêtre de VOL

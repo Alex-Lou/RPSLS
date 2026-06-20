@@ -191,16 +191,24 @@ function RecoverBurst() {
  *    4. PAILLETTES — 22 micro-étincelles qui radient + scintillent + glyphe ✦.
  *  100% transform/opacity + screen → fluide WebView. ONE-SHOT (aucun
  *  repeat:Infinity, AnimatePresence démonte) → zéro coût en idle. */
-function FusionBurst() {
+export function FusionBurst({ size = 1 }: { size?: number }) {
+  // `size` : 1 = petit flash LOCAL sur la forge ; ~1.6 = grande célébration
+  // CENTRÉE sur le plateau (Alex 2026-06-17 « à peine visible/hyper pauvre »).
+  // Tout est dimensionné par `size` (cadre + rayons des particules + glyphe).
   const IMPLODE = Array.from({ length: 14 }, (_, i) => i);
   const SPARKLES = Array.from({ length: 22 }, (_, i) => i);
   const ang = (i: number, n: number) => ((360 / n) * i + (i % 2) * 13) * (Math.PI / 180);
+  const box = 88 * size;
   return (
-    <div className="absolute -inset-4 pointer-events-none" aria-hidden>
+    <div
+      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+      style={{ width: box, height: box }}
+      aria-hidden
+    >
       {/* ── 1. IMPLOSION — particules colorées ASPIRÉES vers le centre ── */}
       {IMPLODE.map((i) => {
         const a = ang(i, 14);
-        const r = 38 + (i % 3) * 6;
+        const r = (38 + (i % 3) * 6) * size;
         const fuchsia = i % 2 === 0;
         return (
           <motion.span
@@ -208,8 +216,8 @@ function FusionBurst() {
             initial={{ opacity: 0, x: Math.cos(a) * r, y: Math.sin(a) * r, scale: 1.3 }}
             animate={{ opacity: [0, 1, 1, 0], x: [Math.cos(a) * r, 0, 0], y: [Math.sin(a) * r, 0, 0], scale: [1.3, 0.4, 0] }}
             transition={{ duration: 0.5, ease: "easeIn", times: [0, 0.25, 0.45, 0.5], delay: (i % 4) * 0.015 }}
-            className="absolute left-1/2 top-1/2 w-1.5 h-1.5 -ml-[3px] -mt-[3px] rounded-full"
-            style={{ background: fuchsia ? "#f0abfc" : "#fcd34d", boxShadow: fuchsia ? "0 0 7px #e879f9" : "0 0 7px #fbbf24" }}
+            className="absolute left-1/2 top-1/2 rounded-full"
+            style={{ width: 6 * size, height: 6 * size, marginLeft: -3 * size, marginTop: -3 * size, background: fuchsia ? "#f0abfc" : "#fcd34d", boxShadow: fuchsia ? `0 0 ${7 * size}px #e879f9` : `0 0 ${7 * size}px #fbbf24` }}
           />
         );
       })}
@@ -227,7 +235,7 @@ function FusionBurst() {
         animate={{ opacity: [0, 0, 1, 0], scale: [0.1, 0.1, 2.6, 3.4] }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.9, ease: "easeOut", times: [0, 0.45, 0.58, 1] }}
-        className="absolute -inset-2 rounded-full"
+        className="absolute inset-0 rounded-full"
         style={{ background: "radial-gradient(circle, rgba(255,255,255,0.98) 0%, rgba(252,211,77,0.75) 38%, transparent 70%)", mixBlendMode: "screen" }}
       />
       {/* ── 3. LUMIÈRE — bloom blanc bref + 2 ondes de choc ── */}
@@ -253,15 +261,15 @@ function FusionBurst() {
       {/* ── 4. PAILLETTES — 22 micro-étincelles qui radient + scintillent ── */}
       {SPARKLES.map((i) => {
         const a = ang(i, 22);
-        const r = 30 + (i % 4) * 12;
+        const r = (30 + (i % 4) * 12) * size;
         return (
           <motion.span
             key={`sp${i}`}
             initial={{ opacity: 0, x: 0, y: 0, scale: 0 }}
             animate={{ opacity: [0, 0, 1, 0], x: [0, 0, Math.cos(a) * r], y: [0, 0, Math.sin(a) * r], scale: [0, 0, 1, 0.2] }}
             transition={{ duration: 0.75, ease: "easeOut", times: [0, 0.45, 0.62, 1], delay: (i % 5) * 0.015 }}
-            className="absolute left-1/2 top-1/2 w-[3px] h-[3px] -ml-[1.5px] -mt-[1.5px] rounded-full bg-amber-50"
-            style={{ boxShadow: "0 0 4px rgba(252,211,77,0.95)" }}
+            className="absolute left-1/2 top-1/2 rounded-full bg-amber-50"
+            style={{ width: 3 * size, height: 3 * size, marginLeft: -1.5 * size, marginTop: -1.5 * size, boxShadow: `0 0 ${4 * size}px rgba(252,211,77,0.95)` }}
           />
         );
       })}
@@ -270,8 +278,8 @@ function FusionBurst() {
         initial={{ opacity: 0, scale: 0.2, rotate: -40 }}
         animate={{ opacity: [0, 0, 1, 0], scale: [0.2, 0.2, 1.7, 2.4], rotate: [-40, -40, 0, 12] }}
         transition={{ duration: 0.95, ease: "easeOut", times: [0, 0.48, 0.72, 1] }}
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-amber-50 text-lg font-black"
-        style={{ textShadow: "0 0 10px rgba(252,211,77,0.95)" }}
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-amber-50 font-black"
+        style={{ fontSize: 18 * size, textShadow: `0 0 ${10 * size}px rgba(252,211,77,0.95)` }}
       >
         ✦
       </motion.span>

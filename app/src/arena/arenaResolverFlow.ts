@@ -152,6 +152,14 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
     b = applyAllSpells(b, playerIntent, cpuIntent);
     setBoard(b);
     setResolveStep("spells");
+    // Flash de strip sur le héros qui ENCAISSE un sort de dégât direct (Supernova,
+    // Trou Noir, Heist…) — Alex 2026-06-17 « la Supernova doit aussi animer le
+    // strip de celui qui la prend dans la poire ». On compare les PV avant/après
+    // l'application des sorts ; le perdant de PV voit son strip flasher (même
+    // langage visuel qu'un coup de lane). Le heal (Second Souffle) ne déclenche
+    // rien (diff positive). lane=0 = placeholder (non lu pour un sort).
+    if (b.a.hp < startBoard.a.hp) setHeroHit({ side: "you", lane: 0, key: Date.now() });
+    if (b.b.hp < startBoard.b.hp) setHeroHit({ side: "opp", lane: 0, key: Date.now() + 1 });
     // Signatures plein-board (Genèse, Supernova, Trou Noir…) — au moment où les
     // sorts FONT effet. ArenaSpellFX filtre ceux sans signature. ArenaGame
     // purge l'état après l'anim (timer nettoyé → pas de fuite).

@@ -24,7 +24,7 @@ import {
   type Side,
   type TurnIntent,
 } from "../arenaTypes";
-import { makeCreature, endOfTurnReset } from "./heroCreature";
+import { makeCreature, endOfTurnReset, gainStrateIfHeld } from "./heroCreature";
 import type { CardId } from "../../ranked/rankedTypes";
 import type { Move } from "../../engine/game";
 
@@ -204,9 +204,12 @@ export function countAliveAffinity(
 }
 
 export function endOfTurnCleanup(board: BoardState): BoardState {
+  // STRATES (Voie Montagne) appliquées APRÈS le reset, en passant le
+  // summonedThisTurn ORIGINAL (avant reset) → une Pierre ne gagne pas de Strate
+  // le tour de son arrivée, seulement après avoir TENU un tour. Cf. gainStrateIfHeld.
   const lanes = board.lanes.map((lane) => ({
-    a: lane.a ? endOfTurnReset(lane.a, board.a.vergerActive) : null,
-    b: lane.b ? endOfTurnReset(lane.b, board.b.vergerActive) : null,
+    a: lane.a ? gainStrateIfHeld(endOfTurnReset(lane.a, board.a.vergerActive), board.a.affinity, lane.a.summonedThisTurn) : null,
+    b: lane.b ? gainStrateIfHeld(endOfTurnReset(lane.b, board.b.vergerActive), board.b.affinity, lane.b.summonedThisTurn) : null,
   })) as [LaneState, LaneState, LaneState];
   // 🔥 PHÉNIX (2026-06-12) : ressuscite à 1 PV les créatures snapshotées au
   // cast (applyPhenix) qui sont mortes ce tour — lane désormais vide. Si la

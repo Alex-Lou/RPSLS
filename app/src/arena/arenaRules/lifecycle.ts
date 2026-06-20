@@ -2,6 +2,7 @@ import { alog, alogSetTurn } from "../arenaLog";
 import {
   CREATURE_STATS,
   MANA_CAP,
+  arenaHandCap,
   type ArenaMatchResult,
   type BoardState,
   type HeroState,
@@ -48,11 +49,20 @@ export function advanceToNextTurn(board: BoardState): BoardState {
   // listées avec mana + flags (kill bonus pending, aegis lock).
   alog("hand", `a hand=[${board.a.hand.join(",")}] deck=${board.a.deck.length} discard=${board.a.discard.length} mana=${board.a.mana}/${board.a.maxMana}${board.a.killBonusPending ? " +K" : ""}`);
   alog("hand", `b hand=[${board.b.hand.join(",")}] deck=${board.b.deck.length} discard=${board.b.discard.length} mana=${board.b.mana}/${board.b.maxMana}${board.b.killBonusPending ? " +K" : ""}`);
-  // Alex feedback 2026-06-09 D : "récompenser l'agression" → si tu as
-  // tué une créature opp ce tour, tu pioches +1 carte bonus au tour
-  // suivant. killBonusPending reset après la pioche bonus.
-  const drawA = 2 + (board.a.killBonusPending ? 1 : 0);
-  const drawB = 2 + (board.b.killBonusPending ? 1 : 0);
+  // ÉCONOMIE EN PHASES (Alex 2026-06-17) : T1-3 = invocations seulement (cap 0).
+  // Dès T4, le PLAFOND de main monte par paliers (3, +1 tous les 3 tours). À
+  // chaque hausse de palier → « CHUTE DE DECK » : on REMPLIT la main jusqu'au
+  // nouveau cap. ENTRE les paliers, la pioche-sur-kill refait +1 (jusqu'au cap).
+  // Jamais au-dessus du cap du moment. Pioches SPÉCIALES (Larcin, sorts) à part.
+  const capNext = arenaHandCap(nextTurn);
+  const capPrev = arenaHandCap(board.turn);
+  const drawFor = (h: HeroState): number => {
+    const room = Math.max(0, capNext - h.hand.length);
+    if (capNext > capPrev) return room;                 // nouveau palier → remplir (chute de deck)
+    return h.killBonusPending ? Math.min(1, room) : 0;  // sinon : +1 sur kill, sous le cap
+  };
+  const drawA = drawFor(board.a);
+  const drawB = drawFor(board.b);
   // Lot D-bis Round 10 — hooks runtime Finishers persistants :
   // VERGER : si vergerActive, hero heal +1/tour (cumulé tant que actif)
   // MÉTAMORPHOSE : si metamorphoseActive, tous mes Lézard refill dodgeCharges
@@ -76,24 +86,42 @@ export function advanceToNextTurn(board: BoardState): BoardState {
   const heroBVerger = board.b.vergerActive ? { ...board.b, hp: Math.min(board.b.maxHp, board.b.hp + 1) } : board.b;
   if (board.a.vergerActive) alog("turn", `a VERGER → +1 HP (${board.a.hp} → ${heroAVerger.hp})`);
   if (board.b.vergerActive) alog("turn", `b VERGER → +1 HP (${board.b.hp} → ${heroBVerger.hp})`);
-  // Filet de sécurité (Alex 2026-06-11) : si après la pioche normale la main
-  // est VIDE, on pioche 1 carte de plus (la pioche reshuffle la défausse,
-  // alimentée par les cartes jouées → il y a presque toujours de quoi).
+  // Filet de sécurité (Alex 2026-06-11) : si après la pioche la main est VIDE,
+  // on pioche 1 de plus — MAIS seulement HORS ouverture (capNext>0), sinon le
+  // filet forcerait une carte pendant les T1-3 « invocations seulement ».
   const drawnA = drawCards(heroAVerger, drawA);
-  const safeA = drawnA.hand.length === 0 ? drawCards(drawnA, 1) : drawnA;
+  const safeA = capNext > 0 && drawnA.hand.length === 0 ? drawCards(drawnA, 1) : drawnA;
   const drawnB = drawCards(heroBVerger, drawB);
-  const safeB = drawnB.hand.length === 0 ? drawCards(drawnB, 1) : drawnB;
-  const a = refreshHero({ ...safeA, killBonusPending: false });
-  const b = refreshHero({ ...safeB, killBonusPending: false });
+  const safeB = capNext > 0 && drawnB.hand.length === 0 ? drawCards(drawnB, 1) : drawnB;
+  // FATIGUE (Alex 2026-06-17 rethink Phase 1) : si le deck est SEC (vide) au
+  // moment de piocher, le héros prend des dégâts CROISSANTS (1, 2, 3…) → le
+  // moment « plus de cartes » devient une horloge léthale qui FORCE la fin au
+  // lieu de stagner en RPSLS prévisible (le point mort « chiant »). Indépendant
+  // par camp = le deck fini a un vrai coût (surpiocher tue plus vite). La mort
+  // par fatigue finit la partie via le `phase` posé plus bas. Cf. ARENA-RETHINK.md.
+  const fatigueOf = (h: HeroState, tag: string): HeroState => {
+    if (h.deck.length > 0) return h;
+    const stacks = (h.fatigueStacks ?? 0) + 1;
+    alog("turn", `FATIGUE ${tag} stack ${stacks} → -${stacks} PV (deck sec, hp ${h.hp}→${Math.max(0, h.hp - stacks)})`);
+    return { ...h, fatigueStacks: stacks, hp: Math.max(0, h.hp - stacks) };
+  };
+  const a = refreshHero({ ...fatigueOf(safeA, "a"), killBonusPending: false });
+  const b = refreshHero({ ...fatigueOf(safeB, "b"), killBonusPending: false });
   // Augur / Oracle Inverse : durée 2 tours (Alex 2026-06-11). Decrement à
   // chaque advance, clear cards quand reach 0.
   const nextATurns = Math.max(0, (board.augurTurnsLeftA ?? 0) - 1);
   const nextBTurns = Math.max(0, (board.augurTurnsLeftB ?? 0) - 1);
+  // Si la FATIGUE met un héros à 0 PV en début de tour, la partie FINIT ici
+  // (le useEffect ArenaGame sur board.phase==="match-end" enregistre + affiche
+  // l'écran de fin). Les deux à 0 le même tour → match-end = nul (matchResult).
+  // En entrée d'advanceToNextTurn les 2 héros sont >0 (le resolver a déjà géré
+  // les morts de combat) → seul un coup de fatigue peut faire passer ≤0 ici.
+  const fatiguePhase = a.hp <= 0 || b.hp <= 0 ? "match-end" : "planning";
   return {
     ...board,
     lanes: lanesAfterFinishers,
     turn: nextTurn,
-    phase: "planning",
+    phase: fatiguePhase,
     a, b,
     augurRevealedA: nextATurns > 0 ? board.augurRevealedA : [],
     augurRevealedB: nextBTurns > 0 ? board.augurRevealedB : [],

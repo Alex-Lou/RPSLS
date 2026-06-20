@@ -365,16 +365,31 @@ function applyOracle(board: BoardState, side: Side): BoardState {
   return withSideHero(board, side, drawCards(hero, 3));
 }
 
-/** Mirror — copy the opp's creature on a lane onto YOUR side of the same
- *  lane (if your side of that lane is empty). The copy starts at full HP. */
+/** Mirror (Miroir) — REWORK (Alex 2026-06-17) : copie la créature adverse d'une
+ *  lane sur TA case vide de la MÊME lane AVEC SES STATS ACTUELLES (PV courants +
+ *  buffs ATK + bonus de Voie type Strates) → un 4/4 buffé devient TON 4/4.
+ *
+ *  POURQUOI : avant, Miroir ne copiait qu'un corps de BASE → STRICTEMENT moins
+ *  bon qu'invoquer GRATUITEMENT le counter du symbole (kill propre), donc inutile.
+ *  Désormais elle ÉGALE une menace développée qu'on ne peut PAS recréer en
+ *  invoquant — vrai cas d'usage, et chiant pour l'adversaire (son investissement
+ *  est copié). Les capacités GRANTÉES (bouclier Aegis, esquive bonus) ne sont PAS
+ *  copiées — seules les stats. Copie FRAÎCHE chez toi (Lente si Pierre/Lézard). */
 function applyMirror(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   if (spell.kind !== "lane") return board;
   const opp = getOppCreatureOnLane(board, side, spell.lane);
   const mine = getMyCreatureOnLane(board, side, spell.lane);
   if (!opp || mine) return board;
-  // Pass my affinity so the copy gets the Voie bonus if applicable.
+  // Base du MÊME symbole côté moi (flags naturels du move + mon bonus de Voie),
+  // puis on ÉCRASE les stats par celles ACTUELLES de la créature adverse.
   const myAffinity = (side === "a" ? board.a : board.b).affinity;
-  return withMyCreatureOnLane(board, side, spell.lane, makeCreature(opp.move, side, myAffinity));
+  const base = makeCreature(opp.move, side, myAffinity);
+  return withMyCreatureOnLane(board, side, spell.lane, {
+    ...base,
+    hp: opp.hp,                     // PV courants (y compris au-dessus de la base via Rempart)
+    atkBuff: opp.atkBuff,           // buffs ATK accumulés
+    voieAtkBonus: opp.voieAtkBonus, // bonus de Voie (Strates, etc.) → ATK égalée
+  });
 }
 
 /** Larcin (Heist) — vrai VOL d'une carte aléatoire de la main adverse

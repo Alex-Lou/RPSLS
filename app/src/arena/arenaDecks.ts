@@ -22,6 +22,7 @@ import { isFinisherCard } from "./arenaFinishers";
 import { CARDS } from "../ranked/cards";
 import type { TurnIntent } from "./arenaTypes";
 import type { CardId } from "../ranked/rankedTypes";
+import type { Move } from "../engine/game";
 
 /** True si la carte peut être placée dans un deck (player ou CPU).
  *  Les Finishers Constellation Pro sont injectés UNIQUEMENT à 3⭐ via
@@ -56,7 +57,7 @@ export const CPU_ARENA_DECK: CardId[] = [
  *  petite que le count requis, on accepte les doublons jusqu'à 2 copies.
  *  Si encore insuffisant, on complète avec d'autres raretés (downgrade
  *  préféré pour ne pas exploser la power level). */
-export function buildCpuDeckMirroring(playerDeck: CardId[]): CardId[] {
+export function buildCpuDeckMirroring(playerDeck: CardId[], cpuAffinity?: Move): CardId[] {
   // Comptage des raretés du joueur (cartes Arena-supported uniquement).
   const counts: Record<string, number> = { common: 0, rare: 0, epic: 0, legendary: 0 };
   for (const id of playerDeck) {
@@ -71,6 +72,9 @@ export function buildCpuDeckMirroring(playerDeck: CardId[]): CardId[] {
   for (const id of Object.keys(CARDS) as CardId[]) {
     if (!isDeckable(id) || !cpuCanPlay(id)) continue;
     const card = CARDS[id];
+    // ORIENTÉ VOIE (Phase B) symétrique au joueur : le CPU n'utilise JAMAIS une
+    // carte d'une AUTRE Voie que la sienne (les neutres + ses signatures restent).
+    if (card.voie && card.voie !== cpuAffinity) continue;
     pools[card.rarity].push(id);
   }
   // Pour chaque rareté du joueur, pige N cartes. PARITÉ ÉCONOMIE 2026-06-13 :
@@ -96,6 +100,10 @@ export function buildCpuDeckMirroring(playerDeck: CardId[]): CardId[] {
       const j = Math.floor(Math.random() * (i + 1));
       [pool[i], pool[j]] = [pool[j], pool[i]];
     }
+    // Signatures de la Voie CPU EN PREMIER (tri stable) → archétype vs archétype.
+    pool.sort((a, b) =>
+      (cpuAffinity && CARDS[a]?.voie === cpuAffinity ? 0 : 1) - (cpuAffinity && CARDS[b]?.voie === cpuAffinity ? 0 : 1),
+    );
     let added = 0;
     // 1re passe : 1 copie par carte
     for (const c of pool) {
@@ -155,7 +163,7 @@ export const RARITY_COPIES: Record<string, number> = {
  *  bloqué dans le DeckManager. Tunable d'un seul chiffre. */
 export const ARENA_LEGENDARY_CAP = 2;
 
-export function buildPlayerDeck(saved: CardId[] | undefined): CardId[] {
+export function buildPlayerDeck(saved: CardId[] | undefined, affinity?: Move): CardId[] {
   // REFONTE Alex 2026-06-12 : le deck RESPECTE les choix du joueur (zéro
   // carte parasite). ÉCONOMIE 2026-06-13 : chaque carte choisie est étendue
   // en N copies selon sa rareté (3/2/2/1) → un deck de 8 choix ≈ 16-20
@@ -189,21 +197,43 @@ export function buildPlayerDeck(saved: CardId[] | undefined): CardId[] {
   for (const c of chosen) {
     for (let k = 0; k < copiesFor(c); k++) tryPush(c);
   }
-  // 2) Filet de portée : 1 carte reach garantie SEULEMENT si aucune présente —
-  //    supernova (légendaire) si on est SOUS le cap, sinon heist (épique) pour
-  //    ne pas dépasser ARENA_LEGENDARY_CAP.
+  // 2) Filet de portée : 1 carte reach garantie SEULEMENT si aucune présente.
+  //    HEIST (épique) au lieu de supernova (Alex 2026-06-17 « je vois supernova
+  //    trop facilement ») : on n'IMPOSE plus la légendaire — le joueur peut
+  //    toujours CHOISIR supernova dans son deck, mais elle n'est plus auto-
+  //    injectée. heist garde la portée (entame le héros board plein) sans flooder.
   if (!out.some((c) => REACH_CARDS.has(c))) {
-    tryPush(out.filter(isLegend).length < ARENA_LEGENDARY_CAP ? "supernova" : "heist");
+    tryPush("heist");
   }
-  // 3) ANTI-POINT-MORT (Alex : "aucun point mort, coincé") : l'exil des
-  //    légendaires retire des cartes du cycle — si le deck choisi est trop
-  //    légendaire-lourd, le pool recyclable peut s'assécher. Garantie : au
-  //    moins 6 cartes NON-légendaires dans le deck, complétées en communes
-  //    neutres si besoin (filler NÉCESSAIRE, donc légitime).
-  const FILLER: CardId[] = ["aegis", "precision", "second-wind", "surge", "augur", "anchor", "tide", "curse", "mirror"];
-  const nonLegendary = () => out.filter((c) => CARDS[c]?.rarity !== "legendary").length;
-  for (const f of FILLER) {
-    if (nonLegendary() >= 6) break;
+  // 3) ANTI-POINT-MORT SEULEMENT (Alex 2026-06-17 « trop de cartes/variétés =
+  //    dégueulis sans stratégie, je veux un CHALLENGE ») : on NE gonfle PLUS le
+  //    deck. Un deck normal reste COHÉRENT (TES choix, pas un sac de cartes
+  //    random) → la rareté/gestion vient de la pioche lente (1/tour), pas d'un
+  //    deck géant. On garantit juste un MINIMUM de 6 cartes NON-légendaires si le
+  //    deck choisi est trop léger / légendaire-lourd (l'exil des légendaires
+  //    assèche le pool sinon), complété par des cartes DISTINCTES variées (jamais
+  //    de copie en plus). Le CPU mirror raisonne par RARETÉ → parité préservée.
+  const have = new Set<CardId>(out);
+  // ORIENTÉ VOIE (Phase B, Alex 2026-06-17) : on EXCLUT toute carte d'une AUTRE
+  // Voie et on PRIORISE les SIGNATURES de ta Voie (voie===affinity), puis les
+  // neutres → le complément reste COHÉRENT au lieu d'un sac random. Les cartes
+  // hors-Voie ne sont JAMAIS auto-injectées (le joueur peut toujours les FORCER
+  // dans son deck via le DeckManager — souveraineté). Cf. VOIE-ARCHETYPES.md.
+  const padPool = (Object.keys(CARDS) as CardId[]).filter(
+    (c) => !have.has(c) && isDeckable(c) && CARDS[c]?.rarity !== "legendary"
+      && (CARDS[c]?.voie === undefined || CARDS[c]?.voie === affinity),
+  );
+  for (let i = padPool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [padPool[i], padPool[j]] = [padPool[j], padPool[i]];
+  }
+  // Signatures de la Voie EN PREMIER (tri stable → ordre aléatoire conservé par groupe).
+  padPool.sort((a, b) =>
+    (affinity && CARDS[a]?.voie === affinity ? 0 : 1) - (affinity && CARDS[b]?.voie === affinity ? 0 : 1),
+  );
+  const nonLegendaryCount = () => out.filter((c) => CARDS[c]?.rarity !== "legendary").length;
+  for (const f of padPool) {
+    if (nonLegendaryCount() >= 6) break;
     tryPush(f);
   }
   return out;

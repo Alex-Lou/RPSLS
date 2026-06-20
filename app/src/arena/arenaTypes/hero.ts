@@ -45,6 +45,12 @@ export interface HeroState {
    *  tour. Set à true dans resolveLaneCombat quand une mort est causée,
    *  reset à false au début du tour suivant après la pioche bonus. */
   killBonusPending?: boolean;
+  /** FATIGUE (Alex 2026-06-17 rethink Phase 1) : nombre de tours où ce héros a
+   *  pioché alors que son deck était SEC (vide). Chaque tour à sec inflige
+   *  `fatigueStacks` PV de dégât (1, 2, 3…) → horloge léthale qui FORCE la fin
+   *  quand les cartes s'épuisent (fini le point mort RPSLS prévisible). 0/absent
+   *  tant que le deck a des cartes. Match-local, jamais persisté. */
+  fatigueStacks?: number;
   /** Lot C — Constellation 3⭐ : compteur cumulé de summons d'Affinité.
    *  Chaque fois que le hero pose son symbole d'Affinité, on incrémente.
    *  À 3 / 3, la constellation est complète → le Finisher se débloque

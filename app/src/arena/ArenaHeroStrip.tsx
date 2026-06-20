@@ -96,6 +96,14 @@ export function ArenaHeroStrip({
     const id = window.setTimeout(() => setBloodDrip(null), 1500);
     return () => window.clearTimeout(id);
   }, [bloodDrip?.key]);
+  // Révélation PROGRESSIVE de la Voie ADVERSE (Alex 2026-06-17 rethink Phase 0).
+  // COLLANT : dès que l'opp a posé son symbole d'Affinité (constellationCount ≥ 1
+  // = « vu »), sa Voie reste révélée même si la créature meurt ensuite. Côté
+  // joueur : toujours visible (c'est ta Voie). Reset au remount (rematch).
+  const [voieSeen, setVoieSeen] = useState(false);
+  useEffect(() => {
+    if ((hero.constellationCount ?? 0) >= 1) setVoieSeen(true);
+  }, [hero.constellationCount]);
   useEffect(() => {
     const prev = prevHpRef.current;
     if (hero.hp < prev) {
@@ -113,6 +121,9 @@ export function ArenaHeroStrip({
     }
     prevHpRef.current = hero.hp;
   }, [hero.hp]);
+  // Opp avant sa 1ʳᵉ étoile → Voie cachée (couleur neutre, pas de glyphe/nom, pas
+  // de motif d'aura). `< 1` couvre le frame courant, `!voieSeen` la persistance.
+  const voieConcealed = side === "opp" && !voieSeen && (hero.constellationCount ?? 0) < 1;
   return (
     <div className={"relative flex items-center gap-1 " + (side === "you" ? "pl-0 pr-1" : "px-1")}>
       {/* 🎨 Identité visuelle PERSO de la Voie — calque animé derrière le HUD,
@@ -121,7 +132,7 @@ export function ArenaHeroStrip({
       {/* Aura de Voie pour LES DEUX camps (Alex 2026-06-13 : « le strip de
        *  chacun doit être robuste et vivant ») — chacun dans SON univers (sa
        *  propre affinité). L'adversaire n'est plus « à poil ». */}
-      {hero.affinity && <VoieAura affinity={hero.affinity} side={side} calm={calm} />}
+      {hero.affinity && <VoieAura affinity={hero.affinity} side={side} calm={calm} concealed={voieConcealed} />}
       {/* Augur peek — overlay FULL WIDTH du strip outer (Alex 2026-06-11) :
        *  le rendu était dans le portrait div w-16 → cartes invisibles car
        *  l'overlay débordait. Ici on a tout l'espace du strip. */}
@@ -222,6 +233,7 @@ export function ArenaHeroStrip({
             side={side}
             finisherUnlocked={hero.finisherUnlocked}
             calm={calm}
+            concealed={voieConcealed}
           />
         )}
         {/* Ligne 2 — barre de vie. */}
@@ -347,7 +359,10 @@ export function ArenaHeroStrip({
                 />
               ))}
             </div>
-            <span className="font-bold text-ink-muted">🂠 {hero.hand.length}</span>
+            {/* Compteur de main MASQUÉ quand la main est vide (Alex 2026-06-17) :
+             *  pendant l'OUVERTURE (T1-3, 0 carte) on n'affiche aucune info de
+             *  pioche/main → on garde la SURPRISE du déblocage des cartes. */}
+            {hero.hand.length > 0 && <span className="font-bold text-ink-muted">🂠 {hero.hand.length}</span>}
             {side === "you" && <span className="font-bold text-themed">T{turn}</span>}
           </div>
         </div>

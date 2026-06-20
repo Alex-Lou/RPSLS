@@ -132,45 +132,49 @@ function shuffle<T>(input: readonly T[]): T[] {
 // HAND_RARITY_CAP (cap 3/2/1/1 par rareté) RETIRÉ (Alex 2026-06-13) : remplacé
 // par la règle ANTI-DOUBLON stricte (max 1 copie en main) dans drawCards.
 
-/** Pioche UNE carte du deck en ÉVITANT les doublons de `avoid` (typiquement
- *  la main) — RÈGLE ANTI-DOUBLON (Alex 2026-06-13) : « tant qu'une carte est en
- *  main, on ne peut pas la repiocher ; si elle n'y est plus, la pioche aléatoire
- *  PEUT la ramener ». Reshuffle la défausse au besoin. FILET ANTI-TOUR-MORT : si
- *  TOUT le pool (deck+défausse) est en doublon de `avoid`, on pioche quand même
- *  (sinon pioche vide = pire). Retourne null seulement si plus AUCUNE carte.
+/** Pioche UNE carte du deck en ÉVITANT les doublons de `avoid` (typiquement la
+ *  main) — ANTI-DOUBLON STRICT (Alex 2026-06-17 « jamais 2 fois la même carte en
+ *  main ») : on ne pioche QUE si une carte non encore en main existe dans le
+ *  deck ; sinon on retourne null (on ne ramène JAMAIS un doublon). Le deck NE
+ *  recycle PLUS la défausse (deck fini). Retourne null si le deck est vide OU si
+ *  tout le deck restant est en doublon de `avoid`.
  *
  *  L'exception « Larcin / pioche au hasard chez l'adversaire » (et Écho) n'est
  *  PAS concernée : ces effets ajoutent à la main SANS passer par ici. */
 export function drawOneAvoidingHand(
   avoid: readonly CardId[], deck: readonly CardId[], discard: readonly CardId[],
+  softAvoid: readonly CardId[] = [],
 ): { card: CardId; deck: CardId[]; discard: CardId[] } | null {
-  let d = deck.slice();
-  let disc = discard.slice();
-  // ⚖️ Légendaires NE RECYCLENT PAS (Alex 2026-06-13 « 4 légendaires en repioche,
-  // wtf ») : à chaque RESHUFFLE de la défausse on les DROPPE → une légendaire VUE
-  // ne revient jamais en pioche. En plus de l'exil au CAST, ça sort aussi du
-  // cycle une légendaire défaussée SANS être jouée (Juge/Cascade) — fini le flood.
-  const noLegend = (pool: CardId[]) => pool.filter((c) => CARDS[c]?.rarity !== "legendary");
-  if (d.length === 0) {
-    const pool = noLegend(disc);
-    if (pool.length === 0) return null;
-    d = shuffle(pool); disc = [];
-  }
-  // Préfère une carte PAS déjà dans `avoid`.
-  let idx = d.findIndex((c) => !avoid.includes(c));
-  if (idx < 0 && disc.length > 0) {
-    // Rien de neuf dans le deck → injecte la défausse mélangée (sans légendaires).
-    d = d.concat(shuffle(noLegend(disc))); disc = [];
-    idx = d.findIndex((c) => !avoid.includes(c));
-  }
-  if (idx < 0) idx = 0; // tout le pool est doublon → filet : pioche la tête
+  const d = deck.slice();
+  const disc = discard.slice();
+  // 🔒 DECK FINI (Alex 2026-06-17) : la défausse NE RECYCLE PLUS dans le deck.
+  // Une carte jouée ne REVIENT jamais (fini le « retour des mêmes cartes
+  // triches ») et le deck s'ÉPUISE → vraie gestion de ressources + les parties
+  // finissent (on manque de cartes → il faut conclure). Le deck est mélangé UNE
+  // fois à l'init (makeHero → shuffle) donc l'ordre de pioche reste aléatoire et
+  // équitable sur tout le deck. Deck vide → null : main+deck vides = tu joues
+  // quand même en RPSLS/invocations (les moves ne coûtent pas de carte). Les
+  // effets qui RAJOUTENT en main (Écho, Larcin) passent hors d'ici, intacts.
+  if (d.length === 0) return null;
+  // Anti-récurrence à 2 niveaux (Alex 2026-06-17) :
+  //  • DUR (`avoid` = la main) : JAMAIS 2 fois la même carte en main. Inviolable.
+  //  • DOUX (`softAvoid` = cartes jouées récemment) : on évite de repiocher une
+  //    carte (ou une autre de ses copies) jouée il y a peu (« aegis revient juste
+  //    après le tour où je l'ai utilisé ») — MAIS seulement SI une autre carte
+  //    existe. Sinon on autorise une carte récente plutôt que de ne rien piocher
+  //    (pas de famine de pioche). Le doublon EN MAIN reste, lui, impossible.
+  let idx = d.findIndex((c) => !avoid.includes(c) && !softAvoid.includes(c));
+  if (idx < 0) idx = d.findIndex((c) => !avoid.includes(c)); // fallback : récent toléré
+  if (idx < 0) return null; // tout le deck est en main → rien (jamais de doublon main)
   const [card] = d.splice(idx, 1);
   return { card, deck: d, discard: disc };
 }
 
-/** Pull `n` cards from the deck → hand (reshuffles discard into deck if the
- *  deck runs dry mid-draw). Returns the new HeroState. Cap at HAND_CAP — extra
- *  cards sont "burned" (lost to the void — classic overdraw rule).
+/** Pull `n` cards from the deck → hand. Returns the new HeroState. Cap at
+ *  HAND_CAP — extra cards sont "burned" (lost to the void — classic overdraw).
+ *  DECK FINI (Alex 2026-06-17) : la défausse ne recycle PLUS (cf.
+ *  drawOneAvoidingHand) — si le deck s'épuise en cours de pioche, on s'arrête
+ *  (break sur null) ; une carte jouée ne revient jamais.
  *
  *  RÈGLE ANTI-DOUBLON (Alex 2026-06-13) : on ne pioche jamais une carte DÉJÀ en
  *  main tant qu'elle y est (remplace l'ancien cap par rareté 3/2/1/1, plus
@@ -183,10 +187,18 @@ export function drawCards(hero: HeroState, n: number): HeroState {
   const castEvents: CastOnDrawEvent[] = [];
   let toDraw = n;
   let guard = 0; // filet anti-boucle (deck 100% à-la-pioche / pioches en chaîne)
+  // ANTI-RÉCURRENCE (Alex 2026-06-17 « aegis revient juste après le tour où je
+  // l'ai utilisé ») : les cartes JOUÉES récemment sont en queue de défausse
+  // (cf. arenaResolvePrep). On évite de repiocher une de leurs copies pendant ce
+  // tour (softAvoid) → une carte ne réapparaît pas juste après son usage. Fenêtre
+  // courte = ~les 4 derniers jeux. C'est DOUX : si rien d'autre n'est piochable,
+  // on autorise quand même (pas de famine), mais jamais un doublon en main.
+  const RECENT_PLAY_WINDOW = 4;
+  const recentlyPlayed = hero.discard.slice(-RECENT_PLAY_WINDOW);
   while (toDraw > 0 && guard < 64) {
     guard++;
     toDraw--;
-    const res = drawOneAvoidingHand(hand, deck, discard);
+    const res = drawOneAvoidingHand(hand, deck, discard, recentlyPlayed);
     if (!res) break; // plus aucune carte (deck + défausse vides)
     deck = res.deck;
     discard = res.discard;

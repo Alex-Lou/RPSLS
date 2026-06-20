@@ -248,22 +248,62 @@ function PaperWrap() {
   );
 }
 
-/** LÉZARD — MORSURE : deux mâchoires (croissants) qui se REFERMENT du haut et
- *  du bas vers le centre. Convergence VERTICALE (≠ des autres). */
+/** LÉZARD — MORSURE (Alex 2026-06-17 « une gueule/crocs d'animal qui se referme
+ *  sur la lane », façon buff Osamodas vieux Dofus) : deux MÂCHOIRES à CROCS
+ *  (haute violette + basse cyan, crocs DÉCALÉS qui s'imbriquent) qui CLAQUENT
+ *  l'une sur l'autre au centre de la lane, snap + léger rebond + flash de morsure.
+ *  Palette iridescente Mirage. 100% transform/opacity + SVG, one-shot. */
 function LizardFlick() {
+  const SNAP = { duration: 0.5, times: [0, 0.5, 0.64, 1], ease: [0.5, 0, 0.18, 1] as const, delay: 0.04 };
+  const JAW_SHADOW = "drop-shadow(0 0 6px rgba(167,139,250,0.85))";
   return (
     <>
+      {/* Mâchoire HAUTE — crocs vers le bas, claque depuis le haut. */}
       <motion.div
-        initial={{ opacity: 0, y: "-95%" }} animate={{ opacity: [0, 1, 0], y: ["-95%", "-14%", "-14%"] }} exit={{ opacity: 0 }}
-        transition={{ duration: 0.4, times: [0, 0.55, 1], ease: "easeOut", delay: 0.04 }}
-        className="absolute left-1/2 top-1/2 w-12 h-6 -ml-6 -mt-3"
-        style={{ borderRadius: "0 0 100% 100%", background: "linear-gradient(180deg, rgba(196,181,253,0.92), rgba(124,58,237,0.45))", boxShadow: "0 0 11px rgba(34,211,238,0.75)" }}
-      />
+        className="absolute left-1 right-1 top-0 h-1/2"
+        initial={{ opacity: 0, y: "-72%" }}
+        animate={{ opacity: [0, 1, 1, 0], y: ["-72%", "16%", "9%", "9%"] }}
+        exit={{ opacity: 0 }}
+        transition={SNAP}
+      >
+        <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="w-full h-full" style={{ filter: JAW_SHADOW }}>
+          <defs>
+            <linearGradient id="lzUp" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#ddd6fe" /><stop offset="55%" stopColor="#a78bfa" /><stop offset="100%" stopColor="#6d28d9" />
+            </linearGradient>
+          </defs>
+          {/* gencive haute + 5 crocs pointant vers le bas */}
+          <path d="M0 0 H100 V13 L90 39 L80 13 L66 39 L52 13 L38 39 L24 13 L12 39 L2 13 L0 14 Z" fill="url(#lzUp)" />
+          <path d="M0 0 H100 V7 H0 Z" fill="rgba(243,240,255,0.55)" />
+        </svg>
+      </motion.div>
+      {/* Mâchoire BASSE — crocs vers le haut, DÉCALÉS pour s'imbriquer. */}
       <motion.div
-        initial={{ opacity: 0, y: "95%" }} animate={{ opacity: [0, 1, 0], y: ["95%", "14%", "14%"] }} exit={{ opacity: 0 }}
-        transition={{ duration: 0.4, times: [0, 0.55, 1], ease: "easeOut", delay: 0.04 }}
-        className="absolute left-1/2 top-1/2 w-12 h-6 -ml-6 -mt-3"
-        style={{ borderRadius: "100% 100% 0 0", background: "linear-gradient(0deg, rgba(34,211,238,0.92), rgba(8,145,178,0.45))", boxShadow: "0 0 11px rgba(167,139,250,0.75)" }}
+        className="absolute left-1 right-1 bottom-0 h-1/2"
+        initial={{ opacity: 0, y: "72%" }}
+        animate={{ opacity: [0, 1, 1, 0], y: ["72%", "-16%", "-9%", "-9%"] }}
+        exit={{ opacity: 0 }}
+        transition={SNAP}
+      >
+        <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="w-full h-full" style={{ filter: JAW_SHADOW }}>
+          <defs>
+            <linearGradient id="lzLo" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#0e7490" /><stop offset="45%" stopColor="#22d3ee" /><stop offset="100%" stopColor="#a5f3fc" />
+            </linearGradient>
+          </defs>
+          {/* crocs vers le haut, x décalés de ~7 vs la mâchoire haute → ils s'imbriquent */}
+          <path d="M0 40 H100 V27 L96 1 L84 27 L70 1 L56 27 L42 1 L28 27 L16 1 L6 27 L0 26 Z" fill="url(#lzLo)" />
+          <path d="M0 40 H100 V33 H0 Z" fill="rgba(207,250,254,0.5)" />
+        </svg>
+      </motion.div>
+      {/* Flash de MORSURE au centre, au moment de la fermeture. */}
+      <motion.div
+        initial={{ opacity: 0, scaleX: 0.35 }}
+        animate={{ opacity: [0, 0, 0.9, 0], scaleX: [0.35, 0.35, 1, 1.15] }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.5, times: [0, 0.48, 0.6, 1], ease: "easeOut", delay: 0.04 }}
+        className="absolute left-2 right-2 top-1/2 h-[3px] -mt-[1.5px] rounded-full"
+        style={{ background: "linear-gradient(90deg, transparent, rgba(237,233,254,0.97), transparent)", boxShadow: "0 0 12px rgba(167,139,250,0.95)", mixBlendMode: "screen" }}
       />
     </>
   );

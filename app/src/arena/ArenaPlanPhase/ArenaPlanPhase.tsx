@@ -16,8 +16,10 @@
  * MVP: simple-but-readable. Phase 2 polishes the animations.
  */
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence } from "motion/react";
+import { ArenaDeckDrop } from "../ArenaDeckDrop";
 import type { Move } from "../../engine/game";
 import { hapticAlert, hapticTap } from "../../haptic";
 import { CARDS } from "../../ranked/cards";
@@ -29,7 +31,8 @@ import { isFusible, findFusionResult, fusionPartnersOf } from "../arenaFusionCar
 import { alog } from "../arenaLog";
 import { ArenaHeroStrip } from "../ArenaHeroStrip";
 import { ArenaCardInspect } from "../ArenaCardInspect";
-import { CARD_TARGET_KIND as SHARED_TARGET_KIND, LANE_SPELL_TARGET_SIDE, intentManaGrant, type ArenaTargeting } from "../arenaTypes";
+import { CARD_TARGET_KIND as SHARED_TARGET_KIND, LANE_SPELL_TARGET_SIDE, intentManaGrant, OPENING_TURNS, type ArenaTargeting } from "../arenaTypes";
+import { ArenaCardBack } from "../ArenaCardBack";
 import type {
   BoardState,
   LaneIndex,
@@ -115,6 +118,21 @@ export function ArenaPlanPhase({
   // être sélectionnées ») : au pointer-down on la passe DEVANT (z + remontée)
   // → le geste atterrit sur la bonne carte malgré le chevauchement de l'éventail.
   const [pressedPos, setPressedPos] = useState<number | null>(null);
+  // RÉVÉLATION phase 1→2 « DÉPLOIEMENT » (Alex 2026-06-17) : joué UNE fois quand
+  // l'OUVERTURE finit (turn = OPENING_TURNS+1) et que les 1res cartes sont en
+  // main → elles tombent du deck + se RETOURNENT (ArenaDeckDrop). Auto-dismiss.
+  const [deckDrop, setDeckDrop] = useState<{ key: number; cards: CardId[] } | null>(null);
+  const deckDropFiredRef = useRef(false);
+  useEffect(() => {
+    if (deckDropFiredRef.current) return;
+    if (board.turn === OPENING_TURNS + 1 && me.hand.length > 0 && !disabled) {
+      deckDropFiredRef.current = true;
+      setDeckDrop({ key: Date.now(), cards: me.hand });
+      const id = window.setTimeout(() => setDeckDrop(null), 2100);
+      return () => window.clearTimeout(id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [board.turn, me.hand.length, disabled]);
   // (Pill nom : rendue par-carte sous la carte active — cf. éventail.)
 
   function pickMoveToSummon(mv: Move) {
@@ -275,6 +293,11 @@ export function ArenaPlanPhase({
 
   return (
     <div className="flex flex-col gap-1 px-2 pb-1.5 shrink-0">
+      {/* RÉVÉLATION « DÉPLOIEMENT » plein écran (portal) — passage phase 1→2. */}
+      {deckDrop && createPortal(
+        <ArenaDeckDrop key={deckDrop.key} cards={deckDrop.cards} phaseName="Déploiement" />,
+        document.body,
+      )}
       {/* Phrase jaune retirée (Alex 2026-06-11) : les lanes illuminées indiquent
        *  déjà où cibler, et re-tap sur le move/carte = annuler. */}
 
@@ -361,25 +384,53 @@ export function ArenaPlanPhase({
         commitDragDrop={commitDragDrop}
       />
 
+      {/* OUVERTURE (Alex 2026-06-17) : T1-3 la main est VIDE par design — on
+       *  N'ANNONCE RIEN (ni icône main vide, ni « cartes au tour 4 ») pour garder
+       *  la SURPRISE du déblocage. La phase d'ouverture = invocations seulement,
+       *  le joueur le découvre par le jeu. (Bannière retirée.) */}
       {/* É1 COCKPIT (audit UX 2026-06-12) — la main et le bouton FIN DE TOUR
        *  partagent une RANGÉE façon Hearthstone : main éventail flex-1 +
        *  bouton ROND doré fixe à droite (badge mana planifié intégré). */}
       <div className="shrink-0 flex items-end gap-1.5">
-        <ArenaHandFanout
-          intent={intent}
-          me={me}
-          board={board}
-          manaLeft={manaLeft}
-          targeting={targeting}
-          inspecting={inspecting}
-          disabled={disabled}
-          activePos={activePos}
-          setActivePos={setActivePos}
-          pressedPos={pressedPos}
-          setPressedPos={setPressedPos}
-          startPress={startPress}
-          endPress={endPress}
-        />
+        {board.turn <= OPENING_TURNS ? (
+          /* DECK FACE CACHÉE qui ATTEND (Alex 2026-06-17) : occupe l'espace de la
+             main pendant l'ouverture + POSE la surprise — c'est cette pile qui
+             « tombera » à T4 (chute de deck). Dos premium ArenaCardBack. */
+          <div className="flex-1 flex flex-col items-center justify-end gap-1 pb-0.5" aria-hidden>
+            <div className="relative" style={{ width: 54, height: 74 }}>
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="absolute inset-0"
+                  style={{ transform: `rotate(${(i - 1) * 4}deg) translateX(${(i - 1) * 3}px)`, zIndex: i }}
+                >
+                  <ArenaCardBack className="w-full h-full" glow={i === 2} />
+                </div>
+              ))}
+            </div>
+            {/* INDICATEUR de phase (Alex 2026-06-17 : « Ouverture » se lisait comme
+             *  un bouton « appuyer pour ouvrir ») → « PHASE 1 », un statut non
+             *  actionnable qui annonce la « PHASE 2 · DÉPLOIEMENT » de la révélation,
+             *  sans dire QUAND les cartes arrivent (surprise préservée). */}
+            <div className="text-[8px] uppercase tracking-[0.32em] font-black text-amber-200/60">Phase 1</div>
+          </div>
+        ) : (
+          <ArenaHandFanout
+            intent={intent}
+            me={me}
+            board={board}
+            manaLeft={manaLeft}
+            targeting={targeting}
+            inspecting={inspecting}
+            disabled={disabled}
+            activePos={activePos}
+            setActivePos={setActivePos}
+            pressedPos={pressedPos}
+            setPressedPos={setPressedPos}
+            startPress={startPress}
+            endPress={endPress}
+          />
+        )}
         <ArenaLockButton
           canLock={canLock}
           targeting={targeting}

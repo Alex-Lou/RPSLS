@@ -96,6 +96,7 @@ export function ArenaGame({
     (player.arenaDeck ?? player.rankedDeck ?? []).filter(
       (id): id is CardId => Object.prototype.hasOwnProperty.call(CARDS, id),
     ),
+    player.arenaAffinity, // orienté Voie (Phase B) : priorise tes signatures, exclut les autres Voies
   ));
   // Constellation Pro v2 Couche 1 — Affinité du joueur passée au moteur.
   // Le CPU prend une Affinité ALÉATOIRE à chaque match (Constellation 3⭐
@@ -132,7 +133,7 @@ export function ArenaGame({
   const cardFr = (id: CardId) => t(CARDS[id]?.nameKey ?? "") || id;
 
   const [board, setBoard] = useState<BoardState>(() =>
-    makeInitialBoard(playerDeck.current, buildCpuDeckMirroring(playerDeck.current), playerAffinity.current, cpuAffinity.current, cpuPersona.current),
+    makeInitialBoard(playerDeck.current, buildCpuDeckMirroring(playerDeck.current, cpuAffinity.current), playerAffinity.current, cpuAffinity.current, cpuPersona.current),
   );
 
   // ── MULLIGAN T1 (Alex 2026-06-13 économie expert) ──
@@ -599,7 +600,7 @@ export function ArenaGame({
       {/* ── MULLIGAN T1 — modale extraite (ArenaMulligan) : empilage des
        *  doublons + remplacement IMMÉDIAT en place (Alex 2026-06-13). ── */}
       <AnimatePresence>
-        {mulliganOpen && board.turn === 1 && !resolving && (
+        {mulliganOpen && board.turn === 1 && board.a.hand.length > 0 && !resolving && (
           <ArenaMulligan
             hand={board.a.hand}
             swapsLeft={mulliganSwapsLeft}

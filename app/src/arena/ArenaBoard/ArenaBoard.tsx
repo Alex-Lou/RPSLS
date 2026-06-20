@@ -28,7 +28,8 @@ import { useT } from "../../i18n";
 import { ArenaHeroStrip } from "../ArenaHeroStrip";
 import { ArenaSpellsReveal } from "../ArenaSpellsReveal";
 import { ArenaSpellFX } from "../ArenaSpellFX";
-import { ForgeSlot } from "../ArenaForge";
+import { ForgeSlot, FusionBurst } from "../ArenaForge";
+import { CardImage } from "../../ranked/CardImage";
 import { ArenaHpVignette } from "../ArenaHpVignette";
 import { isValidLaneTarget, targetLabelFor, LANE_SPELL_TARGET_SIDE, CARD_TARGET_KIND } from "../arenaTypes";
 import { ArenaCardInspect } from "../ArenaCardInspect";
@@ -131,6 +132,16 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
   const t = useT();
   // Fiche LECTURE SEULE d'une carte adverse révélée par Augure (long-press).
   const [inspectOpp, setInspectOpp] = useState<CardId | null>(null);
+  // ✦ RÉVÉLATION DE FUSION (Alex 2026-06-17) : on CAPTURE la carte forgée à
+  // l'instant exact du flash (forgeFlashKey ne bump QUE sur une fusion, jamais
+  // sur un simple dépôt) → on la révèle ensuite en grand plein centre. La
+  // capture évite qu'un dépôt ultérieur (forgeFlashKey inchangé) ne ré-affiche
+  // la révélation, et fige la carte même si le joueur récupère vite.
+  const [fuseReveal, setFuseReveal] = useState<{ key: number; card: CardId } | null>(null);
+  useEffect(() => {
+    if (forgeFlashKey && forgeYou) setFuseReveal({ key: forgeFlashKey, card: forgeYou });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forgeFlashKey]);
   useEffect(() => {
     if (combatLane === null) return;
     padShake.start({
@@ -323,6 +334,35 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
         {/* ✦ SIGNATURES FX plein-board (Genèse, Supernova…) — overlay z-40 sur
          *  toute la zone des lanes, joué au step SPELLS puis auto-démonté. */}
         <ArenaSpellFX fx={spellFX} />
+        {/* ✦ RÉVÉLATION DE FUSION plein centre (Alex 2026-06-17 : « boum la carte
+            apparaît, 0 animation, mal placée »). La carte forgée SURGIT en grand
+            au centre du pad avec le burst autour → l'œil va dessus (la carte est
+            la vedette, façon « craft » Hearthstone), puis tout s'efface. Centré =
+            fini le décalage par rapport à la forge. */}
+        <AnimatePresence>
+          {fuseReveal && (
+            <motion.div
+              key={`fuse-reveal-${fuseReveal.key}`}
+              className="absolute inset-0 flex items-center justify-center pointer-events-none"
+              style={{ zIndex: 48 }}
+              aria-hidden
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 1, 1, 0] }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.5, ease: "easeInOut", times: [0, 0.1, 0.78, 1] }}
+            >
+              <FusionBurst size={1.9} />
+              <motion.div
+                className="relative w-16 sm:w-[72px] rounded-md overflow-hidden ring-2 ring-amber-300/90 shadow-[0_8px_22px_rgba(252,211,77,0.5)]"
+                initial={{ scale: 0.2, rotate: -12, opacity: 0 }}
+                animate={{ scale: [0.2, 1.18, 1], rotate: [-12, 5, 0], opacity: [0, 1, 1] }}
+                transition={{ duration: 0.62, ease: "easeOut", times: [0, 0.72, 1] }}
+              >
+                <CardImage id={fuseReveal.card} glyphSize="text-base" />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
         {/* Opponent lane row — ghost previews of opp summons during reveal.
          *  Slots become tappable when a spell targets OPP creatures (Curse,
          *  Sangsue, Trou Noir). */}

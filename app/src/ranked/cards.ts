@@ -15,28 +15,28 @@ export const CARDS: Record<CardId, RankedCard> = {
     art: "/Cards Bonus/aegis.png",
   },
   precision: {
-    id: "precision", cost: 1, rarity: "common",
+    id: "precision", cost: 1, rarity: "common", voie: "scissors",
     target: "lane", palette: "emerald", glyph: "🎯",
     nameKey: "ranked.cards.precision.name", descKey: "ranked.cards.precision.desc",
     targetHintKey: "ranked.cards.precision.targetHint",
     art: "/Cards Bonus/precision.png",
   },
   anchor: {
-    id: "anchor", cost: 1, rarity: "common",
+    id: "anchor", cost: 1, rarity: "common", voie: "rock",
     target: "lane", palette: "zinc", glyph: "🪨",
     nameKey: "ranked.cards.anchor.name", descKey: "ranked.cards.anchor.desc",
     targetHintKey: "ranked.cards.anchor.targetHint",
     art: "/Cards Bonus/anchor.png",
   },
   "second-wind": {
-    id: "second-wind", cost: 1, rarity: "common",
+    id: "second-wind", cost: 1, rarity: "common", voie: "paper",
     target: "self", palette: "teal", glyph: "🩹",
     nameKey: "ranked.cards.second-wind.name", descKey: "ranked.cards.second-wind.desc",
     targetHintKey: "ranked.cards.second-wind.targetHint",
     art: "/Cards Bonus/second-wind.png",
   },
   prescience: {
-    id: "prescience", cost: 1, rarity: "common",
+    id: "prescience", cost: 1, rarity: "common", voie: "spock",
     target: "none", palette: "cyan", glyph: "🔮",
     nameKey: "ranked.cards.prescience.name", descKey: "ranked.cards.prescience.desc",
     targetHintKey: "ranked.cards.prescience.targetHint",
@@ -50,7 +50,7 @@ export const CARDS: Record<CardId, RankedCard> = {
     art: "/Cards Bonus/cadence.png",
   },
   mascarade: {
-    id: "mascarade", cost: 1, rarity: "common",
+    id: "mascarade", cost: 1, rarity: "common", voie: "lizard",
     target: "none", palette: "indigo", glyph: "🎭",
     nameKey: "ranked.cards.mascarade.name", descKey: "ranked.cards.mascarade.desc",
     targetHintKey: "ranked.cards.mascarade.targetHint",
@@ -66,21 +66,21 @@ export const CARDS: Record<CardId, RankedCard> = {
 
   /* 🔵 RARES — 2 mana */
   surge: {
-    id: "surge", cost: 2, rarity: "rare",
+    id: "surge", cost: 2, rarity: "rare", voie: "scissors",
     target: "lane", palette: "amber", glyph: "⚡",
     nameKey: "ranked.cards.surge.name", descKey: "ranked.cards.surge.desc",
     targetHintKey: "ranked.cards.surge.targetHint",
     art: "/Cards Bonus/surge.png",
   },
   augur: {
-    id: "augur", cost: 2, rarity: "rare",
+    id: "augur", cost: 2, rarity: "rare", voie: "spock",
     target: "lane-reveal", palette: "violet", glyph: "👁️",
     nameKey: "ranked.cards.augur.name", descKey: "ranked.cards.augur.desc",
     targetHintKey: "ranked.cards.augur.targetHint",
     art: "/Cards Bonus/augur.png",
   },
   riposte: {
-    id: "riposte", cost: 2, rarity: "rare",
+    id: "riposte", cost: 2, rarity: "rare", voie: "scissors",
     target: "lane", palette: "pink", glyph: "⚔️",
     nameKey: "ranked.cards.riposte.name", descKey: "ranked.cards.riposte.desc",
     targetHintKey: "ranked.cards.riposte.targetHint",
@@ -94,21 +94,21 @@ export const CARDS: Record<CardId, RankedCard> = {
     art: "/Cards Bonus/curse.png",
   },
   mirror: {
-    id: "mirror", cost: 2, rarity: "rare",
+    id: "mirror", cost: 2, rarity: "rare", voie: "lizard",
     target: "lane", palette: "cyan", glyph: "🪞",
     nameKey: "ranked.cards.mirror.name", descKey: "ranked.cards.mirror.desc",
     targetHintKey: "ranked.cards.mirror.targetHint",
     art: "/Cards Bonus/mirror.png",
   },
   sangsue: {
-    id: "sangsue", cost: 2, rarity: "rare",
+    id: "sangsue", cost: 2, rarity: "rare", voie: "paper",
     target: "lane", palette: "rose", glyph: "🩸",
     nameKey: "ranked.cards.sangsue.name", descKey: "ranked.cards.sangsue.desc",
     targetHintKey: "ranked.cards.sangsue.targetHint",
     art: "/Cards Bonus/sangsue.png",
   },
   rempart: {
-    id: "rempart", cost: 2, rarity: "rare",
+    id: "rempart", cost: 2, rarity: "rare", voie: "rock",
     target: "none", palette: "zinc", glyph: "🏰",
     nameKey: "ranked.cards.rempart.name", descKey: "ranked.cards.rempart.desc",
     targetHintKey: "ranked.cards.rempart.targetHint",
@@ -148,7 +148,7 @@ export const CARDS: Record<CardId, RankedCard> = {
   // ── 6 arts orphelins câblés (Alex 2026-06-13) — usages inventés depuis le
   //    nom + l'image, validés "OUI GO". Effets Arena ; sans effet en Classé. ──
   surcharge: {
-    id: "surcharge", cost: 2, rarity: "rare",
+    id: "surcharge", cost: 2, rarity: "rare", voie: "scissors",
     target: "lane", palette: "amber", glyph: "⚡",
     nameKey: "ranked.cards.surcharge.name", descKey: "ranked.cards.surcharge.desc",
     targetHintKey: "ranked.cards.surcharge.targetHint",
@@ -176,14 +176,14 @@ export const CARDS: Record<CardId, RankedCard> = {
     art: "/Cards Bonus/Rappel.png",
   },
   "double-mot": {
-    id: "double-mot", cost: 3, rarity: "epic",
+    id: "double-mot", cost: 3, rarity: "epic", voie: "scissors",
     target: "lane", palette: "sky", glyph: "📜",
     nameKey: "ranked.cards.double-mot.name", descKey: "ranked.cards.double-mot.desc",
     targetHintKey: "ranked.cards.double-mot.targetHint",
     art: "/Cards Bonus/Double Mot.png",
   },
   chronomancien: {
-    id: "chronomancien", cost: 2, rarity: "epic",
+    id: "chronomancien", cost: 2, rarity: "epic", voie: "spock",
     target: "self", palette: "indigo", glyph: "⏳",
     nameKey: "ranked.cards.chronomancien.name", descKey: "ranked.cards.chronomancien.desc",
     targetHintKey: "ranked.cards.chronomancien.targetHint",
@@ -355,7 +355,7 @@ export const CARDS: Record<CardId, RankedCard> = {
     art: "/Cards Bonus/braise.png",
   },
   echappee: {
-    id: "echappee", cost: 1, rarity: "common",
+    id: "echappee", cost: 1, rarity: "common", voie: "lizard",
     target: "lane", palette: "sky", glyph: "🏃",
     nameKey: "ranked.cards.echappee.name", descKey: "ranked.cards.echappee.desc",
     targetHintKey: "ranked.cards.echappee.targetHint",
@@ -371,7 +371,7 @@ export const CARDS: Record<CardId, RankedCard> = {
     art: "/Cards Bonus/oracle-inverse.png",
   },
   fardeau: {
-    id: "fardeau", cost: 2, rarity: "rare",
+    id: "fardeau", cost: 2, rarity: "rare", voie: "rock",
     target: "none", palette: "zinc", glyph: "🪨",
     nameKey: "ranked.cards.fardeau.name", descKey: "ranked.cards.fardeau.desc",
     targetHintKey: "ranked.cards.fardeau.targetHint",
@@ -415,7 +415,7 @@ export const CARDS: Record<CardId, RankedCard> = {
     art: "/Cards Bonus/metamorphose.png",
   },
   gaia: {
-    id: "gaia", cost: 3, rarity: "epic", kind: "passive",
+    id: "gaia", cost: 3, rarity: "epic", voie: "rock", kind: "passive",
     target: "none", palette: "emerald", glyph: "🛡️",
     nameKey: "ranked.cards.gaia.name", descKey: "ranked.cards.gaia.desc",
     targetHintKey: "ranked.cards.gaia.targetHint",
@@ -459,14 +459,14 @@ export const CARDS: Record<CardId, RankedCard> = {
     art: "/Cards Bonus/schrodinger.png",
   },
   juge: {
-    id: "juge", cost: 4, rarity: "legendary",
+    id: "juge", cost: 4, rarity: "legendary", voie: "spock",
     target: "none", palette: "yellow", glyph: "⚖️",
     nameKey: "ranked.cards.juge.name", descKey: "ranked.cards.juge.desc",
     targetHintKey: "ranked.cards.juge.targetHint",
     art: "/Cards Bonus/juge.png",
   },
   genese: {
-    id: "genese", cost: 4, rarity: "legendary",
+    id: "genese", cost: 4, rarity: "legendary", voie: "spock",
     target: "none", palette: "yellow", glyph: "🌟",
     nameKey: "ranked.cards.genese.name", descKey: "ranked.cards.genese.desc",
     targetHintKey: "ranked.cards.genese.targetHint",
@@ -517,19 +517,19 @@ export const CARDS: Record<CardId, RankedCard> = {
    * Art à générer (cf docs/NOUVELLES_CARTES_PRO.md) → art:null = glyph fallback
    * via CardImage en attendant. Effets Arena dans arenaPhase3Spells.ts. */
   "jet-caillou": {
-    id: "jet-caillou", cost: 1, rarity: "common",
+    id: "jet-caillou", cost: 1, rarity: "common", voie: "rock",
     target: "lane", palette: "zinc", glyph: "⛰️",
     nameKey: "ranked.cards.jet-caillou.name", descKey: "ranked.cards.jet-caillou.desc",
     targetHintKey: "ranked.cards.jet-caillou.targetHint", art: "/Cards Bonus/Jet de Caillou.png",
   },
   "seve": {
-    id: "seve", cost: 1, rarity: "common",
+    id: "seve", cost: 1, rarity: "common", voie: "paper",
     target: "lane", palette: "emerald", glyph: "🌱",
     nameKey: "ranked.cards.seve.name", descKey: "ranked.cards.seve.desc",
     targetHintKey: "ranked.cards.seve.targetHint", art: "/Cards Bonus/Sève.png",
   },
   "coup-oeil": {
-    id: "coup-oeil", cost: 1, rarity: "common",
+    id: "coup-oeil", cost: 1, rarity: "common", voie: "spock",
     target: "none", palette: "cyan", glyph: "🔍",
     nameKey: "ranked.cards.coup-oeil.name", descKey: "ranked.cards.coup-oeil.desc",
     targetHintKey: "ranked.cards.coup-oeil.targetHint", art: "/Cards Bonus/Coup d'Œil.png",
@@ -553,7 +553,7 @@ export const CARDS: Record<CardId, RankedCard> = {
     targetHintKey: "ranked.cards.reverberation.targetHint", art: "/Cards Bonus/Réverbération.png",
   },
   "gravite": {
-    id: "gravite", cost: 3, rarity: "epic",
+    id: "gravite", cost: 3, rarity: "epic", voie: "spock",
     target: "none", palette: "indigo", glyph: "🌑",
     nameKey: "ranked.cards.gravite.name", descKey: "ranked.cards.gravite.desc",
     targetHintKey: "ranked.cards.gravite.targetHint", art: "/Cards Bonus/Gravité.png",
@@ -635,7 +635,7 @@ export const CARDS: Record<CardId, RankedCard> = {
     targetHintKey: "ranked.cards.apocalypse.targetHint", art: "/Cards Bonus/APOCALYPSE.png",
   },
   "imposteur": {
-    id: "imposteur", cost: 3, rarity: "legendary", kind: "fusion",
+    id: "imposteur", cost: 3, rarity: "legendary", voie: "lizard", kind: "fusion",
     target: "none", palette: "violet", glyph: "🎭",
     nameKey: "ranked.cards.imposteur.name", descKey: "ranked.cards.imposteur.desc",
     targetHintKey: "ranked.cards.imposteur.targetHint", art: "/Cards Bonus/IMPOSTEUR.png",

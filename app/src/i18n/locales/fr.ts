@@ -395,7 +395,7 @@ const fr: Record<string, string> = {
   "arena.cards.prescience.desc": "Pioche 2 cartes.",
   "arena.cards.surge.desc": "+3 ATK ce tour à ta créature ciblée. Spock l'ignore (Détaché).",
   "arena.cards.curse.desc": "−2 ATK ce tour à la créature adverse ciblée. Bloqué par Ancre et par Spock (Logique).",
-  "arena.cards.mirror.desc": "Copie la créature adverse de la lane ciblée sur TON côté (ta moitié doit être vide). La copie arrive neuve et profite de ta Voie.",
+  "arena.cards.mirror.desc": "Copie la créature adverse de la lane ciblée sur TON côté (ta moitié doit être vide) AVEC ses stats ACTUELLES (PV + buffs ATK) — un 4/4 buffé devient ton 4/4. Capacités spéciales (bouclier, esquive) non copiées.",
   "arena.cards.augur.desc": "Révèle 4 cartes de la main adverse ce tour.",
   "arena.cards.heist.desc": "Vole une carte au hasard dans la main adverse. Si elle est vide : inflige 3 dégâts au héros adverse à la place.",
   "arena.cards.razzia.desc": "Vole la carte posée sur la FORGE adverse (dépôt OU carte forgée non récupérée) → dans ta main. Forge adverse vide : sans effet. Légendaire : 1 usage par partie.",

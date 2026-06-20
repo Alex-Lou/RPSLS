@@ -18,6 +18,7 @@
  */
 
 import { alog } from "./arenaLog";
+import { VOIE_DEF } from "./arenaVoies";
 import type { BoardState, LaneState, Side } from "./arenaTypes";
 import type { CardId } from "../ranked/rankedTypes";
 import type { Move } from "../engine/game";
@@ -25,12 +26,13 @@ import type { Move } from "../engine/game";
 /** Map Affinité → CardId du Finisher correspondant. Used by applySummons
  *  pour savoir quelle carte injecter dans la main à 3⭐, et par l'AI/UI
  *  pour lookup le finisher associé. */
+// Dérivé de VOIE_DEF (source unique, Phase A) — valeurs identiques à avant.
 export const AFFINITY_TO_FINISHER: Record<Move, CardId> = {
-  rock: "finisher-forteresse",
-  paper: "finisher-verger",
-  scissors: "finisher-lame",
-  lizard: "finisher-metamorphose",
-  spock: "finisher-calcul",
+  rock: VOIE_DEF.rock.finisher,
+  paper: VOIE_DEF.paper.finisher,
+  scissors: VOIE_DEF.scissors.finisher,
+  lizard: VOIE_DEF.lizard.finisher,
+  spock: VOIE_DEF.spock.finisher,
 };
 
 /** Reverse lookup utile pour AI/UI : depuis le CardId, retrouver l'Affinité.
