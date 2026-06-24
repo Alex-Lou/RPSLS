@@ -82,8 +82,9 @@ function ArenaLaneSlotInner({
    *  fully absorbed). Makes the pierce visible (Alex: chip Tranchant explicite). */
   const [pierced, setPierced] = useState<{ key: number } | null>(null);
   /** Death overlay — when a creature that WAS here is now gone, render a
-   *  brief shatter/fade animation for ~600ms before the slot becomes empty.
-   *  Tracks the move that just died so we can show its glyph one last time. */
+   *  brief shatter/fade animation (~470ms, calé sur la fin de l'anim) en
+   *  overlay au-dessus de la case (déjà vide). Tracks the move that just died
+   *  so we can show its glyph one last time. */
   const [deathGhost, setDeathGhost] = useState<{ move: Creature["move"]; key: number } | null>(null);
   /** Secousse de DÉGÂT (Alex 2026-06-12 "manque secousse quand attaquée/altérée") :
    *  recul brutal + flash rouge quand la créature perd des PV. */
@@ -147,7 +148,11 @@ function ArenaLaneSlotInner({
     // Death transition.
     if (!creature && prev && prev.move !== null) {
       setDeathGhost({ move: prev.move, key: Date.now() });
-      const id = window.setTimeout(() => setDeathGhost(null), 650);
+      // 470ms = calé sur la FIN de l'anim DeathShatter (flash 400 / glyphe 450 /
+      // éclats ~460). Avant : 650ms → le symbole mort restait monté ~190ms APRÈS
+      // la fin de l'animation = « il met du temps à disparaître malgré l'anim
+      // finie » (Alex 2026-06-24). Maintenant il s'efface net juste après, smooth.
+      const id = window.setTimeout(() => setDeathGhost(null), 470);
       // Aegis pierced — the creature died WHILE still shielded, which only
       // happens when Tranchant (Ciseau) / LAME pierces it (a normal hit would
       // be fully absorbed). Surface the pierce so it isn't invisible.

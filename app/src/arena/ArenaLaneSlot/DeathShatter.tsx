@@ -49,7 +49,7 @@ export function DeathShatter({ move, isPlayer }: { move: Creature["move"]; isPla
           key={i}
           initial={{ x: 0, y: 0, opacity: 1, scale: 1, rotate: 0 }}
           animate={{ x: s.dx, y: s.dy, opacity: 0, scale: 0.3, rotate: s.rot }}
-          transition={{ duration: 0.5, ease: "easeOut", delay: 0.04 }}
+          transition={{ duration: 0.42, ease: "easeOut", delay: 0.04 }}
           className="absolute left-1/2 top-1/2 w-1.5 h-1.5 rounded-sm"
           style={{ marginLeft: -3, marginTop: -3, background: "#fda4af", boxShadow: "0 0 5px rgba(244,63,94,0.9)" }}
         />
