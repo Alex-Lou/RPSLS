@@ -30,14 +30,15 @@ export function detectGraphicsLevel(): GraphicsLevel {
   const nav = navigator as Navigator & { deviceMemory?: number };
   const mem = nav.deviceMemory ?? 0; // Go (0 = inconnu / non exposé)
   const cores = nav.hardwareConcurrency ?? 0; // cœurs logiques (0 = inconnu)
-  const dpr = window.devicePixelRatio || 1;
-  // DPR < 2.2 = signal FORT « tablette / appareil modeste » : les flagships sont
-  // à 2.6-3.5 ; une tablette haute-résolution mais densité basse (ex. Lenovo
-  // TB336FU = 1600×2560 mais DPR 2.0) rame en WebView malgré 8 Go/8 cœurs. Ce
-  // signal-là (pas la RAM/les cœurs « sur le papier ») la classe correctement.
-  if (dpr < 2.2 || (mem > 0 && mem <= 3) || (cores > 0 && cores <= 4)) return "low";
-  // Milieu de gamme → 'medium'.
-  if ((mem > 0 && mem <= 6) || (cores > 0 && cores <= 6) || dpr < 2.6) return "medium";
+  // Le DPR n'est PLUS utilisé (Alex 2026-06-24) : c'était un mauvais proxy GPU —
+  // il classait en 'low' des appareils parfaitement capables mais à écran peu
+  // dense (DPR < 2.2, ex. mon PC en DPR 1, des téléphones 1080p), coupant à tort
+  // les effets. On fait désormais CONFIANCE par défaut ('high') et on ne
+  // rétrograde QUE sur des signaux specs FIABLES d'appareil VRAIMENT faible. La
+  // vraie jank (ex. la tablette qui rame malgré ses specs) est mesurée au
+  // RUNTIME par useGfxAutoDetect, qui rétrograde alors le palier per-appareil.
+  if ((mem > 0 && mem <= 2) || (cores > 0 && cores <= 2)) return "low";
+  if ((mem > 0 && mem <= 3) || (cores > 0 && cores <= 4)) return "medium";
   return "high";
 }
 
@@ -77,17 +78,34 @@ const MIN_LEVEL: Record<string, GraphicsLevel> = {
   stormRainLayer: "medium", // pluie premium (overlay) — COUPÉE en 'low'
 };
 
-/** L'effet nommé doit-il être rendu au palier donné (ou courant si omis) ? */
+/** Contenu PREMIUM (PAYANT) — thèmes premium + traînées de toucher. RÈGLE
+ *  SPÉCIALE (Alex 2026-06-24) : on ne le coupe JAMAIS via l'AUTO ni la mesure
+ *  FPS — UNIQUEMENT si le joueur choisit MANUELLEMENT 'Bas'. Un thème acheté ne
+ *  doit pas paraître cassé parce qu'un appareil a été mal détecté. Ces effets
+ *  IGNORENT donc MIN_LEVEL et le palier effectif. */
+const PREMIUM_EFFECTS = new Set<string>(["premiumThemes", "premiumTouch"]);
+
+/** L'effet nommé doit-il être rendu ? PREMIUM → autorisé sauf si l'override
+ *  MANUEL est 'low'. Autres → palier effectif (donné, ou courant) >= minimum. */
 export function gfxAllows(effect: string, level?: GraphicsLevel): boolean {
+  if (PREMIUM_EFFECTS.has(effect)) {
+    return useStore.getState().player.graphicsQuality !== "low";
+  }
   const eff = level ?? getGraphicsLevel();
   const min = MIN_LEVEL[effect] ?? "low";
   return ORDER[eff] >= ORDER[min];
 }
 
-/** Hook RÉACTIF : l'effet nommé est-il autorisé au palier courant ? */
+/** Hook RÉACTIF : l'effet nommé est-il autorisé ? UN SEUL useStore (sélecteur
+ *  qui retourne le booléen) → même empreinte de hooks que les autres lectures,
+ *  re-render uniquement quand le verdict change. Premium → override manuel seul ;
+ *  autres → palier effectif (override > mesuré > specs). */
 export function useGfxAllows(effect: string): boolean {
-  const level = useGraphicsLevel();
-  return gfxAllows(effect, level);
+  return useStore((s) =>
+    PREMIUM_EFFECTS.has(effect)
+      ? s.player.graphicsQuality !== "low"
+      : gfxAllows(effect, resolveLevel(s.player.graphicsQuality, s.player.graphicsMeasured)),
+  );
 }
 
 /** Multiplicateur de densité [0..1] pour les effets à intensité variable (pluie
