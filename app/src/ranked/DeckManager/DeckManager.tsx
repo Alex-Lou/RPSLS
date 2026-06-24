@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../../store/store";
 import { ALL_CARD_IDS, CARDS, isPassiveCard, RARITY_ORDER, STARTER_COLLECTION } from "../cards";
-import { ARENA_LEGENDARY_CAP, resolveArenaDeckSource } from "../../arena/arenaDecks";
+import { ARENA_LEGENDARY_CAP, isDeckable, resolveArenaDeckSource } from "../../arena/arenaDecks";
 import { SIGNATURE_DECK, VOIE_DEF } from "../../arena/arenaVoies";
 import type { Move } from "../../engine/game";
 
@@ -234,6 +234,13 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
     const q = searchQuery.trim().toLowerCase();
     const filtered = ALL_CARD_IDS.filter((id) => {
       const card = CARDS[id];
+      // ARÈNE : ne montrer que les cartes réellement équipables (isDeckable =
+      // source unique, cf. arenaDecks). Masque les cartes sans effet Arène
+      // (no-op Classé : gambit, boussole…) et les Finishers (injectés à jauge
+      // pleine, non draftables) — sinon le builder les laissait équiper puis
+      // buildPlayerDeck les retirait au match (UX trompeuse). Le Classé reste
+      // inchangé (montre toute la collection).
+      if (mode === "arena" && !isDeckable(id)) return false;
       if (rarityFilter !== "all" && card.rarity !== rarityFilter) return false;
       if (ownedOnly && !collection.includes(id)) return false;
       if (inDeckOnly && !usedInDeck.has(id)) return false;
