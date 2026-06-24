@@ -96,6 +96,23 @@ export function ArenaHeroStrip({
     const id = window.setTimeout(() => setBloodDrip(null), 1500);
     return () => window.clearTimeout(id);
   }, [bloodDrip?.key]);
+  // Auto-effacement INDÉPENDANT des popups −N / +N (Alex 2026-06-24, bug « le
+  // dégât reste coincé visible ») : chaque popup porte SON timer, keyé sur sa
+  // propre clé. Avant, le timer d'effacement vivait DANS l'effet hero.hp et son
+  // cleanup l'annulait dès que les PV rechangeaient → un coup SUIVI d'un soin
+  // (régén Sève/Verger/fin de tour) dans la même seconde partait dans la branche
+  // heal sans jamais remettre dmgPop à null → le « −N » restait figé (et flottait
+  // dans la barre de statut Android). Découplé ici → un soin n'annule plus le dégât.
+  useEffect(() => {
+    if (!dmgPop) return;
+    const id = window.setTimeout(() => setDmgPop(null), 1100);
+    return () => window.clearTimeout(id);
+  }, [dmgPop?.key]);
+  useEffect(() => {
+    if (!healPop) return;
+    const id = window.setTimeout(() => setHealPop(null), 1100);
+    return () => window.clearTimeout(id);
+  }, [healPop?.key]);
   // Révélation PROGRESSIVE de la Voie ADVERSE (Alex 2026-06-17 rethink Phase 0).
   // COLLANT : dès que l'opp a fait monter sa jauge de Voie (engineVal ≥ 1
   // = « vu »), sa Voie reste révélée même si la créature meurt ensuite. Côté
@@ -112,15 +129,8 @@ export function ArenaHeroStrip({
     if (hero.hp < prev) {
       setDmgPop({ n: prev - hero.hp, key: Date.now() });
       if (hero.hp > 0 && hero.hp <= 5) setBloodDrip({ key: Date.now() });
-      const id = window.setTimeout(() => setDmgPop(null), 1100);
-      prevHpRef.current = hero.hp;
-      return () => window.clearTimeout(id);
-    }
-    if (hero.hp > prev) {
+    } else if (hero.hp > prev) {
       setHealPop({ n: hero.hp - prev, key: Date.now() });
-      const id = window.setTimeout(() => setHealPop(null), 1100);
-      prevHpRef.current = hero.hp;
-      return () => window.clearTimeout(id);
     }
     prevHpRef.current = hero.hp;
   }, [hero.hp]);
