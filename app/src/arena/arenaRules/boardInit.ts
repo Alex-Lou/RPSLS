@@ -48,7 +48,6 @@ export function makeHero(deckIds: CardId[], affinity?: Move, cpuPersona?: import
     exiled: [],
     divineShield: false,
     affinity,
-    constellationCount: 0,
     cpuPersona,
   };
 }

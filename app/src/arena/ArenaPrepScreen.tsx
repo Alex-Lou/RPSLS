@@ -105,13 +105,14 @@ export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
   const oppTheme = THEMES[cpu.themeId];
 
   return (
-    <div className="relative flex-1 flex flex-col items-center justify-center min-h-0 p-3 gap-4">
+    <div className="relative flex-1 flex flex-col items-center justify-center min-h-0 p-3 gap-3 landscape:gap-2">
       <h2 className="text-center text-[11px] uppercase tracking-[0.3em] font-black text-emerald-300/90">
         ⚔ Pré-match · Constellation Pro
       </h2>
 
-      {/* VS face-off + coin */}
-      <div className="flex items-center justify-center gap-4 sm:gap-6">
+      {/* VS face-off + coin. En paysage : trio étalé (faces VS de chaque côté,
+       *  pièce au centre) en flex-1 réparti pour profiter de la largeur. */}
+      <div className="flex items-center justify-center gap-4 sm:gap-6 landscape:w-full landscape:max-w-2xl landscape:justify-between landscape:gap-2">
         <Portrait name={playerName} avatar={playerAvatar} side="you" themeColor={youTheme?.primary ?? "#a78bfa"} highlight={phase === "landed" && winner === "you"} />
         <SimpleCoin phase={phase} winner={winner} youColor={youTheme?.primary ?? "#a78bfa"} oppColor={oppTheme?.primary ?? "#f43f5e"} onTap={flip} />
         <Portrait name={cpu.name} avatar={cpu.avatar} side="opp" themeColor={oppTheme?.primary ?? "#f43f5e"} highlight={phase === "landed" && winner === "opp"} />
@@ -153,7 +154,7 @@ export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
       {/* Action row — "?" (training only) + COMMENCER + ANNULER. In a real
        *  tournament / online match the rules button is hidden so the other
        *  player isn't kept waiting while this one reads. */}
-      <div className="flex items-center justify-center gap-2 mt-2">
+      <div className="flex items-center justify-center gap-2 mt-2 landscape:mt-0">
         {isTraining && (
           <button
             onClick={() => { hapticTap(); setHowOpen(true); }}

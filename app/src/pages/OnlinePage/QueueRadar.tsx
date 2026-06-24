@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "motion/react";
 import { useState, useEffect } from "react";
+import { useGfxAllows } from "../../graphics/graphicsQuality";
 
 export function QueueRadar({
   position,
@@ -23,6 +24,10 @@ export function QueueRadar({
   onExtend?: () => void;
 }) {
   const [now, setNow] = useState(Date.now());
+  // Palier perf : en 'low' on coupe les décorations animées lourdes (anneaux de
+  // pulsation infinis, particules en orbite, blobs de gradient en rotation) et
+  // on garde un loader minimal. Le matchmaking lui-même n'est pas affecté.
+  const queueFx = useGfxAllows("queueFx");
   useEffect(() => {
     let id: ReturnType<typeof setInterval> | undefined;
     const start = () => { if (!id) id = setInterval(() => setNow(Date.now()), 250); };
@@ -54,26 +59,28 @@ export function QueueRadar({
     >
       {/* Nebulous bg shimmer — three blurred radial blobs slowly rotate so
           the loader sits inside a living atmosphere instead of a flat card. */}
-      <div aria-hidden className="absolute inset-0 pointer-events-none">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 38, ease: "linear", repeat: Infinity }}
-          className="absolute -inset-10"
-          style={{
-            background:
-              "radial-gradient(circle at 30% 35%, rgba(168,85,247,0.20), transparent 38%)," +
-              "radial-gradient(circle at 70% 65%, rgba(34,211,238,0.16), transparent 40%)," +
-              "radial-gradient(circle at 50% 50%, rgba(244,114,182,0.12), transparent 55%)",
-            filter: "blur(8px)",
-          }}
-        />
-      </div>
+      {queueFx && (
+        <div aria-hidden className="absolute inset-0 pointer-events-none">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 38, ease: "linear", repeat: Infinity }}
+            className="absolute -inset-10"
+            style={{
+              background:
+                "radial-gradient(circle at 30% 35%, rgba(168,85,247,0.20), transparent 38%)," +
+                "radial-gradient(circle at 70% 65%, rgba(34,211,238,0.16), transparent 40%)," +
+                "radial-gradient(circle at 50% 50%, rgba(244,114,182,0.12), transparent 55%)",
+              filter: "blur(8px)",
+            }}
+          />
+        </div>
+      )}
 
       {/* Logo + orbits stack */}
       <div className="relative w-56 h-56 sm:w-64 sm:h-64 flex items-center justify-center">
         {/* Outer expanding pulses — three rings, staggered, share the same
             scale-fade animation so the whole stage breathes. */}
-        {[0, 1, 2].map((i) => (
+        {queueFx && [0, 1, 2].map((i) => (
           <motion.div
             key={"pulse-" + i}
             aria-hidden
@@ -86,38 +93,42 @@ export function QueueRadar({
 
         {/* Counter-rotating conic-gradient rings sandwich the logo with a
             thin scanning arc each — gives the matchmaker a sci-fi feel. */}
-        <motion.div
-          aria-hidden
-          animate={{ rotate: 360 }}
-          transition={{ duration: 14, ease: "linear", repeat: Infinity }}
-          className="absolute inset-2 rounded-full"
-          style={{
-            background:
-              "conic-gradient(from 0deg, rgba(168,85,247,0.0) 0%, rgba(168,85,247,0.6) 30%, rgba(168,85,247,0.0) 60%, rgba(168,85,247,0.0) 100%)",
-            WebkitMask:
-              "radial-gradient(circle, transparent 47%, black 49%, black 50%, transparent 51%)",
-            mask:
-              "radial-gradient(circle, transparent 47%, black 49%, black 50%, transparent 51%)",
-          }}
-        />
-        <motion.div
-          aria-hidden
-          animate={{ rotate: -360 }}
-          transition={{ duration: 22, ease: "linear", repeat: Infinity }}
-          className="absolute inset-6 rounded-full"
-          style={{
-            background:
-              "conic-gradient(from 90deg, rgba(244,114,182,0.0) 0%, rgba(244,114,182,0.55) 25%, rgba(244,114,182,0.0) 55%, rgba(244,114,182,0.0) 100%)",
-            WebkitMask:
-              "radial-gradient(circle, transparent 45%, black 47%, black 48%, transparent 49%)",
-            mask:
-              "radial-gradient(circle, transparent 45%, black 47%, black 48%, transparent 49%)",
-          }}
-        />
+        {queueFx && (
+          <>
+            <motion.div
+              aria-hidden
+              animate={{ rotate: 360 }}
+              transition={{ duration: 14, ease: "linear", repeat: Infinity }}
+              className="absolute inset-2 rounded-full"
+              style={{
+                background:
+                  "conic-gradient(from 0deg, rgba(168,85,247,0.0) 0%, rgba(168,85,247,0.6) 30%, rgba(168,85,247,0.0) 60%, rgba(168,85,247,0.0) 100%)",
+                WebkitMask:
+                  "radial-gradient(circle, transparent 47%, black 49%, black 50%, transparent 51%)",
+                mask:
+                  "radial-gradient(circle, transparent 47%, black 49%, black 50%, transparent 51%)",
+              }}
+            />
+            <motion.div
+              aria-hidden
+              animate={{ rotate: -360 }}
+              transition={{ duration: 22, ease: "linear", repeat: Infinity }}
+              className="absolute inset-6 rounded-full"
+              style={{
+                background:
+                  "conic-gradient(from 90deg, rgba(244,114,182,0.0) 0%, rgba(244,114,182,0.55) 25%, rgba(244,114,182,0.0) 55%, rgba(244,114,182,0.0) 100%)",
+                WebkitMask:
+                  "radial-gradient(circle, transparent 45%, black 47%, black 48%, transparent 49%)",
+                mask:
+                  "radial-gradient(circle, transparent 45%, black 47%, black 48%, transparent 49%)",
+              }}
+            />
+          </>
+        )}
 
         {/* Orbiting particles. Each dot sits at the 12 o'clock of an absolute
             layer that rotates the dot along a circular path around the logo. */}
-        {orbitAngles.map((angle, i) => (
+        {queueFx && orbitAngles.map((angle, i) => (
           <motion.div
             key={"orbit-" + i}
             aria-hidden

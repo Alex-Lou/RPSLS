@@ -56,6 +56,34 @@ export const CARD_TARGET_KIND: Partial<Record<CardId, SpellTargetKind>> = {
   paradoxe:     "global",
   juge:         "global",
   genese:       "global",
+  // ── Voie Montagne (2026-06-22) ──
+  eboulement:       "lane",
+  "strate-vive":    "lane",
+  "gardien-pierre": "lane",
+  contrefort:       "self",
+  "veine-gaia":     "self",
+  // ── Voie Mirage (2026-06-22) ──
+  "mascarade-enchainee": "lane",
+  "fuite-masquee":       "lane",
+  "reflet-echo":         "self",
+  // ── Voie Tranchant (2026-06-22) ──
+  "coup-de-taille": "lane",
+  acuite:           "lane",
+  frenesie:         "self",
+  // ── Voie Forêt (2026-06-23) ──
+  ramure:            "self",
+  photosynthese:     "lane",
+  ronces:            "lane",
+  // ── Voie Cosmos (2026-06-23) ──
+  "dilatation-temporelle": "self",
+  "loi-de-causalite":      "lane",
+  "convergence-cosmique":  "hero",
+  // ── Dégâts signature par Voie (2026-06-23) — toutes ciblent le héros adverse ──
+  "eboulis-final":         "hero",
+  "drain-vital":           "hero",
+  "coup-dans-lombre":      "hero",
+  "intrication-quantique": "hero",
+  "taillade-mortelle":     "hero",
   // ── Nouvelles cartes Pro (2026-06-12) ──
   "jet-caillou":   "lane",
   seve:            "lane",
@@ -111,6 +139,21 @@ export const LANE_SPELL_TARGET_SIDE: Partial<Record<CardId, LaneTargetSide>> = {
   sangsue:    "opp-creature",
   "trou-noir": "opp-creature",
   mirror:     "my-empty-opp-occupied",
+  // ── Voie Montagne (2026-06-22) ──
+  eboulement:       "opp-creature",
+  "strate-vive":    "my-creature",
+  "gardien-pierre": "my-creature",
+  // ── Voie Mirage (2026-06-22) ──
+  "mascarade-enchainee": "my-creature",
+  "fuite-masquee":       "my-creature",
+  // ── Voie Tranchant (2026-06-22) ──
+  "coup-de-taille": "my-creature",
+  acuite:           "my-creature",
+  // ── Voie Forêt (2026-06-23) ──
+  photosynthese:    "my-creature",
+  ronces:           "my-creature",
+  // ── Voie Cosmos (2026-06-23) ──
+  "loi-de-causalite": "opp-creature",
   // ── Nouvelles cartes Pro (2026-06-12) ──
   "jet-caillou":   "opp-creature",
   seve:            "my-creature",
@@ -135,6 +178,7 @@ export const LANE_SPELL_TARGET_SIDE: Partial<Record<CardId, LaneTargetSide>> = {
 export const MANA_GRANTS: Partial<Record<CardId, number>> = {
   sablier: 2,
   offre: 2, // (+ monte aussi maxMana de façon permanente, géré à la résolution)
+  "dilatation-temporelle": 1, // (+ monte maxMana de +1, permanent, géré à la résolution)
 };
 
 /** Total de mana « tempo » offert par les cartes déjà planifiées dans l'intent

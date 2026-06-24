@@ -9,11 +9,12 @@
  * DOM pilote l'empilement des overlays sans z-index explicite).
  */
 
+import { memo } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "../../icons";
 import { CREATURE_STATS, type Creature } from "../arenaTypes";
 import { creatureEffectiveAtk } from "../arenaRules";
-import { DisguiseOverlay, CreatureBuffOverlay, CreatureDebuffOverlay, CreatureHealBloom } from "../ArenaCreatureFX";
+import { DisguiseOverlay, CreatureBuffOverlay, CreatureDebuffOverlay, CreatureHealBloom, CreatureStrateOverlay, CreatureMirageOverlay, CreatureSharpenOverlay } from "../ArenaCreatureFX";
 import { creatureReactAnim } from "./creatureSlotAnim";
 
 /** Vecteurs FIXES des étincelles d'impact (pas de Math.random au render —
@@ -28,10 +29,41 @@ const SPARK_VECTORS: Array<{ dx: number; dy: number; amber: boolean }> = [
   { dx: 22,  dy: 26,  amber: true },
 ];
 
-export function CreatureSlot({
+/** Identité de Voie sur le CADRE de la créature (statique, gratuit, derrière le
+ *  contenu). 1 entrée par move ayant une Voie thématisée → DRY pour la
+ *  réplication (Montagne/Mirage… puis Cosmos/Tranchant/Forêt). Réversible. */
+const VOIE_FRAME: Partial<Record<Creature["move"], { bg: string; shadow: string }>> = {
+  // ⛰ Montagne — granite gris-pierre.
+  rock: {
+    bg: "linear-gradient(150deg, rgba(168,162,158,0.20), rgba(68,64,60,0.10) 55%, transparent)",
+    shadow: "inset 0 0 0 1px rgba(214,211,209,0.35), inset 0 0 14px rgba(68,64,60,0.40)",
+  },
+  // 🎭 Mirage — voile iridescent indigo↔cyan.
+  lizard: {
+    bg: "linear-gradient(150deg, rgba(129,140,248,0.18), rgba(34,211,238,0.10) 55%, transparent)",
+    shadow: "inset 0 0 0 1px rgba(165,180,252,0.35), inset 0 0 14px rgba(99,102,241,0.35)",
+  },
+  // ⚔️ Tranchant — acier froid + rose-cardinal.
+  scissors: {
+    bg: "linear-gradient(150deg, rgba(244,63,94,0.16), rgba(148,163,184,0.10) 55%, transparent)",
+    shadow: "inset 0 0 0 1px rgba(254,205,211,0.35), inset 0 0 14px rgba(225,29,72,0.30)",
+  },
+  // 🌲 Forêt — émeraude vivante + sève dorée.
+  paper: {
+    bg: "linear-gradient(150deg, rgba(52,211,153,0.18), rgba(16,122,87,0.10) 55%, transparent)",
+    shadow: "inset 0 0 0 1px rgba(167,243,208,0.35), inset 0 0 14px rgba(5,150,105,0.35)",
+  },
+  // 🌌 Cosmos — violet du vide + liseré cyan glacé.
+  spock: {
+    bg: "linear-gradient(150deg, rgba(139,92,246,0.18), rgba(34,211,238,0.08) 55%, transparent)",
+    shadow: "inset 0 0 0 1px rgba(196,181,253,0.35), inset 0 0 14px rgba(124,58,237,0.35)",
+  },
+};
+
+function CreatureSlotInner({
   creature, isPlayer, chargeAttack, clickable, clickableLabel, onClick,
   passiveSuppressed, deflectingPulse,
-  dmgPop, shieldBlocked, dodgedHit, hitShake, buffPulse, healFlash, debuffPulse, disguiseFlash,
+  dmgPop, shieldBlocked, dodgedHit, hitShake, buffPulse, healFlash, debuffPulse, disguiseFlash, strateGain, mirageGain,
 }: {
   creature: Creature;
   isPlayer: boolean;
@@ -49,6 +81,8 @@ export function CreatureSlot({
   healFlash: { n: number; key: number } | null;
   debuffPulse: { key: number } | null;
   disguiseFlash: { key: number } | null;
+  strateGain: { key: number } | null;
+  mirageGain: { key: number } | null;
 }) {
   const stats = CREATURE_STATS[creature.move];
   // Effective ATK = base + buff − (Lente/Lent on summon, Fanaison per
@@ -60,13 +94,15 @@ export function CreatureSlot({
   const atkReduced = atk < baseAtkPlusBuff; // a malus is biting
   const lowHp = creature.hp <= 1;
   const pal = MOVE_PALETTE[creature.move];
+  // Cadre d'identité de Voie (granite Montagne, iridescent Mirage…) — statique.
+  const voieFrame = VOIE_FRAME[creature.move];
   const rim = moveRim(pal.hex);
   const glow = moveGlow(pal.hex);
   // Side affinity tinting: player creatures get an emerald inner badge,
   // opp creatures get a rose one — visual ownership cue independent of
   // the move's signature color (kept on the frame rim).
   const sideTint = isPlayer ? "rgba(52,211,153,0.55)" : "rgba(244,63,94,0.55)";
-  const reactAnim = creatureReactAnim({ chargeAttack, hitShake, debuffPulse, healFlash, buffPulse, isPlayer });
+  const reactAnim = creatureReactAnim({ chargeAttack, dodgedHit, hitShake, debuffPulse, healFlash, buffPulse, isPlayer });
   return (
     <motion.div
       layout
@@ -78,6 +114,8 @@ export function CreatureSlot({
       transition={
         chargeAttack
           ? { duration: 0.72, ease: "easeOut", times: [0, 0.2, 0.42, 0.55, 0.78, 1] }
+          : dodgedHit
+          ? { duration: 0.55, ease: [0.22, 1, 0.36, 1], times: [0, 0.18, 0.34, 0.5, 0.74, 1] }
           : hitShake
           ? { duration: 0.46, ease: "easeOut" }
           : debuffPulse
@@ -90,7 +128,7 @@ export function CreatureSlot({
       }
       className="aspect-[5/4] w-full rounded-xl relative flex flex-col items-center justify-center overflow-hidden transition"
       style={{
-        zIndex: chargeAttack ? 30 : hitShake || buffPulse ? 20 : 1,
+        zIndex: chargeAttack ? 30 : dodgedHit ? 22 : hitShake || buffPulse ? 20 : 1,
         background: "linear-gradient(160deg, rgba(20,22,32,0.94) 0%, rgba(10,12,20,0.94) 100%)",
         border: `2px solid ${creature.divineShield ? "rgba(252,211,77,0.95)" : rim}`,
         boxShadow:
@@ -100,6 +138,16 @@ export function CreatureSlot({
           `inset 0 1px 0 rgba(255,255,255,0.08), inset 0 0 0 1px ${sideTint}30`,
       }}
     >
+      {/* CADRE D'IDENTITÉ DE VOIE — voile thématique statique + liseré (granite
+       *  Montagne, iridescent Mirage…). Pur CSS (transform/opacity-safe), zéro
+       *  coût idle, derrière le contenu. Réversible (VOIE_FRAME[move]). */}
+      {voieFrame && (
+        <div
+          aria-hidden
+          className="absolute inset-0 rounded-xl pointer-events-none"
+          style={{ background: voieFrame.bg, boxShadow: voieFrame.shadow }}
+        />
+      )}
       {/* Radial burst overlay — at the apex of the charge, a bright
        *  white → amber ring expands outward from the creature's center.
        *  Drives the "impact" feel beyond the lunge alone. */}
@@ -160,6 +208,22 @@ export function CreatureSlot({
           </motion.div>
         )}
       </AnimatePresence>
+      {/* FLASH ROUGE de coup (Alex 2026-06-23 « le dégât est encore mou ») : voile
+       *  rouge bref sur TOUTE la case quand la créature encaisse — viscéral et
+       *  lisible, opacity-only (GPU-safe, pas de filtre animé). */}
+      <AnimatePresence>
+        {hitShake && (
+          <motion.div
+            key={`hitflash-${hitShake.key}`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 0.5, 0] }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.32, times: [0, 0.3, 1], ease: "easeOut" }}
+            className="absolute inset-0 rounded-xl pointer-events-none"
+            style={{ background: "rgba(244,63,94,0.7)", zIndex: 24 }}
+          />
+        )}
+      </AnimatePresence>
       {/* 🎭 MASCARADE — voile de déguisement : un balayage conique doré
        *  tourne autour de la créature pendant qu'un voile violet pulse, et
        *  un masque 🎭 éclôt au centre. Signature visuelle du changement
@@ -173,6 +237,17 @@ export function CreatureSlot({
        *  cf. ArenaCreatureFX. One-shot, leak-free. */}
       <AnimatePresence>
         {buffPulse && <CreatureBuffOverlay key={`buff-${buffPulse.key}`} />}
+      </AnimatePresence>
+      {/* Cue du gain d'ATK PERMANENT (voieAtkBonus↑), thématisée par move :
+       *  Montagne = dalle granite qui s'empile, Tranchant = éclat d'acier. */}
+      <AnimatePresence>
+        {strateGain && (creature.move === "scissors"
+          ? <CreatureSharpenOverlay key={`atk-${strateGain.key}`} />
+          : <CreatureStrateOverlay key={`atk-${strateGain.key}`} />)}
+      </AnimatePresence>
+      {/* 🎭 ESQUIVE (Voie Mirage) — cue du gain de charge d'Esquive. */}
+      <AnimatePresence>
+        {mirageGain && <CreatureMirageOverlay key={`mirage-${mirageGain.key}`} />}
       </AnimatePresence>
       <AnimatePresence>
         {debuffPulse && <CreatureDebuffOverlay key={`debuff-${debuffPulse.key}`} />}
@@ -308,7 +383,7 @@ export function CreatureSlot({
             🛡{creature.provocationCharges > 1 ? <span className="text-[7px]">×{creature.provocationCharges}</span> : null}
           </span>
         )}
-        {creature.stifles && (
+        {creature.move === "paper" && (
           <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-400/95 text-black font-black tracking-wider shadow leading-none" title="Étouffe — annule la Provocation des Pierres adverses">
             🌿
           </span>
@@ -338,17 +413,15 @@ export function CreatureSlot({
       {creature.taunt && !passiveSuppressed && creature.provocationCharges > 0 && (
         <motion.div
           aria-hidden
+          // PERF (Alex 2026-06-23 « saccadé ») : ce halo Provocation tournait en
+          // repeat:Infinity en animant un box-shadow-blur 26px = re-raster par frame
+          // sur 1-6 créatures pendant TOUT le combat. Box-shadow STATIQUE + pulse
+          // d'OPACITY seul (GPU-composité) → quasi gratuit, même rendu.
           initial={{ opacity: 0.7 }}
-          animate={{
-            boxShadow: [
-              "inset 0 0 0 2px rgba(252,211,77,0.55), 0 0 14px 2px rgba(252,211,77,0.45)",
-              "inset 0 0 0 3px rgba(252,211,77,0.95), 0 0 26px 5px rgba(252,211,77,0.75)",
-              "inset 0 0 0 2px rgba(252,211,77,0.55), 0 0 14px 2px rgba(252,211,77,0.45)",
-            ],
-            opacity: [0.85, 1, 0.85],
-          }}
+          animate={{ opacity: [0.7, 1, 0.7] }}
           transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
           className="absolute inset-0 rounded-xl pointer-events-none z-[5]"
+          style={{ boxShadow: "inset 0 0 0 3px rgba(252,211,77,0.8), 0 0 22px 4px rgba(252,211,77,0.6)" }}
         />
       )}
       {/* DEFLECTION PULSE — fires when THIS rock just ate an attack. A
@@ -360,20 +433,14 @@ export function CreatureSlot({
           <motion.div
             key={"defl-" + deflectingPulse}
             aria-hidden
+            // PERF (Alex 2026-06-23) : box-shadow STATIQUE + on n'anime que
+            // opacity/scale (avant : box-shadow-blur 36px animé sur plusieurs déflexions/tour).
             initial={{ opacity: 0, scale: 0.9 }}
-            animate={{
-              opacity: [0, 1, 0.85, 0],
-              scale: [0.9, 1.1, 1.15, 1.2],
-              boxShadow: [
-                "0 0 0 0 rgba(168,85,247,0)",
-                "inset 0 0 0 4px rgba(168,85,247,0.95), 0 0 28px 8px rgba(252,211,77,0.85)",
-                "inset 0 0 0 3px rgba(252,211,77,0.95), 0 0 36px 10px rgba(168,85,247,0.7)",
-                "inset 0 0 0 0 rgba(252,211,77,0), 0 0 0 0 rgba(168,85,247,0)",
-              ],
-            }}
+            animate={{ opacity: [0, 1, 0.85, 0], scale: [0.9, 1.1, 1.15, 1.25] }}
             exit={{ opacity: 0 }}
             transition={{ duration: 1.4, ease: "easeOut" }}
             className="absolute inset-0 rounded-xl pointer-events-none z-[6]"
+            style={{ boxShadow: "inset 0 0 0 4px rgba(168,85,247,0.9), 0 0 30px 8px rgba(252,211,77,0.8)" }}
           />
         )}
       </AnimatePresence>
@@ -421,8 +488,8 @@ export function CreatureSlot({
             transition={{ duration: 1.2, ease: "easeOut" }}
             className="absolute inset-0 flex items-center justify-center pointer-events-none"
           >
-            <span className="px-1.5 py-0.5 rounded bg-violet-300/95 text-black text-[9px] uppercase tracking-wider font-black shadow-lg whitespace-nowrap">
-              ✨ ESQUIVÉ
+            <span className="px-1.5 py-0.5 rounded bg-cyan-300/95 text-black text-[9px] uppercase tracking-wider font-black shadow-lg whitespace-nowrap">
+              ✦ ESQUIVÉ
             </span>
           </motion.div>
         )}
@@ -456,3 +523,10 @@ export function CreatureSlot({
     </motion.div>
   );
 }
+
+/** React.memo (Alex 2026-06-23 perf « animations saccadées ») : le résolveur
+ *  appelle setBoard ~8×/tour ; sans memo, CHAQUE case (6) + ses ~8 calques
+ *  AnimatePresence se reconciliaient à chaque tick = la frame à 730ms. Le moteur
+ *  garde la référence des créatures inchangées → comparaison par défaut SÛRE
+ *  (saute uniquement les cases byte-identiques ; un vrai changement re-rend). */
+export const CreatureSlot = memo(CreatureSlotInner);

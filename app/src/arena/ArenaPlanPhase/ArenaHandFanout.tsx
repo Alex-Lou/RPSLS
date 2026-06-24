@@ -35,7 +35,7 @@ export function ArenaHandFanout({
 }) {
   const t = useT();
   return (
-    <div className="h-[96px] flex-1 min-w-0 flex items-end justify-center relative z-30">
+    <div className="h-[96px] landscape:h-[68px] flex-1 landscape:flex-none min-w-0 flex items-end justify-center relative z-30">
       {(() => {
         // Filtre visuel (Alex 2026-06-11) : les cartes mises dans l'intent
         // sont DIRECTEMENT retirées de la main affichée → sentiment CCG net.

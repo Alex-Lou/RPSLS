@@ -127,7 +127,7 @@ export function InkPad({ compact = false, ...props }: React.SVGProps<SVGSVGEleme
       )}
 
       {/* ── RED SEAL (bottom-right) — the artist's signature ── */}
-      <g transform={`translate(${W - 200} ${H - 160})`}>
+      <g transform={`translate(${W - 200} ${H - 160}) scale(1.6)`}>
         <rect x="-55" y="-55" width="110" height="110" rx="6"
               fill={SEAL} opacity="0.92" />
         {/* Glyph: two horizontal strokes + a vertical (resemble 印) */}
@@ -154,7 +154,7 @@ export function InkPad({ compact = false, ...props }: React.SVGProps<SVGSVGEleme
       {/* Title */}
       <g transform={`translate(${W/2} 115)`} textAnchor="middle">
         <text fontFamily='"EB Garamond","Cormorant Garamond",serif' fontStyle="italic"
-              fontSize="22" fill={INK} fillOpacity="0.55" letterSpacing="10">
+              fontSize="35" fill={INK} fillOpacity="0.55" letterSpacing="10">
           🖋 Sumi-e
         </text>
       </g>

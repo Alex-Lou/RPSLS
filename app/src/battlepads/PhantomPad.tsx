@@ -82,7 +82,7 @@ export function PhantomPad({ compact = false, ...props }: React.SVGProps<SVGSVGE
             roaming faces. An ornate vesica piscis (almond) eye with iris,
             pupil, and outer ectoplasm halo. Reads as "the realm watches" —
             slow blink keyTimes give it presence. ── */}
-      <g transform={`translate(${W/2} ${H/2})`}>
+      <g transform={`translate(${W/2} ${H/2}) scale(1.6)`}>
         {/* Outer ring of 12 ghost tear-shapes around the eye. */}
         {Array.from({ length: 12 }).map((_, i) => {
           const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
@@ -145,7 +145,7 @@ export function PhantomPad({ compact = false, ...props }: React.SVGProps<SVGSVGE
       {/* Title */}
       <g transform={`translate(${W/2} 115)`} textAnchor="middle">
         <text fontFamily='"Cinzel","EB Garamond",serif' fontWeight="400"
-              fontSize="18" fill={MOTE} fillOpacity="0.40" letterSpacing="14">
+              fontSize="29" fill={MOTE} fillOpacity="0.40" letterSpacing="14">
           PHANTOM REALM
         </text>
         <line x1="-80" y1="12" x2="80" y2="12" stroke={FRAME} strokeOpacity="0.08" />

@@ -35,6 +35,9 @@ import { ArenaMatchEnd } from "../ArenaMatchEnd";
 import { ArenaMatchSplash } from "../ArenaMatchSplash";
 import { AnimatePresence, motion, useAnimationControls } from "motion/react";
 import { ArenaImpactFX } from "../ArenaImpactFX";
+import { ArenaTraceCue, type TraceCue } from "../ArenaTraceCue";
+import { hasDominantSpell } from "../arenaFinishers";
+import { engineGauge } from "../arenaEngines";
 import { ArenaCastOnDrawFX, useCastOnDrawQueue } from "../ArenaCastOnDrawFX";
 import { ArenaHeistAnim } from "../ArenaHeistAnim";
 import { ArenaPlanPhase } from "../ArenaPlanPhase";
@@ -55,7 +58,7 @@ import {
   type TurnIntent,
 } from "../arenaTypes";
 import { setMatchExit } from "../../matchExitStore";
-import { buildCpuDeckMirroring, buildPlayerDeck } from "../arenaDecks";
+import { buildCpuDeckMirroring, buildPlayerDeck, resolveArenaDeckSource } from "../arenaDecks";
 import { runResolverFlow, type ResolveStep } from "../arenaResolverFlow";
 import { BoardFillSlot } from "./BoardFillSlot";
 import { HeroHitFlash } from "./HeroHitFlash";
@@ -91,9 +94,11 @@ export function ArenaGame({
   // the saved deck has too few supported cards. Saved deck is `string[]` in
   // the store; we re-narrow to CardId by filtering against the registry.
   const playerDeck = useRef<CardId[]>(buildPlayerDeck(
-    // Deck Pro SÉPARÉ (arenaDeck, 8 cartes) — fallback rankedDeck pour les
-    // joueurs sans arenaDeck encore (migration douce). Alex 2026-06-13.
-    (player.arenaDeck ?? player.rankedDeck ?? []).filter(
+    // Source résolue PAR VOIE (Alex 2026-06-22) : deck CUSTOM édité de la Voie >
+    // deck SIGNATURE curé > deck arène libre (fallback rankedDeck, migration douce).
+    resolveArenaDeckSource(
+      player.arenaAffinity, player.arenaDeckByVoie, player.arenaDeck ?? player.rankedDeck,
+    ).filter(
       (id): id is CardId => Object.prototype.hasOwnProperty.call(CARDS, id),
     ),
     player.arenaAffinity, // orienté Voie (Phase B) : priorise tes signatures, exclut les autres Voies
@@ -169,7 +174,13 @@ export function ArenaGame({
   const [spellFX, setSpellFX] = useState<{ ids: CardId[]; key: number } | null>(null);
   useEffect(() => {
     if (!spellFX) return;
-    const id = window.setTimeout(() => setSpellFX(null), 1500);
+    // LE MOMENT : une Légendaire/Finisher reste à l'écran plus longtemps (anim
+    // solo ralentie, cf. ArenaSpellFX + la pause de flux allongée).
+    // Hold ≥ la fenêtre par carte du résolveur (CARD_MS 1700 / DOMINANT 2700)
+    // pour qu'une carte reste affichée jusqu'à ce que la SUIVANTE la remplace,
+    // sans trou noir entre deux (Alex 2026-06-23 spell-spotlight séquencé).
+    const hold = hasDominantSpell(spellFX.ids) ? 2900 : 1900;
+    const id = window.setTimeout(() => setSpellFX(null), hold);
     return () => window.clearTimeout(id);
   }, [spellFX?.key]);
   // IMPACT FX plein-écran (coup puissant/fatal) + TREMBLEMENT de l'écran. Purgé
@@ -186,9 +197,26 @@ export function ArenaGame({
       y: [0, amp * 0.6, -amp * 0.5, amp * 0.4, -amp * 0.2, amp * 0.1, 0],
       transition: { duration: fatal ? 0.6 : 0.45, ease: "easeOut" },
     });
-    const id = window.setTimeout(() => setImpactFX(null), 900);
-    return () => window.clearTimeout(id);
+    const idImpact = window.setTimeout(() => setImpactFX(null), 900);
+    return () => window.clearTimeout(idImpact);
   }, [impactFX?.key]);
+  // LE TRACÉ — cue « ★ ARÊTE TRACÉE » quand la constellation du JOUEUR (board.a)
+  // MONTE. Rend le mécanisme visible : tu vois la cause→effet (« counter de Voie
+  // gagné → arête tracée »). One-shot, purgé par timer nettoyé (leak-free).
+  const [traceCue, setTraceCue] = useState<TraceCue | null>(null);
+  const engineValA = engineGauge(board.a)?.value ?? 0;
+  const prevEngineA = useRef(engineValA);
+  useEffect(() => {
+    if (engineValA > prevEngineA.current && engineValA >= 1) {
+      setTraceCue({ count: engineValA, affinity: board.a.affinity, key: Date.now() });
+    }
+    prevEngineA.current = engineValA;
+  }, [engineValA, board.a.affinity]);
+  useEffect(() => {
+    if (!traceCue) return;
+    const idCue = window.setTimeout(() => setTraceCue(null), 1800);
+    return () => window.clearTimeout(idCue);
+  }, [traceCue?.key]);
   // ⚡ Cartes « à la pioche » (Cast When Drawn) — file d'événements lue à chaque
   // changement de tour, jouée une par une (hook co-localisé avec son FX).
   const castDraw = useCastOnDrawQueue(board);
@@ -488,7 +516,7 @@ export function ArenaGame({
           matchEndedRef.current = false;
           setMulliganOpen(true);
           setMulliganSwapsLeft(2);
-          setBoard(makeInitialBoard(playerDeck.current, buildCpuDeckMirroring(playerDeck.current), playerAffinity.current, cpuAffinity.current, cpuPersona.current));
+          setBoard(makeInitialBoard(playerDeck.current, buildCpuDeckMirroring(playerDeck.current, cpuAffinity.current), playerAffinity.current, cpuAffinity.current, cpuPersona.current));
           setIntent({ spells: [], summons: [] });
           setOppPreview(null);
           setPlayerPreview(null);
@@ -504,10 +532,11 @@ export function ArenaGame({
   }
 
   return (
-    <motion.div animate={screenShake} className="relative flex-1 flex flex-col min-h-0 gap-1">
+    <motion.div animate={screenShake} className="relative flex-1 flex flex-col min-h-0 gap-1 landscape:gap-0">
       {/* 💥 IMPACT FX plein-écran (coup puissant/fatal) — entaille Ciseaux,
        *  ébranlement Pierre… + tremblement de cette racine (Alex 2026-06-13). */}
       <ArenaImpactFX fx={impactFX} />
+      <ArenaTraceCue cue={traceCue} />
       {/* ⚡ Cartes « à la pioche » (Cast When Drawn) — éclair + carte + effet,
        *  jouées une par une (Alex 2026-06-13). One-shot, démonte via onDone. */}
       <AnimatePresence>

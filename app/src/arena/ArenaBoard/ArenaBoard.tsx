@@ -28,19 +28,17 @@ import { useT } from "../../i18n";
 import { ArenaHeroStrip } from "../ArenaHeroStrip";
 import { ArenaSpellsReveal } from "../ArenaSpellsReveal";
 import { ArenaSpellFX } from "../ArenaSpellFX";
-import { ForgeSlot, FusionBurst } from "../ArenaForge";
-import { CardImage } from "../../ranked/CardImage";
 import { ArenaHpVignette } from "../ArenaHpVignette";
-import { isValidLaneTarget, targetLabelFor, LANE_SPELL_TARGET_SIDE, CARD_TARGET_KIND } from "../arenaTypes";
-import { ArenaCardInspect } from "../ArenaCardInspect";
-import { fusionPartnersOf } from "../arenaFusionCards";
+import { isValidLaneTarget, targetLabelFor, LANE_SPELL_TARGET_SIDE } from "../arenaTypes";
 import type { ArenaTargeting, BoardState, LaneIndex, Side, TurnIntent } from "../arenaTypes";
 import type { CardId } from "../../ranked/rankedTypes";
 import { InlineBurger } from "../../ui/ModeLobbyShell";
 import { setBurgerHidden } from "../../Sidebar";
 import { MoveGlyph } from "../../icons";
 import { AugurFlash, TauntBlockChip, AntiTauntChip } from "./ArenaBoardChips";
-import { CenterStatus } from "./CenterStatus";
+import { ArenaCenterBand } from "./ArenaCenterBand";
+import { ArenaFuseReveal } from "./ArenaFuseReveal";
+import { ArenaOppCardInspect } from "./ArenaOppCardInspect";
 import { LaneRow } from "./LaneRow";
 
 export interface ArenaBoardProps {
@@ -132,16 +130,6 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
   const t = useT();
   // Fiche LECTURE SEULE d'une carte adverse révélée par Augure (long-press).
   const [inspectOpp, setInspectOpp] = useState<CardId | null>(null);
-  // ✦ RÉVÉLATION DE FUSION (Alex 2026-06-17) : on CAPTURE la carte forgée à
-  // l'instant exact du flash (forgeFlashKey ne bump QUE sur une fusion, jamais
-  // sur un simple dépôt) → on la révèle ensuite en grand plein centre. La
-  // capture évite qu'un dépôt ultérieur (forgeFlashKey inchangé) ne ré-affiche
-  // la révélation, et fige la carte même si le joueur récupère vite.
-  const [fuseReveal, setFuseReveal] = useState<{ key: number; card: CardId } | null>(null);
-  useEffect(() => {
-    if (forgeFlashKey && forgeYou) setFuseReveal({ key: forgeFlashKey, card: forgeYou });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [forgeFlashKey]);
   useEffect(() => {
     if (combatLane === null) return;
     padShake.start({
@@ -198,7 +186,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
 
   return (
     <div
-      className="relative w-full max-w-3xl mx-auto px-0.5 flex flex-col gap-0 sm:gap-0.5 [@media(max-height:560px)]:max-w-md"
+      className="relative w-full max-w-3xl landscape:max-w-4xl mx-auto px-0.5 flex flex-col gap-0 sm:gap-0.5 [@media(max-height:560px)]:max-w-md"
       style={{ minHeight: fillHeight ? fillHeight : undefined }}
     >
       {/* 🩸 Danger rouge crescendo quand TES PV ≤ 10 → 0 (fixed plein écran,
@@ -209,10 +197,11 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
        *  (Alex 2026-06-11). Le portal échappe au clip `overflow-y-auto` du
        *  <main> (la "muraille marron" qui coupait le haut) et se positionne
        *  en `fixed` au MÊME niveau que le burger, EN AVANT de tout. ════════ */}
-      {/* Spacer réduit (Alex 2026-06-11) : h-[34px] pour remonter le haut du
-       *  pad et équilibrer l'espace haut (opp strip→pad) avec l'espace bas
-       *  (pad→strip you). Ajustable si pas pile symétrique. */}
-      <div className="shrink-0 h-[34px]" aria-hidden />
+      {/* Spacer (Alex 2026-06-11) : remonte le haut du pad + équilibre l'espace
+       *  haut (opp strip→pad) avec le bas. 34→44 (Alex 2026-06-23 « descendre le
+       *  contenu de qq px ») : suit le strip adverse poussé +10px sous la barre
+       *  de statut → le bloc du haut dégage le notch, gap haut/bas conservé. */}
+      <div className="shrink-0 h-[44px]" aria-hidden />
       {typeof document !== "undefined" && createPortal(
         // É4 (Alex 2026-06-12, audit UX) : burger themed INLINE intégré à la
         // rangée du strip adverse (le flottant est masqué pendant le match —
@@ -220,8 +209,17 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
         // d'espace réservé au flottant.
         <div
           // right-12 : coin haut-droit réservé au bouton Logs 🐛 (Alex 2026-06-12).
-          className="fixed left-2 right-12 z-[55] flex items-center gap-1.5"
-          style={{ top: "max(env(safe-area-inset-top, 0px), 32px)" }}
+          // PAYSAGE (Alex 2026-06-21) : en portrait on garde `left-2 right-12` (le
+          // strip remplit la largeur, réserve du bouton Logs à droite). En PAYSAGE
+          // le strip-contenu ne remplissait que ~le quart gauche d'un écran large
+          // → on le CENTRE et on le BORNE à la largeur du plateau (max-w-3xl) pour
+          // qu'il s'aligne avec lui au lieu de déborder pleine largeur.
+          className="fixed left-2 right-12 z-[55] flex items-center gap-1.5
+                     landscape:left-1/2 landscape:right-auto landscape:-translate-x-1/2
+                     landscape:w-full landscape:max-w-4xl landscape:px-2"
+          // +10px (Alex 2026-06-23) : le strip adverse était collé à la barre de
+          // statut (32px trop juste pour le notch). On le descend pour dégager le haut.
+          style={{ top: "calc(max(var(--sai-top), 32px) + 10px)" }}
         >
           <InlineBurger />
           <div className="flex-1 min-w-0">
@@ -238,25 +236,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
         document.body,
       )}
       {/* Fiche LECTURE SEULE d'une carte adverse révélée (Augure) — portal. */}
-      {createPortal(
-        <AnimatePresence>
-          {inspectOpp && (
-            <ArenaCardInspect
-              id={inspectOpp}
-              targetKind={CARD_TARGET_KIND[inspectOpp] ?? "global"}
-              t={t}
-              readOnly
-              onCommit={() => {}}
-              onClose={() => setInspectOpp(null)}
-              fusionRecipes={fusionPartnersOf(inspectOpp).map((r) => ({
-                partner: r.a === inspectOpp ? r.b : r.a,
-                result: r.result,
-              }))}
-            />
-          )}
-        </AnimatePresence>,
-        document.body,
-      )}
+      <ArenaOppCardInspect inspectOpp={inspectOpp} onClose={() => setInspectOpp(null)} />
 
       {/* ════════ LE PAD DE JEU — SURFACE élargie en full-bleed (Alex 2026-06-11).
        *  -mx-[10px] casse la marge du parent (px-3 PlayPage + px-0.5) pour
@@ -272,7 +252,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
       >
       {/* Backdrop — same pad system as Ranked, so themes carry over. */}
       <div className="absolute inset-0 pointer-events-none">
-        <BattlePad padId={padId} className="w-full h-full" compact />
+        <BattlePad padId={padId} className="w-full h-full" compact paused={resolveStep !== null} />
       </div>
       {/* Radial vignette for legibility. */}
       <div
@@ -322,7 +302,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
       {/* SECOUSSE D'IMPACT du board (Alex 2026-06-12 "combats trop mous") :
        *  via animation controls (PAS de key → pas de remount des lanes), le
        *  pad entier tremble brièvement au moment où le coup atterrit. */}
-      <motion.div animate={padShake} className="relative z-[1] flex-1 min-h-0 flex flex-col justify-between py-[13px] px-1.5 sm:py-4 sm:px-2 gap-4 sm:gap-6 [@media(max-height:560px)]:py-1.5 [@media(max-height:560px)]:px-1 [@media(max-height:560px)]:gap-2">
+      <motion.div animate={padShake} className="relative z-[1] flex-1 min-h-0 flex flex-col justify-between py-[13px] px-1.5 sm:py-4 sm:px-2 gap-4 sm:gap-6 landscape:py-1 landscape:gap-2 [@media(max-height:560px)]:py-1.5 [@media(max-height:560px)]:px-1 [@media(max-height:560px)]:gap-2">
         {/* É3 (audit UX) — filigrane de la Voie au centre du pad : habille le
          *  vide entre les rangées hors reveal. Ultra-subtil (5%), -z-10 pour
          *  rester DERRIÈRE lanes/status, pointer-events-none. */}
@@ -334,35 +314,9 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
         {/* ✦ SIGNATURES FX plein-board (Genèse, Supernova…) — overlay z-40 sur
          *  toute la zone des lanes, joué au step SPELLS puis auto-démonté. */}
         <ArenaSpellFX fx={spellFX} />
-        {/* ✦ RÉVÉLATION DE FUSION plein centre (Alex 2026-06-17 : « boum la carte
-            apparaît, 0 animation, mal placée »). La carte forgée SURGIT en grand
-            au centre du pad avec le burst autour → l'œil va dessus (la carte est
-            la vedette, façon « craft » Hearthstone), puis tout s'efface. Centré =
-            fini le décalage par rapport à la forge. */}
-        <AnimatePresence>
-          {fuseReveal && (
-            <motion.div
-              key={`fuse-reveal-${fuseReveal.key}`}
-              className="absolute inset-0 flex items-center justify-center pointer-events-none"
-              style={{ zIndex: 48 }}
-              aria-hidden
-              initial={{ opacity: 0 }}
-              animate={{ opacity: [0, 1, 1, 0] }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 1.5, ease: "easeInOut", times: [0, 0.1, 0.78, 1] }}
-            >
-              <FusionBurst size={1.9} />
-              <motion.div
-                className="relative w-16 sm:w-[72px] rounded-md overflow-hidden ring-2 ring-amber-300/90 shadow-[0_8px_22px_rgba(252,211,77,0.5)]"
-                initial={{ scale: 0.2, rotate: -12, opacity: 0 }}
-                animate={{ scale: [0.2, 1.18, 1], rotate: [-12, 5, 0], opacity: [0, 1, 1] }}
-                transition={{ duration: 0.62, ease: "easeOut", times: [0, 0.72, 1] }}
-              >
-                <CardImage id={fuseReveal.card} glyphSize="text-base" />
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* ✦ RÉVÉLATION DE FUSION plein centre (la carte forgée SURGIT en grand
+            au centre du pad avec le burst autour). Cf. ArenaFuseReveal. */}
+        <ArenaFuseReveal forgeFlashKey={forgeFlashKey} forgeYou={forgeYou} />
         {/* Opponent lane row — ghost previews of opp summons during reveal.
          *  Slots become tappable when a spell targets OPP creatures (Curse,
          *  Sangsue, Trou Noir). */}
@@ -391,29 +345,20 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
          *  Alex feedback 2026-06-09 point #2 : pad trop serré, agrandir le
          *  board. Réduit le my-* du wrapper (was my-2 sm:my-3) pour rendre
          *  le pad plus dense et combler l'espace vide vers la main strip. */}
-        {/* Bande centrale = [⚗️ Forge adverse] [statut flex-1] [⚗️ TA Forge]
-         *  (Alex 2026-06-13) — les flancs vides du pad deviennent les cases
-         *  de fusion, visibles des deux camps (info warfare). */}
-        <div className="shrink-0 flex items-center gap-1.5">
-          <ForgeSlot card={forgeOpp} mine={false} />
-          <div className="flex-1 min-w-0">
-            <CenterStatus
-              step={resolveStep ?? null}
-              turn={board.turn}
-              oppPreview={oppPreview}
-              playerPreview={playerPreview}
-            />
-          </div>
-          <ForgeSlot
-            card={forgeYou}
-            mine
-            onTap={onForgeTap}
-            highlight={forgeHighlight}
-            flashKey={forgeFlashKey}
-            recoverKey={forgeRecoverKey}
-            forged={!!forgeYou && CARDS[forgeYou]?.kind === "fusion"}
-          />
-        </div>
+        {/* Bande centrale = [⚗️ Forge adverse] [statut] [⚗️ TA Forge] : forges en
+         *  flux (portrait) ou flanc absolu (paysage). Cf. ArenaCenterBand. */}
+        <ArenaCenterBand
+          forgeOpp={forgeOpp}
+          forgeYou={forgeYou}
+          onForgeTap={onForgeTap}
+          forgeHighlight={forgeHighlight}
+          forgeFlashKey={forgeFlashKey}
+          forgeRecoverKey={forgeRecoverKey}
+          resolveStep={resolveStep}
+          turn={board.turn}
+          oppPreview={oppPreview}
+          playerPreview={playerPreview}
+        />
 
         {/* Player lane row — slots become tappable when targeting wants
          *  THIS side (summon → my empty; aegis/surge → my creature; etc.). */}

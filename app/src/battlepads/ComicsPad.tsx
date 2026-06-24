@@ -53,7 +53,7 @@ export function ComicsPad(props: React.SVGProps<SVGSVGElement>) {
 
       {/* Onomatopoeia bursts in corners */}
       {/* BAM! — top left */}
-      <g transform="translate(210 200) rotate(-12)">
+      <g transform="translate(210 200) rotate(-12) scale(1.3)">
         <path
           d="M -130 -40 L -90 -60 L -50 -50 L -10 -75 L 30 -55 L 70 -78 L 110 -50 L 140 -28 L 130 5 L 145 32 L 110 50 L 70 60 L 30 50 L -10 70 L -50 55 L -90 65 L -130 40 L -150 10 L -135 -10 Z"
           fill="url(#cm-burst-yellow)" stroke="#0b0d12" strokeWidth="6" strokeLinejoin="round"
@@ -66,7 +66,7 @@ export function ComicsPad(props: React.SVGProps<SVGSVGElement>) {
       </g>
 
       {/* POW! — bottom right */}
-      <g transform="translate(1290 820) rotate(8)">
+      <g transform="translate(1290 820) rotate(8) scale(1.3)">
         <path
           d="M -130 -40 L -90 -60 L -50 -50 L -10 -75 L 30 -55 L 70 -78 L 110 -50 L 140 -28 L 130 5 L 145 32 L 110 50 L 70 60 L 30 50 L -10 70 L -50 55 L -90 65 L -130 40 L -150 10 L -135 -10 Z"
           fill="url(#cm-burst-red)" stroke="#0b0d12" strokeWidth="6" strokeLinejoin="round"
@@ -79,7 +79,7 @@ export function ComicsPad(props: React.SVGProps<SVGSVGElement>) {
       </g>
 
       {/* ZAP! — top right (smaller) */}
-      <g transform="translate(1280 200) rotate(15)">
+      <g transform="translate(1280 200) rotate(15) scale(1.6)">
         <polygon
           points="-60,-30 -25,-50 -35,-15 0,-25 -10,5 25,-5 5,25 40,15 15,45 -15,30 -45,40 -30,15 -55,5"
           fill="url(#cm-burst-yellow)" stroke="#0b0d12" strokeWidth="5" strokeLinejoin="round"
@@ -92,8 +92,8 @@ export function ComicsPad(props: React.SVGProps<SVGSVGElement>) {
 
       {/* Sound dots accents */}
       <g fill="#0b0d12">
-        {[[400, 350, 6], [430, 380, 4], [380, 410, 5],
-          [950, 700, 6], [990, 680, 4], [930, 730, 5]
+        {[[400, 350, 9.6], [430, 380, 6.4], [380, 410, 8],
+          [950, 700, 9.6], [990, 680, 6.4], [930, 730, 8]
          ].map(([x, y, r], i) => (
           <circle key={i} cx={x} cy={y} r={r} />
         ))}

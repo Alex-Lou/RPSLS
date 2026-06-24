@@ -19,6 +19,7 @@
 
 import { alog } from "./arenaLog";
 import { VOIE_DEF } from "./arenaVoies";
+import { CARDS } from "../ranked/cards";
 import type { BoardState, LaneState, Side } from "./arenaTypes";
 import type { CardId } from "../ranked/rankedTypes";
 import type { Move } from "../engine/game";
@@ -47,6 +48,18 @@ export function finisherToAffinity(id: CardId): Move | undefined {
 /** True si la CardId est un Finisher Pro (utile pour gating UI / arenaSupported). */
 export function isFinisherCard(id: CardId): boolean {
   return id.startsWith("finisher-");
+}
+
+/** Un sort « DOMINANT » = Légendaire OU Finisher : c'est un climax, il mérite un
+ *  MOMENT (anim solo + ralentie, pause de flux allongée). Cf. ArenaSpellFX
+ *  (spotlight), arenaResolverFlow (pause), ArenaGame (hold). */
+export function isDominantSpell(id: CardId): boolean {
+  return isFinisherCard(id) || CARDS[id]?.rarity === "legendary";
+}
+
+/** True si l'un des sorts joués ce tour est dominant (→ ralentir / isoler). */
+export function hasDominantSpell(ids: CardId[]): boolean {
+  return ids.some(isDominantSpell);
 }
 
 /** Helper : mute une lane spécifique de `side` avec une transformation creature. */
@@ -124,15 +137,23 @@ function applyLame(board: BoardState, side: Side): BoardState {
   return b;
 }
 
-/** Effet MÉTAMORPHOSE — flag metamorphoseActive : Esquive infinie sur tous
- *  tes Lézard, dodgeCharge refresh à chaque endOfTurnReset. */
+/** MÉTAMORPHOSE — niveau d'Esquive « infinie » (Alex 2026-06-23, audit) : on
+ *  recharge les Lézards à un SENTINEL élevé chaque tour → ils encaissent autant
+ *  de coups/tour qu'il faut sans tomber = réellement INTOUCHABLES. L'ancien
+ *  max(.,1) ne donnait qu'1 charge : il DÉGRADAIT même un Lézard de Voie (2
+ *  charges), et un coup de combat + un sort le même tour le tuait — en
+ *  contradiction directe avec le texte « Esquive infinie / intouchables ». */
+export const METAMORPHOSE_DODGE = 9;
+
+/** Effet MÉTAMORPHOSE — flag metamorphoseActive + Lézards rechargés à
+ *  METAMORPHOSE_DODGE (intouchables), refresh à chaque endOfTurnReset. */
 function applyMetamorphose(board: BoardState, side: Side): BoardState {
   let b = board;
   let count = 0;
   for (let i = 0; i < 3; i++) {
     const c = b.lanes[i][side];
     if (c && c.move === "lizard") {
-      b = mutateLaneCreature(b, side, i, (cur) => ({ ...cur, dodgeCharges: Math.max(cur.dodgeCharges, 1) }));
+      b = mutateLaneCreature(b, side, i, (cur) => ({ ...cur, dodgeCharges: Math.max(cur.dodgeCharges, METAMORPHOSE_DODGE) }));
       count++;
     }
   }

@@ -127,7 +127,7 @@ export function CoralReefPad({ compact = false, ...props }: React.SVGProps<SVGSV
       {/* ── CENTRAL ANEMONE EMBLEM (the signature) ──
             12 radial petals + bright core, slow rotation. */}
       {!compact && (
-        <g transform={`translate(${W/2} ${H/2})`}>
+        <g transform={`translate(${W/2} ${H/2}) scale(1.6)`}>
           {Array.from({ length: 12 }).map((_, i) => {
             const a = (i / 12) * 360;
             return (
@@ -157,7 +157,7 @@ export function CoralReefPad({ compact = false, ...props }: React.SVGProps<SVGSV
       {/* Title */}
       <g transform={`translate(${W/2} 115)`} textAnchor="middle">
         <text fontFamily='"Playfair Display","Cormorant Garamond",serif' fontWeight="600"
-              fontSize="20" fill={GLOW} fillOpacity="0.45" letterSpacing="14">
+              fontSize="32" fill={GLOW} fillOpacity="0.45" letterSpacing="14">
           🪸 CORAL REEF
         </text>
       </g>

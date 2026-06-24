@@ -13,6 +13,7 @@
  */
 
 import { motion } from "motion/react";
+import { useGfxAllows } from "../graphics/graphicsQuality";
 
 const STARS: Array<[number, number, number]> = [
   [18, 22, 2], [80, 18, 1.5], [30, 70, 2], [72, 76, 1.5],
@@ -24,6 +25,9 @@ const P = "var(--theme-primary, #a78bfa)";
 const S = "var(--theme-secondary, #22d3ee)";
 
 export function ArenaCardBack({ className = "", glow = false }: { className?: string; glow?: boolean }) {
+  // PERF (Alex 2026-06-20) : au palier 'low', les 3 boucles d'animation passent
+  // STATIQUES (le dos reste premium, zéro boucle GPU). 'medium'/'high' = animé.
+  const anim = useGfxAllows("cardBackAnim");
   return (
     // Cadre (dégradé d'accent du thème) via une fine bordure : couche externe + contenu.
     <div
@@ -46,8 +50,8 @@ export function ArenaCardBack({ className = "", glow = false }: { className?: st
         <motion.div
           className="absolute inset-0"
           style={{ background: `radial-gradient(48% 38% at 50% 50%, color-mix(in oklab, ${S} 45%, transparent), transparent 72%)` }}
-          animate={{ opacity: [0.6, 1, 0.6] }}
-          transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+          animate={anim ? { opacity: [0.6, 1, 0.6] } : { opacity: 0.8 }}
+          transition={anim ? { duration: 6, repeat: Infinity, ease: "easeInOut" } : { duration: 0 }}
         />
         {/* Champ d'étoiles — STATIQUE (perf) */}
         {STARS.map(([x, y, s], i) => (
@@ -65,8 +69,8 @@ export function ArenaCardBack({ className = "", glow = false }: { className?: st
         <motion.div
           className="absolute inset-0 flex items-center justify-center"
           style={{ filter: `drop-shadow(0 0 4px ${P})` }}
-          animate={{ opacity: [0.85, 1, 0.85], scale: [1, 1.05, 1] }}
-          transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
+          animate={anim ? { opacity: [0.85, 1, 0.85], scale: [1, 1.05, 1] } : { opacity: 0.95, scale: 1 }}
+          transition={anim ? { duration: 3.2, repeat: Infinity, ease: "easeInOut" } : { duration: 0 }}
         >
           <svg viewBox="0 0 100 100" className="w-[58%] h-[58%]">
             <defs>
@@ -83,14 +87,16 @@ export function ArenaCardBack({ className = "", glow = false }: { className?: st
             <path d="M50 24 L52 48 L76 50 L52 52 L50 76 L48 52 L24 50 L48 48 Z" fill="#ffffff" opacity="0.55" />
           </svg>
         </motion.div>
-        {/* Reflet holographique qui BALAIE (1 boucle) */}
-        <motion.div
-          className="absolute inset-y-0 w-1/2"
-          style={{ background: "linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.16) 50%, transparent 70%)", mixBlendMode: "screen" }}
-          initial={{ x: "-160%" }}
-          animate={{ x: ["-160%", "320%"] }}
-          transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut", repeatDelay: 2 }}
-        />
+        {/* Reflet holographique qui BALAIE (1 boucle) — décoratif, coupé en 'low'. */}
+        {anim && (
+          <motion.div
+            className="absolute inset-y-0 w-1/2"
+            style={{ background: "linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.16) 50%, transparent 70%)", mixBlendMode: "screen" }}
+            initial={{ x: "-160%" }}
+            animate={{ x: ["-160%", "320%"] }}
+            transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut", repeatDelay: 2 }}
+          />
+        )}
       </div>
     </div>
   );

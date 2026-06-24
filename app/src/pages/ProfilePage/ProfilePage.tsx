@@ -9,6 +9,7 @@ import { HapticsSection } from "./HapticsSection";
 import { StyleSection } from "./StyleSection";
 import { ByMoveStatsSection } from "./ByMoveStatsSection";
 import { AccessibilitySection } from "./AccessibilitySection";
+import { GraphicsSection } from "./GraphicsSection";
 import { PrivacySection } from "./PrivacySection";
 import { ResetSection } from "./ResetSection";
 
@@ -40,6 +41,7 @@ export function ProfilePage({ onNavigate }: { onNavigate?: (page: Page) => void 
       <StyleSection />
       <ByMoveStatsSection />
       <AccessibilitySection />
+      <GraphicsSection />
       <PrivacySection />
       <ResetSection />
     </motion.div>

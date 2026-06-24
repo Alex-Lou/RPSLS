@@ -82,9 +82,9 @@ export function QuantumPad({ compact = false, ...props }: React.SVGProps<SVGSVGE
 
       {/* Equation labels along the edges. */}
       <g fontFamily='"JetBrains Mono","Consolas",monospace' fill={cyan} fillOpacity="0.4">
-        <text x="92" y={H / 2} fontSize="14" transform={`rotate(-90 92 ${H / 2})`}>iℏ ∂ψ/∂t = Ĥψ</text>
-        <text x={W - 72} y={H / 2} fontSize="14" transform={`rotate(90 ${W - 72} ${H / 2})`}>Δx·Δp ≥ ℏ/2</text>
-        <text x={W / 2} y="118" fontSize="13" textAnchor="middle">|ψ⟩ = α|0⟩ + β|1⟩</text>
+        <text x="92" y={H / 2} fontSize="22" transform={`rotate(-90 92 ${H / 2})`}>iℏ ∂ψ/∂t = Ĥψ</text>
+        <text x={W - 72} y={H / 2} fontSize="22" transform={`rotate(90 ${W - 72} ${H / 2})`}>Δx·Δp ≥ ℏ/2</text>
+        <text x={W / 2} y="118" fontSize="21" textAnchor="middle">|ψ⟩ = α|0⟩ + β|1⟩</text>
       </g>
 
       {/* Soft reactor core (mostly hidden by the in-game vignette). */}

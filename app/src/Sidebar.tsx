@@ -244,7 +244,7 @@ export function Sidebar({
   onNavigate: (p: Page) => void;
 }) {
   return (
-    <aside className="w-60 shrink-0 hidden md:flex [@media(max-height:600px)]:!hidden flex-col h-screen sticky top-0 p-4 bg-surface backdrop-blur border-r border-hairline">
+    <aside className="w-60 shrink-0 hidden portrait:min-[900px]:flex [@media(max-height:600px)]:!hidden flex-col h-screen sticky top-0 p-4 bg-surface backdrop-blur border-r border-hairline">
       <SidebarBody page={page} onNavigate={onNavigate} />
     </aside>
   );
@@ -305,7 +305,7 @@ export function MobileShell({
           // Position via Tailwind (not inline) so the short-viewport overrides
           // actually apply. Smaller + tighter to the corner on landscape so it
           // stops eating the play area; full size in portrait.
-          className="md:hidden [@media(max-height:600px)]:!flex fixed z-30 w-11 h-11 rounded-2xl bg-black/55 backdrop-blur border border-hairline flex items-center justify-center text-ink active:scale-95 transition shadow-lg top-[max(env(safe-area-inset-top),32px)] left-[max(env(safe-area-inset-left),12px)] [@media(max-height:540px)]:w-8 [@media(max-height:540px)]:h-8 [@media(max-height:540px)]:top-1 [@media(max-height:540px)]:left-1"
+          className="portrait:min-[900px]:hidden [@media(max-height:600px)]:!flex fixed z-30 w-11 h-11 rounded-2xl bg-black/55 backdrop-blur border border-hairline flex items-center justify-center text-ink active:scale-95 transition shadow-lg top-[var(--sai-top)] left-[max(var(--sai-left),12px)] [@media(max-height:540px)]:w-8 [@media(max-height:540px)]:h-8 [@media(max-height:540px)]:top-1 [@media(max-height:540px)]:left-1"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
             <line x1="4" y1="7" x2="20" y2="7" />
@@ -332,7 +332,7 @@ export function MobileShell({
               transition={{ duration: 0.2 }}
               onClick={() => setOpen(false)}
               data-no-touchfx
-              className="md:hidden fixed inset-0 bg-black/60 z-[60]"
+              className="portrait:min-[900px]:hidden fixed inset-0 bg-black/60 z-[60]"
             />
             {/* Panel */}
             <motion.aside
@@ -342,11 +342,11 @@ export function MobileShell({
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", stiffness: 320, damping: 32 }}
-              className="md:hidden fixed left-0 top-0 bottom-0 z-[70] w-72 max-w-[85vw] bg-surface-raised backdrop-blur-md border-r border-hairline p-4 flex flex-col"
+              className="portrait:min-[900px]:hidden fixed left-0 top-0 bottom-0 z-[70] w-72 max-w-[85vw] bg-surface-raised backdrop-blur-md border-r border-hairline p-4 flex flex-col"
               style={{
-                paddingTop:    "max(env(safe-area-inset-top),    32px)",
-                paddingBottom: "max(env(safe-area-inset-bottom), 56px)",
-                paddingLeft:   "max(env(safe-area-inset-left),   16px)",
+                paddingTop:    "max(var(--sai-top),    32px)",
+                paddingBottom: "max(var(--sai-bottom), 56px)",
+                paddingLeft:   "max(var(--sai-left),   16px)",
               }}
             >
               {/* Close button */}
@@ -354,7 +354,7 @@ export function MobileShell({
                 onClick={() => setOpen(false)}
                 aria-label="Close menu"
                 className="absolute right-3 w-9 h-9 rounded-xl bg-hairline hover:bg-hairline border border-hairline flex items-center justify-center text-ink-muted"
-                style={{ top: "max(env(safe-area-inset-top), 32px)" }}
+                style={{ top: "max(var(--sai-top), 32px)" }}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
                   <line x1="6" y1="6" x2="18" y2="18" />

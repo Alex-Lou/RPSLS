@@ -24,7 +24,7 @@ export function UserHeader({
   className?: string;
 }) {
   return (
-    <div className={"md:hidden w-full max-w-3xl mx-auto " + className}>
+    <div className={"portrait:min-[900px]:hidden w-full max-w-3xl mx-auto " + className}>
       <PlayerBadge
         onTap={() => onNavigate("profile")}
         onCurrencyTap={() => onNavigate("shop")}

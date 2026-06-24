@@ -31,7 +31,7 @@ import { isFusible, findFusionResult, fusionPartnersOf } from "../arenaFusionCar
 import { alog } from "../arenaLog";
 import { ArenaHeroStrip } from "../ArenaHeroStrip";
 import { ArenaCardInspect } from "../ArenaCardInspect";
-import { CARD_TARGET_KIND as SHARED_TARGET_KIND, LANE_SPELL_TARGET_SIDE, intentManaGrant, OPENING_TURNS, type ArenaTargeting } from "../arenaTypes";
+import { CARD_TARGET_KIND as SHARED_TARGET_KIND, intentManaGrant, OPENING_TURNS, type ArenaTargeting } from "../arenaTypes";
 import { ArenaCardBack } from "../ArenaCardBack";
 import type {
   BoardState,
@@ -43,6 +43,7 @@ import type {
 import { ArenaMovePicker } from "./ArenaMovePicker";
 import { ArenaHandFanout } from "./ArenaHandFanout";
 import { ArenaLockButton } from "./ArenaLockButton";
+import { commitDragDrop as commitDragDropImpl } from "./arenaPlanDrag";
 
 /** Spell target shape needed by a given card — drives the targeting UI. */
 // SpellTargetKind is exported from arenaTypes (used elsewhere).
@@ -187,76 +188,10 @@ export function ArenaPlanPhase({
     playCard(id);
   }
 
-  /** Drop-zone hit-test — finds the ArenaLaneSlot under a screen point and
-   *  commits the active targeting to that slot if valid. Used by both the
-   *  RPSLS picker drag and the hand-card drag handlers. Returns true if
-   *  something was committed (the drag is "consumed"), false otherwise so
-   *  the caller can leave targeting active for a regular tap-fallback. */
-  function commitDragDrop(point: { x: number; y: number }, current: ArenaTargeting): boolean {
-    if (!current) return false;
-    if (typeof document === "undefined") return false;
-    const els = document.elementsFromPoint(point.x, point.y);
-    for (const el of els) {
-      const slot = (el as HTMLElement).closest?.("[data-arena-lane]");
-      if (!slot) continue;
-      const laneStr = (slot as HTMLElement).dataset?.arenaLane;
-      const sideStr = (slot as HTMLElement).dataset?.arenaSide;
-      if (laneStr == null || sideStr == null) continue;
-      const lane = parseInt(laneStr, 10) as LaneIndex;
-      const side = sideStr as "a" | "b";
-      // Summon: only on MY (a) empty lanes.
-      if (current.kind === "summon") {
-        if (side !== "a") return false;
-        const mine = board.lanes[lane].a;
-        if (mine) return false;
-        hapticTap();
-        onAddSummon({ lane, move: current.move });
-        setTargeting(null);
-        return true;
-      }
-      // Spell lane-target: respect LANE_SPELL_TARGET_SIDE.
-      if (current.kind === "spell" && current.targetKind === "lane") {
-        const want = LANE_SPELL_TARGET_SIDE[current.id] ?? "my-creature";
-        const mine = board.lanes[lane].a;
-        const opp = board.lanes[lane].b;
-        const ok =
-          (want === "my-creature" && side === "a" && !!mine) ||
-          (want === "opp-creature" && side === "b" && !!opp) ||
-          (want === "my-empty-opp-occupied" && side === "a" && !mine && !!opp) ||
-          (want === "my-empty" && side === "a" && !mine);
-        if (!ok) return false;
-        hapticTap();
-        onAddSpell({ id: current.id, kind: "lane", lane });
-        setTargeting(null);
-        return true;
-      }
-    }
-    // FORGE — drop d'une CARTE (spell) près de TA forge = dépôt / fusion.
-    // (Alex 2026-06-13 : « le drag jusqu'à la case de fusion ne marche pas ».)
-    // Avant : la forge n'était PAS une cible de drop → le geste échouait
-    // toujours. On teste la proximité de la boîte forge (pad généreux ~26px)
-    // pour une cible facile à viser même petite. handleForgeTap lit le
-    // targeting courant (= la carte glissée) → dépôt si vide, fusion si
-    // partenaire, sinon log « ne fusionne pas ». Les invocations (kind summon)
-    // ne vont jamais sur la forge.
-    if (current.kind === "spell" && onForgeTap && typeof document !== "undefined") {
-      const forgeEl = document.querySelector("[data-arena-forge='you']");
-      if (forgeEl) {
-        const r = forgeEl.getBoundingClientRect();
-        const pad = 26;
-        const near =
-          point.x >= r.left - pad && point.x <= r.right + pad &&
-          point.y >= r.top - pad && point.y <= r.bottom + pad;
-        if (near) {
-          hapticTap();
-          onForgeTap();      // lit targeting = la carte glissée
-          setTargeting(null);
-          return true;
-        }
-      }
-    }
-    return false;
-  }
+  /** Drop-zone hit-test — délègue à arenaPlanDrag (logique pure). Garde la
+   *  signature (point, current) attendue par le picker en bindant les deps. */
+  const commitDragDrop = (point: { x: number; y: number }, current: ArenaTargeting): boolean =>
+    commitDragDropImpl(point, current, { board, onAddSummon, onAddSpell, setTargeting, onForgeTap });
 
   /** Long-press detection — single tap = commit, hold ~750ms = open the
    *  inspect modal. Reduced again (1050 → 750ms) per Alex's "encore réduire
@@ -292,7 +227,7 @@ export function ArenaPlanPhase({
   // l'utilisait est supprimée. Le re-tap sur le move/carte annule directement.
 
   return (
-    <div className="flex flex-col gap-1 px-2 pb-1.5 shrink-0">
+    <div className="flex flex-col gap-1 px-2 pb-1.5 landscape:gap-0.5 landscape:pb-0.5 shrink-0 landscape:w-full landscape:max-w-4xl landscape:mx-auto landscape:px-0.5">
       {/* RÉVÉLATION « DÉPLOIEMENT » plein écran (portal) — passage phase 1→2. */}
       {deckDrop && createPortal(
         <ArenaDeckDrop key={deckDrop.key} cards={deckDrop.cards} phaseName="Déploiement" />,
@@ -340,7 +275,7 @@ export function ArenaPlanPhase({
 
       {/* ════ PLAYER HERO STRIP — rendu ICI, JUSTE au-dessus du picker, pour
        *  être à ~1px des moves (Alex 2026-06-11). Bloc indépendant. ════ */}
-      <div className="pl-0 pr-1 shrink-0 mb-0.5">
+      <div className="pl-0 pr-1 shrink-0 mb-0.5 landscape:mb-0">
         <ArenaHeroStrip
           hero={me}
           board={board}
@@ -373,6 +308,11 @@ export function ArenaPlanPhase({
        *  THEN tap a lane on the board, OR drag the symbol directly onto a
        *  lane for one-gesture commit. Drag uses framer-motion with
        *  dragSnapToOrigin so the button returns to its place after drop. */}
+      {/* PAYSAGE TABLETTE (Alex 2026-06-20) : picker + deck/main + Fin de tour sur
+       *  UNE rangée (le deck de phase 1 ne prend plus une ligne entière, on gagne
+       *  de la hauteur). `contents` = transparent en PORTRAIT (empilé comme avant,
+       *  inchangé) ; `landscape:flex-row` les met côte à côte en PAYSAGE. */}
+      <div className="contents landscape:flex landscape:flex-row landscape:items-end landscape:justify-center landscape:gap-2 landscape:w-full landscape:max-w-3xl landscape:mx-auto">
       <ArenaMovePicker
         intent={intent}
         manaLeft={manaLeft}
@@ -391,7 +331,7 @@ export function ArenaPlanPhase({
       {/* É1 COCKPIT (audit UX 2026-06-12) — la main et le bouton FIN DE TOUR
        *  partagent une RANGÉE façon Hearthstone : main éventail flex-1 +
        *  bouton ROND doré fixe à droite (badge mana planifié intégré). */}
-      <div className="shrink-0 flex items-end gap-1.5">
+      <div className="shrink-0 flex items-end gap-1.5 landscape:flex-none landscape:min-w-0">
         {board.turn <= OPENING_TURNS ? (
           /* DECK FACE CACHÉE qui ATTEND (Alex 2026-06-17) : occupe l'espace de la
              main pendant l'ouverture + POSE la surprise — c'est cette pile qui
@@ -437,6 +377,7 @@ export function ArenaPlanPhase({
           setTargeting={setTargeting}
           onLock={onLock}
         />
+      </div>
       </div>
     </div>
   );

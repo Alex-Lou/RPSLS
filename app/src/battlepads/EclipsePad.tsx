@@ -149,7 +149,7 @@ export function EclipsePad({ compact = false, ...props }: React.SVGProps<SVGSVGE
           { x: 60, y: H / 2 },    // West
           { x: W - 60, y: H / 2 }, // East
         ].map((p, i) => (
-          <g key={i} transform={`translate(${p.x} ${p.y})`}>
+          <g key={i} transform={`translate(${p.x} ${p.y}) scale(1.6)`}>
             <line x1="-14" y1="0" x2="14" y2="0" />
             <line x1="0" y1="-14" x2="0" y2="14" />
             <circle r="5" fill={GOLD} fillOpacity="0.12" stroke="none" />
@@ -201,7 +201,7 @@ export function EclipsePad({ compact = false, ...props }: React.SVGProps<SVGSVGE
             corona ring of the matching backdrop. Reads as "this is the
             Eclipse PAD" even without context: gold 8-point star + central
             small diamond + outer dotted dial. ── */}
-      <g transform={`translate(${W/2} ${H/2})`}>
+      <g transform={`translate(${W/2} ${H/2}) scale(1.6)`}>
         {/* Outer dial — 24 small dots around a 230-radius circle. */}
         {Array.from({ length: 24 }).map((_, i) => {
           const a = (i / 24) * Math.PI * 2 - Math.PI / 2;
@@ -246,7 +246,7 @@ export function EclipsePad({ compact = false, ...props }: React.SVGProps<SVGSVGE
       {/* ── Arching eclipse label above corona ── */}
       <g transform={`translate(${W/2} ${H/2 - 155})`} textAnchor="middle">
         <text fontFamily='"Cinzel","EB Garamond",serif' fontWeight="600"
-              fontSize="19" fill={GOLD} fillOpacity="0.50" letterSpacing="12">
+              fontSize="30" fill={GOLD} fillOpacity="0.50" letterSpacing="12">
           TOTAL ECLIPSE
         </text>
         <line x1="-90" y1="14" x2="90" y2="14" stroke={GOLD} strokeOpacity="0.10"
@@ -256,7 +256,7 @@ export function EclipsePad({ compact = false, ...props }: React.SVGProps<SVGSVGE
       {/* ── Lower sigil ── */}
       <g transform={`translate(${W/2} ${H/2 + 200})`} textAnchor="middle">
         <text fontFamily='"JetBrains Mono","Consolas",monospace' fontWeight="500"
-              fontSize="11" fill={BRONZE} fillOpacity="0.30" letterSpacing="5">
+              fontSize="18" fill={BRONZE} fillOpacity="0.30" letterSpacing="5">
           CORONA · DIAMOND · UMBRA
         </text>
       </g>

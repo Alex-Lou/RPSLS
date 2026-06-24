@@ -446,23 +446,27 @@ body {
   background-attachment: fixed;
 }
 
-/* Respect Android status bar / nav bar.
-   Tauri's Android WebView doesn't always propagate env(safe-area-inset-*),
-   so we use max(env, sensible fallback) — at least 28px top, 36px bottom. */
+/* SAFE-AREA (barre d'état + barre de navigation + encoche).
+   SOURCE DE VÉRITÉ = variables --sai-* injectées par le PONT NATIF Android
+   (MainActivity.setupSafeAreaInsets) avec les VRAIS insets système — exact en
+   portrait ET paysage, et remis à jour à la rotation. Le `max(env(), min)`
+   n'est qu'un FALLBACK (1ers frames avant le pont, ou build web).
+   ⚠️ Plus d'override « desktop » par largeur : une tablette en PAYSAGE dépasse
+   900px tout en ayant des barres → c'est --sai-* (= 0 sur un vrai desktop, réel
+   sur tablette) qui décide, jamais la largeur. */
+:root {
+  --sai-top:    max(env(safe-area-inset-top),    24px);
+  --sai-right:  env(safe-area-inset-right, 0px);
+  --sai-bottom: max(env(safe-area-inset-bottom), 24px);
+  --sai-left:   env(safe-area-inset-left, 0px);
+}
 #root {
-  padding-top:    max(env(safe-area-inset-top),    28px);
-  padding-right:  max(env(safe-area-inset-right),  0px);
-  padding-bottom: max(env(safe-area-inset-bottom), 36px);
-  padding-left:   max(env(safe-area-inset-left),   0px);
+  padding-top:    var(--sai-top);
+  padding-right:  var(--sai-right);
+  padding-bottom: var(--sai-bottom);
+  padding-left:   var(--sai-left);
   min-height: 100vh;
   min-height: 100dvh;
-}
-/* On desktop, no fallback needed */
-@media (min-width: 768px) {
-  #root {
-    padding-top: 0;
-    padding-bottom: 0;
-  }
 }
 
 /* ───────────────────────────── No-scrollbar policy ───────────────────────────

@@ -73,7 +73,7 @@ export function BloomPad({ compact = false, ...props }: React.SVGProps<SVGSVGEle
               </ellipse>
             ))}
             {/* Flower at the tip */}
-            <g transform={`translate(${v.x} ${H * 0.18})`}>
+            <g transform={`translate(${v.x} ${H * 0.18}) scale(1.6)`}>
               {Array.from({ length: 5 }).map((_, p) => {
                 const a = (p / 5) * 360;
                 return (
@@ -150,9 +150,9 @@ export function BloomPad({ compact = false, ...props }: React.SVGProps<SVGSVGEle
       {/* ── BUTTERFLIES — 2 small ones cruise on sin paths ── */}
       <g fill={PINK}>
         <g>
-          <ellipse cx="-3" cy="0" rx="8" ry="14" />
-          <ellipse cx="3" cy="0" rx="8" ry="14" />
-          <circle cx="0" cy="0" r="2" fill={INK_COLOR()} />
+          <ellipse cx="-5" cy="0" rx="13" ry="22" />
+          <ellipse cx="5" cy="0" rx="13" ry="22" />
+          <circle cx="0" cy="0" r="3" fill={INK_COLOR()} />
           <animateTransform attributeName="transform" type="translate"
             values={`${-50} ${H*0.4}; ${W + 50} ${H*0.35}; ${-50} ${H*0.4}`}
             dur="25s" repeatCount="indefinite" />
@@ -160,9 +160,9 @@ export function BloomPad({ compact = false, ...props }: React.SVGProps<SVGSVGEle
                    keyTimes="0;0.05;0.45;0.5;1" dur="25s" repeatCount="indefinite" />
         </g>
         <g>
-          <ellipse cx="-3" cy="0" rx="8" ry="14" fill={YELLOW} />
-          <ellipse cx="3" cy="0" rx="8" ry="14" fill={YELLOW} />
-          <circle cx="0" cy="0" r="2" fill={INK_COLOR()} />
+          <ellipse cx="-5" cy="0" rx="13" ry="22" fill={YELLOW} />
+          <ellipse cx="5" cy="0" rx="13" ry="22" fill={YELLOW} />
+          <circle cx="0" cy="0" r="3" fill={INK_COLOR()} />
           <animateTransform attributeName="transform" type="translate"
             values={`${W + 50} ${H*0.6}; ${-50} ${H*0.55}; ${W + 50} ${H*0.6}`}
             dur="32s" repeatCount="indefinite" />
@@ -173,7 +173,7 @@ export function BloomPad({ compact = false, ...props }: React.SVGProps<SVGSVGEle
 
       {/* ── CENTRAL CROWNING FLOWER — large bloom emblem ── */}
       {!compact && (
-        <g transform={`translate(${W/2} ${H/2})`}>
+        <g transform={`translate(${W/2} ${H/2}) scale(1.6)`}>
           {/* 8 outer petals */}
           {Array.from({ length: 8 }).map((_, i) => {
             const a = (i / 8) * 360;
@@ -217,7 +217,7 @@ export function BloomPad({ compact = false, ...props }: React.SVGProps<SVGSVGEle
       {/* Title */}
       <g transform={`translate(${W/2} 115)`} textAnchor="middle">
         <text fontFamily='"Playfair Display","Inter",serif' fontStyle="italic"
-              fontSize="22" fill={STEM} fillOpacity="0.65" letterSpacing="12">
+              fontSize="35" fill={STEM} fillOpacity="0.65" letterSpacing="12">
           🌸 Bloom Garden
         </text>
       </g>

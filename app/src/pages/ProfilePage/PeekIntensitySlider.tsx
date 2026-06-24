@@ -59,7 +59,7 @@ export function PeekIntensitySlider({ setId, accent }: {
     <div
       className="
         fixed pointer-events-none flex flex-col items-center gap-1
-        right-[max(env(safe-area-inset-right),8px)]
+        right-[max(var(--sai-right),8px)]
         top-1/2 -translate-y-1/2
         select-none
       "

@@ -161,12 +161,6 @@ export interface Creature {
    *  silently. Doesn't affect combat damage or summons replacement. Set
    *  inherently on Spock at summon. */
   spellImmune: boolean;
-  /** Feuille's "Étouffe" — while this creature lives, OPP rocks lose their
-   *  Provocation (taunt) effect. Set inherently on Paper at summon. The
-   *  anti-taunt CHECK actually uses move === "paper" || "spock" so both
-   *  RPSLS counters of Rock suppress its taunt; this flag is kept solely
-   *  for the UI badge "🌿" on the Paper card. */
-  stifles: boolean;
   /** True for the turn a creature is summoned. Reset to false in
    *  endOfTurnReset. Drives the "Lente" malus on Pierre (ATK 0 turn-of-
    *  summon) and "Lent" on Lézard (ATK 1 turn-of-summon, base 2). */

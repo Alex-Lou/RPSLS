@@ -42,7 +42,7 @@ export function ForgeSlot({
     <Tag
       {...(mine && onTap ? { onClick: onTap, type: "button" as const } : {})}
       {...(mine ? { "data-arena-forge": "you" } : {})}
-      className="relative shrink-0 w-9 h-12 rounded-md overflow-visible"
+      className="relative shrink-0 w-9 h-12 landscape:w-[84px] landscape:h-[112px] rounded-md overflow-visible"
       aria-label={mine ? "Forge (dépôt / fusion / reprise)" : "Forge adverse"}
     >
       {/* Halo OR statique d'une carte FORGÉE à récupérer (pas de pulse infini). */}
@@ -92,7 +92,7 @@ export function ForgeSlot({
             <CardImage id={card} glyphSize="text-sm" />
           </motion.div>
         ) : (
-          <span className={"text-[13px] " + (mine ? "opacity-70" : "opacity-30")} aria-hidden>⚗️</span>
+          <span className={"text-[13px] landscape:text-[28px] " + (mine ? "opacity-70" : "opacity-30")} aria-hidden>⚗️</span>
         )}
       </motion.div>
       {/* Burst de FUSION — multi-couches (cœur + onde + étincelles + glyphe). */}
@@ -121,11 +121,11 @@ export function ForgeSlot({
         // (Alex 2026-06-13) → on voit que la forge est tappable pour récupérer.
         const isReprise = mine && !!card && !highlight;
         return isReprise ? (
-          <span className={"absolute -bottom-4 left-1/2 -translate-x-1/2 px-1.5 py-[1px] rounded border text-[7px] uppercase tracking-wider font-black whitespace-nowrap shadow-sm " + (forged ? "bg-amber-500/30 border-amber-300/80 text-amber-50" : "bg-emerald-500/25 border-emerald-300/70 text-emerald-50")}>
+          <span className={"absolute -bottom-4 landscape:-bottom-5 left-1/2 -translate-x-1/2 px-1.5 py-[1px] rounded border text-[7px] landscape:text-[10px] uppercase tracking-wider font-black whitespace-nowrap shadow-sm " + (forged ? "bg-amber-500/30 border-amber-300/80 text-amber-50" : "bg-emerald-500/25 border-emerald-300/70 text-emerald-50")}>
             {label}
           </span>
         ) : (
-          <span className={"absolute -bottom-3 left-1/2 -translate-x-1/2 text-[7px] uppercase tracking-wider font-black whitespace-nowrap " + (!mine ? "text-zinc-500" : highlight === "fuse" ? "text-amber-300" : highlight === "deposit" ? "text-fuchsia-200" : "text-fuchsia-300/80")}>
+          <span className={"absolute -bottom-3 landscape:-bottom-4 left-1/2 -translate-x-1/2 text-[7px] landscape:text-[10px] uppercase tracking-wider font-black whitespace-nowrap " + (!mine ? "text-zinc-500" : highlight === "fuse" ? "text-amber-300" : highlight === "deposit" ? "text-fuchsia-200" : "text-fuchsia-300/80")}>
             {label}
           </span>
         );

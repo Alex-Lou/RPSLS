@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { ThemedBackdrop, type BackdropScene } from "../backdrops/ThemedBackdrop";
+import { useGfxAllows } from "../graphics/graphicsQuality";
 
 /**
  * SplashShader — WebGL fluid cosmic backdrop for the splash screen.
@@ -27,6 +28,11 @@ import { ThemedBackdrop, type BackdropScene } from "../backdrops/ThemedBackdrop"
  * default cosmic shader so the opening matches the chosen ambience.
  */
 export function SplashShader({ scene }: { scene?: BackdropScene | null } = {}) {
+  // PERF (Alex 2026-06-20 « l'intro galère ») : au palier 'low', l'ouverture
+  // abandonne le WebGL (shader cosmique OU scène premium) pour un fond cosmique
+  // STATIQUE — zéro canvas, zéro rAF. C'est l'intro qui plombe la tablette.
+  const fancy = useGfxAllows("splashShader");
+  if (!fancy) return <SplashStaticFallback />;
   // Reuse the same scene catalogue as the in-app backdrop so the splash
   // already shows the player's chosen ambience. The default cosmic shader
   // below kicks in only when no scene is set (first launch / "default" /
@@ -35,6 +41,24 @@ export function SplashShader({ scene }: { scene?: BackdropScene | null } = {}) {
     return <ThemedBackdrop scene={scene} />;
   }
   return <DefaultCosmicShader />;
+}
+
+/** Fallback d'intro pour le palier 'low' : nébuleuse cosmique STATIQUE en CSS
+ *  (void indigo + voile violet/fuchsia + pointe cyan), reprend la palette du
+ *  shader sans aucun coût GPU/rAF. */
+function SplashStaticFallback() {
+  return (
+    <div
+      aria-hidden
+      className="absolute inset-0 w-full h-full pointer-events-none"
+      style={{
+        background:
+          "radial-gradient(120% 90% at 50% 34%, #2a1a5e 0%, #1a1142 28%, #0a0a22 58%, #05050f 100%)," +
+          "radial-gradient(60% 50% at 72% 66%, rgba(199,64,163,0.18), transparent 70%)," +
+          "radial-gradient(50% 42% at 24% 72%, rgba(64,210,232,0.12), transparent 70%)",
+      }}
+    />
+  );
 }
 
 function DefaultCosmicShader() {

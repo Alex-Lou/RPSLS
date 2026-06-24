@@ -9,11 +9,13 @@
  * (Lot D, à câbler) est débloqué.
  *
  * KISS : pas de logique métier ici — uniquement de l'affichage à partir
- * des props. Le compteur vit dans HeroState.constellationCount.
+ * des props. Le compteur (count) est calculé par l'appelant via engineGauge
+ * (arenaEngines) — la jauge d'ENGINE de la Voie.
  */
 
 import { motion } from "motion/react";
-import { MoveGlyph, MOVE_PALETTE } from "../icons";
+import { MOVE_PALETTE } from "../icons";
+import { VOIE_EMBLEM } from "./voieEmblem";
 import type { Move } from "../engine/game";
 
 interface ArenaConstellationBarProps {
@@ -92,9 +94,15 @@ export function ArenaConstellationBar({
           ?
         </span>
       ) : (
-        <MoveGlyph
-          move={affinity}
-          className="w-3 h-3 shrink-0 opacity-90 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
+        // Médaillon d'emblème de Voie (Alex 2026-06-23) — remplace le mini-glyphe :
+        // c'est ICI, sur la jauge qui se remplit, que l'identité de Voie doit
+        // sauter aux yeux. rounded-full + object-cover clippe en cercle → sûr même
+        // si le PNG n'a pas les coins parfaitement transparents.
+        <img
+          src={VOIE_EMBLEM[affinity]}
+          alt=""
+          draggable={false}
+          className="w-4 h-4 landscape:w-5 landscape:h-5 shrink-0 rounded-full object-cover drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"
         />
       )}
       {/* Round 9 fix Alex point #2 : label texte "Voie de X" pour que le

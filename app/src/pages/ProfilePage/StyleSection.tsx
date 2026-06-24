@@ -86,8 +86,19 @@ export function StyleSection() {
     setPeekPremiumPending(null);
     setPeek(false);
   };
-  // Never leave the shell hidden if the page unmounts while peeking.
-  useEffect(() => () => setPeek(false), [setPeek]);
+  // Never leave the shell hidden if the page unmounts while peeking — AND
+  // revert the temporary look. Sans ça, sortir du peek par le RETOUR ANDROID
+  // (qui démonte la page Profil → setPage("play")) laissait l'aperçu APPLIQUÉ
+  // alors que le joueur n'a PAS cliqué « Choisir ce thème » (Alex 2026-06-23).
+  // closePeek/confirmPeek mettent previousLookRef à null → ici on ne revert que
+  // si le peek a été quitté SANS valider/annuler (pas de double-revert).
+  useEffect(() => () => {
+    setPeek(false);
+    if (previousLookRef.current) {
+      updateProfile(previousLookRef.current);
+      previousLookRef.current = null;
+    }
+  }, [setPeek, updateProfile]);
   const currentBg = BACKGROUNDS.find((b) => b.id === (player.backgroundId ?? "default"));
 
   /** Upload a personal background: fit within 1080px (portrait-friendly),

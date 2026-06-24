@@ -52,7 +52,7 @@ export function CyberpunkPad({ compact = false, ...props }: React.SVGProps<SVGSV
         { x: W - 80, y: H - 80, sx: -1, sy: -1 },
         { x: 80, y: H - 80, sx: 1, sy: -1 },
       ].map((c, i) => (
-        <g key={i} transform={`translate(${c.x} ${c.y}) scale(${c.sx} ${c.sy})`} stroke={magenta} strokeWidth="3" strokeOpacity="0.9" fill="none">
+        <g key={i} transform={`translate(${c.x} ${c.y}) scale(${c.sx} ${c.sy}) scale(1.6)`} stroke={magenta} strokeWidth="3" strokeOpacity="0.9" fill="none">
           <line x1="0" y1="0" x2="56" y2="0" />
           <line x1="0" y1="0" x2="0" y2="56" />
         </g>
@@ -67,14 +67,14 @@ export function CyberpunkPad({ compact = false, ...props }: React.SVGProps<SVGSV
       {/* HUD readouts. */}
       <g fontFamily='"JetBrains Mono","Consolas",monospace' fontWeight="700">
         <g transform={`translate(${W / 2} 120)`} textAnchor="middle">
-          <text fontSize="30" fill={magenta} letterSpacing="10" filter="url(#cp-glow)">NEON SECTOR</text>
-          <text fontSize="30" fill="#ff8df0" letterSpacing="10">NEON SECTOR</text>
+          <text fontSize="48" fill={magenta} letterSpacing="10" filter="url(#cp-glow)">NEON SECTOR</text>
+          <text fontSize="48" fill="#ff8df0" letterSpacing="10">NEON SECTOR</text>
         </g>
-        <text x="100" y={H - 70} fontSize="14" fill={cyan} fillOpacity="0.75">SYS//
+        <text x="100" y={H - 70} fontSize="22" fill={cyan} fillOpacity="0.75">SYS//
           <tspan fill="#7CFC00">ONLINE</tspan>
           <animate attributeName="fill-opacity" values="0.4;0.85;0.4" dur="1.8s" repeatCount="indefinite" />
         </text>
-        <text x={W - 230} y={H - 70} fontSize="14" fill={cyan} fillOpacity="0.7">NET·77.0.0.1</text>
+        <text x={W - 230} y={H - 70} fontSize="22" fill={cyan} fillOpacity="0.7">NET·77.0.0.1</text>
       </g>
     </svg>
   );

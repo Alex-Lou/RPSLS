@@ -131,7 +131,7 @@ export function ModeLobbyShell({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -14 }}
       transition={{ duration: 0.25 }}
-      className="flex flex-col flex-1 min-h-0 w-full max-w-lg mx-auto px-1 pb-1 gap-2"
+      className="flex flex-col flex-1 min-h-0 w-full max-w-lg landscape:max-w-2xl mx-auto px-1 pb-1 gap-2"
     >
       {/* Header — burger | titre centré | retour. Symétrique : les deux
        *  boutons font 40px, le titre est VRAIMENT centré. */}

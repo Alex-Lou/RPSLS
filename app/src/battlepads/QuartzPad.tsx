@@ -108,8 +108,8 @@ export function QuartzPad({ compact = false, ...props }: React.SVGProps<SVGSVGEl
           <animate attributeName="r" values={`${compact ? 120 : 160};${compact ? 145 : 195};${compact ? 120 : 160}`}
             dur="6.4s" repeatCount="indefinite" />
         </circle>
-        <use href="#qpad-shape" width={compact ? 100 : 140} height={compact ? 160 : 220}
-          x={-(compact ? 50 : 70)} y={-(compact ? 80 : 110)}
+        <use href="#qpad-shape" width={compact ? 160 : 224} height={compact ? 256 : 352}
+          x={-(compact ? 80 : 112)} y={-(compact ? 128 : 176)}
           transform={`translate(${cx} ${cy})`} opacity="0.55">
           <animateTransform attributeName="transform" type="rotate"
             from={`0 ${cx} ${cy}`} to={`360 ${cx} ${cy}`} dur="120s" repeatCount="indefinite" />
@@ -122,8 +122,8 @@ export function QuartzPad({ compact = false, ...props }: React.SVGProps<SVGSVGEl
           <g opacity="0.85">
             <animateTransform attributeName="transform" type="rotate"
               values="-5; 5; -5" dur={`${22 + i * 1.5}s`} repeatCount="indefinite" begin={`${i * 0.7}s`} />
-            <use href="#qpad-shape" width={compact ? 110 : 150} height={compact ? 175 : 240}
-              x={-(compact ? 55 : 75)} y={-(compact ? 90 : 120)}>
+            <use href="#qpad-shape" width={compact ? 176 : 240} height={compact ? 280 : 384}
+              x={-(compact ? 88 : 120)} y={-(compact ? 144 : 192)}>
               <animate attributeName="opacity" values="0.7;1;0.7" dur={`${8 + i}s`} begin={`${i * 0.5}s`} repeatCount="indefinite" />
             </use>
             {/* Highlight scan along each shard. */}

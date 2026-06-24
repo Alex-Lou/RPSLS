@@ -1,5 +1,6 @@
 import { alog, csnap } from "../arenaLog";
 import { AFFINITY_TO_FINISHER } from "../arenaFinishers";
+import { applyEnginesEndOfTurn, engineMaxed, trancheAtkBonus, mirageDodgeBonus } from "../arenaEngines";
 // resolveCombat vit dans ./arenaCombat (déplacé 2026-06-09 : arenaRules > 700 l).
 // Le cycle arenaRules<->arenaCombat tient car arenaCombat n'importe que les
 // primitives feuilles (creatureEffectiveAtk/damageCreature/damageHero), sans
@@ -165,7 +166,16 @@ export function applySummons(board: BoardState, intent: TurnIntent, side: Side):
     const lanes = b.lanes.slice() as [LaneState, LaneState, LaneState];
     const lane = { ...lanes[summon.lane] };
     const replaced = lane[side];
-    lane[side] = makeCreature(summon.move, side, hero.affinity);
+    // ENGINE de Voie — la jauge ne monte PLUS au summon : elle monte quand ton
+    // symbole REMPORTE un counter en lane (« Le Tracé », Alex 2026-06-24 ; cf.
+    // arenaCombat.riseEngineOnCounterWin). Le Lézard posé profite ici de la jauge
+    // Mirage déjà accumulée par tes victoires passées.
+    const created = makeCreature(summon.move, side, hero.affinity);
+    // MIRAGE : un Lézard de la Voie arrive avec +mirageStack charges d'Esquive
+    // (borné 5 — Mirage dépasse volontairement le cap normal de 3 = son identité).
+    lane[side] = created.move === "lizard"
+      ? { ...created, dodgeCharges: Math.min(5, created.dodgeCharges + mirageDodgeBonus(hero)) }
+      : created;
     lanes[summon.lane] = lane;
     if (replaced) {
       alog("summon", `${side} pose ${summon.move} L${summon.lane} (REMPLACE ${csnap(replaced)}) affinity=${hero.affinity ?? "∅"}`);
@@ -185,31 +195,13 @@ export function applySummons(board: BoardState, intent: TurnIntent, side: Side):
   return b;
 }
 
-/** Lot C v2 — Count les créatures de `side` qui correspondent à son Affinité
- *  ET sont vivantes. Utilisé pour la Constellation 3⭐ SIMULTANÉE (Alex
- *  feedback 2026-06-09) : il faut maintenir 3 Voies en vie en même temps
- *  pour débloquer le Finisher, pas juste poser 3× cumulés. */
-export function countAliveAffinity(
-  lanes: readonly LaneState[],
-  side: Side,
-  affinity: Move | undefined,
-): number {
-  if (!affinity) return 0;
-  let count = 0;
-  for (const lane of lanes) {
-    const c = lane[side];
-    if (c && c.move === affinity) count++;
-  }
-  return count;
-}
-
 export function endOfTurnCleanup(board: BoardState): BoardState {
   // STRATES (Voie Montagne) appliquées APRÈS le reset, en passant le
   // summonedThisTurn ORIGINAL (avant reset) → une Pierre ne gagne pas de Strate
   // le tour de son arrivée, seulement après avoir TENU un tour. Cf. gainStrateIfHeld.
   const lanes = board.lanes.map((lane) => ({
-    a: lane.a ? gainStrateIfHeld(endOfTurnReset(lane.a, board.a.vergerActive), board.a.affinity, lane.a.summonedThisTurn) : null,
-    b: lane.b ? gainStrateIfHeld(endOfTurnReset(lane.b, board.b.vergerActive), board.b.affinity, lane.b.summonedThisTurn) : null,
+    a: lane.a ? gainStrateIfHeld(endOfTurnReset(lane.a, board.a.vergerActive, trancheAtkBonus(board.a)), board.a.affinity, lane.a.summonedThisTurn) : null,
+    b: lane.b ? gainStrateIfHeld(endOfTurnReset(lane.b, board.b.vergerActive, trancheAtkBonus(board.b)), board.b.affinity, lane.b.summonedThisTurn) : null,
   })) as [LaneState, LaneState, LaneState];
   // 🔥 PHÉNIX (2026-06-12) : ressuscite à 1 PV les créatures snapshotées au
   // cast (applyPhenix) qui sont mortes ce tour — lane désormais vide. Si la
@@ -235,27 +227,31 @@ export function endOfTurnCleanup(board: BoardState): BoardState {
   // avant, la 3e étoile via Mirror ne débloquait le Finisher qu'au summon
   // suivant). L'unlock + l'injection restent 1×/match (guard finisherUnlocked).
   const refreshConstellation = (hero: HeroState, side: Side): HeroState => {
-    const alive = countAliveAffinity(lanes, side, hero.affinity);
-    const unlocked = alive >= 3 && !hero.finisherUnlocked;
-    if (alive === hero.constellationCount && !unlocked) return hero;
+    // Refonte clarté (Alex 2026-06-23) : le Finisher se débloque quand la jauge
+    // d'ENGINE de la Voie est PLEINE (engineMaxed) — une seule progression visible,
+    // finie la « constellation » séparée qui embrouillait. 1×/match (finisherUnlocked).
+    const unlocked = engineMaxed(hero) && !hero.finisherUnlocked;
+    if (!unlocked) return hero;
     let hand = hero.hand;
-    if (unlocked && hero.affinity) {
+    if (hero.affinity) {
       const finisherId = AFFINITY_TO_FINISHER[hero.affinity];
       hand = [...hero.hand, finisherId];
-      alog("turn", `${side} constellation ⭐ ${alive}/3 (post-combat) → FINISHER UNLOCKED — [${finisherId}] injecté en main`);
+      alog("turn", `${side} TRACÉ FERMÉ ⭐⭐⭐ → FINISHER [${finisherId}] injecté en main`);
     }
-    return {
-      ...hero,
-      constellationCount: alive,
-      finisherUnlocked: hero.finisherUnlocked || unlocked,
-      hand,
-    };
+    return { ...hero, finisherUnlocked: true, hand };
   };
+  // ENGINES de Voie (Sève régén + Cosmos chip) appliqués APRÈS la constellation,
+  // sur les héros rafraîchis. Pur/capé/additif (cf. arenaEngines).
+  const engines = applyEnginesEndOfTurn(
+    board,
+    refreshConstellation(board.a, "a"),
+    refreshConstellation(board.b, "b"),
+  );
   return {
     ...board,
     lanes,
-    a: refreshConstellation(board.a, "a"),
-    b: refreshConstellation(board.b, "b"),
+    a: engines.a,
+    b: engines.b,
     phenixReviveA: undefined, // snapshot Phénix consommé
     phenixReviveB: undefined,
   };

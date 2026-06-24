@@ -13,11 +13,13 @@
  * Only consumed by ArenaBoard's LaneRow.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { type Creature, type LaneIndex } from "../arenaTypes";
 import { CreatureSlot } from "./CreatureSlot";
 import { PlannedSlot } from "./PlannedSlot";
 import { EmptySlot } from "./EmptySlot";
+import { DeathShatter } from "./DeathShatter";
+import { CreatureDodgeOverlay } from "../ArenaCreatureFX";
 
 export interface ArenaLaneSlotProps {
   lane: LaneIndex;
@@ -57,7 +59,7 @@ export interface ArenaLaneSlotProps {
   onRemoveSummon?: () => void;
 }
 
-export function ArenaLaneSlot({
+function ArenaLaneSlotInner({
   creature, plannedSummon, isPlayer, showPlanned = false, chargeAttack = false,
   clickable = false, clickableLabel = "✦ jouer ici", onClick,
   passiveSuppressed = false,
@@ -67,7 +69,7 @@ export function ArenaLaneSlot({
   // Track previous HP so we can spawn a "-N" floating popup when this lane's
   // creature takes damage. We guard by move identity to avoid false-positives
   // when one creature dies and another spawns on the same lane.
-  const prevRef = useRef<{ hp: number; move: Creature["move"] | null; shield: boolean; dodge: boolean } | null>(null);
+  const prevRef = useRef<{ hp: number; move: Creature["move"] | null; shield: boolean; dodge: number } | null>(null);
   const [dmgPop, setDmgPop] = useState<{ n: number; key: number } | null>(null);
   /** "🛡️ ABSORBÉ" chip — when the previous tick had a divine shield AND
    *  the current tick has none AND HP didn't change, we know the shield
@@ -97,7 +99,7 @@ export function ArenaLaneSlot({
   useEffect(() => {
     const prev = prevRef.current;
     const snap = creature
-      ? { hp: creature.hp, move: creature.move, shield: creature.divineShield, dodge: creature.dodgeCharges > 0 }
+      ? { hp: creature.hp, move: creature.move, shield: creature.divineShield, dodge: creature.dodgeCharges }
       : null;
     if (creature && prev && prev.move === creature.move && creature.hp < prev.hp) {
       const dmg = prev.hp - creature.hp;
@@ -122,14 +124,15 @@ export function ArenaLaneSlot({
       prevRef.current = snap;
       return () => window.clearTimeout(id);
     }
-    // DODGE ESQUIVÉ — prev had dodge, now doesn't, HP unchanged. Alex
-    // feedback : "animations pour les effets de type esquive du lézard
-    // au premier tour" — manquait avant.
+    // DODGE ESQUIVÉ — une charge d'Esquive vient d'être CONSOMMÉE (dodgeCharges
+    // baisse) sans perte de PV. Élargi 2026-06-23 : avant on n'animait QUE le
+    // passage à 0 (=== 0), donc un lézard à plusieurs charges (Métamorphose = 9)
+    // n'animait pas ses esquives intermédiaires. Maintenant CHAQUE esquive joue.
     // Alex feedback 2026-06-09 round 5 (#5) : Esquive chip stuck sur L2.
     // Cause probable : si dodgedHit était déjà set quand la creature change
     // (mort/replace), le chip restait visible. Ajout d'un clear explicite
     // quand la creature meurt OU change de move (sticker plus jamais stale).
-    if (creature && prev && prev.move === creature.move && prev.dodge && creature.dodgeCharges === 0 && creature.hp === prev.hp) {
+    if (creature && prev && prev.move === creature.move && prev.dodge > 0 && creature.dodgeCharges < prev.dodge && creature.hp === prev.hp) {
       setDodgedHit({ key: Date.now() });
       const id = window.setTimeout(() => setDodgedHit(null), 1400);
       prevRef.current = snap;
@@ -209,49 +212,100 @@ export function ArenaLaneSlot({
     prevBuffRef.current = cur;
   }, [creature?.atkBuff, creature?.divineShield, creature?.cannotAttack]);
 
-  if (creature) {
-    return (
-      <CreatureSlot
-        creature={creature}
-        isPlayer={isPlayer}
-        chargeAttack={chargeAttack}
-        clickable={clickable}
-        clickableLabel={clickableLabel}
-        onClick={onClick}
-        passiveSuppressed={passiveSuppressed}
-        deflectingPulse={deflectingPulse}
-        dmgPop={dmgPop}
-        shieldBlocked={shieldBlocked}
-        dodgedHit={dodgedHit}
-        hitShake={hitShake}
-        buffPulse={buffPulse}
-        healFlash={healFlash}
-        debuffPulse={debuffPulse}
-        disguiseFlash={disguiseFlash}
-      />
-    );
-  }
+  // ⛰ STRATE (Voie Montagne) — détecte la hausse de voieAtkBonus. Garde STRICTE
+  // à +1 (= une Strate ajoutée, gain de fin de tour) : le finisher Forteresse
+  // (+2 d'un coup) a sa PROPRE cue plein-board (ArenaSpellFX) → zéro double-flash.
+  // Isolé des pipelines dégâts/buff. Pas de faux positif sur résummon (la valeur
+  // retombe à 0 via un render `null` entre deux créatures).
+  const prevStrateRef = useRef<number>(creature?.voieAtkBonus ?? 0);
+  const [strateGain, setStrateGain] = useState<{ key: number } | null>(null);
+  useEffect(() => {
+    const prev = prevStrateRef.current;
+    const cur = creature?.voieAtkBonus ?? 0;
+    if (creature && cur === prev + 1) {
+      setStrateGain({ key: Date.now() });
+      const id = window.setTimeout(() => setStrateGain(null), 760);
+      prevStrateRef.current = cur;
+      return () => window.clearTimeout(id);
+    }
+    prevStrateRef.current = cur;
+  }, [creature?.voieAtkBonus]);
 
-  if (plannedSummon && showPlanned) {
-    return (
-      <PlannedSlot
-        plannedSummon={plannedSummon}
-        clickable={clickable}
-        clickableLabel={clickableLabel}
-        onClick={onClick}
-        onRemoveSummon={onRemoveSummon}
-      />
-    );
-  }
+  // 🎭 ESQUIVE (Voie Mirage) — détecte la HAUSSE de dodgeCharges (= une charge
+  // d'Esquive gagnée, via les cartes Mirage). La CONSOMMATION (baisse) garde son
+  // chip « ✨ ESQUIVÉ » existant. Même motif one-shot que la Strate.
+  const prevDodgeRef = useRef<number>(creature?.dodgeCharges ?? 0);
+  const [mirageGain, setMirageGain] = useState<{ key: number } | null>(null);
+  useEffect(() => {
+    const prev = prevDodgeRef.current;
+    const cur = creature?.dodgeCharges ?? 0;
+    if (creature && cur > prev) {
+      setMirageGain({ key: Date.now() });
+      const id = window.setTimeout(() => setMirageGain(null), 720);
+      prevDodgeRef.current = cur;
+      return () => window.clearTimeout(id);
+    }
+    prevDodgeRef.current = cur;
+  }, [creature?.dodgeCharges]);
 
-  return (
+  const slot = creature ? (
+    <CreatureSlot
+      creature={creature}
+      isPlayer={isPlayer}
+      chargeAttack={chargeAttack}
+      clickable={clickable}
+      clickableLabel={clickableLabel}
+      onClick={onClick}
+      passiveSuppressed={passiveSuppressed}
+      deflectingPulse={deflectingPulse}
+      dmgPop={dmgPop}
+      shieldBlocked={shieldBlocked}
+      dodgedHit={dodgedHit}
+      hitShake={hitShake}
+      buffPulse={buffPulse}
+      healFlash={healFlash}
+      debuffPulse={debuffPulse}
+      disguiseFlash={disguiseFlash}
+      strateGain={strateGain}
+      mirageGain={mirageGain}
+    />
+  ) : plannedSummon && showPlanned ? (
+    <PlannedSlot
+      plannedSummon={plannedSummon}
+      clickable={clickable}
+      clickableLabel={clickableLabel}
+      onClick={onClick}
+      onRemoveSummon={onRemoveSummon}
+    />
+  ) : (
     <EmptySlot
-      deathGhost={deathGhost}
       pierced={pierced}
       clickable={clickable}
       clickableLabel={clickableLabel}
       onClick={onClick}
-      isPlayer={isPlayer}
     />
   );
+  return (
+    <div className="relative w-full">
+      {slot}
+      {/* DEATH-SHATTER en OVERLAY au-dessus de la case (quelle que soit la branche)
+       *  → la mort joue TOUJOURS. Avant, le ghost vivait DANS EmptySlot et était
+       *  AVALÉ quand la case affichait un fantôme d'invocation planifiée (rangée
+       *  joueur reçoit `intent`) ou une nouvelle créature → « parfois la mort traîne
+       *  sans anim, parfois oui parfois non ». Keyé → re-joue à chaque mort. */}
+      {deathGhost && <DeathShatter key={deathGhost.key} move={deathGhost.move} isPlayer={isPlayer} />}
+      {/* ✦ ESQUIVE — overlay ancré à la case (le corps détale via son propre
+       *  transform dans CreatureSlot ; le fantôme reste ICI). Keyé → re-joue à
+       *  chaque charge consommée. creature non-null garanti (l'esquive survit). */}
+      {dodgedHit && creature && (
+        <CreatureDodgeOverlay key={`dodge-${dodgedHit.key}`} move={creature.move} dir={isPlayer ? 1 : -1} />
+      )}
+    </div>
+  );
 }
+
+/** React.memo (Alex 2026-06-23 perf) : gate de la case — pendant le combat, une
+ *  case non touchée reçoit des props stables → on saute l'orchestrateur ET sa
+ *  CreatureSlot. L'état d'anim interne (hitShake…) vient de useState, donc il
+ *  bypasse memo : aucune animation n'est bloquée. */
+export const ArenaLaneSlot = memo(ArenaLaneSlotInner);

@@ -19,6 +19,7 @@ import { ArenaPadProvider } from "../ranked/arena";
 import { applyTheme } from "../theme/theme";
 import { useStore } from "../store/store";
 import { useArenaOverride } from "../ranked/arenaOverride";
+import { setMatchFullscreen } from "../match/matchFullscreenStore";
 
 export function ArenaPage({ onBack }: { onBack: () => void }) {
   const [stage, setStage] = useState<"prep" | "game">("prep");
@@ -41,10 +42,15 @@ export function ArenaPage({ onBack }: { onBack: () => void }) {
       primary: root.style.getPropertyValue("--theme-primary"),
       secondary: root.style.getPropertyValue("--theme-secondary"),
     };
+    // PLEIN ÉCRAN pendant toute l'arène (prep + game) : masque la Sidebar et
+    // retire le cap max-w-md du <main> (App.tsx lit ce store) → le plateau respire
+    // en paysage tablette au lieu d'être écrasé. Alex 2026-06-20.
+    setMatchFullscreen(true);
     return () => {
       // Restore the player's own theme + fond on unmount.
       applyTheme(playerThemeId);
       setArenaBg(null);
+      setMatchFullscreen(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

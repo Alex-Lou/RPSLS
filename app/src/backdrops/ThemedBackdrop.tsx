@@ -302,3 +302,48 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
     </div>
   );
 }
+
+/** Dégradé statique on-thème par scène (deux glows d'accent sur fond sombre).
+ *  Couleurs d'accent reprises de themes.ts — assez pour garder l'identité du
+ *  thème SANS aucun WebGL/rAF. */
+const g = (a: string, b: string) =>
+  `radial-gradient(120% 85% at 50% 28%, ${a}33 0%, transparent 52%),` +
+  `radial-gradient(85% 70% at 72% 78%, ${b}26 0%, transparent 58%),` +
+  `linear-gradient(180deg, #0a0b14 0%, #06070e 100%)`;
+
+const SCENE_GRADIENT: Record<BackdropScene, string> = {
+  nebula: g("#7c5cff", "#22d3ee"),
+  aurora: g("#34d399", "#f0abfc"),
+  grid: g("#06b6d4", "#f0abfc"),
+  galaxy: g("#a855f7", "#22d3ee"),
+  holy: g("#fbbf24", "#6366f1"),
+  quantum: g("#22d3ee", "#3b82f6"),
+  casino: g("#10b981", "#f5c543"),
+  volcanic: g("#ff4500", "#ff8c00"),
+  abyss: g("#00e5c8", "#6040c0"),
+  eclipse: g("#d4a745", "#8b7fcf"),
+  phantom: g("#5a7a9a", "#8a9bb5"),
+  emberforge: g("#ff6a14", "#ff9426"),
+  tempus: g("#b8956a", "#d4a76a"),
+  storm: g("#4af0ff", "#a078ff"),
+  coral: g("#ff6b6b", "#4ecdc4"),
+  rust: g("#d2691e", "#8b4513"),
+  void: g("#9aa0a6", "#3a3a3a"),
+  prism: g("#8b5cf6", "#22d3ee"),
+  ink: g("#8c8c8c", "#262626"),
+  bloom: g("#c45a86", "#5f9367"),
+};
+
+/** Fallback STATIQUE (zéro WebGL/rAF) pour le palier graphique bas : monté à la
+ *  place de ThemedBackdrop quand les thèmes premium sont coupés (perf tablette).
+ *  Même signature de boîte (fixed inset-0 z-0) → la shell ne bouge pas. */
+export function ThemedBackdropStaticFallback({ scene }: { scene: BackdropScene }) {
+  return (
+    <div className="fixed inset-0 z-0 pointer-events-none" style={{ background: SCENE_GRADIENT[scene] ?? "#0b0d12" }}>
+      <div
+        className="absolute inset-0"
+        style={{ background: "radial-gradient(ellipse 75% 65% at 50% 45%, transparent 40%, rgba(5,7,11,0.5) 100%)" }}
+      />
+    </div>
+  );
+}

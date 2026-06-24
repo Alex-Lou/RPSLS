@@ -80,18 +80,18 @@ export function CosmosPad({ compact = false, ...props }: React.SVGProps<SVGSVGEl
 
       {/* ── Galaxy spirals ── */}
       <g stroke="#bea5ff" fill="none" strokeOpacity="0.32">
-        <g transform="translate(180 230) rotate(-15)">
+        <g transform="translate(180 230) rotate(-15) scale(1.6)">
           <path d="M 0 0 Q 30 -20 60 -5 T 110 25 Q 120 60 85 75 T 20 90 Q -30 80 -45 35 T -10 -25" strokeWidth="2" />
           <circle r="3" fill="#ffffff" fillOpacity="0.7" stroke="none" />
         </g>
-        <g transform="translate(1300 780) rotate(160) scale(0.85)">
+        <g transform="translate(1300 780) rotate(160) scale(0.85) scale(1.6)">
           <path d="M 0 0 Q 30 -20 60 -5 T 110 25 Q 120 60 85 75 T 20 90 Q -30 80 -45 35 T -10 -25" strokeWidth="2" />
           <circle r="3" fill="#ffffff" fillOpacity="0.7" stroke="none" />
         </g>
       </g>
 
       {/* ── Bohr atom (hydrogen), TL near top */}
-      <g transform="translate(330 200)" stroke="#a7e9ff" fill="none" strokeOpacity="0.45">
+      <g transform="translate(330 200) scale(1.6)" stroke="#a7e9ff" fill="none" strokeOpacity="0.45">
         <ellipse rx="56" ry="20" strokeWidth="1.6" />
         <ellipse rx="56" ry="20" strokeWidth="1.6" transform="rotate(60)" />
         <ellipse rx="56" ry="20" strokeWidth="1.6" transform="rotate(-60)" />
@@ -104,7 +104,7 @@ export function CosmosPad({ compact = false, ...props }: React.SVGProps<SVGSVGEl
       </g>
 
       {/* ── Saturn-like ringed planet, BR */}
-      <g transform="translate(1180 760)">
+      <g transform="translate(1180 760) scale(1.6)">
         <ellipse rx="68" ry="14" stroke="#d8b878" strokeOpacity="0.55" strokeWidth="2.5" fill="none" />
         <ellipse rx="58" ry="11" stroke="#d8b878" strokeOpacity="0.35" strokeWidth="1.2" fill="none" />
         <circle r="26" fill="#cba36a" fillOpacity="0.55" />
@@ -117,7 +117,7 @@ export function CosmosPad({ compact = false, ...props }: React.SVGProps<SVGSVGEl
       </g>
 
       {/* ── Black-hole accretion disc, TR */}
-      <g transform="translate(1140 240)">
+      <g transform="translate(1140 240) scale(1.6)">
         <circle r="22" fill="#000" />
         <circle r="22" fill="none" stroke="#ff9a3c" strokeOpacity="0.6" strokeWidth="3" />
         <ellipse rx="46" ry="14" stroke="#ff9a3c" strokeOpacity="0.4" strokeWidth="2" fill="none" />
@@ -128,7 +128,7 @@ export function CosmosPad({ compact = false, ...props }: React.SVGProps<SVGSVGEl
       </g>
 
       {/* ── Small constellation, BL */}
-      <g transform="translate(320 800)" stroke="#cfe8ff" strokeOpacity="0.50" fill="#ffffff" fillOpacity="0.85">
+      <g transform="translate(320 800) scale(1.6)" stroke="#cfe8ff" strokeOpacity="0.50" fill="#ffffff" fillOpacity="0.85">
         <line x1="0" y1="0" x2="40" y2="-30" strokeWidth="1" />
         <line x1="40" y1="-30" x2="90" y2="-15" strokeWidth="1" />
         <line x1="90" y1="-15" x2="120" y2="20" strokeWidth="1" />
@@ -144,23 +144,25 @@ export function CosmosPad({ compact = false, ...props }: React.SVGProps<SVGSVGEl
       </g>
 
       {/* ── Comet trails ── */}
-      <g stroke="#a7e9ff" strokeOpacity="0.55" fill="none">
+      <g stroke="#a7e9ff" strokeOpacity="0.55" fill="none"
+         transform="translate(920 80) scale(1.6) translate(-920 -80)">
         <path d="M 700 90 Q 800 110 920 80" strokeWidth="2" strokeDasharray="14 8" />
         <circle cx="920" cy="80" r="4" fill="#ffffff" stroke="none" />
       </g>
-      <g stroke="#a7e9ff" strokeOpacity="0.45" fill="none">
+      <g stroke="#a7e9ff" strokeOpacity="0.45" fill="none"
+         transform="translate(560 940) scale(1.6) translate(-560 -940)">
         <path d="M 720 920 Q 620 900 560 940" strokeWidth="1.5" strokeDasharray="10 6" />
         <circle cx="560" cy="940" r="3" fill="#ffffff" stroke="none" />
       </g>
 
       {/* ── Scientific labels along borders ── */}
       <g fontFamily='"JetBrains Mono","Consolas",monospace' fill="#a7e9ff" fillOpacity="0.45">
-        <text x="80"        y={H/2 - 60} fontSize="14" transform={`rotate(-90 80 ${H/2 - 60})`}>c = 2.998 × 10⁸ m·s⁻¹</text>
-        <text x="80"        y={H/2 + 130} fontSize="14" transform={`rotate(-90 80 ${H/2 + 130})`}>λ Hα = 656 nm</text>
-        <text x={W - 70}    y={H/2 - 70} fontSize="14" transform={`rotate(90 ${W-70} ${H/2 - 70})`}>T_CMB = 2.725 K</text>
-        <text x={W - 70}    y={H/2 + 130} fontSize="14" transform={`rotate(90 ${W-70} ${H/2 + 130})`}>M_⊙ = 1.989·10³⁰ kg</text>
-        <text x={W/2 - 240} y={H - 60} fontSize="13">z = 1.42</text>
-        <text x={W/2 + 110} y={H - 60} fontSize="13">G = 6.674 × 10⁻¹¹</text>
+        <text x="80"        y={H/2 - 60} fontSize="22" transform={`rotate(-90 80 ${H/2 - 60})`}>c = 2.998 × 10⁸ m·s⁻¹</text>
+        <text x="80"        y={H/2 + 130} fontSize="22" transform={`rotate(-90 80 ${H/2 + 130})`}>λ Hα = 656 nm</text>
+        <text x={W - 70}    y={H/2 - 70} fontSize="22" transform={`rotate(90 ${W-70} ${H/2 - 70})`}>T_CMB = 2.725 K</text>
+        <text x={W - 70}    y={H/2 + 130} fontSize="22" transform={`rotate(90 ${W-70} ${H/2 + 130})`}>M_⊙ = 1.989·10³⁰ kg</text>
+        <text x={W/2 - 240} y={H - 60} fontSize="21">z = 1.42</text>
+        <text x={W/2 + 110} y={H - 60} fontSize="21">G = 6.674 × 10⁻¹¹</text>
       </g>
 
       {/* Frame */}

@@ -25,6 +25,7 @@
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { menuFxSuppressed } from "../fx/menuFx";
+import { useGfxAllows } from "../graphics/graphicsQuality";
 import { useStore } from "../store/store";
 import { renderParticle, type RenderCtx } from "./touchFx/particles";
 import {
@@ -57,9 +58,13 @@ export function PremiumTouchLayer({ scene, active }: { scene: PremiumFxScene; ac
   const intensity = useStore((s) => s.player.premiumIntensity?.[scene] ?? 1.0);
   const intensityRef = useRef(intensity);
   intensityRef.current = intensity;
+  // Palier perf : les traînées tactiles premium (le + cher, par pointeur) ne
+  // tournent qu'en 'high'. En 'low'/'medium', composant monté mais INERTE :
+  // pas de canvas, pas de rAF, pas de listeners pointeur.
+  const gfxOn = useGfxAllows("premiumTouch");
 
   useEffect(() => {
-    if (!active) return;
+    if (!active || !gfxOn) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -160,9 +165,9 @@ export function PremiumTouchLayer({ scene, active }: { scene: PremiumFxScene; ac
       ptsRef.current = []; partsRef.current = [];
       try { ctx.clearRect(0, 0, w, h); } catch { /* canvas gone */ }
     };
-  }, [active, scene]);
+  }, [active, scene, gfxOn]);
 
-  if (!active) return null;
+  if (!active || !gfxOn) return null;
   return createPortal(
     <canvas ref={canvasRef} aria-hidden className="fixed inset-0 pointer-events-none" style={{ zIndex: 1 }} />,
     document.body,

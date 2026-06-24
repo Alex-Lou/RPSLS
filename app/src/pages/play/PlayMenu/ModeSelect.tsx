@@ -37,13 +37,26 @@ export function ModeSelect({
   // haut. Restauré au unmount (autres pages / match gardent le flottant).
   // + SCROLL LOCK (Alex 2026-06-12 #2) : le menu doit tenir sur une page,
   // scroll bloqué. Repasser MENU_SCROLL_LOCKED à false si on doit ré-autoriser.
+  // SCROLL LOCK = PORTRAIT-ONLY (tablette paysage 2026-06-21) : en portrait
+  // téléphone le menu tient sur une page → on bloque le scroll. En PAYSAGE
+  // (tablette, courte en hauteur) la grille s'étale en 2×3 mais on garde le
+  // scroll comme filet de sécurité. On (ré)applique à chaque rotation.
   useEffect(() => {
     setBurgerHidden(true);
     const main = MENU_SCROLL_LOCKED ? document.querySelector("main") : null;
     const prevOverflow = main?.style.overflowY ?? "";
-    if (main) main.style.overflowY = "hidden";
+    const applyLock = () => {
+      if (!main) return;
+      const portrait = window.matchMedia("(orientation:portrait)").matches;
+      main.style.overflowY = portrait ? "hidden" : "";
+    };
+    applyLock();
+    window.addEventListener("orientationchange", applyLock);
+    window.addEventListener("resize", applyLock);
     return () => {
       setBurgerHidden(false);
+      window.removeEventListener("orientationchange", applyLock);
+      window.removeEventListener("resize", applyLock);
       if (main) main.style.overflowY = prevOverflow;
     };
   }, []);
@@ -54,7 +67,7 @@ export function ModeSelect({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -16 }}
       transition={{ duration: 0.3 }}
-      className="flex flex-col gap-2 sm:gap-4 flex-1 justify-center py-1"
+      className="flex flex-col gap-2 sm:gap-4 flex-1 justify-start py-1"
     >
       <div className="text-center">
         {/* Respiration TRÈS douce du titre (Alex 2026-06-12 #4) : scale-only
@@ -100,7 +113,7 @@ export function ModeSelect({
 
       {/* Mode tiles — 2 columns even on mobile so the 6 tiles fit one viewport.
        *  Compacté (Alex 2026-06-12) : tout le menu doit tenir SANS scroll. */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+      <div className="grid grid-cols-2 landscape:grid-cols-3 gap-2 sm:gap-3 flex-1 min-h-0 grid-rows-3 landscape:grid-rows-2 auto-rows-fr max-h-[46vh] landscape:max-h-none content-start">
         {ALL_CARDS.map((m, i) => {
           if (m === "online") {
             return (
@@ -114,7 +127,7 @@ export function ModeSelect({
                 onClick={() => onGoOnline?.()}
                 disabled={!onGoOnline}
                 className={
-                  "text-left p-2 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1 relative overflow-hidden min-h-[100px] " +
+                  "text-left p-2 sm:p-4 rounded-2xl border transition flex flex-col items-start justify-center gap-1 relative overflow-hidden min-h-[100px] landscape:min-h-[88px] " +
                   TILE_BASE + " border-violet-400/30 from-violet-500/22 via-fuchsia-500/14 to-cyan-500/22 " +
                   "hover:from-violet-500/32 hover:via-fuchsia-500/26 hover:to-cyan-500/32 hover:border-violet-400/60 " +
                   "shadow-lg shadow-violet-500/10"
@@ -145,7 +158,7 @@ export function ModeSelect({
                 onClick={() => onGoConstellationMenu?.()}
                 disabled={!onGoConstellationMenu}
                 className={
-                  "text-left p-2 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1 relative overflow-hidden min-h-[100px] " +
+                  "text-left p-2 sm:p-4 rounded-2xl border transition flex flex-col items-start justify-center gap-1 relative overflow-hidden min-h-[100px] landscape:min-h-[88px] " +
                   TILE_BASE + " border-fuchsia-400/30 from-fuchsia-500/22 via-violet-500/14 to-amber-500/22 " +
                   "hover:from-fuchsia-500/32 hover:via-violet-500/26 hover:to-amber-500/32 hover:border-fuchsia-400/60 " +
                   "shadow-lg shadow-fuchsia-500/10"
@@ -160,7 +173,7 @@ export function ModeSelect({
                     </span>
                   </div>
                   <p className="text-[10px] sm:text-xs text-ink-muted mt-0.5 line-clamp-2">
-                    3 lanes en parallèle vs IA
+                    RPSLS pur · 3 lanes vs IA · sans cartes
                   </p>
                 </div>
               </motion.button>
@@ -178,7 +191,7 @@ export function ModeSelect({
                 onClick={() => onGoRanked?.()}
                 disabled={!onGoRanked}
                 className={
-                  "text-left p-2 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1 relative overflow-hidden min-h-[100px] " +
+                  "text-left p-2 sm:p-4 rounded-2xl border transition flex flex-col items-start justify-center gap-1 relative overflow-hidden min-h-[100px] landscape:min-h-[88px] " +
                   TILE_BASE + " border-amber-400/40 from-amber-500/22 via-rose-500/14 to-fuchsia-500/22 " +
                   "hover:from-amber-500/32 hover:via-rose-500/26 hover:to-fuchsia-500/32 hover:border-amber-400/70 " +
                   "shadow-lg shadow-amber-500/10"
@@ -211,7 +224,7 @@ export function ModeSelect({
                 onClick={() => onGoArenaPro?.()}
                 disabled={!onGoArenaPro}
                 className={
-                  "text-left p-2 sm:p-4 rounded-2xl border transition flex flex-col items-start gap-1 relative overflow-hidden min-h-[100px] " +
+                  "text-left p-2 sm:p-4 rounded-2xl border transition flex flex-col items-start justify-center gap-1 relative overflow-hidden min-h-[100px] landscape:min-h-[88px] " +
                   TILE_BASE + " border-fuchsia-400/40 from-fuchsia-500/22 via-violet-500/14 to-indigo-500/22 " +
                   "hover:from-fuchsia-500/32 hover:via-violet-500/26 hover:to-indigo-500/32 hover:border-fuchsia-400/70 " +
                   "shadow-lg shadow-fuchsia-500/10"
@@ -220,7 +233,7 @@ export function ModeSelect({
                 <ModeIcon mode="arena_pro" />
                 <div className="min-w-0 w-full">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-semibold text-sm sm:text-base">{t("mode.arena_pro")}</span>
+                    <span className="font-semibold text-xs sm:text-sm">{t("mode.arena_pro")}</span>
                     <span className="text-[9px] uppercase tracking-wider text-fuchsia-200 bg-fuchsia-500/30 px-1 rounded-full">
                       BETA
                     </span>
@@ -252,13 +265,13 @@ export function ModeSelect({
                 setMode(m); setPendingMode(m);
               }}
               className={
-                "p-2.5 sm:p-4 rounded-2xl border transition flex flex-col gap-1.5 min-h-[124px] " +
+                "p-2.5 sm:p-4 rounded-2xl border transition flex flex-col gap-1.5 min-h-[124px] landscape:min-h-[88px] " +
                 (TILE_ACCENT[m]
                   ? TILE_BASE + " " + TILE_ACCENT[m]
                   : "border-hairline bg-surface hover:border-white/20") + " " +
                 // Wide tile (hot-seat) spans both columns, so left-aligning
                 // its content leaves an ugly empty right half. Center it.
-                (wide ? "col-span-2 items-center text-center justify-center" : "text-left items-start")
+                (wide ? "col-span-2 landscape:col-span-1 items-center landscape:items-start text-center landscape:text-left justify-center" : "text-left items-start justify-center")
               }
             >
               <ModeIcon mode={m} />

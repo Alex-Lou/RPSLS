@@ -121,8 +121,10 @@ export function PlayPage({
         // remplacé par le burger themed inline à gauche du Défi du jour) →
         // plus rien à esquiver, la carte monte (-mt-10 sur le pt-12 global).
         // px-0 : aligne la carte sur la largeur des tuiles du menu (qui n'ont
-        // pas de padding interne) ; -mt-11 : remontée presque au ras du haut.
-        <UserHeader onNavigate={onNavigate ?? (() => {})} className="px-0 -mt-11" />
+        // pas de padding interne). -mt-11→-mt-4 (Alex 2026-06-23) : -mt-11 plaçait
+        // la carte à ~4px sous la safe-area → DANS la barre de statut Android. -mt-4
+        // garde ~32px de marge au-dessus de --sai-top (≥24px) → dégage le notch.
+        <UserHeader onNavigate={onNavigate ?? (() => {})} className="px-0 -mt-4" />
       )}
       <AnimatePresence mode="wait">
         {view.kind === "select" && (

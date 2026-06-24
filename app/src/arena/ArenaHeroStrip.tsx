@@ -21,14 +21,14 @@ import { arenaCardDescKey } from "./arenaTypes";
 import type { BoardState, HeroState, PlayedSpell } from "./arenaTypes";
 import { arenaSpellCost } from "./arenaSpellHelpers";
 import { ArenaConstellationBar } from "./ArenaConstellationBar";
+import { engineGauge } from "./arenaEngines";
 import { ArenaSpellQueueChip } from "./ArenaSpellQueueChip";
 import { VoieAura } from "./ArenaVoieAura";
 
 export interface ArenaHeroStripProps {
   hero: HeroState;
-  /** Board complet — utilisé pour computer live le count Constellation
-   *  (Lot C v2 simultanée) plutôt que de lire hero.constellationCount qui
-   *  pourrait être stale après combat. Optionnel (fallback sur le count). */
+  /** Board complet — prop héritée (Lot C v2), plus lue par ce composant
+   *  (la jauge de Voie est calculée via engineGauge(hero)). Optionnelle. */
   board?: BoardState;
   side: "you" | "opp";
   turn: number;
@@ -97,13 +97,16 @@ export function ArenaHeroStrip({
     return () => window.clearTimeout(id);
   }, [bloodDrip?.key]);
   // Révélation PROGRESSIVE de la Voie ADVERSE (Alex 2026-06-17 rethink Phase 0).
-  // COLLANT : dès que l'opp a posé son symbole d'Affinité (constellationCount ≥ 1
+  // COLLANT : dès que l'opp a fait monter sa jauge de Voie (engineVal ≥ 1
   // = « vu »), sa Voie reste révélée même si la créature meurt ensuite. Côté
   // joueur : toujours visible (c'est ta Voie). Reset au remount (rematch).
   const [voieSeen, setVoieSeen] = useState(false);
+  // Valeur de la jauge d'ENGINE de la Voie (0-3) — désormais l'UNIQUE progression
+  // affichée (refonte clarté Alex). null/0 = Montagne sans rocher posé / pas d'affinité.
+  const engineVal = engineGauge(hero)?.value ?? 0;
   useEffect(() => {
-    if ((hero.constellationCount ?? 0) >= 1) setVoieSeen(true);
-  }, [hero.constellationCount]);
+    if (engineVal >= 1) setVoieSeen(true);
+  }, [engineVal]);
   useEffect(() => {
     const prev = prevHpRef.current;
     if (hero.hp < prev) {
@@ -123,7 +126,7 @@ export function ArenaHeroStrip({
   }, [hero.hp]);
   // Opp avant sa 1ʳᵉ étoile → Voie cachée (couleur neutre, pas de glyphe/nom, pas
   // de motif d'aura). `< 1` couvre le frame courant, `!voieSeen` la persistance.
-  const voieConcealed = side === "opp" && !voieSeen && (hero.constellationCount ?? 0) < 1;
+  const voieConcealed = side === "opp" && !voieSeen && engineVal < 1;
   return (
     <div className={"relative flex items-center gap-1 " + (side === "you" ? "pl-0 pr-1" : "px-1")}>
       {/* 🎨 Identité visuelle PERSO de la Voie — calque animé derrière le HUD,
@@ -182,9 +185,9 @@ export function ArenaHeroStrip({
       {/* Portrait — avatar + name in a circle so each side has a face.
        *  Floating damage popup pops out of the portrait on HP loss. Opp =
        *  scale-95 (-5%). w-14 (au lieu de w-16) pour rapprocher les infos. */}
-      <div className={"flex flex-col items-center shrink-0 w-14 relative z-10 " + (side === "opp" ? "scale-95 origin-top" : "")}>
+      <div className={"flex flex-col items-center shrink-0 w-14 landscape:w-[76px] relative z-10 " + (side === "opp" ? "scale-95 origin-top" : "")}>
         <HeroPortrait avatar={avatar} ringColor={ringColor} divineShield={hero.divineShield} damaged={!!dmgPop} />
-        <span className={"text-[9px] uppercase tracking-wider font-black truncate max-w-[64px] mt-0.5 " + accent}>
+        <span className={"text-[9px] landscape:text-[11px] uppercase tracking-wider font-black truncate max-w-[64px] landscape:max-w-[76px] mt-0.5 " + accent}>
           {name}
         </span>
         {/* (chip queue utility est positionné au niveau du strip parent, plus haut) */}
@@ -220,15 +223,18 @@ export function ArenaHeroStrip({
       {/* HP + mana — largeur naturelle, collée à l'avatar (Alex 2026-06-11) :
        *  shrink-0 (plus flex-1) pour ne PAS s'étirer → l'espace à droite est
        *  libéré pour le slot des cartes utility lancées. */}
-      <div className="relative z-10 shrink-0 flex flex-col justify-center gap-0.5 min-h-[3.4rem]">
+      <div className="relative z-10 shrink-0 landscape:flex-1 flex flex-col justify-center gap-0.5 min-h-[3.4rem]">
         {/* Ligne 1 — VOIE / constellation AU-DESSUS (Alex 2026-06-12) : passée
          *  sur sa propre ligne. Les 3 lignes (voie / vie / mana) sont
          *  distribuées sur la hauteur de l'avatar via justify-center +
          *  gap serré, SANS agrandir le strip (sinon la main se fait expulser
          *  hors écran). */}
+        {/* UNE seule jauge de Voie (refonte clarté Alex 2026-06-23) : la barre
+         *  affiche le NOM de la Voie + les pips de l'ENGINE (0-3) + ✦ quand le
+         *  Finisher est prêt. Plus de double-jauge qui embrouillait. */}
         {hero.affinity && (
           <ArenaConstellationBar
-            count={hero.constellationCount ?? 0}
+            count={engineVal}
             affinity={hero.affinity}
             side={side}
             finisherUnlocked={hero.finisherUnlocked}
@@ -259,12 +265,12 @@ export function ArenaHeroStrip({
             style={{ fontFamily: "var(--font-headline)" }}
           >
             <span className="text-[13px] mr-0.5" style={{ color: lowHp ? "#fb7185" : "#f87171" }}>❤</span>
-            <span className="text-[18px] font-black" style={{ color: lowHp ? "#fb7185" : "#ffffff" }}>{hero.hp}</span>
+            <span className="text-[18px] landscape:text-[24px] font-black" style={{ color: lowHp ? "#fb7185" : "#ffffff" }}>{hero.hp}</span>
             <span className="text-[10px] font-bold text-white/45">/{hero.maxHp}</span>
           </motion.span>
           <div
             className={
-              "relative w-28 sm:w-32 h-3 rounded-full bg-zinc-900/80 overflow-hidden ring-1 ring-black/50 " +
+              "relative w-28 sm:w-32 landscape:flex-1 landscape:min-w-0 h-3 landscape:h-4 rounded-full bg-zinc-900/80 overflow-hidden ring-1 ring-black/50 " +
               (lowHp ? "animate-pulse" : "")
             }
           >
@@ -404,7 +410,7 @@ export function ArenaHeroStrip({
             // overflow-visible (Alex 2026-06-11) : la croix ✕ déborde du chip,
             // overflow-auto la clippait. pl-1 pr-2 pour que la 1re carte et la
             // croix de la dernière ne touchent pas les bords. Éventail overlap.
-            "relative z-10 flex-1 flex items-center min-w-0 overflow-visible justify-start pl-1 pr-2 " +
+            "relative z-10 flex-1 landscape:flex-none flex items-center min-w-0 overflow-visible justify-start pl-1 pr-2 " +
             (onRemoveUtility ? "" : "pointer-events-none")
           }
           aria-label="Sorts utility planifiés"
@@ -444,7 +450,7 @@ function HeroPortrait({ avatar, ringColor, divineShield, damaged }: {
       animate={damaged ? { scale: [1, 1.08, 0.96, 1], x: [0, -2, 2, -1, 1, 0] } : { scale: 1, x: 0 }}
       transition={damaged ? { duration: 0.5 } : { duration: 0.2 }}
       className={
-        "relative w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden ring-2 " +
+        "relative w-14 h-14 sm:w-16 sm:h-16 landscape:w-[68px] landscape:h-[68px] rounded-full overflow-hidden ring-2 " +
         (damaged ? "ring-rose-400 shadow-[0_0_18px_-1px_rgba(244,63,94,0.95)]" : ringColor) +
         " bg-gradient-to-br from-zinc-700 to-zinc-900 flex items-center justify-center " +
         (divineShield && !damaged ? "shadow-[0_0_12px_-1px_rgba(252,211,77,0.85)]" : "")

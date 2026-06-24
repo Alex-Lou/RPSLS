@@ -19,6 +19,7 @@
 
 import { motion } from "motion/react";
 import type { Move } from "../engine/game";
+import { useGfxAllows } from "../graphics/graphicsQuality";
 
 interface VoieTheme {
   /** Liseré vertical gauche — couleur signature de la Voie. */
@@ -58,6 +59,10 @@ const LEAVES = [16, 40, 60, 82]; // positions X% des feuilles
 
 export function VoieAura({ affinity, side, calm = false, concealed = false }: { affinity: Move; side: "you" | "opp"; calm?: boolean; concealed?: boolean }) {
   const th = OWNERSHIP_THEME[side];
+  // PERF (Alex 2026-06-20) : le MOTIF animé (3 à 9 nœuds en boucle, le poste le
+  // plus lourd de l'arène) est coupé au palier 'low'. La teinte de CAMP + le
+  // liseré (2 boucles d'opacité, négligeables) restent → identité préservée.
+  const motifOk = useGfxAllows("voieMotif");
   return (
     <div
       className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none"
@@ -85,7 +90,7 @@ export function VoieAura({ affinity, side, calm = false, concealed = false }: { 
           encore cachée (Alex 2026-06-17 rethink Phase 0) : le motif est
           spécifique à la Voie (lames=Tranchant, feuilles=Forêt…), il la
           trahirait. Seuls la teinte de CAMP + le liseré restent (zéro info Voie). */}
-      {!calm && !concealed && <VoieMotif affinity={affinity} />}
+      {!calm && !concealed && motifOk && <VoieMotif affinity={affinity} />}
     </div>
   );
 }

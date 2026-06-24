@@ -36,6 +36,8 @@ import type {
 import { arenaSupported, spellPriority } from "./arenaCardEffects";
 import { truncateIntentByCaps } from "./arenaRules";
 import { arenaSpellCost } from "./arenaSpellHelpers";
+import { affinityEdges } from "./arenaTrace";
+import { engineGauge } from "./arenaEngines";
 import type { CardId } from "../ranked/rankedTypes";
 import type { Move } from "../engine/game";
 import type { Difficulty } from "../types";
@@ -94,6 +96,19 @@ const CPU_PLAYABLE = new Set<CardId>([
   //    laissées au JOUEUR (ciblage trop spécifique pour l'IA). ──
   "jet-caillou", "seve", "coup-oeil", "toile-gluante", "gravite",
   "doppelganger", "purge", "roue-destin", "phenix", "singularite",
+  // ── Voie Montagne (2026-06-22) ──
+  "eboulement", "strate-vive", "contrefort", "gardien-pierre", "veine-gaia",
+  // ── Voie Mirage (2026-06-22) ──
+  "reflet-echo", "mascarade-enchainee", "fuite-masquee",
+  // ── Voie Tranchant (2026-06-22) ──
+  "coup-de-taille", "acuite", "frenesie",
+  // ── Voie Forêt (2026-06-23) ──
+  "ramure", "photosynthese", "ronces",
+  // ── Voie Cosmos (2026-06-23) ──
+  "dilatation-temporelle", "loi-de-causalite", "convergence-cosmique",
+  // ── Dégâts signature par Voie (2026-06-23) ──
+  "eboulis-final", "drain-vital", "coup-dans-lombre",
+  "intrication-quantique", "taillade-mortelle",
 ]);
 export function cpuCanPlay(id: CardId): boolean {
   return CPU_PLAYABLE.has(id);
@@ -255,7 +270,7 @@ export function cpuArenaDecision(
     if (sideCreature(board, side, lane)) continue;
     if (Math.random() < summonSkip) continue;
     const opp = sideCreature(board, oppSide, lane);
-    const choice = pickBestMove(opp, hero.affinity, oppHeroState.affinity, bias);
+    const choice = pickBestMove(opp, hero.affinity, oppHeroState.affinity, bias, engineGauge(oppHeroState)?.value ?? 0);
     intent.summons.push({ lane, move: choice });
     mana -= 1;
     summonsThisTurn += 1;
@@ -267,7 +282,7 @@ export function cpuArenaDecision(
     for (const lane of laneOrder) {
       if (sideCreature(board, side, lane)) continue;
       const opp = sideCreature(board, oppSide, lane);
-      intent.summons.push({ lane, move: pickBestMove(opp, hero.affinity, oppHeroState.affinity, bias) });
+      intent.summons.push({ lane, move: pickBestMove(opp, hero.affinity, oppHeroState.affinity, bias, engineGauge(oppHeroState)?.value ?? 0) });
       mana -= 1;
       break;
     }
@@ -322,7 +337,18 @@ function pickBestMove(
   myAffinity: Move | undefined,
   oppAffinity: Move | undefined,
   bias: PersonaBias,
+  humanStars = 0,
 ): Move {
+  // LE TRACÉ — garde-fou IA : SEULEMENT quand l'humain est PROCHE du tracé (≥2
+  // arêtes), le CPU ÉVITE (dans ses pioches random) de poser les 2 symboles que la
+  // Voie humaine counter → il se dérobe au dernier moment, sans rendre le early/mid
+  // mou (Alex 2026-06-23 « beaucoup plus mou »). Build de SA Voie + counters gardés.
+  const avoidMoves: Move[] = oppAffinity && humanStars >= 2 ? affinityEdges(oppAffinity) : [];
+  const draw = (bag: Move[]): Move => {
+    const pool = avoidMoves.length ? bag.filter((m) => !avoidMoves.includes(m)) : bag;
+    const safe = pool.length ? pool : bag;
+    return safe[Math.floor(Math.random() * safe.length)];
+  };
   // Cas lane VIDE : opportunité de poser SA Voie pour build sa Constellation.
   if (!opp) {
     if (myAffinity && Math.random() < bias.affinityBuildChance) {
@@ -330,7 +356,7 @@ function pickBestMove(
     }
     // Sinon bag défensif (mêmes proportions qu'avant) — varié.
     const bag: Move[] = ["rock", "rock", "rock", "spock", "spock", "scissors", "scissors", "lizard", "paper"];
-    return bag[Math.floor(Math.random() * bag.length)];
+    return draw(bag);
   }
   // Face à une créature opp qui MATCH la Voie joueur → priorité blocage
   // (le CPU "lit" ton plan et le contre).
@@ -350,7 +376,7 @@ function pickBestMove(
   // moins d'agression brute) — déjà calibré par bias.
   if (Math.random() < 0.30) {
     const bag: Move[] = ["rock", "rock", "rock", "spock", "spock", "scissors", "scissors", "lizard", "paper"];
-    return bag[Math.floor(Math.random() * bag.length)];
+    return draw(bag);
   }
   for (const mv of MOVES) {
     if (moveCountersMove(mv, opp.move)) {
@@ -369,7 +395,7 @@ function pickBestMove(
   // for the 5-symbol table, but guards against future extensions). Random
   // from the bag instead of hardcoded Scissors.
   const fallbackBag: Move[] = ["rock", "paper", "scissors", "lizard", "spock"];
-  return fallbackBag[Math.floor(Math.random() * fallbackBag.length)];
+  return draw(fallbackBag);
 }
 
 /** Build a PlayedSpell with a sensible target chosen for the CPU. Returns null
@@ -489,6 +515,122 @@ function buildSpellTarget(
         (l) => !!sideCreature(board, side, l) || !!sideCreature(board, oppSide, l),
       );
       return anyCreature ? { id, kind: "hero" } : null;
+    }
+    // ── Voie Montagne (2026-06-22) ──
+    case "eboulement":   return targetOppBestCreature(board, oppSide, id);
+    case "strate-vive":
+    case "gardien-pierre": {
+      // rock-only : cible la meilleure de MES Pierres (sinon fizzle → ne joue pas).
+      let bestLane: LaneIndex | null = null;
+      let best = -1;
+      for (let i = 0; i < 3; i++) {
+        const c = sideCreature(board, side, i as LaneIndex);
+        if (c && c.move === "rock") {
+          const s = CREATURE_STATS.rock.atk + c.hp + c.voieAtkBonus;
+          if (s > best) { best = s; bestLane = i as LaneIndex; }
+        }
+      }
+      return bestLane === null ? null : { id, kind: "lane", lane: bestLane };
+    }
+    case "contrefort": {
+      // +PV/bouclier board-wide : utile avec ≥1 créature non-Spock.
+      const hasBuffable = ([0, 1, 2] as LaneIndex[]).some((l) => {
+        const c = sideCreature(board, side, l);
+        return !!c && c.move !== "spock";
+      });
+      return hasBuffable ? { id, kind: "self" } : null;
+    }
+    case "veine-gaia": {
+      // Soin = 2×Pierres : ne tente que blessé ET avec ≥1 Pierre.
+      const me = side === "a" ? board.a : board.b;
+      const rocks = ([0, 1, 2] as LaneIndex[]).filter(
+        (l) => sideCreature(board, side, l)?.move === "rock",
+      ).length;
+      return me.hp < me.maxHp && rocks > 0 ? { id, kind: "self" } : null;
+    }
+    // ── Voie Mirage (2026-06-22) ──
+    case "reflet-echo": return { id, kind: "self" };
+    case "mascarade-enchainee":
+    case "fuite-masquee": {
+      // lizard-only : cible le meilleur de MES Lézards (sinon ne joue pas).
+      let bestLane: LaneIndex | null = null;
+      let best = -1;
+      for (let i = 0; i < 3; i++) {
+        const c = sideCreature(board, side, i as LaneIndex);
+        if (c && c.move === "lizard" && c.dodgeCharges < 3) {
+          const s = c.hp + c.dodgeCharges;
+          if (s > best) { best = s; bestLane = i as LaneIndex; }
+        }
+      }
+      return bestLane === null ? null : { id, kind: "lane", lane: bestLane };
+    }
+    // ── Voie Tranchant (2026-06-22) ──
+    case "coup-de-taille":
+    case "acuite": {
+      // scissors-only : cible le meilleur de MES Ciseaux (sinon ne joue pas).
+      let bestLane: LaneIndex | null = null;
+      let best = -1;
+      for (let i = 0; i < 3; i++) {
+        const c = sideCreature(board, side, i as LaneIndex);
+        if (c && c.move === "scissors") {
+          const s = CREATURE_STATS.scissors.atk + c.hp + c.voieAtkBonus;
+          if (s > best) { best = s; bestLane = i as LaneIndex; }
+        }
+      }
+      return bestLane === null ? null : { id, kind: "lane", lane: bestLane };
+    }
+    case "frenesie": {
+      // Buff board scissors : utile avec ≥1 Ciseau.
+      const hasScissors = ([0, 1, 2] as LaneIndex[]).some((l) => sideCreature(board, side, l)?.move === "scissors");
+      return hasScissors ? { id, kind: "self" } : null;
+    }
+    // ── Voie Forêt (2026-06-23) ──
+    case "ramure": {
+      // Bouclier board-wide : utile avec ≥1 créature non-Spock (Détaché ignoré).
+      const hasBuffable = ([0, 1, 2] as LaneIndex[]).some((l) => {
+        const c = sideCreature(board, side, l);
+        return !!c && c.move !== "spock";
+      });
+      return hasBuffable ? { id, kind: "self" } : null;
+    }
+    case "photosynthese":
+      // Soin + ATK perm : cible ma meilleure créature (fizzle → ne joue pas).
+      return targetMyBestCreature(board, side, "lane", id);
+    case "ronces":
+      // Riposte + bouclier : protège ma meilleure créature (fizzle → ne joue pas).
+      return targetMyBestCreature(board, side, "lane", id);
+    // ── Voie Cosmos (2026-06-23) ──
+    case "dilatation-temporelle": {
+      // +1 mana max permanent — inutile une fois le plafond atteint.
+      const me = side === "a" ? board.a : board.b;
+      return me.maxMana < MANA_CAP ? { id, kind: "self" } : null;
+    }
+    case "loi-de-causalite": return targetOppBestCreature(board, oppSide, id);
+    case "convergence-cosmique":
+      // Dégât héros = mon mana max : toujours bon (direct, inconditionnel).
+      return { id, kind: "hero" };
+    // ── Dégâts signature par Voie (2026-06-23) — toutes frappent le héros ──
+    case "drain-vital":
+    case "taillade-mortelle":
+      // Burst / drain inconditionnel : toujours bon.
+      return { id, kind: "hero" };
+    case "eboulis-final": {
+      // Dégât = Pierres + Strates : ne tente que si j'ai ≥1 Pierre.
+      const hasRock = ([0, 1, 2] as LaneIndex[]).some((l) => sideCreature(board, side, l)?.move === "rock");
+      return hasRock ? { id, kind: "hero" } : null;
+    }
+    case "coup-dans-lombre": {
+      // Dégât = charges d'Esquive : ne tente que si j'en ai ≥1.
+      const charges = ([0, 1, 2] as LaneIndex[]).reduce<number>((s, l) => {
+        const c = sideCreature(board, side, l);
+        return s + (c && c.move === "lizard" ? c.dodgeCharges : 0);
+      }, 0);
+      return charges > 0 ? { id, kind: "hero" } : null;
+    }
+    case "intrication-quantique": {
+      // Dégât = mes Spock : ne tente que si j'en ai ≥1.
+      const hasSpock = ([0, 1, 2] as LaneIndex[]).some((l) => sideCreature(board, side, l)?.move === "spock");
+      return hasSpock ? { id, kind: "hero" } : null;
     }
     default:          return null;
   }

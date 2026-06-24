@@ -6,7 +6,7 @@ import { applyTheme, THEMES } from "./theme/theme";
 import { BACKGROUNDS_BY_ID, resolveFontFamily } from "./theme/themes";
 import { RTL_LOCALES } from "./i18n";
 import { SplashShader } from "./fx/SplashShader";
-import { ThemedBackdrop } from "./backdrops/ThemedBackdrop";
+import { ThemedBackdrop, ThemedBackdropStaticFallback } from "./backdrops/ThemedBackdrop";
 import { QuartzBackdropWithLayer } from "./backdrops/QuartzBackdrop";
 import { PremiumTouchLayer, isPremiumFxScene } from "./backdrops/PremiumTouchLayer";
 import { StormRain } from "./backdrops/StormRain";
@@ -17,9 +17,12 @@ import { Sidebar, MobileShell, type Page } from "./Sidebar";
 // so lazy-loading it would just add a flicker for no gain.
 import { PlayPage } from "./pages/PlayPage";
 import { FloatingMatchBackButton } from "./match/sharedMatchUI";
+import { useMatchFullscreen } from "./match/matchFullscreenStore";
 import { UserHeader } from "./UserHeader";
 import { LevelUpWatcher } from "./fx/LevelUpOverlay";
 import { useT } from "./i18n";
+import { useGfxAutoDetect } from "./graphics/useGfxAutoDetect";
+import { useGfxAllows } from "./graphics/graphicsQuality";
 import { setHapticSettings } from "./haptic";
 import { initSentry, shutdownSentry } from "./monitoring/sentry";
 import { startSyncSubscriber } from "./online/playerSync";
@@ -106,6 +109,16 @@ export default function App() {
   // the mode-select home).
   const [homeNonce, setHomeNonce] = useState(0);
   const t = useT();
+  // Détection de perf au runtime : mesure les FPS au boot et rétrograde le palier
+  // graphique si l'appareil rame malgré de bonnes specs (cf. tablette 8Go/8cœurs).
+  useGfxAutoDetect();
+  // Palier perf : les backdrops premium (WebGL/SVG continus) deviennent STATIQUES
+  // sur appareil faible (le gros poste de lag des « gros thèmes » signalé par Alex).
+  const gfxThemes = useGfxAllows("premiumThemes");
+  const gfxStorm = useGfxAllows("stormRainLayer");
+  const gfxQuartz = useGfxAllows("quartzScene");
+  // Match arène en cours → shell PLEIN ÉCRAN (sidebar masquée + cap max-w-md retiré).
+  const matchFullscreen = useMatchFullscreen();
 
   function navigateTo(next: Page) {
     if (next === "play") setHomeNonce((n) => n + 1);
@@ -251,7 +264,9 @@ export default function App() {
       {/* Backdrop stays gated on `stage !== "splash"` — Splash already mounts
           its own ThemedBackdrop via SplashShader, doubling it would render two
           WebGL canvases at z-0 and waste a context. */}
-      {activeScene && stage !== "splash" && stage !== "auth" && <ThemedBackdrop scene={activeScene} />}
+      {activeScene && stage !== "splash" && stage !== "auth" && (
+        gfxThemes ? <ThemedBackdrop scene={activeScene} /> : <ThemedBackdropStaticFallback scene={activeScene} />
+      )}
       {/* Per-theme touch/slide FX for the coded premium scenes (storm/tempus/
           emberforge/phantom/eclipse) — each reacts in its own voice. Passive in
           menus (taps still reach the UI), active during the full-screen peek.
@@ -265,15 +280,28 @@ export default function App() {
           Mounted during splash too: the rain IS the theme — hiding it on
           opening means the splash looks dead for a beat. Performance: one
           canvas + rAF, runs alongside the cosmic shader without contention. */}
-      {activeScene === "storm" && <StormRain />}
+      {activeScene === "storm" && gfxStorm && <StormRain />}
       {premiumScene === "quartz" && (
-        // Interactive layer is wired ONLY during peek (full-screen preview):
-        // outside peek the regular UI taps must keep reaching their buttons.
-        // The wrapper switches `pointerEvents` inline so the same component
-        // serves both passive and active modes without duplication.
-        <div className={"fixed inset-0 z-0 " + (peek ? "" : "pointer-events-none")}>
-          <QuartzBackdropWithLayer interactive={peek} />
-        </div>
+        gfxQuartz ? (
+          // Interactive layer is wired ONLY during peek (full-screen preview):
+          // outside peek the regular UI taps must keep reaching their buttons.
+          // The wrapper switches `pointerEvents` inline so the same component
+          // serves both passive and active modes without duplication.
+          <div className={"fixed inset-0 z-0 " + (peek ? "" : "pointer-events-none")}>
+            <QuartzBackdropWithLayer interactive={peek} />
+          </div>
+        ) : (
+          // Palier perf bas : fallback STATIQUE prismatique (zéro SVG/SMIL).
+          <div
+            className="fixed inset-0 z-0 pointer-events-none"
+            style={{
+              background:
+                "radial-gradient(120% 85% at 50% 28%, rgba(232,210,250,0.20) 0%, transparent 52%)," +
+                "radial-gradient(85% 70% at 72% 78%, rgba(200,174,240,0.15) 0%, transparent 58%)," +
+                "linear-gradient(180deg, #141019 0%, #0a0710 100%)",
+            }}
+          />
+        )
       )}
       {/* Readability scrim over a player's OWN uploaded image — coded scenes
           already ship their own vignette, but a raw photo can be bright/busy
@@ -337,7 +365,7 @@ export default function App() {
             // During a full-screen peek, hide the shell so the live backdrop fills the screen.
             className={"relative z-10 flex h-full min-h-0" + (peek ? " invisible" : "")}
           >
-            <Sidebar page={page} onNavigate={navigateTo} />
+            {!matchFullscreen && <Sidebar page={page} onNavigate={navigateTo} />}
             <MobileShell page={page} onNavigate={navigateTo} />
             {/* Theme-coloured touch particles across the menu. Quiet on Contact,
                 and inside any game/deck screen (useNoMenuFx) or the open drawer
@@ -363,7 +391,7 @@ export default function App() {
                   double-count it here). Bottom pad = minimal nav-bar clearance
                   on top of #root's safe-area. Keeps the match using the full
                   vertical space instead of floating with big top/bottom voids. */}
-              <main className="flex-1 flex flex-col min-h-0 overflow-x-hidden overflow-y-auto pt-12 pb-4 md:pt-0 md:pb-0 [@media(max-height:540px)]:pt-2 [@media(max-height:540px)]:pb-1">
+              <main className={"flex-1 flex flex-col min-h-0 w-full overflow-x-hidden overflow-y-auto pt-12 pb-4 portrait:min-[900px]:pt-0 portrait:min-[900px]:pb-0 [@media(max-height:540px)]:pt-2 [@media(max-height:540px)]:pb-1" + (matchFullscreen ? "" : " max-w-md mx-auto landscape:max-w-none")}>
                 {/* Persistent player header — shown on every menu page, never on
                     a match surface (Play / Online own internal match states),
                     and never on Profile (which mounts the SAME PlayerBadge as

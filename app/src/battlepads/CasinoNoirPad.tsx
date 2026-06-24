@@ -120,7 +120,7 @@ export function CasinoNoirPad({ compact = false, ...props }: React.SVGProps<SVGS
           </g>
           {/* Suit glyph */}
           <text textAnchor="middle" dominantBaseline="central"
-                fontFamily='"Times New Roman",serif' fontSize="48"
+                fontFamily='"Times New Roman",serif' fontSize="77"
                 fill={G} fillOpacity="0.6">{c.suit}</text>
           {/* Slow pulsing glow */}
           <circle r="36" fill={G} fillOpacity="0" filter="url(#cn-glow)">
@@ -132,7 +132,7 @@ export function CasinoNoirPad({ compact = false, ...props }: React.SVGProps<SVGS
 
       {/* ── Centre Art Deco medallion (suppressed in compact) ── */}
       {!compact && (
-        <g transform={`translate(${cx} ${cy})`}>
+        <g transform={`translate(${cx} ${cy}) scale(1.6)`}>
           <g>
             <animateTransform attributeName="transform" type="rotate"
               from="0" to="360" dur="50s" repeatCount="indefinite" />
@@ -205,7 +205,7 @@ export function CasinoNoirPad({ compact = false, ...props }: React.SVGProps<SVGS
         <line x1="100"  y1="0" x2="240"  y2="0" stroke={G} strokeWidth="1" strokeOpacity="0.5" />
         <circle cx="-88" cy="0" r="2.5" fill={G} fillOpacity="0.6" />
         <circle cx="88"  cy="0" r="2.5" fill={G} fillOpacity="0.6" />
-        <text fontFamily="Cinzel,Georgia,serif" fontSize="20" fill={GL}
+        <text fontFamily="Cinzel,Georgia,serif" fontSize="32" fill={GL}
               fillOpacity="0.85" letterSpacing="12">CASINO NOIR</text>
       </g>
 
@@ -213,7 +213,7 @@ export function CasinoNoirPad({ compact = false, ...props }: React.SVGProps<SVGS
       <g transform={`translate(${cx} ${H - 78})`} textAnchor="middle">
         <line x1="-180" y1="0" x2="-70" y2="0" stroke={G} strokeWidth="0.8" strokeOpacity="0.4" />
         <line x1="70"   y1="0" x2="180"  y2="0" stroke={G} strokeWidth="0.8" strokeOpacity="0.4" />
-        <text fontFamily="Cinzel,Georgia,serif" fontSize="13" fill={G}
+        <text fontFamily="Cinzel,Georgia,serif" fontSize="21" fill={G}
               fillOpacity="0.6" letterSpacing="8">MONTE-CARLO</text>
       </g>
     </svg>

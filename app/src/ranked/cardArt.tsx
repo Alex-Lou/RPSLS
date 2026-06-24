@@ -48,6 +48,42 @@ export function CardArt({ card, alt }: { card: RankedCard; alt: string }) {
   );
 }
 
+/** Fond d'identité de Voie pour les cartes SANS art (texture + liseré), gated par
+ *  `card.voie`. Purement CSS, réversible. 1 entrée/Voie → DRY pour la réplication
+ *  (Montagne/Mirage… puis Cosmos/Tranchant/Forêt). */
+const VOIE_CARD_BG: Partial<Record<string, { background: string; boxShadow: string }>> = {
+  // ⛰ Montagne — granite gris-pierre.
+  rock: {
+    background:
+      "radial-gradient(circle at 50% 38%, rgba(168,162,158,0.35), rgba(68,64,60,0.22) 60%, transparent), repeating-linear-gradient(135deg, rgba(120,113,108,0.12) 0 3px, transparent 3px 7px)",
+    boxShadow: "inset 0 0 0 1px rgba(214,211,209,0.4)",
+  },
+  // 🎭 Mirage — champ iridescent indigo↔cyan.
+  lizard: {
+    background:
+      "radial-gradient(circle at 50% 38%, rgba(129,140,248,0.35), rgba(34,211,238,0.18) 60%, transparent), repeating-linear-gradient(135deg, rgba(99,102,241,0.12) 0 3px, transparent 3px 7px)",
+    boxShadow: "inset 0 0 0 1px rgba(165,180,252,0.4)",
+  },
+  // ⚔️ Tranchant — acier + rose-cardinal.
+  scissors: {
+    background:
+      "radial-gradient(circle at 50% 38%, rgba(244,63,94,0.30), rgba(148,163,184,0.18) 60%, transparent), repeating-linear-gradient(135deg, rgba(225,29,72,0.12) 0 3px, transparent 3px 7px)",
+    boxShadow: "inset 0 0 0 1px rgba(254,205,211,0.4)",
+  },
+  // 🌲 Forêt — canopée émeraude + sève dorée.
+  paper: {
+    background:
+      "radial-gradient(circle at 50% 38%, rgba(52,211,153,0.32), rgba(16,122,87,0.18) 60%, transparent), repeating-linear-gradient(135deg, rgba(5,150,105,0.12) 0 3px, transparent 3px 7px)",
+    boxShadow: "inset 0 0 0 1px rgba(167,243,208,0.4)",
+  },
+  // 🌌 Cosmos — nébuleuse violette + cyan glacé.
+  spock: {
+    background:
+      "radial-gradient(circle at 50% 38%, rgba(139,92,246,0.32), rgba(34,211,238,0.16) 60%, transparent), repeating-linear-gradient(135deg, rgba(124,58,237,0.12) 0 3px, transparent 3px 7px)",
+    boxShadow: "inset 0 0 0 1px rgba(196,181,253,0.4)",
+  },
+};
+
 /** Gradient + glyph placeholder for cards without art. */
 export function CardArtFallback({
   card,
@@ -56,6 +92,7 @@ export function CardArtFallback({
   card: RankedCard;
   glyphSize?: string;
 }) {
+  const voieBg = card.voie ? VOIE_CARD_BG[card.voie] : undefined;
   return (
     <div
       className={
@@ -63,7 +100,14 @@ export function CardArtFallback({
         RARITY_BG[card.rarity]
       }
     >
-      <span className={glyphSize + " drop-shadow-md"}>{card.glyph}</span>
+      {voieBg && (
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{ background: voieBg.background, boxShadow: voieBg.boxShadow }}
+        />
+      )}
+      <span className={glyphSize + " drop-shadow-md relative"}>{card.glyph}</span>
     </div>
   );
 }

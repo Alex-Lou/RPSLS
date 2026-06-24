@@ -16,7 +16,8 @@
  */
 
 import { motion } from "motion/react";
-import type { Move } from "../engine/game";
+import { MoveGlyph } from "../icons";
+import { type Creature } from "./arenaTypes";
 
 const ARROWS = [0, 1, 2];
 
@@ -92,6 +93,177 @@ export function CreatureBuffOverlay() {
   );
 }
 
+/** ⛰ STRATE (Voie Montagne) — une COUCHE DE ROCHE qui s'empile depuis le bas
+ *  + des éclats de pierre à l'impact + un pulse AMBRE de puissance PERMANENTE.
+ *  Signature du gain de Strate (voieAtkBonus ↑ = +1 ATK perm). Palette granite
+ *  (gris-pierre) ≠ buff (émeraude/or) pour qu'on lise « le mur grandit ».
+ *  One-shot, 100% transform/opacity, leak-free (démonté par AnimatePresence). */
+export function CreatureStrateOverlay() {
+  return (
+    <motion.div className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden" style={{ zIndex: 22 }}>
+      {/* Dalle de granite qui MONTE et se cale JUSTE AU-DESSUS du bandeau de stats
+       *  (bottom-[24%]) → la strate s'ajoute SANS masquer la barre PV / les chips
+       *  ATK-HP (c'est ce chiffre qu'on veut voir monter). */}
+      <motion.div
+        initial={{ opacity: 0, y: "70%", scaleY: 0.5 }}
+        animate={{ opacity: [0, 0.95, 0.8, 0], y: ["70%", "0%", "0%", "0%"], scaleY: [0.5, 1, 1, 1] }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.7, times: [0, 0.4, 0.7, 1], ease: "easeOut" }}
+        className="absolute left-0 right-0 bottom-[24%] h-[26%]"
+        style={{ background: "linear-gradient(to top, rgba(120,113,108,0.9), rgba(168,162,158,0.55) 60%, transparent)", boxShadow: "inset 0 2px 0 rgba(231,229,228,0.7)" }}
+      />
+      {/* Éclats de pierre qui sautent à l'impact de la dalle. */}
+      {[-22, 0, 22].map((dx, i) => (
+        <motion.span
+          key={i}
+          initial={{ opacity: 0, x: 0, y: 8, scale: 0.6 }}
+          animate={{ opacity: [0, 1, 0], x: dx, y: -10 - i * 4, scale: 0.9 }}
+          transition={{ duration: 0.6, delay: 0.28 + i * 0.04, ease: "easeOut" }}
+          className="absolute left-1/2 bottom-1/3 w-1.5 h-1.5 -ml-[3px] rounded-sm"
+          style={{ background: "#d6d3d1", boxShadow: "0 0 5px rgba(120,113,108,0.95)" }}
+        />
+      ))}
+      {/* Pulse AMBRE interne — la puissance gagnée est PERMANENTE. */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: [0, 0.85, 0] }}
+        transition={{ duration: 0.7, ease: "easeOut" }}
+        className="absolute inset-0 rounded-xl"
+        style={{ boxShadow: "inset 0 0 18px rgba(180,83,9,0.75)" }}
+      />
+    </motion.div>
+  );
+}
+
+/** ⚔️ AFFÛTAGE (Voie Tranchant) — un ÉCLAT D'ACIER balaie la lame + pulse
+ *  rose-acier : signature du gain d'ATK permanent d'un Ciseau (Acuité). Variante
+ *  « lame » du gain de voieAtkBonus (≠ la dalle granite de Montagne). One-shot. */
+export function CreatureSharpenOverlay() {
+  return (
+    <motion.div className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden" style={{ zIndex: 22 }}>
+      {/* Éclat d'acier qui balaie en diagonale (affûtage de la lame). */}
+      <motion.div
+        initial={{ opacity: 0, x: "-110%" }}
+        animate={{ opacity: [0, 1, 0], x: ["-110%", "10%", "120%"] }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.55, ease: "easeOut" }}
+        className="absolute left-0 right-0 top-1/2 -mt-[3px] h-[6px] origin-center"
+        style={{ rotate: "-12deg", background: "linear-gradient(90deg, transparent, #e0f2fe 38%, #ffffff 50%, #fecdd3 62%, transparent)", boxShadow: "0 0 14px 2px rgba(244,63,94,0.8)" }}
+      />
+      {/* Pulse rose-acier interne — la puissance gagnée est PERMANENTE. */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: [0, 0.8, 0] }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="absolute inset-0 rounded-xl"
+        style={{ boxShadow: "inset 0 0 16px rgba(244,63,94,0.6)" }}
+      />
+    </motion.div>
+  );
+}
+
+/** 🎭 ESQUIVE (Voie Mirage) — voile iridescent indigo↔cyan qui MIROITE en
+ *  balayant + halo cyan + étincelles ✦ : signature du gain de charge d'Esquive
+ *  (la créature devient insaisissable). Palette iridescente ≠ buff/Strate.
+ *  One-shot, 100% transform/opacity, leak-free. */
+export function CreatureMirageOverlay() {
+  return (
+    <motion.div className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden" style={{ zIndex: 22 }}>
+      {/* Miroitement iridescent qui balaie en diagonale. */}
+      <motion.div
+        initial={{ opacity: 0, x: "-120%" }}
+        animate={{ opacity: [0, 0.9, 0], x: ["-120%", "10%", "120%"] }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.7, times: [0, 0.5, 1], ease: "easeOut" }}
+        className="absolute inset-0"
+        style={{ background: "linear-gradient(105deg, transparent 30%, rgba(129,140,248,0.7) 48%, rgba(34,211,238,0.75) 56%, transparent 72%)", mixBlendMode: "screen" }}
+      />
+      {/* Halo cyan interne qui pulse une fois. */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: [0, 0.7, 0] }}
+        transition={{ duration: 0.65, ease: "easeOut" }}
+        className="absolute inset-0 rounded-xl"
+        style={{ boxShadow: "inset 0 0 16px rgba(34,211,238,0.6)" }}
+      />
+      {/* Étincelles ✦ qui scintillent (insaisissable). */}
+      {[0, 1, 2].map((i) => (
+        <motion.span
+          key={i}
+          initial={{ opacity: 0, scale: 0.4 }}
+          animate={{ opacity: [0, 1, 0], scale: [0.4, 1, 0.6] }}
+          transition={{ duration: 0.6, delay: 0.1 + i * 0.1, ease: "easeOut" }}
+          className="absolute text-cyan-200 text-xs font-black"
+          style={{ left: `${25 + i * 25}%`, top: `${28 + (i % 2) * 30}%`, textShadow: "0 0 6px rgba(165,243,252,0.95)" }}
+        >
+          ✦
+        </motion.span>
+      ))}
+    </motion.div>
+  );
+}
+
+/** ✦ ESQUIVE CONSOMMÉE (Lézard / Voie Mirage) — la signature de l'esquive.
+ *  RENDU AU NIVEAU DE LA CASE (frère du slot dans ArenaLaneSlot, comme
+ *  DeathShatter), PAS dans CreatureSlot : le corps glisse via le transform de sa
+ *  motion.div racine, donc tout ce qui est À L'INTÉRIEUR glisserait avec lui. Cet
+ *  overlay reste ANCRÉ à la case pendant que le corps détale → c'est ce décalage
+ *  qui vend « il était LÀ, plus maintenant ».
+ *
+ *  4 calques, tous one-shot, 100% opacity/transform + teinte/box-shadow STATIQUES
+ *  (zéro re-raster) : (1) halo cyan inset, (2) voile iridescent indigo↔cyan en
+ *  opacity pure (PAS de mixBlendMode, contrairement au CreatureMirageOverlay du
+ *  GAIN de charge — exigence perf durcie Alex 2026-06-23), (3) le FANTÔME-GLYPHE
+ *  cyan qui reste figé et se délave, (4) le WHIFF : un trait qui FILE dans le vide
+ *  laissé par la créature (le coup qui rate). dir = sens de la glisse du corps. */
+export function CreatureDodgeOverlay({ move, dir }: { move: Creature["move"]; dir: number }) {
+  const fromLeft = dir > 0;
+  return (
+    <motion.div className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden" style={{ zIndex: 23 }} aria-hidden>
+      {/* (1) HALO cyan inset — scelle la case dans un éclat. box-shadow STATIQUE,
+       *  on n'anime QUE l'opacity du calque (pattern halo déjà validé perf). */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: [0, 0.7, 0] }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="absolute inset-0 rounded-xl"
+        style={{ boxShadow: "inset 0 0 16px rgba(34,211,238,0.6)" }}
+      />
+      {/* (2) VOILE iridescent indigo↔cyan — gradient en OPACITY pure (no blend). */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: [0, 0.6, 0] }}
+        transition={{ duration: 0.5, ease: "easeOut", times: [0, 0.35, 1] }}
+        className="absolute inset-0"
+        style={{ background: "linear-gradient(105deg, transparent 35%, rgba(129,140,248,0.5) 50%, rgba(34,211,238,0.55) 58%, transparent 72%)" }}
+      />
+      {/* (3) FANTÔME-GLYPHE — copie cyan du glyphe (teinte STATIQUE) qui reste
+       *  quasi sur place (dérive légère côté opposé à la glisse) et se DÉLAVE. */}
+      <motion.div
+        initial={{ opacity: 0.85, scale: 1 }}
+        animate={{ opacity: [0.85, 0.55, 0], x: [0, dir * -3, dir * -10], scale: [1, 1.04, 1.12] }}
+        transition={{ duration: 0.5, ease: "easeOut", times: [0, 0.4, 1] }}
+        className="absolute inset-0 flex items-center justify-center"
+        style={{ filter: "brightness(1.6) sepia(1) hue-rotate(140deg) saturate(2.5)" }}
+      >
+        <MoveGlyph move={move} className="w-[3.8rem] h-[3.8rem] sm:w-[4.35rem] sm:h-[4.35rem]" />
+      </motion.div>
+      {/* (4) WHIFF — trait fin qui TRAVERSE le centre désormais vide (le coup rate).
+       *  Part du côté de l'attaquant. box-shadow STATIQUE, rotate constant. */}
+      <motion.div
+        initial={{ opacity: 0, x: fromLeft ? "-115%" : "115%", rotate: -8 }}
+        animate={{ opacity: [0, 1, 0], x: fromLeft ? ["-115%", "15%", "125%"] : ["115%", "-15%", "-125%"], rotate: -8 }}
+        transition={{ duration: 0.4, ease: "easeIn", delay: 0.06, times: [0, 0.45, 1] }}
+        className="absolute left-0 right-0 top-1/2 h-[5px] -mt-[2.5px]"
+        style={{
+          background: "linear-gradient(90deg, transparent, rgba(165,243,252,0.95) 45%, #ffffff 50%, rgba(129,140,248,0.9) 55%, transparent)",
+          boxShadow: "0 0 10px 1px rgba(34,211,238,0.7)",
+        }}
+      />
+    </motion.div>
+  );
+}
+
 /** 💀 MALUS — affaiblissement : voile violet sombre qui DESCEND, 3 chevrons ▼
  *  qui s'enfoncent, vignette qui s'assombrit. Pour ATK↓ (Malédiction) / Toile. */
 export function CreatureDebuffOverlay() {
@@ -155,183 +327,5 @@ export function CreatureHealBloom() {
         />
       ))}
     </motion.div>
-  );
-}
-
-/** ✂ TRANCHANT (Ciseaux) — cue de lane LÉGER quand une créature Ciseaux
- *  attaque : DEUX entailles diagonales (lecture « double lame ») qui balaient
- *  la case. Donne la signature « tranchant » dès la 1ʳᵉ manche, distincte de
- *  l'entaille PLEIN ÉCRAN (ArenaImpactFX) réservée aux gros coups (≥4/fatal).
- *  ZÉRO emoji (règle dure Alex). One-shot, 100% transform/opacity, leak-free.
- *  (Alex 2026-06-17, Pro-37.) */
-/** Cue d'ATTAQUE par MOVE, rendu sur la LANE ATTAQUÉE (la cible) — Alex
- *  2026-06-17 : « un petit effet sur l'adverse aussi, joli, soft, visible et
- *  relatif à la main ». Chaque move a sa signature LÉGÈRE (1-2 éléments,
- *  transform/opacity, one-shot, ~0.45s) — calée pour culminer à l'impact du
- *  slam. La perf reste OK (les auras idle sont gelées en résolution). */
-export function MoveAttackCue({ move }: { move: Move }) {
-  return (
-    <div className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden" style={{ zIndex: 34 }} aria-hidden>
-      {move === "scissors" ? <ScissorsBlades />
-        : move === "rock" ? <RockSlam />
-        : move === "paper" ? <PaperWrap />
-        : move === "lizard" ? <LizardFlick />
-        : <SpockBolt />}
-    </div>
-  );
-}
-
-/** CISEAUX — 2 lames acier qui balaient en X (le tranchant). */
-function ScissorsBlades() {
-  const BG = "linear-gradient(to right, transparent, #e0f2fe 32%, #ffffff 50%, #e0f2fe 68%, transparent)";
-  const SH = "0 0 16px 3px rgba(56,189,248,0.95), 0 0 5px 1px rgba(2,6,23,0.85)";
-  return (
-    <>
-      <motion.div
-        initial={{ opacity: 0, x: "-125%" }} animate={{ opacity: [0, 1, 1, 0], x: ["-125%", "-8%", "8%", "125%"] }} exit={{ opacity: 0 }}
-        transition={{ duration: 0.42, times: [0, 0.32, 0.56, 1], ease: "easeOut", delay: 0.06 }}
-        className="absolute left-0 right-0 top-1/2 -mt-[3px] h-[6px] origin-center"
-        style={{ rotate: "-24deg", background: BG, boxShadow: SH }}
-      />
-      <motion.div
-        initial={{ opacity: 0, x: "-125%" }} animate={{ opacity: [0, 1, 1, 0], x: ["-125%", "-8%", "8%", "125%"] }} exit={{ opacity: 0 }}
-        transition={{ duration: 0.40, times: [0, 0.34, 0.56, 1], ease: "easeOut", delay: 0.16 }}
-        className="absolute left-0 right-0 top-1/2 -mt-[2.5px] h-[5px] origin-center"
-        style={{ rotate: "24deg", background: BG, boxShadow: SH }}
-      />
-    </>
-  );
-}
-
-/** PIERRE — SLAM vertical : un bloc qui s'écrase depuis le haut + fissures qui
- *  rayonnent du point d'impact. Mouvement VERTICAL descendant (≠ des autres). */
-function RockSlam() {
-  return (
-    <>
-      <motion.div
-        initial={{ opacity: 0, y: "-75%", scaleY: 0.5 }} animate={{ opacity: [0, 1, 0.85, 0], y: ["-75%", "-6%", "-2%", "-2%"], scaleY: [0.5, 1, 0.85, 0.85] }} exit={{ opacity: 0 }}
-        transition={{ duration: 0.46, times: [0, 0.42, 0.58, 1], ease: "easeIn", delay: 0.02 }}
-        className="absolute left-1/2 top-1/2 w-11 h-8 -ml-[22px] -mt-6"
-        style={{ background: "linear-gradient(160deg, rgba(231,229,228,0.97), rgba(120,113,108,0.75))", clipPath: "polygon(16% 0, 84% 0, 100% 100%, 0 100%)", boxShadow: "0 0 16px rgba(180,83,9,0.6)" }}
-      />
-      {[-34, 0, 34].map((deg, k) => (
-        <motion.div
-          key={k}
-          initial={{ opacity: 0, scaleY: 0 }} animate={{ opacity: [0, 0.95, 0], scaleY: [0, 1, 1] }} exit={{ opacity: 0 }}
-          transition={{ duration: 0.32, ease: "easeOut", delay: 0.3 + k * 0.03 }}
-          className="absolute left-1/2 top-1/2 w-[2px] h-[42%] origin-top"
-          style={{ rotate: `${deg}deg`, background: "linear-gradient(to bottom, rgba(231,229,228,0.95), transparent)" }}
-        />
-      ))}
-    </>
-  );
-}
-
-/** FEUILLE — un voile/feuille qui se DÉPLOIE pour ENVELOPPER la cible (s'ouvre
- *  du centre + nervure). Croissance RADIALE (≠ des autres). */
-function PaperWrap() {
-  return (
-    <>
-      <motion.div
-        initial={{ opacity: 0, scale: 0.2, rotate: -22 }} animate={{ opacity: [0, 0.72, 0.5, 0], scale: [0.2, 1.05, 1.05, 1.12], rotate: [-22, 0, 0, 5] }} exit={{ opacity: 0 }}
-        transition={{ duration: 0.52, times: [0, 0.4, 0.7, 1], ease: "easeOut", delay: 0.03 }}
-        className="absolute inset-1"
-        style={{ background: "linear-gradient(135deg, rgba(110,231,183,0.58), rgba(5,150,105,0.32))", borderRadius: "0 85% 0 85%", boxShadow: "inset 0 0 18px rgba(52,211,153,0.5)" }}
-      />
-      <motion.div
-        initial={{ opacity: 0, scaleX: 0 }} animate={{ opacity: [0, 0.85, 0], scaleX: [0, 1, 1] }} exit={{ opacity: 0 }}
-        transition={{ duration: 0.46, ease: "easeOut", delay: 0.12 }}
-        className="absolute left-[16%] right-[16%] top-1/2 h-[2px] origin-left"
-        style={{ rotate: "-22deg", background: "linear-gradient(to right, rgba(167,243,208,0.95), transparent)" }}
-      />
-    </>
-  );
-}
-
-/** LÉZARD — MORSURE (Alex 2026-06-17 « une gueule/crocs d'animal qui se referme
- *  sur la lane », façon buff Osamodas vieux Dofus) : deux MÂCHOIRES à CROCS
- *  (haute violette + basse cyan, crocs DÉCALÉS qui s'imbriquent) qui CLAQUENT
- *  l'une sur l'autre au centre de la lane, snap + léger rebond + flash de morsure.
- *  Palette iridescente Mirage. 100% transform/opacity + SVG, one-shot. */
-function LizardFlick() {
-  const SNAP = { duration: 0.5, times: [0, 0.5, 0.64, 1], ease: [0.5, 0, 0.18, 1] as const, delay: 0.04 };
-  const JAW_SHADOW = "drop-shadow(0 0 6px rgba(167,139,250,0.85))";
-  return (
-    <>
-      {/* Mâchoire HAUTE — crocs vers le bas, claque depuis le haut. */}
-      <motion.div
-        className="absolute left-1 right-1 top-0 h-1/2"
-        initial={{ opacity: 0, y: "-72%" }}
-        animate={{ opacity: [0, 1, 1, 0], y: ["-72%", "16%", "9%", "9%"] }}
-        exit={{ opacity: 0 }}
-        transition={SNAP}
-      >
-        <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="w-full h-full" style={{ filter: JAW_SHADOW }}>
-          <defs>
-            <linearGradient id="lzUp" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#ddd6fe" /><stop offset="55%" stopColor="#a78bfa" /><stop offset="100%" stopColor="#6d28d9" />
-            </linearGradient>
-          </defs>
-          {/* gencive haute + 5 crocs pointant vers le bas */}
-          <path d="M0 0 H100 V13 L90 39 L80 13 L66 39 L52 13 L38 39 L24 13 L12 39 L2 13 L0 14 Z" fill="url(#lzUp)" />
-          <path d="M0 0 H100 V7 H0 Z" fill="rgba(243,240,255,0.55)" />
-        </svg>
-      </motion.div>
-      {/* Mâchoire BASSE — crocs vers le haut, DÉCALÉS pour s'imbriquer. */}
-      <motion.div
-        className="absolute left-1 right-1 bottom-0 h-1/2"
-        initial={{ opacity: 0, y: "72%" }}
-        animate={{ opacity: [0, 1, 1, 0], y: ["72%", "-16%", "-9%", "-9%"] }}
-        exit={{ opacity: 0 }}
-        transition={SNAP}
-      >
-        <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="w-full h-full" style={{ filter: JAW_SHADOW }}>
-          <defs>
-            <linearGradient id="lzLo" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#0e7490" /><stop offset="45%" stopColor="#22d3ee" /><stop offset="100%" stopColor="#a5f3fc" />
-            </linearGradient>
-          </defs>
-          {/* crocs vers le haut, x décalés de ~7 vs la mâchoire haute → ils s'imbriquent */}
-          <path d="M0 40 H100 V27 L96 1 L84 27 L70 1 L56 27 L42 1 L28 27 L16 1 L6 27 L0 26 Z" fill="url(#lzLo)" />
-          <path d="M0 40 H100 V33 H0 Z" fill="rgba(207,250,254,0.5)" />
-        </svg>
-      </motion.div>
-      {/* Flash de MORSURE au centre, au moment de la fermeture. */}
-      <motion.div
-        initial={{ opacity: 0, scaleX: 0.35 }}
-        animate={{ opacity: [0, 0, 0.9, 0], scaleX: [0.35, 0.35, 1, 1.15] }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.5, times: [0, 0.48, 0.6, 1], ease: "easeOut", delay: 0.04 }}
-        className="absolute left-2 right-2 top-1/2 h-[3px] -mt-[1.5px] rounded-full"
-        style={{ background: "linear-gradient(90deg, transparent, rgba(237,233,254,0.97), transparent)", boxShadow: "0 0 12px rgba(167,139,250,0.95)", mixBlendMode: "screen" }}
-      />
-    </>
-  );
-}
-
-/** SPOCK — ÉCLAIR FOURCHU : 2 segments en zigzag + flash bref. Forme JAGGED (≠). */
-function SpockBolt() {
-  const SEG = { background: "linear-gradient(180deg, rgba(224,231,255,0.98), rgba(56,189,248,0.92))", boxShadow: "0 0 12px 2px rgba(129,140,248,0.95)" };
-  return (
-    <>
-      <motion.div
-        initial={{ opacity: 0, scaleY: 0.2 }} animate={{ opacity: [0, 1, 0], scaleY: [0.2, 1, 1] }} exit={{ opacity: 0 }}
-        transition={{ duration: 0.34, ease: "easeOut", delay: 0.05 }}
-        className="absolute left-[40%] top-[6%] w-[3px] h-[48%] origin-top rounded-full"
-        style={{ rotate: "20deg", ...SEG }}
-      />
-      <motion.div
-        initial={{ opacity: 0, scaleY: 0.2 }} animate={{ opacity: [0, 1, 0], scaleY: [0.2, 1, 1] }} exit={{ opacity: 0 }}
-        transition={{ duration: 0.34, ease: "easeOut", delay: 0.12 }}
-        className="absolute left-[54%] top-[46%] w-[3px] h-[48%] origin-top rounded-full"
-        style={{ rotate: "-24deg", ...SEG }}
-      />
-      <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: [0, 0.5, 0] }} exit={{ opacity: 0 }}
-        transition={{ duration: 0.3, ease: "easeOut", delay: 0.06 }}
-        className="absolute inset-0"
-        style={{ background: "radial-gradient(circle, rgba(129,140,248,0.42), transparent 62%)", mixBlendMode: "screen" }}
-      />
-    </>
   );
 }

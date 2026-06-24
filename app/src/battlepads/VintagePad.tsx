@@ -38,10 +38,10 @@ export function VintagePad(props: React.SVGProps<SVGSVGElement>) {
 
       {/* Art Deco fans in 4 corners */}
       {[
-        { x: 100,     y: 100,     r: 0,   s: 1 },
-        { x: W - 100, y: 100,     r: 90,  s: 1 },
-        { x: W - 100, y: H - 100, r: 180, s: 1 },
-        { x: 100,     y: H - 100, r: 270, s: 1 },
+        { x: 100,     y: 100,     r: 0,   s: 1.6 },
+        { x: W - 100, y: 100,     r: 90,  s: 1.6 },
+        { x: W - 100, y: H - 100, r: 180, s: 1.6 },
+        { x: 100,     y: H - 100, r: 270, s: 1.6 },
       ].map((c, i) => (
         <g key={i} transform={`translate(${c.x} ${c.y}) rotate(${c.r}) scale(${c.s})`}
            stroke={gold} fill="none" strokeWidth="2">
@@ -62,7 +62,7 @@ export function VintagePad(props: React.SVGProps<SVGSVGElement>) {
         <line x1="90"   y1="0" x2="220"  y2="0" stroke={gold} strokeWidth="1.2" />
         <circle cx="-75" cy="0" r="3" fill={gold} />
         <circle cx="75"  cy="0" r="3" fill={gold} />
-        <text fontFamily="Georgia,serif" fontSize="22" fill={goldLight}
+        <text fontFamily="Georgia,serif" fontSize="35" fill={goldLight}
               fillOpacity="0.85" letterSpacing="12">GENTLEMAN'S WAGER</text>
       </g>
 
@@ -70,7 +70,7 @@ export function VintagePad(props: React.SVGProps<SVGSVGElement>) {
       <g transform={`translate(${W/2} ${H - 105})`} textAnchor="middle">
         <line x1="-160" y1="0" x2="-70" y2="0" stroke={gold} strokeWidth="1" />
         <line x1="70"   y1="0" x2="160" y2="0" stroke={gold} strokeWidth="1" />
-        <text fontFamily="Georgia,serif" fontSize="14" fill={gold}
+        <text fontFamily="Georgia,serif" fontSize="22" fill={gold}
               fillOpacity="0.70" letterSpacing="8">EST · MMXXIV</text>
       </g>
 
@@ -79,8 +79,10 @@ export function VintagePad(props: React.SVGProps<SVGSVGElement>) {
         <circle r="200" fill="none" stroke={gold} strokeOpacity="0.10" strokeWidth="1" />
         <circle r="180" fill="none" stroke={gold} strokeOpacity="0.08" strokeWidth="1" strokeDasharray="2 6" />
         {/* 5-pointed star to nod at the 5 moves */}
-        <path d="M 0 -60 L 14 -18 L 58 -18 L 22 6 L 36 48 L 0 22 L -36 48 L -22 6 L -58 -18 L -14 -18 Z"
-              fill="none" stroke={gold} strokeOpacity="0.18" strokeWidth="1.5" />
+        <g transform="scale(1.6)">
+          <path d="M 0 -60 L 14 -18 L 58 -18 L 22 6 L 36 48 L 0 22 L -36 48 L -22 6 L -58 -18 L -14 -18 Z"
+                fill="none" stroke={gold} strokeOpacity="0.18" strokeWidth="1.5" />
+        </g>
       </g>
     </svg>
   );

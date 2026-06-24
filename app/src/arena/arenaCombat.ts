@@ -23,6 +23,7 @@
 
 import { alog, csnap } from "./arenaLog";
 import { creatureEffectiveAtk, damageCreature, damageHero } from "./arenaRules";
+import { riseEngineOnCounterWin } from "./arenaEngines";
 import { moveCountersMove } from "./arenaTypes";
 import type {
   BoardState,
@@ -69,7 +70,9 @@ export function resolveCombat(board: BoardState): BoardState {
   return b;
 }
 
-function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
+function resolveLaneCombat(boardIn: BoardState, laneIdx: LaneIndex): BoardState {
+  // `let` car LE TRACÉ / engines ré-affectent board AVANT les branches (qui le lisent).
+  let board = boardIn;
   const lane = board.lanes[laneIdx];
   const ca = lane.a;
   const cb = lane.b;
@@ -118,6 +121,27 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
     // effectif 0 (creatureEffectiveAtk), elle est neutralisée mais survit.
     const counterAB = !ca.cannotAttack && moveCountersMove(ca.move, cb.move);
     const counterBA = !cb.cannotAttack && moveCountersMove(cb.move, ca.move);
+    // LE TRACÉ (Alex 2026-06-24) — ta jauge de Voie monte de +1 quand TON symbole
+    // d'affinité REMPORTE VRAIMENT le counter de cette lane, c.-à-d. quand le coup
+    // ATTERRIT et TUE le défenseur. S'il se DÉROBE (Esquive du Lézard) ou ENCAISSE
+    // sur son Aegis, l'échange n'est PAS gagné → aucun progrès (Alex « ma Pierre a
+    // frappé le Lézard mais il a esquivé, ça ne doit pas compter »). Les conditions
+    // de « dérobade » ci-dessous MIROITENT exactement les saves des branches
+    // A-wins/B-wins plus bas (LAME perce tout ; Tranchant frais perce l'Aegis).
+    // Lecture seule (ni vainqueur ni PV). Commité par-lane → le cue « ★ » tombe sur
+    // la lane gagnante, au moment du combat.
+    const bDerobe =
+      !(board.a.lameActive && ca.move === "scissors") &&
+      (cb.dodgeCharges > 0 || (cb.divineShield && !(ca.pierces && !ca.pierceUsed)));
+    const aDerobe =
+      !(board.b.lameActive && cb.move === "scissors") &&
+      (ca.dodgeCharges > 0 || (ca.divineShield && !(cb.pierces && !cb.pierceUsed)));
+    if (counterAB && !counterBA && ca.move === board.a.affinity && !bDerobe) {
+      board = { ...board, a: riseEngineOnCounterWin(board.a) };
+    }
+    if (counterBA && !counterAB && cb.move === board.b.affinity && !aDerobe) {
+      board = { ...board, b: riseEngineOnCounterWin(board.b) };
+    }
     alog("combat", `L${laneIdx} BOTH-PRESENT counterAB=${counterAB} counterBA=${counterBA}`);
 
     if (counterAB && !counterBA) {
@@ -146,7 +170,7 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
         alog("combat", `L${laneIdx} A wins → TRANCHANT pierce 🛡 (charge consummée)`);
         const piercedWinner: Creature = { ...winnerA, pierceUsed: true };
         lanes[laneIdx] = { a: piercedWinner, b: null };
-        const updatedBoard = { ...board, lanes, a: { ...board.a, killBonusPending: true } };
+        const updatedBoard = { ...board, lanes };
         // Splash damage (Alex 2026-06-11) : HP du défenseur tué absorbe l'ATK
         // du tueur. Le résidu = splash → hero. Pierre 3 HP devient un vrai mur.
         const atkA = creatureEffectiveAtk(ca);
@@ -167,20 +191,15 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
       alog("combat", `L${laneIdx} step=noSave killing-B`);
       // RIPOSTE — contrat carte : "si ta créature meurt au combat, son tueur
       // meurt aussi". S'applique AUSSI au counter-kill (pas seulement au
-      // mirror trade). Le tueur tombe avec sa proie : pas de poursuite héros,
-      // kill bonus des DEUX côtés (même règle que la destruction mutuelle).
+      // mirror trade). Le tueur tombe avec sa proie : pas de poursuite héros
+      // (même règle que la destruction mutuelle).
       if (cb.ripostePrimed) {
         lanes[laneIdx] = { a: null, b: null };
         alog("combat", `L${laneIdx} A wins → B die + RIPOSTE → A meurt aussi (pas de poursuite)`);
-        return {
-          ...board,
-          lanes,
-          a: { ...board.a, killBonusPending: true },
-          b: { ...board.b, killBonusPending: true },
-        };
+        return { ...board, lanes };
       }
       lanes[laneIdx] = { a: winnerA, b: null };
-      const updatedBoard = { ...board, lanes, a: { ...board.a, killBonusPending: true } };
+      const updatedBoard = { ...board, lanes };
       alog("combat", `L${laneIdx} step=updatedBoardBuilt`);
       // LAME Finisher : la poursuite perce aussi la Provoc (deflect skip).
       const deflect = aLamePierce ? null : findDeflector(updatedBoard, "b");
@@ -226,7 +245,7 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
         alog("combat", `L${laneIdx} B wins → TRANCHANT pierce 🛡 (charge consummée)`);
         const piercedWinner: Creature = { ...winnerB, pierceUsed: true };
         lanes[laneIdx] = { a: null, b: piercedWinner };
-        const updatedBoard = { ...board, lanes, b: { ...board.b, killBonusPending: true } };
+        const updatedBoard = { ...board, lanes };
         // Splash damage : HP du défenseur tué absorbe l'ATK du tueur.
         const atkB = creatureEffectiveAtk(cb);
         const splashB = Math.max(0, atkB - ca.hp);
@@ -244,20 +263,14 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
       }
       if (bLamePierce) alog("combat", `L${laneIdx} B wins → LAME pierce TOUT (no save)`);
       // RIPOSTE — symétrique du branch A-wins : la créature A mourante
-      // emporte son tueur. Kill bonus des deux côtés, pas de poursuite.
+      // emporte son tueur. Pas de poursuite héros.
       if (ca.ripostePrimed) {
         lanes[laneIdx] = { a: null, b: null };
         alog("combat", `L${laneIdx} B wins → A die + RIPOSTE → B meurt aussi (pas de poursuite)`);
-        return {
-          ...board,
-          lanes,
-          a: { ...board.a, killBonusPending: true },
-          b: { ...board.b, killBonusPending: true },
-        };
+        return { ...board, lanes };
       }
       lanes[laneIdx] = { a: null, b: winnerB };
-      // Alex feedback D : kill bonus pour le côté attaquant (B a tué A).
-      const updatedBoard = { ...board, lanes, b: { ...board.b, killBonusPending: true } };
+      const updatedBoard = { ...board, lanes };
       // Splash damage : HP du défenseur tué absorbe l'ATK du tueur.
       const atkB = creatureEffectiveAtk(cb);
       const splashB = Math.max(0, atkB - ca.hp);
@@ -317,17 +330,12 @@ function resolveLaneCombat(board: BoardState, laneIdx: LaneIndex): BoardState {
     }
     const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
     lanes[laneIdx] = { a: newA, b: newB };
-    // Alex feedback D : mirror trade kill bonus — chaque side qui a tué
-    // récupère un bonus. Si A killed B → A gets bonus. Si both died → both
-    // bonus (mutual destruction = double récompense, agressivité OK).
-    const heroA = !newB ? { ...board.a, killBonusPending: true } : board.a;
-    const heroB = !newA ? { ...board.b, killBonusPending: true } : board.b;
     // SPLASH EN MIROIR (Alex 2026-06-17) : si une créature en TUE une autre avec
     // un SURPLUS d'ATK (atk > PV de la cible — ex. ma Pierre buffée vs sa Pierre),
     // le résidu DÉBORDE sur le héros adverse. Rend le combat miroir COHÉRENT avec
     // la poursuite des counter-kills (qui débordent déjà). Déviable par une Provoc
     // (Pierre) adverse, exactement comme le splash de poursuite.
-    let out: BoardState = { ...board, lanes, a: heroA, b: heroB };
+    let out: BoardState = { ...board, lanes };
     const spA = !newB ? Math.max(0, atkA - cb.hp) : 0; // A a tué B → surplus → héros B
     const spB = !newA ? Math.max(0, atkB - ca.hp) : 0; // B a tué A → surplus → héros A
     if (spA > 0) {

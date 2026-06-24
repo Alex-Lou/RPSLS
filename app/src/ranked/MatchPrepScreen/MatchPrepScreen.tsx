@@ -168,13 +168,13 @@ export function MatchPrepScreen({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -16 }}
       transition={{ duration: 0.3 }}
-      className="flex flex-col gap-3 flex-1 min-h-0 py-2 px-3 max-w-md mx-auto w-full justify-center"
+      className="flex flex-col gap-3 landscape:gap-2 flex-1 min-h-0 py-2 px-3 max-w-md landscape:max-w-2xl mx-auto w-full justify-center"
     >
       <FloatingMatchBackButton onClick={onBack} label="Retour" />
 
       <div className="text-center shrink-0">
         <h1
-          className="text-xl sm:text-2xl font-extrabold text-themed leading-tight"
+          className="text-xl sm:text-2xl landscape:text-lg font-extrabold text-themed leading-tight"
           style={{ fontFamily: "var(--font-headline)" }}
         >
           Préparation du duel
@@ -188,8 +188,9 @@ export function MatchPrepScreen({
         <FighterCard name={oppName} avatar={oppAvatar} theme={oppTheme} tag="Adv." highlight={winner === "opp"} />
       </div>
 
-      {/* Coin flip — the centrepiece. */}
-      <div className="rounded-2xl bg-surface-raised border border-hairline p-3 flex flex-col items-center gap-2.5">
+      {/* Coin flip — the centrepiece. En paysage : padding/gap resserrés pour
+       *  que la colonne (titre + VS + pièce + actions) rentre sans déborder. */}
+      <div className="rounded-2xl bg-surface-raised border border-hairline p-3 landscape:py-2 flex flex-col items-center gap-2.5 landscape:gap-1.5">
         <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-ink-muted text-center">
           À qui le terrain ?
         </div>

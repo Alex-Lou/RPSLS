@@ -87,6 +87,12 @@ export function OwnedBadgeLongPress({
   return (
     <div
       onPointerDown={(e) => {
+        // La RÉVOCATION par appui long (re-test du flux d'achat) n'est désactivée
+        // que dans une vraie RELEASE PUBLIQUE (VITE_PUBLIC_RELEASE=1) ; elle reste
+        // dispo en dev ET dans les builds debug device. En public, le badge
+        // « ✓ OWNED » reste et le tap passe au parent (sélection normale du
+        // cosmétique possédé). Alex 2026-06-20 « virer le test dev en public ».
+        if (import.meta.env.VITE_PUBLIC_RELEASE === "1") return;
         stopAll(e);
         startAt.current = performance.now();
         startPos.current = { x: e.clientX, y: e.clientY };

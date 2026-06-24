@@ -82,7 +82,7 @@ export function TempusPad({ compact = false, ...props }: React.SVGProps<SVGSVGEl
       {/* CENTRAL HOURGLASS — premium centerpiece. Two stacked trapezoids
           meeting at a narrow neck, faint glow inside, and a stream of sand
           flowing through the neck. */}
-      <g transform={`translate(${W/2} ${H/2 - 10})`}>
+      <g transform={`translate(${W/2} ${H/2 - 10}) scale(1.6)`}>
         {/* Hourglass outer frame — bronze stroke. */}
         <path d="M -70 -90 L 70 -90 L 70 -80 L 10 -10 L 10 10 L 70 80 L 70 90 L -70 90 L -70 80 L -10 10 L -10 -10 L -70 -80 Z"
               fill="none" stroke={BRONZE} strokeOpacity="0.40" strokeWidth="2.5" strokeLinejoin="round" />
@@ -120,7 +120,7 @@ export function TempusPad({ compact = false, ...props }: React.SVGProps<SVGSVGEl
           slowly rotating; the entire ring fades in/out so it reads as a
           ghosted timepiece around the hourglass. */}
       <g transform={`translate(${W/2} ${H/2 - 10})`} fontFamily='"Cinzel","EB Garamond",serif'
-         fontSize="14" fill={SEPIA} fillOpacity="0.18" textAnchor="middle">
+         fontSize="22" fill={SEPIA} fillOpacity="0.18" textAnchor="middle">
         <animateTransform attributeName="transform" type="rotate"
           values="0;360" dur="120s" repeatCount="indefinite" additive="sum" />
         <animate attributeName="fill-opacity" values="0.10;0.24;0.10" dur="9s" repeatCount="indefinite" />
@@ -180,7 +180,7 @@ export function TempusPad({ compact = false, ...props }: React.SVGProps<SVGSVGEl
           { x: W - 76, y: H - 76 },
           { x: 76, y: H - 76 },
         ].map((p, i) => (
-          <g key={i} transform={`translate(${p.x} ${p.y})`}>
+          <g key={i} transform={`translate(${p.x} ${p.y}) scale(1.6)`}>
             <line x1="-8" y1="-12" x2="8" y2="-12" />
             <line x1="-8" y1="12" x2="8" y2="12" />
             <line x1="-3" y1="-12" x2="-3" y2="12" />

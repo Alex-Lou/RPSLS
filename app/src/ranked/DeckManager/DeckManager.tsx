@@ -11,7 +11,18 @@ import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../../store/store";
 import { ALL_CARD_IDS, CARDS, isPassiveCard, RARITY_ORDER, STARTER_COLLECTION } from "../cards";
-import { ARENA_LEGENDARY_CAP } from "../../arena/arenaDecks";
+import { ARENA_LEGENDARY_CAP, resolveArenaDeckSource } from "../../arena/arenaDecks";
+import { SIGNATURE_DECK, VOIE_DEF } from "../../arena/arenaVoies";
+import type { Move } from "../../engine/game";
+
+/** Filtre de collection par Voie en Arène (Alex 2026-06-22 « un filtre pour
+ *  chaque voie ») : "myvoie" = ta Voie active + neutres ; un Move = cette Voie ;
+ *  "neutral" = cartes neutres ; "all" = tout. */
+type VoieFilter = "myvoie" | "neutral" | "all" | Move;
+/** Symboles RPSLS des chips de Voie (décoratifs). */
+const VOIE_CHIP_ICON: Record<Move, string> = {
+  rock: "⛰", paper: "🌿", scissors: "⚔", lizard: "🦎", spock: "🖖",
+};
 import type { CardId, CardRarity } from "../rankedTypes";
 import { useT } from "../../i18n";
 import { useNoMenuFx } from "../../fx/menuFx";
@@ -41,11 +52,27 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
   const player = useStore((s) => s.player);
   const setRankedDeck = useStore((s) => s.setRankedDeck);
   const setArenaDeck = useStore((s) => s.setArenaDeck);
-  // Source + setter selon le mode. Pro retombe sur le deck Classé si pas
-  // encore d'arenaDeck (migration douce des joueurs existants).
-  const savedDeck = mode === "arena" ? (player.arenaDeck ?? player.rankedDeck ?? []) : (player.rankedDeck ?? []);
-  const saveDeck = mode === "arena" ? setArenaDeck : setRankedDeck;
-  const collection = player.cardCollection ?? STARTER_COLLECTION;
+  const setArenaVoieDeck = useStore((s) => s.setArenaVoieDeck);
+  // DECK PAR VOIE (Alex 2026-06-22) : en arène, la source = ton deck CUSTOM de la
+  // Voie active > deck SIGNATURE curé > deck libre (fallback Classé) ; la sauvegarde
+  // va dans le slot de CETTE Voie. Le Classé reste inchangé.
+  const savedDeck = mode === "arena"
+    ? resolveArenaDeckSource(player.arenaAffinity, player.arenaDeckByVoie, player.arenaDeck ?? player.rankedDeck)
+    : (player.rankedDeck ?? []);
+  const saveDeck = mode === "arena"
+    ? (d: string[]) => (player.arenaAffinity ? setArenaVoieDeck(player.arenaAffinity, d) : setArenaDeck(d))
+    : setRankedDeck;
+  // COLLECTION EFFECTIVE — en arène, les cartes de TA Voie (tag voie===affinity +
+  // cartes du deck signature) sont DISPONIBLES sans les « posséder » (kit de la
+  // Voie, zéro impact éco/collection). Hors arène : collection possédée stricte.
+  const baseCollection = player.cardCollection ?? STARTER_COLLECTION;
+  const collection = (mode === "arena" && player.arenaAffinity)
+    ? [...new Set<string>([
+        ...baseCollection,
+        ...ALL_CARD_IDS.filter((id) => CARDS[id]?.voie === player.arenaAffinity),
+        ...(SIGNATURE_DECK[player.arenaAffinity] ?? []),
+      ])]
+    : baseCollection;
   const [deck, setDeck] = useState<(CardId | null)[]>(() => {
     const padded = [...savedDeck];
     while (padded.length < TOTAL) padded.push(null as unknown as string);
@@ -70,7 +97,9 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
   // (signatures voie===affinity + NEUTRES voie absente) et masque les autres
   // Voies. Toggle via la chip « Ma Voie ». arenaAffinity = la Voie choisie.
   const arenaAffinity = player.arenaAffinity;
-  const [voieOnly, setVoieOnly] = useState(mode === "arena");
+  // Filtre par Voie (arène) — défaut « Ma Voie » (ta Voie active + neutres) ;
+  // chips dédiés pour voir CHAQUE Voie distinctement (Alex 2026-06-22).
+  const [voieFilter, setVoieFilter] = useState<VoieFilter>(mode === "arena" ? "myvoie" : "all");
 
   const equipped = deck.filter(Boolean).length;
 
@@ -211,7 +240,16 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
       if (passiveOnly && !isPassiveCard(id)) return false;
       // VOIE (arène) : masque les cartes d'une AUTRE Voie ; garde tes signatures
       // (voie===affinity) + les neutres (voie absente).
-      if (mode === "arena" && voieOnly && arenaAffinity && card.voie !== undefined && card.voie !== arenaAffinity) return false;
+      if (mode === "arena") {
+        const cv = card.voie;
+        if (voieFilter === "myvoie") {
+          if (arenaAffinity && cv !== undefined && cv !== arenaAffinity) return false;
+        } else if (voieFilter === "neutral") {
+          if (cv !== undefined) return false;
+        } else if (voieFilter !== "all") {
+          if (cv !== voieFilter) return false;
+        }
+      }
       if (q) {
         const name = t(card.nameKey).toLowerCase();
         if (!name.includes(q) && !id.toLowerCase().includes(q)) return false;
@@ -237,7 +275,7 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
     return [1, 2, 3, 4]
       .filter((c) => groups[c]?.length)
       .map((c) => ({ cost: c, ids: groups[c] }));
-  }, [rarityFilter, ownedOnly, inDeckOnly, passiveOnly, voieOnly, arenaAffinity, mode, searchQuery, collection, usedInDeck, t]);
+  }, [rarityFilter, ownedOnly, inDeckOnly, passiveOnly, voieFilter, arenaAffinity, mode, searchQuery, collection, usedInDeck, t]);
 
   const totalShown = groupedByMana.reduce((sum, g) => sum + g.ids.length, 0);
   const anyFilterActive = rarityFilter !== "all" || ownedOnly || inDeckOnly || passiveOnly || searchQuery.length > 0;
@@ -402,21 +440,45 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
                     ))}
                   </div>
 
+                  {/* FILTRE PAR VOIE (arène, Alex 2026-06-22) — voir CHAQUE Voie
+                      distinctement (fini « tout est mélangé »). Single-select. */}
+                  {mode === "arena" && (
+                    <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-1 no-scrollbar">
+                      <FilterChip
+                        active={voieFilter === "myvoie"}
+                        onClick={() => { hapticTap(); setVoieFilter("myvoie"); }}
+                        icon="✦"
+                        label="Ma Voie"
+                      />
+                      {(["rock", "paper", "scissors", "lizard", "spock"] as const).map((m) => (
+                        <FilterChip
+                          key={m}
+                          active={voieFilter === m}
+                          onClick={() => { hapticTap(); setVoieFilter(m); }}
+                          icon={VOIE_CHIP_ICON[m]}
+                          label={VOIE_DEF[m].shortLabel}
+                        />
+                      ))}
+                      <FilterChip
+                        active={voieFilter === "neutral"}
+                        onClick={() => { hapticTap(); setVoieFilter("neutral"); }}
+                        icon="○"
+                        label="Neutres"
+                      />
+                      <FilterChip
+                        active={voieFilter === "all"}
+                        onClick={() => { hapticTap(); setVoieFilter("all"); }}
+                        icon="∗"
+                        label="Toutes"
+                      />
+                    </div>
+                  )}
+
                   {/* Filter chips — multi-select toggles. Reset button appears
                       only when at least one filter is active so the bar stays
                       clean in the default state. py-0.5 keeps the active ring
                       from clipping at the top edge. */}
                   <div className="flex items-center gap-1.5 flex-wrap py-0.5">
-                    {/* MA VOIE (arène) : n'affiche que les cartes de ta Voie +
-                        neutres (Alex 2026-06-17). Actif par défaut, en tête. */}
-                    {mode === "arena" && arenaAffinity && (
-                      <FilterChip
-                        active={voieOnly}
-                        onClick={() => { hapticTap(); setVoieOnly((v) => !v); }}
-                        icon="✦"
-                        label="Ma Voie"
-                      />
-                    )}
                     <FilterChip
                       active={ownedOnly}
                       onClick={() => { hapticTap(); setOwnedOnly((v) => !v); }}
@@ -450,7 +512,7 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
                       tab/filter switch without re-mounting each card. */}
                   <AnimatePresence mode="wait">
                     <motion.div
-                      key={`${rarityFilter}-${ownedOnly}-${inDeckOnly}-${passiveOnly}-${searchQuery}`}
+                      key={`${rarityFilter}-${ownedOnly}-${inDeckOnly}-${passiveOnly}-${voieFilter}-${searchQuery}`}
                       initial={{ opacity: 0, y: 4 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -4 }}
@@ -527,7 +589,7 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
                 ? "bg-amber-500/25 border-amber-400/60 text-amber-100"
                 : "bg-zinc-700/60 border-zinc-500/60 text-zinc-100")
             }
-            style={{ top: "calc(env(safe-area-inset-top, 0px) + 3.5rem)" }}
+            style={{ top: "calc(var(--sai-top) + 3.5rem)" }}
           >
             {deckMsg.tone === "good" ? "✓ " : deckMsg.tone === "warn" ? "⚠ " : "↺ "}
             {deckMsg.text}

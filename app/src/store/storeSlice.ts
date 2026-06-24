@@ -215,6 +215,13 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
   setArenaDeck: (deck) => set((s) => ({
     player: { ...s.player, arenaDeck: deck, syncedAt: Date.now() },
   })),
+  setArenaVoieDeck: (voie, deck) => set((s) => ({
+    player: {
+      ...s.player,
+      arenaDeckByVoie: { ...(s.player.arenaDeckByVoie ?? {}), [voie]: deck },
+      syncedAt: Date.now(),
+    },
+  })),
   setArenaAffinity: (affinity) => set((s) => ({
     player: { ...s.player, arenaAffinity: affinity },
   })),

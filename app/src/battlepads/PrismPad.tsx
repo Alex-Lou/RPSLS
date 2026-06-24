@@ -114,7 +114,7 @@ export function PrismPad({ compact = false, ...props }: React.SVGProps<SVGSVGEle
 
       {/* ── PRISM ICON CENTRAL — small triangular prism behind the source ── */}
       {!compact && (
-        <g transform={`translate(${W/2} ${H/2})`} opacity="0.18">
+        <g transform={`translate(${W/2} ${H/2}) scale(1.6)`} opacity="0.18">
           <polygon points="0,-90 78,45 -78,45" fill="none" stroke={VIOLET} strokeWidth="2" />
           <line x1="-78" y1="45" x2="78" y2="45" stroke={VIOLET} strokeWidth="1.5" />
         </g>
@@ -147,7 +147,7 @@ export function PrismPad({ compact = false, ...props }: React.SVGProps<SVGSVGEle
       {/* Title */}
       <g transform={`translate(${W/2} 115)`} textAnchor="middle">
         <text fontFamily='"Space Grotesk","Inter",sans-serif' fontWeight="600"
-              fontSize="18" fill={WHITE} fillOpacity="0.50" letterSpacing="18">
+              fontSize="29" fill={WHITE} fillOpacity="0.50" letterSpacing="18">
           💎 PRISM
         </text>
       </g>

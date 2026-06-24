@@ -20,6 +20,7 @@ import { isCastOnDraw } from "./arenaCastOnDraw";
 import { cpuCanPlay } from "./arenaAI";
 import { isFinisherCard } from "./arenaFinishers";
 import { CARDS } from "../ranked/cards";
+import { SIGNATURE_DECK } from "./arenaVoies";
 import type { TurnIntent } from "./arenaTypes";
 import type { CardId } from "../ranked/rankedTypes";
 import type { Move } from "../engine/game";
@@ -163,6 +164,39 @@ export const RARITY_COPIES: Record<string, number> = {
  *  bloqué dans le DeckManager. Tunable d'un seul chiffre. */
 export const ARENA_LEGENDARY_CAP = 2;
 
+/** Source du deck Arène pour une Voie (Alex 2026-06-22 « deck signature
+ *  MODIFIABLE ») : deck CUSTOM édité par le joueur pour CETTE Voie > deck
+ *  SIGNATURE curé par défaut > deck arène libre (legacy/fallback). Partagée par
+ *  le build de match (ArenaGame) ET l'éditeur (DeckManager) pour rester cohérent. */
+/** Multiset d'ids (ordre indifférent) — détecte un deck custom qui n'est qu'une
+ *  COPIE de la signature (un « Sauvegarder » sans édition). */
+function sameCards(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  const sa = [...a].sort();
+  const sb = [...b].sort();
+  return sa.every((id, i) => id === sb[i]);
+}
+
+export function resolveArenaDeckSource(
+  affinity: Move | undefined,
+  byVoie: Partial<Record<Move, string[]>> | undefined,
+  fallback: string[] | undefined,
+): CardId[] {
+  if (affinity) {
+    const sig = SIGNATURE_DECK[affinity];
+    const custom = byVoie?.[affinity];
+    // ROBUSTESSE (Alex 2026-06-23 « le deck ne change pas ») : le custom n'est
+    // retenu que s'il DIFFÈRE réellement de la signature. Un « Sauvegarder » sans
+    // édition (custom == signature) ne doit PAS figer la signature, sinon un futur
+    // rééquilibrage de celle-ci n'atteindrait jamais ce joueur.
+    if (custom && custom.length > 0 && !(sig && sameCards(custom, sig))) {
+      return custom as CardId[];
+    }
+    if (sig) return sig;
+  }
+  return (fallback ?? []) as CardId[];
+}
+
 export function buildPlayerDeck(saved: CardId[] | undefined, affinity?: Move): CardId[] {
   // REFONTE Alex 2026-06-12 : le deck RESPECTE les choix du joueur (zéro
   // carte parasite). ÉCONOMIE 2026-06-13 : chaque carte choisie est étendue
@@ -188,7 +222,11 @@ export function buildPlayerDeck(saved: CardId[] | undefined, affinity?: Move): C
   //    légendaires (les 1res choisies, ordre deck) ; le surplus est retiré.
   const isLegend = (c: CardId) => CARDS[c]?.rarity === "legendary";
   let legKept = 0;
-  const chosen = [...new Set((saved ?? []).filter(isDeckable))].filter((c) => {
+  // DECK PAR VOIE (Alex 2026-06-22) : `saved` est DÉJÀ résolu par l'appelant via
+  // resolveArenaDeckSource (deck CUSTOM édité de la Voie > deck SIGNATURE curé >
+  // deck libre). buildPlayerDeck se contente d'étendre cette source par rareté.
+  const source = saved;
+  const chosen = [...new Set((source ?? []).filter(isDeckable))].filter((c) => {
     if (!isLegend(c)) return true;
     if (legKept >= ARENA_LEGENDARY_CAP) return false; // surplus de légendaires retiré
     legKept += 1;

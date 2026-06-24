@@ -118,7 +118,7 @@ export function RustPad({ compact = false, ...props }: React.SVGProps<SVGSVGElem
 
       {/* ── CENTRAL EMBLEM — Industrial gear with chain links ── */}
       {!compact && (
-        <g transform={`translate(${W/2} ${H/2})`}>
+        <g transform={`translate(${W/2} ${H/2}) scale(1.6)`}>
           {/* Outer gear teeth */}
           <g>
             {Array.from({ length: 14 }).map((_, i) => {
@@ -164,7 +164,7 @@ export function RustPad({ compact = false, ...props }: React.SVGProps<SVGSVGElem
       {/* Title */}
       <g transform={`translate(${W/2} 115)`} textAnchor="middle">
         <text fontFamily='"Bebas Neue","Rajdhani",sans-serif' fontWeight="400"
-              fontSize="26" fill={ORANGE} fillOpacity="0.55" letterSpacing="22">
+              fontSize="42" fill={ORANGE} fillOpacity="0.55" letterSpacing="22">
           🏭 RUST
         </text>
       </g>

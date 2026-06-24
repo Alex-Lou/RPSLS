@@ -190,7 +190,7 @@ export function StormPad({ compact = false, ...props }: React.SVGProps<SVGSVGEle
           <animate attributeName="fill-opacity" values="0.40;0.95;0.40" dur="1.0s" repeatCount="indefinite" />
         </circle>
         <path d="M -3 -8 L 1 -2 L -1 -1 L 3 7 L -1 1 L 1 0 L -3 -8 Z"
-          fill={BOLT} fillOpacity="0.85" />
+          fill={BOLT} fillOpacity="0.85" transform="scale(1.6)" />
       </g>
 
       {/* Frame — electric cyan double border */}
@@ -211,7 +211,7 @@ export function StormPad({ compact = false, ...props }: React.SVGProps<SVGSVGEle
           { x: W - 76, y: H - 76 },
           { x: 76, y: H - 76 },
         ].map((p, i) => (
-          <g key={i} transform={`translate(${p.x} ${p.y})`}>
+          <g key={i} transform={`translate(${p.x} ${p.y}) scale(1.6)`}>
             <line x1="-12" y1="-8" x2="-4" y2="2" />
             <line x1="-4" y1="2" x2="-8" y2="8" />
             <line x1="-8" y1="8" x2="0" y2="12" />
@@ -222,7 +222,7 @@ export function StormPad({ compact = false, ...props }: React.SVGProps<SVGSVGEle
       {/* Title */}
       <g transform={`translate(${W/2} 115)`} textAnchor="middle">
         <text fontFamily='"Orbitron","Rajdhani",sans-serif' fontWeight="600"
-              fontSize="18" fill={BOLT} fillOpacity="0.38" letterSpacing="13">
+              fontSize="29" fill={BOLT} fillOpacity="0.38" letterSpacing="13">
           ⚡ TEMPEST FURY
         </text>
         <line x1="-80" y1="12" x2="80" y2="12" stroke={FRAME} strokeOpacity="0.12" />

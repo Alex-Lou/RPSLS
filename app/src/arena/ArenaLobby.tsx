@@ -24,6 +24,7 @@ import { MOVE_PALETTE, moveRim } from "../icons";
 import type { Move } from "../engine/game";
 import { CREATURE_PASSIVES, CREATURE_STATS } from "./arenaTypes";
 import { ArenaHowItWorks } from "./ArenaHowItWorks";
+import { VOIE_EMBLEM } from "./voieEmblem";
 
 const VOIES: Move[] = ["rock", "paper", "scissors", "lizard", "spock"];
 const VOIE_BONUS: Record<Move, string> = {
@@ -42,16 +43,12 @@ const VOIE_LABEL: Record<Move, string> = {
   lizard:   "Voie du Mirage",
   spock:    "Voie du Cosmos",
 };
-/** Icônes custom des Voies (Alex 2026-06-13, générées depuis
- *  PROMPTS_ICONES_PRO.md) — identité visuelle du lobby, zéro émoticône.
- *  En match les MoveGlyph restent (cohérence du board). */
-const VOIE_ICON: Record<Move, string> = {
-  rock:     "/MenuIcons/IconConstellationPro/voie-montagne.png",
-  paper:    "/MenuIcons/IconConstellationPro/voie-foret.png",
-  scissors: "/MenuIcons/IconConstellationPro/voie-tranchant.png",
-  lizard:   "/MenuIcons/IconConstellationPro/voie-mirage.png",
-  spock:    "/MenuIcons/IconConstellationPro/voie-cosmos.png",
-};
+/** Icônes de Voie du lobby = les MÉDAILLONS d'emblème (Alex 2026-06-23). LE MÊME
+ *  médaillon est désormais affiché sur la jauge de Voie en match
+ *  (ArenaConstellationBar) → fil d'identité « ma Voie = ce médaillon, et il se
+ *  remplit ». Remplace les anciennes /MenuIcons/IconConstellationPro/voie-*.png
+ *  (réversible : repointer ici suffit). */
+const VOIE_ICON: Record<Move, string> = VOIE_EMBLEM;
 const PRO_ICON = (name: string): string => `/MenuIcons/IconConstellationPro/${name}.png`;
 /** Fiche descriptive d'une Voie (Alex 2026-06-11) — affichée au long-press,
  *  comme pour les cartes. Simple et compréhensible. */
@@ -221,12 +218,12 @@ export function ArenaLobby({
       }
     >
 
-      {/* Monnaies — ligne compacte. my-auto sur CHAQUE bloc (Alex 2026-06-12
-       *  "trous, espace mal occupé") : l'espace libre de la zone contenu se
-       *  répartit automatiquement entre les blocs — et si un petit écran
-       *  déborde, les marges auto retombent à 0 → scroll normal, rien de
-       *  clippé (piège du justify-evenly + overflow évité). */}
-      <div className={"shrink-0 flex items-center justify-center " + (voieExpanded ? "" : "my-auto")}>
+      {/* Monnaies — ligne compacte. Sections PACKÉES en haut (Alex 2026-06-21
+       *  "trous verticaux sur tablette haute en portrait") : plus de my-auto
+       *  qui écartait les blocs pour remplir la hauteur → ils suivent le gap
+       *  fixe de la zone contenu et restent collés en haut. Sur petit écran,
+       *  overflow-y-auto du shell prend le relais → scroll normal. */}
+      <div className="shrink-0 flex items-center justify-center">
         <CurrencyBadges size="full" onClick={onGoShop} />
       </div>
 
@@ -234,7 +231,7 @@ export function ArenaLobby({
        *  v2 Couche 1 : le symbole choisi donne un bonus passif aux créatures
        *  de ce type ET avance la constellation 3 étoiles vers le Finisher. */}
       <div
-        className={"bg-surface rounded-2xl px-4 py-3.5 flex flex-col gap-2.5 " + (voieExpanded ? "" : "my-auto")}
+        className="bg-surface rounded-2xl px-4 py-3.5 flex flex-col gap-2.5"
         style={{ border: "1px solid color-mix(in oklab, var(--theme-primary) 35%, transparent)" }}
       >
         <div className="flex items-center justify-between gap-2">
@@ -339,7 +336,7 @@ export function ArenaLobby({
       <motion.button
         whileTap={{ scale: 0.98 }}
         onClick={onManageDeck}
-        className={"bg-surface rounded-2xl px-4 py-3 flex items-center justify-between hover:bg-hairline transition " + (voieExpanded ? "" : "my-auto")}
+        className="bg-surface rounded-2xl px-4 py-3 flex items-center justify-between hover:bg-hairline transition"
         style={{ border: "1px solid color-mix(in oklab, var(--theme-primary) 35%, transparent)" }}
       >
         <div className="flex items-center gap-2.5">

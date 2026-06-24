@@ -69,6 +69,7 @@ export function VoidPad({ compact = false, ...props }: React.SVGProps<SVGSVGElem
       {/* ── CENTRAL TRIANGLE — the signature, slowly rotating ──
             Equilateral, fine white stroke, no fill. Rotates 360° in 60s. */}
       <g transform={`translate(${W/2} ${H/2})`}>
+       <g transform="scale(1.6)">
         <g>
           {/* Outer triangle */}
           <polygon points="0,-160 138.6,80 -138.6,80"
@@ -90,6 +91,7 @@ export function VoidPad({ compact = false, ...props }: React.SVGProps<SVGSVGElem
           <animateTransform attributeName="transform" type="rotate"
             from="0" to="360" dur="60s" repeatCount="indefinite" />
         </g>
+       </g>
       </g>
 
       {/* Frame — single white thin line */}
@@ -99,7 +101,7 @@ export function VoidPad({ compact = false, ...props }: React.SVGProps<SVGSVGElem
       {/* Title — tight monospaced */}
       <g transform={`translate(${W/2} 115)`} textAnchor="middle">
         <text fontFamily='"JetBrains Mono","Space Mono",monospace' fontWeight="500"
-              fontSize="16" fill={WHITE} fillOpacity="0.45" letterSpacing="20">
+              fontSize="25.6" fill={WHITE} fillOpacity="0.45" letterSpacing="20">
           ◼ VOID
         </text>
       </g>

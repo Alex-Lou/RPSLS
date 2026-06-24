@@ -22,8 +22,13 @@
  */
 
 import { AnimatePresence, motion } from "motion/react";
+import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import type { CardId } from "../ranked/rankedTypes";
+import { isDominantSpell } from "./arenaFinishers";
+import { CARDS } from "../ranked/cards";
+import { CardImage } from "../ranked/CardImage";
+import { useT } from "../i18n";
 
 /* Particules radiales déterministes (pas de Math.random → SSR/replay sûrs,
  * et même semence = même éclat, ce qui suffit visuellement). */
@@ -207,35 +212,200 @@ const SIGNATURES: Partial<Record<CardId, () => ReactElement>> = {
       <GlyphPop glyph="☄️" color="rgba(248,113,113,0.95)" dur={1} />
     </>
   ),
+  // FINISHER FORTERESSE (Voie Montagne) — les remparts se DRESSENT : flash ocre,
+  // double onde granite + ambre, éclats de pierre, glyphe 🏰. Le climax du mur.
+  "finisher-forteresse": () => (
+    <>
+      <CoreFlash from="rgba(255,255,255,0.96)" to="rgba(180,83,9,0.7)" dur={0.8} />
+      <Shockwave color="rgba(214,211,209,0.95)" dur={0.75} max={3.6} />
+      <Shockwave color="rgba(245,158,11,0.85)" delay={0.14} dur={0.75} max={2.8} />
+      <Sparks count={14} radius={130} color="rgba(231,229,228,0.95)" dur={0.8} size={7} />
+      <Sparks count={8} radius={80} color="rgba(180,83,9,0.9)" dur={0.6} size={6} />
+      <GlyphPop glyph="🏰" color="rgba(245,158,11,0.95)" dur={0.9} />
+    </>
+  ),
+  // FINISHER MÉTAMORPHOSE (Voie Mirage) — l'insaisissable se RECOMPOSE : flash
+  // indigo, double onde iridescente cyan→vert, étincelles, glyphe 🎭.
+  "finisher-metamorphose": () => (
+    <>
+      <CoreFlash from="rgba(224,231,255,0.95)" to="rgba(129,140,248,0.7)" dur={0.8} />
+      <Shockwave color="rgba(34,211,238,0.9)" dur={0.7} max={3.4} />
+      <Shockwave color="rgba(110,231,183,0.8)" delay={0.15} dur={0.7} max={2.7} />
+      <Sparks count={14} radius={130} color="rgba(165,243,252,0.95)" dur={0.8} size={6} />
+      <GlyphPop glyph="🎭" color="rgba(129,140,248,0.95)" dur={0.9} />
+    </>
+  ),
+  // FINISHER LAME (Voie Tranchant) — une GRANDE LAME d'acier tranche en diagonale
+  // (flash rose, onde, éclats, glyphe ⚔️). La lame qui perce tout.
+  "finisher-lame": () => (
+    <>
+      <CoreFlash from="rgba(255,255,255,0.96)" to="rgba(244,63,94,0.7)" dur={0.7} />
+      <motion.div
+        initial={{ opacity: 0, x: "-130%" }}
+        animate={{ opacity: [0, 1, 1, 0], x: ["-130%", "0%", "12%", "130%"] }}
+        transition={{ duration: 0.5, times: [0, 0.4, 0.55, 1], ease: "easeOut" }}
+        className="absolute left-1/2 top-1/2 w-56 h-2 -ml-28 -mt-1 origin-center"
+        style={{ rotate: "-18deg", background: "linear-gradient(90deg, transparent, #e2e8f0 35%, #ffffff 50%, #fb7185 65%, transparent)", boxShadow: "0 0 20px 3px rgba(244,63,94,0.85)" }}
+      />
+      <Shockwave color="rgba(251,113,133,0.9)" dur={0.6} max={3.4} />
+      <Sparks count={12} radius={120} color="rgba(254,205,211,0.95)" dur={0.6} size={6} />
+      <GlyphPop glyph="⚔️" color="rgba(244,63,94,0.95)" dur={0.85} />
+    </>
+  ),
+  // ÉBOULIS FINAL (Montagne) — la montagne s'effondre : flash blanc→ardoise,
+  // double onde granite + bleu glacier, éclats de pierre, glyphe 🏔️.
+  "eboulis-final": () => (
+    <>
+      <CoreFlash from="rgba(255,255,255,0.95)" to="rgba(148,163,184,0.7)" dur={0.75} />
+      <Shockwave color="rgba(214,211,209,0.95)" dur={0.7} max={3.6} />
+      <Shockwave color="rgba(125,211,252,0.8)" delay={0.14} dur={0.7} max={2.8} />
+      <Sparks count={16} radius={140} color="rgba(231,229,228,0.95)" dur={0.8} size={7} />
+      <Sparks count={8} radius={85} color="rgba(125,211,252,0.85)" dur={0.6} size={6} />
+      <GlyphPop glyph="🏔️" color="rgba(148,163,184,0.95)" dur={0.9} />
+    </>
+  ),
+  // DRAIN VITAL (Forêt) — la vie est ASPIRÉE vers le lanceur : particules vertes
+  // attirées vers le centre (inward), flash émeraude, onde tardive, glyphe 🩸.
+  "drain-vital": () => (
+    <>
+      <Sparks count={16} radius={150} color="rgba(52,211,153,0.9)" dur={0.7} size={6} inward />
+      <CoreFlash from="rgba(167,243,208,0.9)" to="rgba(16,122,87,0.6)" dur={0.7} />
+      <Shockwave color="rgba(52,211,153,0.85)" delay={0.3} dur={0.5} max={2.6} />
+      <GlyphPop glyph="🩸" color="rgba(52,211,153,0.95)" dur={0.85} />
+    </>
+  ),
+  // COUP DANS L'OMBRE (Mirage) — 3 entailles violet→cyan se croisent en éclair,
+  // étincelles cyan à l'impact, glyphe 🌑. L'imblocable qui frappe de partout.
+  "coup-dans-lombre": () => (
+    <>
+      {[-32, 0, 32].map((rot, k) => (
+        <motion.div
+          key={`slash${k}`}
+          initial={{ opacity: 0, x: "-120%" }}
+          animate={{ opacity: [0, 1, 1, 0], x: ["-120%", "0%", "10%", "120%"] }}
+          transition={{ duration: 0.5, delay: k * 0.08, times: [0, 0.4, 0.55, 1], ease: "easeOut" }}
+          className="absolute left-1/2 top-1/2 w-56 h-1.5 origin-center"
+          style={{ marginLeft: -112, marginTop: -3, rotate: `${rot}deg`, background: "linear-gradient(90deg, transparent, rgba(124,58,237,0.92) 45%, rgba(34,211,238,0.95) 55%, transparent)", boxShadow: "0 0 16px 2px rgba(139,92,246,0.8)" }}
+        />
+      ))}
+      <Sparks count={12} radius={115} color="rgba(34,211,238,0.92)" dur={0.6} size={6} />
+      <GlyphPop glyph="🌑" color="rgba(167,139,250,0.95)" dur={0.8} />
+    </>
+  ),
+  // INTRICATION QUANTIQUE (Cosmos) — résonance : double onde violet→cyan,
+  // particules aspirées au cœur, flash indigo, glyphe ⚛️.
+  "intrication-quantique": () => (
+    <>
+      <CoreFlash from="rgba(196,181,253,0.9)" to="rgba(124,58,237,0.65)" dur={0.75} />
+      <Shockwave color="rgba(139,92,246,0.9)" dur={0.7} max={3.4} />
+      <Shockwave color="rgba(34,211,238,0.8)" delay={0.16} dur={0.7} max={2.7} />
+      <Sparks count={14} radius={130} color="rgba(196,181,253,0.95)" dur={0.8} size={6} />
+      <Sparks count={8} radius={80} color="rgba(165,243,252,0.9)" dur={0.6} size={5} inward />
+      <GlyphPop glyph="⚛️" color="rgba(167,139,250,0.95)" dur={0.9} />
+    </>
+  ),
+  // TAILLADE MORTELLE (Tranchant) — UNE grande entaille blanc→rouge sang traverse
+  // l'écran en diagonale, onde + gerbe d'étincelles, glyphe ⚡. Le coup fatal.
+  "taillade-mortelle": () => (
+    <>
+      <CoreFlash from="rgba(255,255,255,0.96)" to="rgba(220,38,38,0.7)" dur={0.65} />
+      <motion.div
+        initial={{ opacity: 0, x: "-130%" }}
+        animate={{ opacity: [0, 1, 1, 0], x: ["-130%", "0%", "12%", "130%"] }}
+        transition={{ duration: 0.45, times: [0, 0.4, 0.55, 1], ease: "easeOut" }}
+        className="absolute left-1/2 top-1/2 w-60 h-2.5 origin-center"
+        style={{ marginLeft: -120, marginTop: -5, rotate: "-22deg", background: "linear-gradient(90deg, transparent, #ffffff 45%, #ef4444 60%, transparent)", boxShadow: "0 0 22px 3px rgba(220,38,38,0.9)" }}
+      />
+      <Shockwave color="rgba(239,68,68,0.9)" dur={0.55} max={3.6} />
+      <Sparks count={14} radius={130} color="rgba(254,202,202,0.95)" dur={0.6} size={6} />
+      <GlyphPop glyph="⚡" color="rgba(239,68,68,0.95)" dur={0.8} />
+    </>
+  ),
 };
 
 /** Liste des sorts qui ONT une signature — exporté pour l'IA/tests éventuels. */
 export const SPELLS_WITH_SIGNATURE = Object.keys(SIGNATURES) as CardId[];
 
 export function ArenaSpellFX({ fx }: { fx: { ids: CardId[]; key: number } | null }) {
-  // Ne garde que les sorts AVEC signature (déduplique : un même sort joué des
-  // deux côtés ne joue qu'une fois — un big-bang suffit).
-  const sigs = fx ? Array.from(new Set(fx.ids)).filter((id) => SIGNATURES[id]) : [];
+  const t = useT();
+  // SPELL-SPOTLIGHT (Alex 2026-06-23 « carte à l'avant → anim → dissolution →
+  // suivante, sinon ça se mélange »). Le résolveur émet désormais UNE carte à la
+  // fois (file séquencée) → on prend la 1ʳᵉ signature présente. Chaque carte a SON
+  // moment : vignette + carte au centre + sa signature derrière + dissolution.
+  const id = fx ? (Array.from(new Set(fx.ids)).filter((x) => SIGNATURES[x])[0] ?? null) : null;
+  const Sig = id ? SIGNATURES[id]! : null;
+  const dominant = id ? isDominantSpell(id) : false;
+  const vignetteDur = dominant ? 2.2 : 1.5;
+  // La signature monte APRÈS un court délai (la carte a eu son moment SEULE), puis
+  // joue ses keyframes internes EN AVANT de la carte. Avant, elle jouait DERRIÈRE
+  // la carte au même instant → la carte cachait le boom (« je vois la carte mais
+  // rien de l'anim »). Démontage final géré par ArenaGame.spellFX (hold timer).
+  const [showSig, setShowSig] = useState(false);
+  useEffect(() => {
+    if (!fx || !id) { setShowSig(false); return; }
+    setShowSig(false);
+    const tid = window.setTimeout(() => setShowSig(true), dominant ? 520 : 400);
+    return () => window.clearTimeout(tid);
+  }, [fx?.key, id, dominant]);
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 40 }} aria-hidden>
       <AnimatePresence>
-        {fx && sigs.length > 0 && (
+        {fx && id && Sig && (
           <motion.div
             key={`spellfx-${fx.key}`}
-            initial={{ opacity: 1 }}
+            initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.22 }}
             className="absolute inset-0 flex items-center justify-center"
           >
-            {sigs.map((id) => {
-              const Sig = SIGNATURES[id]!;
-              return (
-                <div key={id} className="absolute inset-0 flex items-center justify-center">
+            {/* Vignette focus — DERRIÈRE tout, assombrit le board. */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, dominant ? 0.84 : 0.72, dominant ? 0.8 : 0.62, 0] }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: vignetteDur, times: [0, 0.16, 0.72, 1], ease: "easeInOut" }}
+              className="absolute inset-0"
+              style={{ background: "radial-gradient(circle at 50% 50%, transparent 18%, rgba(2,2,10,0.88) 82%)" }}
+            />
+            {/* LA CARTE — s'affiche d'abord (DERRIÈRE le boom), puis se dissout. */}
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0, y: 16, rotateZ: -4 }}
+              animate={{
+                scale: dominant ? [0.5, 1.28, 1.16, 1.3] : [0.5, 1.12, 1.0, 1.08],
+                opacity: [0, 1, 1, 0],
+                y: [16, 0, 0, -14],
+                rotateZ: [-4, 0, 0, 3],
+              }}
+              transition={{ duration: dominant ? 1.2 : 1.0, times: [0, 0.2, 0.5, 1], ease: "easeOut" }}
+              className="relative flex flex-col items-center gap-1"
+            >
+              <div className="relative w-24 h-32 landscape:w-28 landscape:h-36 rounded-xl overflow-hidden ring-2 ring-white/45 shadow-[0_10px_44px_-4px_rgba(0,0,0,0.95)]">
+                <CardImage id={id} glyphSize="text-5xl" />
+              </div>
+              <span
+                className="px-2 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider text-white"
+                style={{ background: "rgba(0,0,0,0.62)", textShadow: "0 1px 3px rgba(0,0,0,0.95)" }}
+              >
+                {t(CARDS[id].nameKey)}
+              </span>
+            </motion.div>
+            {/* LA SIGNATURE — AU-DESSUS de la carte, montée RETARDÉE : elle explose
+             *  quand la carte se dissout → le boom est enfin VISIBLE plein cadre. */}
+            <AnimatePresence>
+              {showSig && (
+                <motion.div
+                  key="sig"
+                  initial={{ scale: dominant ? 1.35 : 1.1, opacity: 0 }}
+                  animate={{ scale: dominant ? 1.65 : 1.32, opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: dominant ? 0.9 : 0.55, ease: "easeOut" }}
+                  className="absolute inset-0 flex items-center justify-center"
+                >
                   <Sig />
-                </div>
-              );
-            })}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>

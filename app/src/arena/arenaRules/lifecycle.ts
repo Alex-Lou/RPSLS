@@ -11,6 +11,7 @@ import {
 } from "../arenaTypes";
 import { creatureEffectiveAtk } from "./heroCreature";
 import { drawCards } from "./boardInit";
+import { METAMORPHOSE_DODGE } from "../arenaFinishers";
 
 /* ───────────────────────── Turn lifecycle ───────────────────────── */
 
@@ -46,9 +47,9 @@ export function advanceToNextTurn(board: BoardState): BoardState {
   }
   // Cartes dispos (Alex feedback : "ajouter les cartes de chacun dans les
   // logs pour voir ce que chacun aurait pu/du jouer"). Mains complètes
-  // listées avec mana + flags (kill bonus pending, aegis lock).
-  alog("hand", `a hand=[${board.a.hand.join(",")}] deck=${board.a.deck.length} discard=${board.a.discard.length} mana=${board.a.mana}/${board.a.maxMana}${board.a.killBonusPending ? " +K" : ""}`);
-  alog("hand", `b hand=[${board.b.hand.join(",")}] deck=${board.b.deck.length} discard=${board.b.discard.length} mana=${board.b.mana}/${board.b.maxMana}${board.b.killBonusPending ? " +K" : ""}`);
+  // listées avec mana.
+  alog("hand", `a hand=[${board.a.hand.join(",")}] deck=${board.a.deck.length} discard=${board.a.discard.length} mana=${board.a.mana}/${board.a.maxMana}`);
+  alog("hand", `b hand=[${board.b.hand.join(",")}] deck=${board.b.deck.length} discard=${board.b.discard.length} mana=${board.b.mana}/${board.b.maxMana}`);
   // ÉCONOMIE EN PHASES (Alex 2026-06-17) : T1-3 = invocations seulement (cap 0).
   // Dès T4, le PLAFOND de main monte par paliers (3, +1 tous les 3 tours). À
   // chaque hausse de palier → « CHUTE DE DECK » : on REMPLIT la main jusqu'au
@@ -59,33 +60,40 @@ export function advanceToNextTurn(board: BoardState): BoardState {
   const drawFor = (h: HeroState): number => {
     const room = Math.max(0, capNext - h.hand.length);
     if (capNext > capPrev) return room;                 // nouveau palier → remplir (chute de deck)
-    return h.killBonusPending ? Math.min(1, room) : 0;  // sinon : +1 sur kill, sous le cap
+    // PIOCHE DE TEMPO (Alex 2026-06-23 « les cartes défilent sans problème, il manque
+    // du contrôle ») : +1 SEULEMENT si la main est BASSE (≤2), plus à chaque kill. Avant,
+    // le kill-bonus refaisait +1 à chaque créature tuée → main toujours pleine, zéro rareté.
+    // Maintenant tu cours plus maigre : chaque carte compte, tu repioches quand tu en as
+    // VRAIMENT besoin (anti-starvation), pas en récompense d'agressivité.
+    return h.hand.length <= 2 ? Math.min(1, room) : 0;
   };
   const drawA = drawFor(board.a);
   const drawB = drawFor(board.b);
   // Lot D-bis Round 10 — hooks runtime Finishers persistants :
-  // VERGER : si vergerActive, hero heal +1/tour (cumulé tant que actif)
+  // VERGER : la régén est désormais gérée par l'ENGINE SÈVE en endOfTurnCleanup
+  //          (seveHealAmount = 2+Sève si Verger actif) — plus rien ici.
   // MÉTAMORPHOSE : si metamorphoseActive, tous mes Lézard refill dodgeCharges
   // Note : LAME est traité in-combat (cf arenaCombat), pas ici.
   let lanesAfterFinishers = board.lanes;
   if (board.a.metamorphoseActive) {
     lanesAfterFinishers = lanesAfterFinishers.map((l) => ({
       ...l,
-      a: l.a && l.a.move === "lizard" ? { ...l.a, dodgeCharges: Math.max(l.a.dodgeCharges, 1) } : l.a,
+      a: l.a && l.a.move === "lizard" ? { ...l.a, dodgeCharges: Math.max(l.a.dodgeCharges, METAMORPHOSE_DODGE) } : l.a,
     })) as [LaneState, LaneState, LaneState];
     alog("turn", `a MÉTAMORPHOSE → Lézard dodge refresh`);
   }
   if (board.b.metamorphoseActive) {
     lanesAfterFinishers = lanesAfterFinishers.map((l) => ({
       ...l,
-      b: l.b && l.b.move === "lizard" ? { ...l.b, dodgeCharges: Math.max(l.b.dodgeCharges, 1) } : l.b,
+      b: l.b && l.b.move === "lizard" ? { ...l.b, dodgeCharges: Math.max(l.b.dodgeCharges, METAMORPHOSE_DODGE) } : l.b,
     })) as [LaneState, LaneState, LaneState];
     alog("turn", `b MÉTAMORPHOSE → Lézard dodge refresh`);
   }
-  const heroAVerger = board.a.vergerActive ? { ...board.a, hp: Math.min(board.a.maxHp, board.a.hp + 1) } : board.a;
-  const heroBVerger = board.b.vergerActive ? { ...board.b, hp: Math.min(board.b.maxHp, board.b.hp + 1) } : board.b;
-  if (board.a.vergerActive) alog("turn", `a VERGER → +1 HP (${board.a.hp} → ${heroAVerger.hp})`);
-  if (board.b.vergerActive) alog("turn", `b VERGER → +1 HP (${board.b.hp} → ${heroBVerger.hp})`);
+  // Régén Verger ÉTERNEL (Forêt) désormais gérée par l'ENGINE SÈVE en
+  // endOfTurnCleanup (seveHealAmount = 2+Sève si Verger actif, sinon Sève) → on
+  // ne soigne PLUS ici, sinon double-soin. Les noms restent pour la pioche.
+  const heroAVerger = board.a;
+  const heroBVerger = board.b;
   // Filet de sécurité (Alex 2026-06-11) : si après la pioche la main est VIDE,
   // on pioche 1 de plus — MAIS seulement HORS ouverture (capNext>0), sinon le
   // filet forcerait une carte pendant les T1-3 « invocations seulement ».
@@ -105,8 +113,8 @@ export function advanceToNextTurn(board: BoardState): BoardState {
     alog("turn", `FATIGUE ${tag} stack ${stacks} → -${stacks} PV (deck sec, hp ${h.hp}→${Math.max(0, h.hp - stacks)})`);
     return { ...h, fatigueStacks: stacks, hp: Math.max(0, h.hp - stacks) };
   };
-  const a = refreshHero({ ...fatigueOf(safeA, "a"), killBonusPending: false });
-  const b = refreshHero({ ...fatigueOf(safeB, "b"), killBonusPending: false });
+  const a = refreshHero(fatigueOf(safeA, "a"));
+  const b = refreshHero(fatigueOf(safeB, "b"));
   // Augur / Oracle Inverse : durée 2 tours (Alex 2026-06-11). Decrement à
   // chaque advance, clear cards quand reach 0.
   const nextATurns = Math.max(0, (board.augurTurnsLeftA ?? 0) - 1);

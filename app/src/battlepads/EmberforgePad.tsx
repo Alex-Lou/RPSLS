@@ -69,7 +69,7 @@ export function EmberforgePad({ compact = false, ...props }: React.SVGProps<SVGS
       </g>
 
       {/* ANVIL SILHOUETTE — dark T-shaped block centre, lit by forge from above. */}
-      <g transform={`translate(${W/2} ${H/2 + 40})`}>
+      <g transform={`translate(${W/2} ${H/2 + 40}) scale(1.6)`}>
         {/* Anvil body — vertical post. */}
         <rect x="-60" y="-50" width="120" height="100" rx="6" fill="#040201" stroke={COPPER} strokeOpacity="0.20" strokeWidth="1.5" />
         {/* Anvil top — wider slab. */}
@@ -177,7 +177,7 @@ export function EmberforgePad({ compact = false, ...props }: React.SVGProps<SVGS
           rest of the surfaces. */}
       <g transform={`translate(${W/2} 112)`} textAnchor="middle">
         <text fontFamily='"Bebas Neue","Rajdhani",Impact,sans-serif' fontWeight="700"
-              fontSize="22" fill={AMBER} fillOpacity="0.45" letterSpacing="14">
+              fontSize="35" fill={AMBER} fillOpacity="0.45" letterSpacing="14">
           EMBER FORGE
         </text>
         <line x1="-70" y1="14" x2="70" y2="14" stroke={FRAME} strokeOpacity="0.12"

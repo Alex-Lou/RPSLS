@@ -63,7 +63,7 @@ export function SandboxView({
         onClick={surprise}
         title="Config aléatoire"
         aria-label="Config aléatoire"
-        className="fixed z-30 top-[max(env(safe-area-inset-top),32px)] right-[max(env(safe-area-inset-right),12px)] [@media(max-height:540px)]:top-1 h-11 [@media(max-height:540px)]:h-8 px-3 rounded-2xl bg-black/55 backdrop-blur border border-hairline hover:bg-black/70 transition flex items-center gap-1.5 text-ink text-xs font-semibold shadow-lg"
+        className="fixed z-30 top-[max(var(--sai-top),32px)] right-[max(var(--sai-right),12px)] [@media(max-height:540px)]:top-1 h-11 [@media(max-height:540px)]:h-8 px-3 rounded-2xl bg-black/55 backdrop-blur border border-hairline hover:bg-black/70 transition flex items-center gap-1.5 text-ink text-xs font-semibold shadow-lg"
       >
         🎲 <span className="[@media(max-width:360px)]:hidden">Aléatoire</span>
       </button>

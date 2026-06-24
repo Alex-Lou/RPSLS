@@ -50,7 +50,7 @@ export function HolyPad({ compact = false, ...props }: React.SVGProps<SVGSVGElem
       <rect width={W} height={H} fill="url(#hp-halo)" />
 
       {/* Rose window — top centre, very slow rotation. */}
-      <g transform={`translate(${W / 2} 210)`} stroke={gold} fill="none">
+      <g transform={`translate(${W / 2} 210) scale(1.6)`} stroke={gold} fill="none">
         <g>
           <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="120s" repeatCount="indefinite" />
           {Array.from({ length: 12 }).map((_, i) => {
@@ -74,7 +74,7 @@ export function HolyPad({ compact = false, ...props }: React.SVGProps<SVGSVGElem
 
       {/* Corner crosses. */}
       {[[120, 120], [W - 120, 120], [120, H - 120], [W - 120, H - 120]].map(([x, y], i) => (
-        <g key={i} transform={`translate(${x} ${y})`} stroke={gold} strokeOpacity="0.5" strokeWidth="3">
+        <g key={i} transform={`translate(${x} ${y}) scale(1.6)`} stroke={gold} strokeOpacity="0.5" strokeWidth="3">
           <line x1="0" y1="-26" x2="0" y2="26" />
           <line x1="-18" y1="-7" x2="18" y2="-7" />
         </g>
@@ -97,7 +97,7 @@ export function HolyPad({ compact = false, ...props }: React.SVGProps<SVGSVGElem
       <g transform={`translate(${W / 2} ${H - 92})`} textAnchor="middle">
         <line x1="-180" y1="0" x2="-70" y2="0" stroke={gold} strokeOpacity="0.5" />
         <line x1="70" y1="0" x2="180" y2="0" stroke={gold} strokeOpacity="0.5" />
-        <text fontFamily="Cinzel,Georgia,serif" fontSize="20" fill={gold} fillOpacity="0.7" letterSpacing="8">SANCTVM</text>
+        <text fontFamily="Cinzel,Georgia,serif" fontSize="32" fill={gold} fillOpacity="0.7" letterSpacing="8">SANCTVM</text>
       </g>
     </svg>
   );

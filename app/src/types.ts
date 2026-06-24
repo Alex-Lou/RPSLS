@@ -101,6 +101,11 @@ export interface Player {
   /** Arena deck (Constellation Pro) — 8 cartes, format SÉPARÉ du Classé
    *  (chaque choix est étendu par rareté 3/2/2/1 au début du match). */
   arenaDeck?: string[];
+  /** Deck signature ÉDITABLE par Voie (Constellation Pro, Alex 2026-06-22) — si
+   *  une entrée existe pour une Voie, elle REMPLACE le deck signature par défaut
+   *  (build de match ET DeckManager). Persisté LOCALEMENT (sync serveur = lot
+   *  suivant). Repli : deck signature curé si absent. 8 cartes par Voie. */
+  arenaDeckByVoie?: Partial<Record<import("./engine/game").Move, string[]>>;
   /** Soft currency earned on every finished match. Spent at the boutique
    *  to buy a pack. */
   eclats?: number;
@@ -207,6 +212,18 @@ export interface Player {
    *  Storm, falling petals for Bloom, flying sparks for Rust, etc. Lives on
    *  the player so the preference survives reinstall + sync. */
   premiumIntensity?: Record<string, number>;
+  /** Palier de qualité graphique (perf). `undefined` = auto-détecté selon
+   *  l'appareil (cf. graphics/graphicsQuality.ts) ; sinon override MANUEL du
+   *  joueur (Profil → Qualité graphique). 'low' coupe les effets coûteux
+   *  (motif d'aura de Voie, shader d'intro, traînées tactiles, pluie premium,
+   *  particules de menu…), 'medium' = intermédiaire, 'high' = plein régime.
+   *  Survit au reinstall + sync (préférence joueur). Alex 2026-06-20. */
+  graphicsQuality?: "low" | "medium" | "high";
+  /** Palier graphique MESURÉ au runtime (détection FPS) — per-appareil, NON
+   *  synchronisé. Sert de défaut sous l'override manuel `graphicsQuality` : si un
+   *  appareil rame malgré de bonnes specs, l'échantillonneur FPS rétrograde ce
+   *  palier (persisté → s'applique dès le prochain lancement). Alex 2026-06-20. */
+  graphicsMeasured?: "low" | "medium" | "high";
 }
 
 /** Where a pad shows up in the Profile pad picker's 3-way sub-filter.

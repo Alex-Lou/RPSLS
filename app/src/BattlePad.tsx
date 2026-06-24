@@ -1,4 +1,4 @@
-import { type CSSProperties, useRef, useEffect, useCallback } from "react";
+import { type CSSProperties, memo, useRef, useEffect, useCallback } from "react";
 import type { PadId } from "./types";
 import { useStore } from "./store/store";
 import { usePageVisible } from "./usePageVisible";
@@ -32,12 +32,13 @@ import { PrismPad } from "./battlepads/PrismPad";
 import { InkPad } from "./battlepads/InkPad";
 import { BloomPad } from "./battlepads/BloomPad";
 
-export function BattlePad({
+function BattlePadInner({
   padId,
   className,
   style,
   compact = false,
   frozen = false,
+  paused = false,
 }: {
   padId: PadId;
   className?: string;
@@ -47,6 +48,10 @@ export function BattlePad({
    *  thumbnails: a real, representative image of the pad with zero animation
    *  cost — the full animation only plays in the open preview. */
   frozen?: boolean;
+  /** Met la SMIL en pause SUR PLACE (sans saut de frame) tant que true — utilisé
+   *  pendant la résolution de combat (Alex 2026-06-23 « animations saccadées ») :
+   *  geler le fond animé rend tout le budget GPU aux FX de combat/sorts → fluide. */
+  paused?: boolean;
 }) {
   const customPadUrl = useStore((s) => s.player.customPadUrl);
   const visible = usePageVisible();
@@ -63,16 +68,16 @@ export function BattlePad({
     svgRef.current = el;
     if (!el) return;
     if (frozen) freeze(el);
-    else if (!visible) el.pauseAnimations();
-  }, [visible, frozen, freeze]);
+    else if (paused || !visible) el.pauseAnimations();
+  }, [visible, frozen, paused, freeze]);
 
   useEffect(() => {
     const el = svgRef.current;
     if (!el) return;
     if (frozen) { freeze(el); return; }
-    if (visible) el.unpauseAnimations();
-    else el.pauseAnimations();
-  }, [visible, frozen, freeze]);
+    if (paused || !visible) el.pauseAnimations();
+    else el.unpauseAnimations();
+  }, [visible, frozen, paused, freeze]);
 
   const common = {
     ref: setRef,
@@ -119,6 +124,12 @@ export function BattlePad({
     default:           return <ChalkboardPad {...common} />;
   }
 }
+
+/** React.memo (Alex 2026-06-23 perf) : ArenaBoard se re-rend ~8×/tour ; sans memo
+ *  le pad SVG (des centaines de nœuds) se re-réconciliait à chaque fois. Props
+ *  stables (padId/compact/paused) → ne re-rend qu'au vrai changement (ex. paused
+ *  qui bascule en début/fin de résolution). */
+export const BattlePad = memo(BattlePadInner);
 
 /* ════════════════════ ImagePad ════════════════════
    Generic <image>-based playmat. Used for every PNG-driven pad in

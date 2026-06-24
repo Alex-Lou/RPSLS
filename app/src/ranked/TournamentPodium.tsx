@@ -192,8 +192,8 @@ function FloatingNewRunButton({ onClick }: { onClick: () => void }) {
       title="Lancer un nouveau tournoi"
       className="
         fixed z-30 group
-        top-[max(env(safe-area-inset-top),32px)]
-        right-[max(env(safe-area-inset-right),12px)]
+        top-[max(var(--sai-top),32px)]
+        right-[max(var(--sai-right),12px)]
         md:top-3
         md:right-3
         h-11 px-4 rounded-2xl

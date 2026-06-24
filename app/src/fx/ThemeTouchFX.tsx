@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { menuFxSuppressed } from "./menuFx";
+import { useGfxAllows } from "../graphics/graphicsQuality";
 
 /**
  * ThemeTouchFX — a light, theme-coloured particle trail that follows the
@@ -37,9 +38,10 @@ function hexToRgb(v: string): [number, number, number] {
 
 export function ThemeTouchFX({ enabled }: { enabled: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const gfxOn = useGfxAllows("menuParticles"); // 'low' → inerte (pas de canvas/rAF/pointeur)
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !gfxOn) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -167,9 +169,9 @@ export function ThemeTouchFX({ enabled }: { enabled: boolean }) {
       window.removeEventListener("pointercancel", onCancel);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [enabled]);
+  }, [enabled, gfxOn]);
 
-  if (!enabled) return null;
+  if (!enabled || !gfxOn) return null;
   return (
     <canvas
       ref={canvasRef}

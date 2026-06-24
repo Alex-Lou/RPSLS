@@ -68,7 +68,7 @@ export function DailyChallengesPanel({
       <div className="flex items-stretch gap-2">
         {/* Burger themed PARTAGÉ (ui/ModeLobbyShell) — même composant que les
          *  lobbies de mode, zéro redondance. */}
-        <InlineBurger className="md:hidden w-12" />
+        <InlineBurger className="portrait:min-[900px]:hidden w-12" />
         <motion.button
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}

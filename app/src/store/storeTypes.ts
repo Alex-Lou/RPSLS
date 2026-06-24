@@ -21,7 +21,7 @@ export interface AppState {
   locale: Locale;
   serverConfig: ServerConfig;
 
-  updateProfile: (patch: Partial<Pick<Player, "nickname" | "avatar" | "themeId" | "padId" | "difficulty" | "hapticEnabled" | "hapticIntensity" | "backgroundId" | "crashReports" | "fontScale" | "customBgUrl" | "customPadUrl" | "customBgs" | "customPads" | "padChosen" | "premiumIntensity">>) => void;
+  updateProfile: (patch: Partial<Pick<Player, "nickname" | "avatar" | "themeId" | "padId" | "difficulty" | "hapticEnabled" | "hapticIntensity" | "backgroundId" | "crashReports" | "fontScale" | "customBgUrl" | "customPadUrl" | "customBgs" | "customPads" | "padChosen" | "premiumIntensity" | "graphicsQuality" | "graphicsMeasured">>) => void;
   recordMatch: (m: MatchRecord) => void;
   /** Grant a flat XP bonus (e.g. tournament placement reward). */
   grantXp: (amount: number) => void;
@@ -40,6 +40,8 @@ export interface AppState {
   unlockCard: (id: string) => void;
   setRankedDeck: (deck: string[]) => void;
   setArenaDeck: (deck: string[]) => void;
+  /** Sauvegarde le deck signature ÉDITÉ d'une Voie (Constellation Pro). */
+  setArenaVoieDeck: (voie: Move, deck: string[]) => void;
   /** Record a finished Constellation Pro (arena) match — increments the
    *  appropriate field of player.arenaStats. The sync subscriber pushes
    *  the change to the cloud via the existing playerSync pipeline. */

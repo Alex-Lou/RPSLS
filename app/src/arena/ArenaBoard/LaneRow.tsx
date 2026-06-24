@@ -6,7 +6,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { ArenaLaneSlot } from "../ArenaLaneSlot";
-import { MoveAttackCue } from "../ArenaCreatureFX";
+import { MoveAttackCue } from "../ArenaMoveAttackCue";
 import { CardSlot } from "../../ranked/CardSlot";
 import type { BoardState, LaneIndex, Side, TurnIntent } from "../arenaTypes";
 
@@ -57,7 +57,7 @@ export function LaneRow({
     return !!c && (c.move === "paper" || c.move === "spock");
   });
   return (
-    <div className="grid grid-cols-3 gap-2 sm:gap-3 max-w-md mx-auto w-full [@media(max-height:560px)]:gap-1.5">
+    <div className="grid grid-cols-3 gap-2 sm:gap-3 max-w-md landscape:max-w-2xl mx-auto w-full [@media(max-height:560px)]:gap-1.5">
       {/* Cases lanes : taille INCHANGÉE (Alex 2026-06-11 "agrandir SEULEMENT le
        *  pad qui les contient, pas les cases mêmes"). max-w-md=448px ignoré
        *  sur mobile 380px → cases prennent ce qui est dispo, comme au build
@@ -67,6 +67,10 @@ export function LaneRow({
         const c = lanes[lane][renderSide];
         const plannedSummon = intent?.summons.find((s) => s.lane === lane) ?? null;
         const inCombat = combatLane === lane;
+        // SPOTLIGHT (Alex 2026-06-23 « je m'y perds, focus ») : pendant le combat
+        // d'UNE lane, les 2 autres s'éteignent (opacité ↓ + désaturées) → l'œil
+        // sait exactement où regarder. Un seul échange à la fois, vraiment.
+        const dimmed = combatLane !== null && !inCombat;
         // chargeAttack = seul l'ATTAQUANT du camp charge (anti-mush). Le halo de
         // lane + le padShake gardent `inCombat` (toute la lane s'allume).
         const charges = inCombat && combatChargers.includes(renderSide);
@@ -84,9 +88,19 @@ export function LaneRow({
         return (
           <div
             key={i}
-            className="relative"
+            // PAYSAGE (Alex 2026-06-22) : la rangée s'élargit (max-w-2xl) pour
+            // ÉTALER les 3 lanes et tuer le vide latéral, MAIS chaque case est
+            // PLAFONNÉE à sa taille naturelle (207px = ce que donnait max-w-xl à
+            // 1rem=18px fixe) et centrée dans sa colonne → les cartes NE
+            // GROSSISSENT PAS (piège « cases géantes »), elles s'écartent juste.
+            className="relative landscape:w-full landscape:max-w-[207px] landscape:justify-self-center"
             data-arena-lane={lane}
             data-arena-side={renderSide}
+            style={{
+              opacity: dimmed ? 0.3 : 1,
+              filter: dimmed ? "saturate(0.45) brightness(0.7)" : "none",
+              transition: "opacity 0.4s ease, filter 0.4s ease",
+            }}
           >
             {/* COMBAT HALO — golden pulsing ring around the lane slot during
              *  its combat tick. Plays in sync with the per-creature charge
@@ -96,20 +110,15 @@ export function LaneRow({
                 <motion.div
                   key={"halo-" + i}
                   aria-hidden
+                  // PERF (Alex 2026-06-23) : box-shadow STATIQUE (style) + on
+                  // n'anime que opacity/scale (GPU-composité). Avant : 5 keyframes
+                  // de box-shadow-blur = re-rasterisation par frame sur la lane active.
                   initial={{ opacity: 0, scale: 1 }}
-                  animate={{
-                    opacity: [0, 0.85, 0.6, 0.85, 0],
-                    boxShadow: [
-                      "0 0 0 0 rgba(252,211,77,0)",
-                      "0 0 22px 5px rgba(252,211,77,0.7), inset 0 0 0 2px rgba(252,211,77,0.55)",
-                      "0 0 16px 4px rgba(252,211,77,0.5), inset 0 0 0 2px rgba(252,211,77,0.4)",
-                      "0 0 28px 8px rgba(252,211,77,0.85), inset 0 0 0 3px rgba(252,211,77,0.7)",
-                      "0 0 0 0 rgba(252,211,77,0)",
-                    ],
-                  }}
+                  animate={{ opacity: [0, 0.9, 0.55, 0.9, 0], scale: [1, 1.03, 1.01, 1.04, 1] }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 1.1, ease: "easeInOut" }}
                   className="absolute -inset-1 rounded-xl pointer-events-none z-[3]"
+                  style={{ boxShadow: "0 0 24px 6px rgba(252,211,77,0.75), inset 0 0 0 2px rgba(252,211,77,0.6)" }}
                 />
               )}
             </AnimatePresence>

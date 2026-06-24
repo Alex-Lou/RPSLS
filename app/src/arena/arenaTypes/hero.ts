@@ -36,32 +36,25 @@ export interface HeroState {
   hp: number;
   maxHp: number;
   affinity?: import("../../engine/game").Move;
-  /** Aegis : lock 1×/match RETIRÉ (Alex 2026-06-11). Le champ reste optional
-   *  pour la back-compat des saves persistées ; jamais set ni lu côté code
-   *  vivant. À nettoyer du save schema dans une migration future. */
-  aegisCastThisMatch?: boolean;
-  /** Alex feedback D 2026-06-09 : "récompenser l'agression" → si ce hero
-   *  a tué une créature opp ce tour, il pioche +1 carte bonus au prochain
-   *  tour. Set à true dans resolveLaneCombat quand une mort est causée,
-   *  reset à false au début du tour suivant après la pioche bonus. */
-  killBonusPending?: boolean;
   /** FATIGUE (Alex 2026-06-17 rethink Phase 1) : nombre de tours où ce héros a
    *  pioché alors que son deck était SEC (vide). Chaque tour à sec inflige
    *  `fatigueStacks` PV de dégât (1, 2, 3…) → horloge léthale qui FORCE la fin
    *  quand les cartes s'épuisent (fini le point mort RPSLS prévisible). 0/absent
    *  tant que le deck a des cartes. Match-local, jamais persisté. */
   fatigueStacks?: number;
-  /** Lot C — Constellation 3⭐ : compteur cumulé de summons d'Affinité.
-   *  Chaque fois que le hero pose son symbole d'Affinité, on incrémente.
-   *  À 3 / 3, la constellation est complète → le Finisher se débloque
-   *  (Lot D injecte la carte Finisher dans la main). Persiste tout le
-   *  match (pas de reset). 0 si pas d'affinité choisie ou si aucune
-   *  Affinité-summon faite jusqu'ici. Cap visuel à 3 mais la valeur
-   *  peut dépasser — le Finisher est unique, déclencher 1× par match. */
-  constellationCount: number;
+  /** ENGINES de Voie (Alex 2026-06-23, pivot « Voie globale ») — un compteur héros
+   *  par Voie qui monte sur la partie et booste tout le camp (cf. arenaEngines).
+   *  Persistent tout le match, capés, 0 au boardInit. Montagne = pas de compteur
+   *  héros (les Strates vivent sur les créatures via voieAtkBonus). */
+  rockStack?: number;    // 🪨 Montagne — jauge vers Forteresse (boost = Strates sur les Pierres)
+  seveStack?: number;    // 🌿 Forêt — régén héros/tour (cap 3)
+  trancheStack?: number; // ✂️ Tranchant — +ATK global au camp (cap 3)
+  mirageStack?: number;  // 🦎 Mirage — +Esquive au summon des Lézards (cap 3)
+  cosmosCount?: number;  // 🖖 Cosmos — chip inévitable/tour (cap 3)
   /** Lot C — flag "Finisher déjà débloqué", évite de redéclencher l'effet
-   *  d'unlock à chaque tour une fois passé 3 ⭐. Set à true au moment où
-   *  constellationCount atteint 3 pour la 1ère fois. */
+   *  d'unlock à chaque tour une fois la jauge d'engine pleine. Set à true au
+   *  moment où engineMaxed(hero) devient vrai pour la 1ère fois (cf. resolver
+   *  .refreshConstellation). */
   finisherUnlocked?: boolean;
   /** Lot D — Finisher déjà cast ce match (1× par match max). La carte
    *  Finisher est injectée dans la main à 3⭐ ; après usage elle est

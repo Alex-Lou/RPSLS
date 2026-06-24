@@ -52,3 +52,42 @@ export const VOIE_DEF: Record<Move, VoieDef> = {
     icon: `${ICON_DIR}/voie-cosmos.png`, finisher: "finisher-calcul",
   },
 };
+
+/** DECK SIGNATURE par Voie (Constellation Pro, Alex 2026-06-22 « decks spéciaux »).
+ *  Si une Voie a une entrée ici, CHOISIR cette Voie DÉTERMINE le deck du joueur :
+ *  buildPlayerDeck remplace le deck sauvegardé par cette liste → fini « n'importe
+ *  quelle carte ». Chaque carte est ensuite étendue en copies-par-rareté au build.
+ *  Pilote = MONTAGNE ; les autres Voies (absentes) gardent le deck-building libre
+ *  actuel. Réversible : retirer l'entrée = retour au libre. Cf. VOIE-ARCHETYPES.md. */
+export const SIGNATURE_DECK: Partial<Record<Move, CardId[]>> = {
+  rock: [
+    "anchor", "jet-caillou", "eboulement",   // défense + removal précoce / AOE
+    "rempart", "contrefort", "strate-vive",  // mur + bouclier + escalade ATK
+    "veine-gaia", "gardien-pierre",          // sustain + verrou tardif (riposte/ancre)
+    "eboulis-final",                         // DÉGÂTS signature (= Pierres × 2 + Strates)
+  ],
+  lizard: [
+    "mascarade", "reflet-echo", "echappee",          // tempo / cycle / fuite
+    "mirror", "mascarade-enchainee", "fuite-masquee", // copie + montée d'Esquive
+    "prescience", "tide",                            // pioche + poussée tempo (neutres)
+    "coup-dans-lombre",                              // DÉGÂTS signature (= charges d'Esquive, imblocable)
+  ],
+  scissors: [
+    "precision", "surge", "surcharge",          // burst ATK précoce
+    "coup-de-taille", "acuite", "frenesie",     // perforation + re-affûtage + frénésie
+    "riposte", "double-mot",                    // punition + doublement d'ATK (le finisher
+    "taillade-mortelle",                        // DÉGÂTS signature (burst brut, légendaire auto-exilée)
+  ],                                            // Lame est injecté en main à 3⭐, PAS deckable)
+  paper: [
+    "seve", "second-wind", "sangsue",            // soin créature + sustain héros + vol de vie
+    "rempart", "ramure", "phenix",               // mur PV + bouclier vivant + renaissance
+    "photosynthese", "ronces",                   // régen+ATK perm + représailles épineuses
+    "drain-vital",                               // DÉGÂTS signature (drain : 4 dmg + 4 PV à toi)
+  ],                                             // (Verger éternel injecté à 3⭐, PAS deckable)
+  spock: [
+    "dilatation-temporelle", "sablier", "offre",  // ramp bas → ce-tour → permanent
+    "chronomancien", "augur", "loi-de-causalite", // burst tempo + lecture de main + stase
+    "trou-noir", "convergence-cosmique",          // removal froid + inévitabilité-éco
+    "intrication-quantique",                      // DÉGÂTS signature (= mes Spock, +1 si ≥2)
+  ],                                              // (Grand Calcul injecté à 3⭐, PAS deckable)
+};

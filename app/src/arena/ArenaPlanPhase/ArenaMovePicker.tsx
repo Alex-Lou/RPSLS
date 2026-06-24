@@ -24,7 +24,7 @@ export function ArenaMovePicker({
   commitDragDrop: (point: { x: number; y: number }, current: ArenaTargeting) => boolean;
 }) {
   return (
-    <div className="grid grid-cols-5 gap-1 sm:gap-1.5 max-w-md mx-auto w-full">
+    <div className="grid grid-cols-5 gap-1 sm:gap-1.5 max-w-md mx-auto w-full landscape:w-[340px] landscape:max-w-none landscape:mx-0 landscape:shrink-0">
       {MOVES.map((mv) => {
         const pal = MOVE_PALETTE[mv];
         const cannotAfford = manaLeft < 1;

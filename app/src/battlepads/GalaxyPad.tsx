@@ -113,7 +113,7 @@ export function GalaxyPad({ compact = false, ...props }: React.SVGProps<SVGSVGEl
           <animate attributeName="opacity" values="0.45;0.62;0.45" dur="4.6s" repeatCount="indefinite" />
         </circle>
         {/* Tiny core pinprick — keeps a focal point without flooding light. */}
-        <circle r="5" fill="#fde68a" fillOpacity="0.55" />
+        <circle r="8" fill="#fde68a" fillOpacity="0.55" />
       </g>
 
       {/* Frame */}
@@ -122,7 +122,7 @@ export function GalaxyPad({ compact = false, ...props }: React.SVGProps<SVGSVGEl
 
       {/* Title */}
       <g transform={`translate(${W / 2} 116)`} textAnchor="middle">
-        <text fontFamily='"Inter",sans-serif' fontWeight="600" fontSize="22" fill="#e9d5ff" fillOpacity="0.7" letterSpacing="14">
+        <text fontFamily='"Inter",sans-serif' fontWeight="600" fontSize="35" fill="#e9d5ff" fillOpacity="0.7" letterSpacing="14">
           SPIRAL ARENA
         </text>
       </g>

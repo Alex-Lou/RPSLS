@@ -132,7 +132,7 @@ export function NebulaPad({ compact = false, ...props }: React.SVGProps<SVGSVGEl
         { x: 880, y: 780, s: 12 },
         { x: 200, y: 680, s: 9 },
       ].map((star, i) => (
-        <g key={i} transform={`translate(${star.x} ${star.y})`}>
+        <g key={i} transform={`translate(${star.x} ${star.y}) scale(1.6)`}>
           <line x1={-star.s} y1="0" x2={star.s} y2="0"
                 stroke="#fff" strokeWidth="0.8" strokeOpacity="0.6" />
           <line x1="0" y1={-star.s} x2="0" y2={star.s}

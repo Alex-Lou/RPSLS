@@ -108,19 +108,19 @@ export function NeonPad({ compact = false, ...props }: React.SVGProps<SVGSVGElem
       {/* Title */}
       <g transform={`translate(${W / 2} 120)`} textAnchor="middle">
         <text fontFamily='"Inter",sans-serif' fontWeight="800"
-              fontSize="36" letterSpacing="14"
+              fontSize="58" letterSpacing="14"
               fill="#ff3df7" filter="url(#neon-glow)">ARCADE</text>
         <text fontFamily='"Inter",sans-serif' fontWeight="800"
-              fontSize="36" letterSpacing="14"
+              fontSize="58" letterSpacing="14"
               fill="#ff3df7">ARCADE</text>
-        <text y="32" fontFamily='"Inter",sans-serif' fontWeight="600"
-              fontSize="12" letterSpacing="8" fill="#22d3ee" fillOpacity="0.7">// PRESS START</text>
+        <text y="44" fontFamily='"Inter",sans-serif' fontWeight="600"
+              fontSize="19" letterSpacing="8" fill="#22d3ee" fillOpacity="0.7">// PRESS START</text>
       </g>
 
       {/* HUD-style "credits" in corners */}
       <g fontFamily='"JetBrains Mono",monospace' fill="#22d3ee" fillOpacity="0.7">
-        <text x="100" y={H - 70} fontSize="13">CR: ∞</text>
-        <text x={W - 200} y={H - 70} fontSize="13">HI: 999,999</text>
+        <text x="100" y={H - 70} fontSize="21">CR: ∞</text>
+        <text x={W - 260} y={H - 70} fontSize="21">HI: 999,999</text>
       </g>
     </svg>
   );

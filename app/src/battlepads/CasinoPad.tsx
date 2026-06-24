@@ -89,7 +89,7 @@ export function CasinoPad({ compact = false, ...props }: React.SVGProps<SVGSVGEl
       ))}
 
       {/* ── Roulette wheel — top-left, slow continuous spin ── */}
-      <g transform="translate(290 290)">
+      <g transform="translate(290 290) scale(1.6)">
         <g>
           <animateTransform attributeName="transform" type="rotate"
             from="0" to="360" dur={compact ? "32s" : "20s"} repeatCount="indefinite" />
@@ -138,7 +138,7 @@ export function CasinoPad({ compact = false, ...props }: React.SVGProps<SVGSVGEl
       </g>
 
       {/* ── Fanned playing cards — top-right ── */}
-      <g transform="translate(1200 290)">
+      <g transform="translate(1200 290) scale(1.6)">
         {[-18, -6, 6, 18].map((deg, idx) => (
           <g key={idx} transform={`rotate(${deg})`}>
             <rect x="-50" y="-80" width="100" height="148" rx="10"
@@ -178,7 +178,7 @@ export function CasinoPad({ compact = false, ...props }: React.SVGProps<SVGSVGEl
       </g>
 
       {/* ── Chip stack — bottom-left, gentle bounce ── */}
-      <g transform="translate(280 770)">
+      <g transform="translate(280 770) scale(1.6)">
         <g>
           {!compact && (
             <animateTransform attributeName="transform" type="translate"
@@ -214,7 +214,7 @@ export function CasinoPad({ compact = false, ...props }: React.SVGProps<SVGSVGEl
       </g>
 
       {/* ── Diamond accent — bottom-right, slow twinkle ── */}
-      <g transform="translate(1220 780)">
+      <g transform="translate(1220 780) scale(1.6)">
         <g>
           <animateTransform attributeName="transform" type="rotate"
             values="-6;6;-6" dur="6s" repeatCount="indefinite" />

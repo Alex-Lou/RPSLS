@@ -12,13 +12,30 @@ import { type TargetAndTransition } from "motion/react";
  */
 export function creatureReactAnim(args: {
   chargeAttack: boolean;
+  dodgedHit: { key: number } | null;
   hitShake: { key: number } | null;
   debuffPulse: { key: number } | null;
   healFlash: { n: number; key: number } | null;
   buffPulse: { key: number } | null;
   isPlayer: boolean;
 }): TargetAndTransition {
-  const { chargeAttack, hitShake, debuffPulse, healFlash, buffPulse, isPlayer } = args;
+  const { chargeAttack, dodgedHit, hitShake, debuffPulse, healFlash, buffPulse, isPlayer } = args;
+  // ESQUIVE (Lézard / Voie Mirage) — le corps DÉTALE latéralement : flicker de
+  // désync → arrachage net ~22px → settle spring, avec un dip vertical (il
+  // s'efface vers le haut), un lean dans le sens de la glisse, et un apex
+  // brightness 2.1 = PHASE-SHIFT (le corps se délave l'instant où l'attaque le
+  // traverse). dir = isPlayer ? droite : gauche (symétrique, lisible des 2 camps).
+  // JAMAIS d'opacity sur le corps (casserait badges/PV) ; brightness fait le verre.
+  // Une esquive ne déclenche jamais hitShake (hp inchangé) → priorité juste sous
+  // chargeAttack. 100% transform + brightness (composité GPU, zéro raster).
+  const dir = isPlayer ? 1 : -1;
+  const dodgeAnim = {
+    x: [0, dir * 3, dir * 22, dir * 20, dir * 6, 0],
+    y: [0, -3, -7, -5, -1, 0],
+    scale: [1, 0.99, 0.93, 0.96, 1.02, 1],
+    rotate: [0, dir * -2, dir * -7, dir * -5, dir * 1, 0],
+    filter: ["brightness(1)", "brightness(1.5)", "brightness(2.1)", "brightness(1.4)", "brightness(1.08)", "brightness(1)"],
+  };
   // CHARGE animation — SLAM-style: wind-up → 60px lunge crossing the lane
   // midline → recoil from the impact → snap back. Adds rotate for weight,
   // brightness apex 1.85 + drop-shadow doré 22px so the creature looks
@@ -30,33 +47,24 @@ export function creatureReactAnim(args: {
     x: [0, 0, -6, 8, -5, 0],
     scale: [1, 1.1, 1.42, 1.28, 1.06, 1],
     rotate: isPlayer ? [0, -3, -7, -4, 1, 0] : [0, 3, 7, 4, -1, 0],
-    filter: [
-      "brightness(1) drop-shadow(0 0 0 transparent)",
-      "brightness(1.3) drop-shadow(0 0 9px rgba(252,211,77,0.6))",
-      "brightness(2.1) drop-shadow(0 0 28px rgba(252,211,77,1))",
-      "brightness(1.5) drop-shadow(0 0 16px rgba(252,211,77,0.85))",
-      "brightness(1.12) drop-shadow(0 0 5px rgba(252,211,77,0.4))",
-      "brightness(1) drop-shadow(0 0 0 transparent)",
-    ],
+    // PERF (Alex 2026-06-23 « saccadé ») : lueur gardée via `brightness` (filtre
+    // GPU-composité, gratuit) ; `drop-shadow` animé RETIRÉ (son rayon de flou se
+    // re-rasterise chaque frame sur CHAQUE attaquant = la saccade). L'impact reste
+    // porté par les overlays burst/shockwave/sparks (transform/opacity).
+    filter: ["brightness(1)", "brightness(1.3)", "brightness(2.1)", "brightness(1.5)", "brightness(1.12)", "brightness(1)"],
   };
-  const idleAnim = { y: 0, x: 0, scale: 1, rotate: 0, filter: "brightness(1) drop-shadow(0 0 0 transparent)" };
+  const idleAnim = { y: 0, x: 0, scale: 1, rotate: 0, filter: "brightness(1)" };
   return chargeAttack
     ? chargeAnim
+    : dodgedHit
+    ? dodgeAnim
     : hitShake
     ? {
         x: [0, -8, 9, -7, 5, -2, 0],
         y: isPlayer ? [0, 5, 0, 3, 0, 0, 0] : [0, -5, 0, -3, 0, 0, 0],
         scale: [1, 0.92, 1.04, 0.97, 1.01, 1, 1],
         rotate: [0, -4, 4, -2, 1, 0, 0],
-        filter: [
-          "brightness(1) drop-shadow(0 0 0 transparent)",
-          "brightness(1.85) drop-shadow(0 0 12px rgba(244,63,94,0.95))",
-          "brightness(0.8)",
-          "brightness(1.35) drop-shadow(0 0 7px rgba(244,63,94,0.6))",
-          "brightness(1) drop-shadow(0 0 0 transparent)",
-          "brightness(1) drop-shadow(0 0 0 transparent)",
-          "brightness(1) drop-shadow(0 0 0 transparent)",
-        ],
+        filter: ["brightness(1)", "brightness(1.85)", "brightness(0.8)", "brightness(1.35)", "brightness(1)", "brightness(1)", "brightness(1)"],
       }
     : debuffPulse
     ? {
@@ -65,12 +73,7 @@ export function creatureReactAnim(args: {
         y: isPlayer ? 3 : -3, x: 0,
         scale: [1, 0.88, 0.96, 1],
         rotate: [0, 2, -1, 0],
-        filter: [
-          "brightness(1) drop-shadow(0 0 0 transparent)",
-          "brightness(0.65) drop-shadow(0 0 10px rgba(139,92,246,0.85))",
-          "brightness(0.85) drop-shadow(0 0 6px rgba(139,92,246,0.5))",
-          "brightness(1) drop-shadow(0 0 0 transparent)",
-        ],
+        filter: ["brightness(1)", "brightness(0.65)", "brightness(0.85)", "brightness(1)"],
       }
     : healFlash
     ? {
@@ -78,23 +81,14 @@ export function creatureReactAnim(args: {
         y: 0, x: 0,
         scale: [1, 1.08, 1],
         rotate: 0,
-        filter: [
-          "brightness(1) drop-shadow(0 0 0 transparent)",
-          "brightness(1.35) drop-shadow(0 0 16px rgba(52,211,153,0.95))",
-          "brightness(1) drop-shadow(0 0 0 transparent)",
-        ],
+        filter: ["brightness(1)", "brightness(1.35)", "brightness(1)"],
       }
     : buffPulse
     ? {
         y: 0, x: 0,
         scale: [1, 1.18, 1.05, 1],
         rotate: [0, -2, 2, 0],
-        filter: [
-          "brightness(1) drop-shadow(0 0 0 transparent)",
-          "brightness(1.55) drop-shadow(0 0 14px rgba(52,211,153,0.9))",
-          "brightness(1.18) drop-shadow(0 0 7px rgba(252,211,77,0.6))",
-          "brightness(1) drop-shadow(0 0 0 transparent)",
-        ],
+        filter: ["brightness(1)", "brightness(1.55)", "brightness(1.18)", "brightness(1)"],
       }
     : idleAnim;
 }

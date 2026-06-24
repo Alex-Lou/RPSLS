@@ -49,8 +49,6 @@ export function makeCreature(move: Move, side: Side, affinity?: Move): Creature 
     ripostePrimed: false,
     // Innate RPSLS passives — one per symbol, tied to RPSLS identity.
     taunt:       move === "rock",     // 🛡 Provocation
-    stifles:     move === "paper",    // 🌿 Étouffe (UI badge only — actual
-                                       //   check uses move === "paper" || "spock")
     pierces:     move === "scissors", // ⚔ Tranchant
     pierceUsed:  false,                // Tranchant : 1 charge (consume au 1er bypass Aegis)
     dodgeCharges,                      // ✨ Esquive (Lézard 1 ou 2 charges)
@@ -118,7 +116,7 @@ export function healCreature(c: Creature, amount: number): Creature {
 
 /** A creature's "per-turn" buffs (atkBuff, anchored, riposte) reset at the
  *  END of the turn so they don't snowball forever. Persistent damage stays.
- *  Innate passives (taunt, stifles, pierces, spellImmune) and consumed
+ *  Innate passives (taunt, pierces, spellImmune) and consumed
  *  resources (dodgeCharges, combatBlunted) persist across turns.
  *  - divineShield: persists across turns until consumed by damage.
  *  - summonedThisTurn: cleared (the "Lente/Lent" malus only bites turn 1).
@@ -142,7 +140,7 @@ export function gainStrateIfHeld(c: Creature, ownerAffinity: Move | undefined, w
   return { ...c, voieAtkBonus: c.voieAtkBonus + 1 };
 }
 
-export function endOfTurnReset(c: Creature, vergerActive = false): Creature {
+export function endOfTurnReset(c: Creature, vergerActive = false, trancheBonus = 0): Creature {
   // Lot B Round 8 — Voie Feuille slow wilt (Fanaison ÷ 2) :
   //   voieFeuille=true + wiltSkipNext=true  → SKIP wilt ce tour, flip à false
   //   voieFeuille=true + wiltSkipNext=false → wilt + flip à true (skip prochain)
@@ -166,7 +164,10 @@ export function endOfTurnReset(c: Creature, vergerActive = false): Creature {
   }
   return {
     ...c,
-    atkBuff: 0,
+    // TRANCHE (engine Tranchant) : atkBuff repart non pas à 0 mais au bonus GLOBAL
+    // de la jauge Tranche du propriétaire (re-appliqué chaque tour → +ATK à TOUT le
+    // camp, peu importe le symbole). 0 hors Tranchant. Additif aux buffs du tour.
+    atkBuff: trancheBonus,
     anchored: false,
     ripostePrimed: false,
     cannotAttack: false, // Toile Gluante expire en fin de tour

@@ -34,6 +34,20 @@ export type CardId =
   | "permutation" | "toile-gluante" | "reverberation"                    // rares (2)
   | "gravite" | "doppelganger" | "purge"                                 // epics (3)
   | "roue-destin" | "phenix" | "singularite"                            // legendaries (4-5)
+  // ── Voie MONTAGNE — cartes signature (Arena 2026-06-22) ──
+  | "eboulement" | "contrefort" | "strate-vive"                         // common / rare / rare
+  | "gardien-pierre" | "veine-gaia"                                     // rare / epic
+  // ── Voie MIRAGE — cartes signature (Arena 2026-06-22) ──
+  | "reflet-echo" | "mascarade-enchainee" | "fuite-masquee"             // common / rare / rare
+  // ── Voie TRANCHANT — cartes signature (Arena 2026-06-22) ──
+  | "coup-de-taille" | "acuite" | "frenesie"                            // rare / rare / rare
+  // ── Voie FORÊT — cartes signature (Arena 2026-06-23) ──
+  | "ramure" | "photosynthese" | "ronces"                               // rare / rare / common
+  // ── Voie COSMOS — cartes signature (Arena 2026-06-23) ──
+  | "dilatation-temporelle" | "loi-de-causalite" | "convergence-cosmique" // common / rare / epic
+  // ── Cartes de DÉGÂTS signature par Voie (Arena 2026-06-23) ──
+  | "eboulis-final" | "drain-vital" | "coup-dans-lombre"                 // rock epic / paper rare / lizard epic
+  | "intrication-quantique" | "taillade-mortelle"                        // spock rare / scissors legendary
   // ── Outils de Forge (Arena 2026-06-13) ──
   | "razzia"                                                             // legendary (2) — vol de la forge adverse
   // ── Arts orphelins câblés (Arena 2026-06-13) — 6 cartes ──

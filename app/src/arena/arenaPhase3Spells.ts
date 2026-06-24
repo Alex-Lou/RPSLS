@@ -22,6 +22,7 @@ import {
 } from "./arenaSpellHelpers";
 import { MANA_CAP, type BoardState, type Creature, type LaneIndex, type LaneState, type PlayedSpell, type Side } from "./arenaTypes";
 import { CARDS } from "../ranked/cards";
+import { STRATE_CAP } from "./arenaRules/heroCreature";
 import { alog } from "./arenaLog";
 
 /** Jet de Caillou — 2 dégâts à une créature adverse. Bloqué par Ancre/Logique. */
@@ -33,6 +34,160 @@ export function applyJetCaillou(board: BoardState, side: Side, spell: PlayedSpel
     return board;
   }
   return withOppCreatureOnLane(board, side, spell.lane, damageCreature(opp, 2));
+}
+
+/** Éboulement (Montagne) — AOE défensif : 2 dégâts à la créature adverse ciblée
+ *  + 1 dégât aux créatures adverses des lanes VOISINES. Chaque cible respecte
+ *  Ancre/Logique (skip silencieux), comme Jet de Caillou. */
+export function applyEboulement(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
+  if (spell.kind !== "lane") return board;
+  const lanes: LaneIndex[] = [spell.lane];
+  if (spell.lane - 1 >= 0) lanes.push((spell.lane - 1) as LaneIndex);
+  if (spell.lane + 1 <= 2) lanes.push((spell.lane + 1) as LaneIndex);
+  let b = board;
+  for (const l of lanes) {
+    const dmg = l === spell.lane ? 2 : 1;
+    const opp = getOppCreatureOnLane(b, side, l);
+    if (!opp || opp.anchored || opp.spellImmune) continue;
+    b = withOppCreatureOnLane(b, side, l, damageCreature(opp, dmg));
+  }
+  alog("spell", `${side} ÉBOULEMENT L${spell.lane} → 2 dmg cible + 1 aux lanes voisines`);
+  return b;
+}
+
+/** Strate Vive (Montagne) — ma Pierre ciblée gagne IMMÉDIATEMENT +1 Strate
+ *  (voieAtkBonus, le MÊME champ que le gain passif gainStrateIfHeld, clampé
+ *  STRATE_CAP). Rock-only : fizzle sur une non-Pierre. */
+export function applyStrateVive(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
+  if (spell.kind !== "lane") return board;
+  const me = getMyCreatureOnLane(board, side, spell.lane);
+  if (!me || me.move !== "rock") {
+    alog("spell", `💤 ${side} Strate Vive L${spell.lane} ne fait rien : pas de Pierre à toi sur cette lane.`);
+    return board;
+  }
+  return withMyCreatureOnLane(board, side, spell.lane, {
+    ...me, voieAtkBonus: Math.min(STRATE_CAP, me.voieAtkBonus + 1),
+  });
+}
+
+/** Gardien de Pierre (Montagne) — ma Pierre ciblée gagne Riposte (tue son tueur
+ *  en combat) ET Ancre (immunisée aux sorts ce tour). PAS de recharge de
+ *  Provocation (choix Alex : anti-point-mort). Rock-only. */
+export function applyGardienPierre(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
+  if (spell.kind !== "lane") return board;
+  const me = getMyCreatureOnLane(board, side, spell.lane);
+  if (!me || me.move !== "rock") {
+    alog("spell", `💤 ${side} Gardien de Pierre L${spell.lane} ne fait rien : pas de Pierre à toi sur cette lane.`);
+    return board;
+  }
+  return withMyCreatureOnLane(board, side, spell.lane, { ...me, ripostePrimed: true, anchored: true });
+}
+
+/** Mascarade Enchaînée (Mirage) — mon Lézard ciblé gagne +1 charge d'Esquive
+ *  (cap 3). Peuple la ressource Esquive. Lizard-only : fizzle sinon. */
+export function applyMascaradeEnchainee(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
+  if (spell.kind !== "lane") return board;
+  const me = getMyCreatureOnLane(board, side, spell.lane);
+  if (!me || me.move !== "lizard") {
+    alog("spell", `💤 ${side} Mascarade Enchaînée L${spell.lane} ne fait rien : pas de Lézard à toi sur cette lane.`);
+    return board;
+  }
+  return withMyCreatureOnLane(board, side, spell.lane, { ...me, dodgeCharges: Math.min(3, me.dodgeCharges + 1) });
+}
+
+/** Fuite Masquée (Mirage) — mon Lézard ciblé gagne +2 charges d'Esquive (cap 3)
+ *  mais −1 ATK ce tour (esquive contre tempo). Lizard-only : fizzle sinon. */
+export function applyFuiteMasquee(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
+  if (spell.kind !== "lane") return board;
+  const me = getMyCreatureOnLane(board, side, spell.lane);
+  if (!me || me.move !== "lizard") {
+    alog("spell", `💤 ${side} Fuite Masquée L${spell.lane} ne fait rien : pas de Lézard à toi sur cette lane.`);
+    return board;
+  }
+  return withMyCreatureOnLane(board, side, spell.lane, { ...me, dodgeCharges: Math.min(3, me.dodgeCharges + 2), atkBuff: me.atkBuff - 1 });
+}
+
+/** Coup de Taille (Tranchant) — mon Ciseau ciblé RÉCUPÈRE sa Perforation
+ *  (pierceUsed=false → perce de nouveau le prochain bouclier). Scissors-only. */
+export function applyCoupDeTaille(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
+  if (spell.kind !== "lane") return board;
+  const me = getMyCreatureOnLane(board, side, spell.lane);
+  if (!me || me.move !== "scissors") {
+    alog("spell", `💤 ${side} Coup de Taille L${spell.lane} ne fait rien : pas de Ciseau à toi sur cette lane.`);
+    return board;
+  }
+  return withMyCreatureOnLane(board, side, spell.lane, { ...me, pierceUsed: false });
+}
+
+/** Acuité (Tranchant) — mon Ciseau ciblé annule l'Émoussé (combatBlunted=false)
+ *  ET gagne +1 ATK PERMANENT (voieAtkBonus, cap 2). Re-affûtage. Scissors-only. */
+export function applyAcuite(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
+  if (spell.kind !== "lane") return board;
+  const me = getMyCreatureOnLane(board, side, spell.lane);
+  if (!me || me.move !== "scissors") {
+    alog("spell", `💤 ${side} Acuité L${spell.lane} ne fait rien : pas de Ciseau à toi sur cette lane.`);
+    return board;
+  }
+  return withMyCreatureOnLane(board, side, spell.lane, {
+    ...me, combatBlunted: false, voieAtkBonus: Math.min(2, me.voieAtkBonus + 1),
+  });
+}
+
+/** Photosynthèse (Forêt) — ma créature ciblée régénère +2 PV (cap PV de base,
+ *  sans réduire) ET gagne +1 ATK PERMANENT (voieAtkBonus, le même champ que
+ *  Strate Vive, clampé STRATE_CAP). Croissance végétale, toute créature. */
+export function applyPhotosynthese(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
+  if (spell.kind !== "lane") return board;
+  const me = getMyCreatureOnLane(board, side, spell.lane);
+  if (!me) {
+    alog("spell", `💤 ${side} Photosynthèse L${spell.lane} ne fait rien : pas de créature à toi sur cette lane.`);
+    return board;
+  }
+  const healed = healCreature(me, 2);
+  return withMyCreatureOnLane(board, side, spell.lane, {
+    ...healed, voieAtkBonus: Math.min(STRATE_CAP, healed.voieAtkBonus + 1),
+  });
+}
+
+/** Ronces (Forêt) — ma créature ciblée gagne Riposte (tue son tueur en combat)
+ *  ET un bouclier (divineShield). Représailles épineuses sans verrou (≠ Gardien
+ *  de Pierre qui ancre). Toute créature. */
+export function applyRonces(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
+  if (spell.kind !== "lane") return board;
+  const me = getMyCreatureOnLane(board, side, spell.lane);
+  if (!me) {
+    alog("spell", `💤 ${side} Ronces L${spell.lane} ne fait rien : pas de créature à toi sur cette lane.`);
+    return board;
+  }
+  return withMyCreatureOnLane(board, side, spell.lane, { ...me, ripostePrimed: true, divineShield: true });
+}
+
+/** Loi de Causalité (Cosmos) — STASE : la créature adverse ciblée ne peut pas
+ *  attaquer ce tour. Bloquée par Ancre/Logique (skip silencieux), comme Toile
+ *  Gluante re-thématisée en contrôle cosmique. */
+export function applyLoiCausalite(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
+  if (spell.kind !== "lane") return board;
+  const opp = getOppCreatureOnLane(board, side, spell.lane);
+  if (!opp || opp.anchored || opp.spellImmune) {
+    alog("spell", `💤 ${side} Loi de Causalité L${spell.lane} ne fait rien : cible vide, ancrée ou immunisée (Spock).`);
+    return board;
+  }
+  alog("spell", `${side} LOI DE CAUSALITÉ L${spell.lane} : ${opp.move} figé (ne peut pas attaquer ce tour)`);
+  return withOppCreatureOnLane(board, side, spell.lane, { ...opp, cannotAttack: true });
+}
+
+/** Convergence Cosmique (Cosmos) — dégâts directs au héros adverse égaux à MON
+ *  mana max actuel, PLAFONNÉS à 6 (anti-burst-éco). Récompense le ramp
+ *  Offre/Dilatation/Sablier. Inévitabilité d'éco, distincte de Singularité
+ *  (qui scale sur le nombre de créatures). */
+const CONVERGENCE_DMG_CAP = 6;
+export function applyConvergence(board: BoardState, side: Side): BoardState {
+  const oppS = oppSide(side);
+  const myHero = side === "a" ? board.a : board.b;
+  const oppHero = oppS === "a" ? board.a : board.b;
+  const dmg = Math.min(CONVERGENCE_DMG_CAP, myHero.maxMana);
+  alog("spell", `${side} CONVERGENCE COSMIQUE → ${dmg} dmg héros ${oppS} (= mon mana max, max ${CONVERGENCE_DMG_CAP})`);
+  return withSideHero(board, oppS, damageHero(oppHero, dmg));
 }
 
 /** Sève — +2 PV à une de mes créatures (cap PV de base, sans réduire). */

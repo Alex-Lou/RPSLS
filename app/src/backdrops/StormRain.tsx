@@ -11,6 +11,7 @@
 import { useEffect, useRef } from "react";
 import { menuFxSuppressed } from "../fx/menuFx";
 import { useStore } from "../store/store";
+import { gfxDensity } from "../graphics/graphicsQuality";
 
 interface Drop { x: number; y: number; len: number; speed: number; w: number; a: number }
 interface Splash { x: number; y: number; t: number }
@@ -77,7 +78,9 @@ export function StormRain() {
       // Pseudo-cubic curve: k^1.4 on the low side (so 0.1 -> ~0.04), and
       // linear-ish above 1.0. Branchless via mix(low, high, step).
       const curved = k < 1.0 ? Math.pow(k, 1.6) : k * k * 0.85 + 0.15;
-      const target = Math.max(4, Math.round(baseTarget * curved));
+      // Palier perf (par appareil) : réduit AUSSI le nombre de gouttes
+      // (low=0.45 / medium=0.75 / high=1), en plus de l'intensité joueur.
+      const target = Math.max(4, Math.round(baseTarget * curved * gfxDensity()));
       drops.length = 0;
       for (let i = 0; i < target; i++) drops.push(makeDrop(true));
     };

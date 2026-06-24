@@ -20,6 +20,9 @@ import { CREATURE_STATS, TURN_HARD_CAP, moveCountersMove, type BoardState, type 
 import type { Move } from "../engine/game";
 import type { CardId } from "../ranked/rankedTypes";
 import { alog } from "./arenaLog";
+import { isDominantSpell } from "./arenaFinishers";
+import { spellPriority } from "./arenaCardEffects";
+import { SPELLS_WITH_SIGNATURE } from "./ArenaSpellFX";
 
 /** Snapshot helper — log compact d'une lane avec flags. Réutilise le même
  *  format que advanceToNextTurn pour cohérence à travers le pipeline. */
@@ -44,8 +47,8 @@ function logBoardSnapshot(b: BoardState, tag: string): void {
   // Alex feedback : "ajouter les cartes de chacun dans les logs" → mains
   // visibles côté joueur ET côté CPU pour analyse CCG post-mortem.
   // Format compact : main=[id1,id2,...] deck=N discard=M mana=X/Y.
-  alog("hand", `${tag} a hand=[${b.a.hand.join(",")}] deck=${b.a.deck.length} discard=${b.a.discard.length} mana=${b.a.mana}/${b.a.maxMana}${b.a.killBonusPending ? " +K" : ""}`);
-  alog("hand", `${tag} b hand=[${b.b.hand.join(",")}] deck=${b.b.deck.length} discard=${b.b.discard.length} mana=${b.b.mana}/${b.b.maxMana}${b.b.killBonusPending ? " +K" : ""}`);
+  alog("hand", `${tag} a hand=[${b.a.hand.join(",")}] deck=${b.a.deck.length} discard=${b.a.discard.length} mana=${b.a.mana}/${b.a.maxMana}`);
+  alog("hand", `${tag} b hand=[${b.b.hand.join(",")}] deck=${b.b.deck.length} discard=${b.b.discard.length} mana=${b.b.mana}/${b.b.maxMana}`);
 }
 
 /** Resolver step labels — kept in sync with ArenaBoard's banner switch. */
@@ -98,24 +101,29 @@ export interface ResolverFlowArgs {
   onMatchEnd?: (winnerIsPlayer: boolean) => void;
 }
 
-/** Pacing constants — chosen so a turn caps around 7-8s. */
-export const REVEAL_MS = 1_500;
-export const SPELLS_MS = 1_200;
-export const SUMMONS_MS = 1_000;
+/** Pacing constants — RALENTIES (Alex 2026-06-23 « tout va vite, je m'y perds »).
+ *  Chaque beat doit LANDER avant le suivant. Un tour ≈ 10-11s : on privilégie la
+ *  LISIBILITÉ au tempo (re-tune live en jouant, option 2). */
+export const REVEAL_MS = 1_700;
+export const SPELLS_MS = 1_500;
+export const SUMMONS_MS = 1_300;
 // COMBAT_MS = délai avant le SETTLE, compté depuis le DÉBUT du combat. DOIT être
-// ≥ la durée réelle des 3 lanes re-timées (≈ 3*LANE_CHARGE + 3*LANE_PAUSE + 100
-// ≈ 3220ms) sinon le SETTLE coupe la 3e lane. Audit anim 2026-06-17 : 3000→3600.
-export const COMBAT_MS = 3_600;
+// ≥ l'instant du dernier event visuel des 3 lanes (= 2*(CHARGE+PAUSE+50) + CHARGE
+// + PAUSE ≈ 4060ms avec 720/600) sinon le SETTLE coupe la 3e lane. 3600→4400.
+export const COMBAT_MS = 4_400;
 export const SETTLE_MS = 1_500;
-// Audit anim 2026-06-17 (Build A) — refonte du rythme de combat. Le beat d'une
-// lane DOIT être ≥ la durée de la charge (720ms, CreatureSlot) sinon le slam est
-// COUPÉ à mi-course (~53%) et la lane suivante s'empile par-dessus = le
-// « chevauchement/trop rapide » signalé. 380→560 (l'apex du slam ≈308ms tombe
-// sur LANE_CHARGE_MS*0.55) ; pause inter-lane 200→480 pour que la traîne
-// (dmgPop/hitShake) d'une lane retombe AVANT que la suivante charge. Objectif :
-// un seul échange lisible à la fois.
-const LANE_CHARGE_MS = 560;
-const LANE_PAUSE_MS = 480;
+// Spell-spotlight séquencé (Alex 2026-06-23 « carte à l'avant → anim → dissolution
+// → suivante »). Fenêtre par carte à signature ; un climax (Légendaire/Finisher)
+// dure plus longtemps. ArenaGame.spellFX hold doit être ≥ ces valeurs (1900/2900).
+const CARD_MS = 1_700;
+const DOMINANT_CARD_MS = 2_700;
+// Rythme de combat (Alex 2026-06-23 ralenti + focus). Le beat d'une lane DOIT être
+// ≥ la durée de la charge (CreatureSlot) sinon le slam est coupé. 560→720 (l'apex
+// du slam ≈308ms a le temps de finir) ; pause inter-lane 480→600 pour que la
+// traîne (dmgPop/hitShake) retombe AVANT que la suivante charge. + la lane active
+// est SPOTLIGHT (les 2 autres s'éteignent, cf LaneRow) → un seul échange lisible.
+const LANE_CHARGE_MS = 720;
+const LANE_PAUSE_MS = 600;
 // Alex 2026-06-12 : pause sur le board final (coup fatal + HP à 0 visibles)
 // AVANT d'afficher l'écran victoire/défaite — sinon la bascule est trop brusque
 // juste après le combat de la 3e lane.
@@ -140,6 +148,9 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
   // renvoie un cancel() que ArenaGame appelle au unmount / forfait.
   let aborted = false;
 
+  // Le « moment » Légendaire/Finisher est géré PAR CARTE dans la file de
+  // spell-spotlight (Step 1) — plus besoin d'un flag global de tour.
+
   // ─── Step 0: REVEAL ───
   setOppPreview(cpuIntent);
   setPlayerPreview(playerIntent);
@@ -160,16 +171,31 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
     // rien (diff positive). lane=0 = placeholder (non lu pour un sort).
     if (b.a.hp < startBoard.a.hp) setHeroHit({ side: "you", lane: 0, key: Date.now() });
     if (b.b.hp < startBoard.b.hp) setHeroHit({ side: "opp", lane: 0, key: Date.now() + 1 });
-    // Signatures plein-board (Genèse, Supernova, Trou Noir…) — au moment où les
-    // sorts FONT effet. ArenaSpellFX filtre ceux sans signature. ArenaGame
-    // purge l'état après l'anim (timer nettoyé → pas de fuite).
+    // SPELL-SPOTLIGHT séquencé (Alex 2026-06-23 « carte à l'avant → anim →
+    // dissolution → suivante, sinon ça se mélange »). Le board est déjà appliqué
+    // d'un coup ci-dessus (correctness inchangée) ; ici on rejoue les SIGNATURES
+    // UNE CARTE À LA FOIS, dans l'ordre de RÉSOLUTION (priorité) → ce que le joueur
+    // voit colle à l'ordre où les effets se sont appliqués. spellsPhaseMs = durée
+    // totale de la file → la phase SORTS dure exactement ce qu'il faut (dynamique).
+    const sigQueue = [...playerIntent.spells, ...cpuIntent.spells]
+      .map((s) => s.id)
+      .filter((cardId) => SPELLS_WITH_SIGNATURE.includes(cardId))
+      .sort((x, y) => spellPriority(x) - spellPriority(y));
+    let spellAcc = 0;
+    const fxBaseKey = Date.now();
     if (setSpellFX) {
-      const castIds = [...playerIntent.spells, ...cpuIntent.spells].map((s) => s.id);
-      if (castIds.length > 0) setSpellFX({ ids: castIds, key: Date.now() });
+      sigQueue.forEach((cardId, k) => {
+        const at = spellAcc;
+        spellAcc += isDominantSpell(cardId) ? DOMINANT_CARD_MS : CARD_MS;
+        window.setTimeout(() => {
+          if (aborted) return;
+          setSpellFX({ ids: [cardId], key: fxBaseKey + k });
+        }, at);
+      });
     }
-    // Snapshot post-spells pour traçage (Alex flag : "je peux pas
-    // surveiller assez, faut les logs côté toi"). Voir aussi l'arenaLog
-    // qui consomme ce log via la catégorie state.
+    // Durée de la phase SORTS = file complète, OU une base mini (SPELLS_MS) si
+    // aucune carte à signature (les sorts ciblés réagissent in-slot, pas ici).
+    const spellsPhaseMs = Math.max(SPELLS_MS, spellAcc + 150);
     logBoardSnapshot(b, "post-spells");
 
     // ─── Step 2: SUMMONS ───
@@ -423,7 +449,7 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
           }, SETTLE_MS);
         }, COMBAT_MS);
       }, SUMMONS_MS);
-    }, SPELLS_MS);
+    }, spellsPhaseMs);
   }, REVEAL_MS);
 
   return () => { aborted = true; };

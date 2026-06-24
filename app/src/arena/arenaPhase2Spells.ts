@@ -57,6 +57,71 @@ export function applyRempart(board: BoardState, side: Side): BoardState {
   return { ...board, lanes };
 }
 
+/** Contrefort (Montagne) — +2 PV à toutes mes créatures + BOUCLIER (divineShield)
+ *  à mes Pierres. Spock ignoré (Détaché). Clone défensif de Rempart avec le
+ *  bonus rock. */
+export function applyContrefort(board: BoardState, side: Side): BoardState {
+  const lanes = board.lanes.map((lane) => {
+    const me = side === "a" ? lane.a : lane.b;
+    if (!me || me.move === "spock") return lane;
+    const buffed: Creature = {
+      ...me,
+      hp: me.hp + 2,
+      divineShield: me.move === "rock" ? true : me.divineShield,
+    };
+    return side === "a" ? { ...lane, a: buffed } : { ...lane, b: buffed };
+  }) as [LaneState, LaneState, LaneState];
+  return { ...board, lanes };
+}
+
+/** Veine de Gaïa (Montagne) — soigne mon héros de +2 PV par PIERRE que je
+ *  contrôle (récompense un board défensif établi). 0 Pierre = soin nul. */
+export function applyVeineGaia(board: BoardState, side: Side): BoardState {
+  let rocks = 0;
+  for (const lane of board.lanes) {
+    const me = side === "a" ? lane.a : lane.b;
+    if (me && me.move === "rock") rocks++;
+  }
+  const hero = side === "a" ? board.a : board.b;
+  alog("spell", `${side} VEINE DE GAÏA → +${rocks * 2} PV héros (${rocks} Pierre(s))`);
+  return withSideHero(board, side, healHero(hero, rocks * 2));
+}
+
+/** Frénésie (Tranchant) — tous mes Ciseaux gagnent +2 ATK ce tour (+1 de plus
+ *  s'ils sont émoussés = combatBlunted, récompense l'agressivité continue). */
+export function applyFrenesie(board: BoardState, side: Side): BoardState {
+  const lanes = board.lanes.map((lane) => {
+    const me = side === "a" ? lane.a : lane.b;
+    if (!me || me.move !== "scissors") return lane;
+    const buffed: Creature = { ...me, atkBuff: me.atkBuff + 2 + (me.combatBlunted ? 1 : 0) };
+    return side === "a" ? { ...lane, a: buffed } : { ...lane, b: buffed };
+  }) as [LaneState, LaneState, LaneState];
+  return { ...board, lanes };
+}
+
+/** Ramure (Forêt) — BOUCLIER VIVANT : un divineShield à TOUTES mes créatures
+ *  (absorbe 1 source de dégât chacune). Spock ignoré (Détaché). Aucun PV/ATK
+ *  touché → protection pure, board-wide. */
+export function applyRamure(board: BoardState, side: Side): BoardState {
+  const lanes = board.lanes.map((lane) => {
+    const me = side === "a" ? lane.a : lane.b;
+    if (!me || me.move === "spock") return lane;
+    const buffed: Creature = { ...me, divineShield: true };
+    return side === "a" ? { ...lane, a: buffed } : { ...lane, b: buffed };
+  }) as [LaneState, LaneState, LaneState];
+  alog("spell", `${side} RAMURE → bouclier vivant à toutes mes créatures`);
+  return { ...board, lanes };
+}
+
+/** Dilatation Temporelle (Cosmos) — +1 mana max PERMANENT (cap MANA_CAP) ; le
+ *  mana courant grimpe aussi de +1 (capé au nouveau max) pour être utilisable
+ *  dès ce tour. Ramp léger bas de courbe (clone d'Offre en +1). */
+export function applyDilatation(board: BoardState, side: Side): BoardState {
+  const hero = side === "a" ? board.a : board.b;
+  const newMax = Math.min(MANA_CAP, hero.maxMana + 1);
+  return withSideHero(board, side, { ...hero, maxMana: newMax, mana: Math.min(newMax, hero.mana + 1) });
+}
+
 /** Bénédiction — +1 ATK this turn to ALL my creatures. Spock Détaché skipped. */
 export function applyBenediction(board: BoardState, side: Side): BoardState {
   const lanes = board.lanes.map((lane) => {
@@ -84,6 +149,18 @@ export function applyCascade(board: BoardState, side: Side): BoardState {
     const idx = Math.floor(Math.random() * after.hand.length);
     const droppedHand = [...after.hand.slice(0, idx), ...after.hand.slice(idx + 1)];
     after = { ...after, hand: droppedHand, discard: [...after.discard, after.hand[idx]] };
+  }
+  return withSideHero(board, side, after);
+}
+
+/** Reflet-Écho (Mirage) — cycle : pioche 1 carte puis défausse 1 au hasard. Fait
+ *  tourner une main bloquée (insaisissable). Calqué sur Cascade (draw 3/disc 1). */
+export function applyRefletEcho(board: BoardState, side: Side): BoardState {
+  const hero = side === "a" ? board.a : board.b;
+  let after = drawCards(hero, 1);
+  if (after.hand.length > 0) {
+    const idx = Math.floor(Math.random() * after.hand.length);
+    after = { ...after, hand: [...after.hand.slice(0, idx), ...after.hand.slice(idx + 1)], discard: [...after.discard, after.hand[idx]] };
   }
   return withSideHero(board, side, after);
 }
