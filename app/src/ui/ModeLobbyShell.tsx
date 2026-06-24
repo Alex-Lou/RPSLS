@@ -134,8 +134,16 @@ export function ModeLobbyShell({
       className="flex flex-col flex-1 min-h-0 w-full max-w-lg landscape:max-w-2xl mx-auto px-1 pb-1 gap-2"
     >
       {/* Header — burger | titre centré | retour. Symétrique : les deux
-       *  boutons font 40px, le titre est VRAIMENT centré. */}
-      <div className="shrink-0 flex items-center gap-2 -mt-10">
+       *  boutons font 40px, le titre est VRAIMENT centré.
+       *  SAFE-AREA (Alex 2026-06-24, « items qui chevauchent la barre du haut
+       *  Android ») : le -2.5rem récupère l'espace mort du pt-12 global (burger
+       *  flottant masqué), MAIS on l'offsette par --sai-top → le header ne passe
+       *  jamais sous la barre de statut/notch. Fallback 32px si le pont natif
+       *  Kotlin n'injecte pas --sai-top (≈ hauteur d'une barre de statut). */}
+      <div
+        className="shrink-0 flex items-center gap-2"
+        style={{ marginTop: "calc(var(--sai-top, 32px) - 2.5rem)" }}
+      >
         <InlineBurger />
         <div className="flex-1 min-w-0 text-center">
           <h1
