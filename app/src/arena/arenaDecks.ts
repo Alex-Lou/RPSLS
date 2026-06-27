@@ -47,10 +47,34 @@ export const CPU_ARENA_DECK: CardId[] = [
   "heist", "tide", "oracle", "supernova",
 ];
 
+/** Deck SIGNATURE du CPU (Alex 2026-06-24 « archétype vs archétype ») : le CPU
+ *  joue le MÊME deck signature curé que le joueur pour sa Voie, au lieu d'un pool
+ *  de neutres mirroir-rareté qui lui donnait des cartes HORS-THÈME (ex. trou-noir
+ *  sur un Tranchant). Filtré aux cartes que l'IA sait jouer (cpuCanPlay) → zéro
+ *  carte morte ; étendu en copies-par-rareté + cap légendaires (parité joueur).
+ *  Les neutres restants (supernova/heist…) ne lui sont plus auto-injectés : il
+ *  pousse via la carte DÉGÂTS signature de sa Voie. */
+function buildCpuSignatureDeck(affinity: Move): CardId[] {
+  const SINGLE_COPY_CARDS = new Set<CardId>(["oracle", "heist"]);
+  const sig = (SIGNATURE_DECK[affinity] ?? []).filter((c) => isDeckable(c) && cpuCanPlay(c));
+  const out: CardId[] = [];
+  let legKept = 0;
+  for (const c of sig) {
+    if (CARDS[c]?.rarity === "legendary") {
+      if (legKept >= ARENA_LEGENDARY_CAP) continue; // surplus de légendaires retiré
+      legKept += 1;
+    }
+    const copies = SINGLE_COPY_CARDS.has(c) ? 1 : (RARITY_COPIES[CARDS[c]?.rarity ?? "common"] ?? 1);
+    for (let k = 0; k < copies; k++) out.push(c);
+  }
+  return out;
+}
+
 /** Alex feedback équité 2026-06-09 : "le cpu devra avoir autant de cartes
  *  de chaque rang que le joueur" — buildCpuDeckMirroring construit un
  *  deck CPU qui match la distribution de raretés (common/rare/epic/legendary)
- *  du deck joueur, mais avec cartes potentiellement différentes.
+ *  du deck joueur, mais avec cartes potentiellement différentes. FALLBACK
+ *  désormais : utilisé seulement si la Voie CPU n'a pas de deck signature.
  *
  *  Algo : compte les raretés du playerDeck, pour chaque rareté pige des
  *  cartes Arena-supportées dans la même rareté (random, sans replacement
@@ -59,6 +83,14 @@ export const CPU_ARENA_DECK: CardId[] = [
  *  Si encore insuffisant, on complète avec d'autres raretés (downgrade
  *  préféré pour ne pas exploser la power level). */
 export function buildCpuDeckMirroring(playerDeck: CardId[], cpuAffinity?: Move): CardId[] {
+  // ARCHÉTYPE vs ARCHÉTYPE (Alex 2026-06-24) : si la Voie CPU a un deck SIGNATURE,
+  // le CPU le joue (comme le joueur) plutôt que le pool mirroir-rareté qui mélangeait
+  // toutes les neutres (trou-noir, supernova…) hors de son thème. Garde-fou : si la
+  // signature donne moins de 6 cartes (ne devrait pas), on retombe sur le mirroir.
+  if (cpuAffinity) {
+    const sig = buildCpuSignatureDeck(cpuAffinity);
+    if (sig.length >= 6) return sig;
+  }
   // Comptage des raretés du joueur (cartes Arena-supported uniquement).
   const counts: Record<string, number> = { common: 0, rare: 0, epic: 0, legendary: 0 };
   for (const id of playerDeck) {

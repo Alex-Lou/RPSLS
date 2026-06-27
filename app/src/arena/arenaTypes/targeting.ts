@@ -171,6 +171,23 @@ export const LANE_SPELL_TARGET_SIDE: Partial<Record<CardId, LaneTargetSide>> = {
   cocon:             "opp-creature",
 };
 
+/** Restriction de MOVE pour les cartes lane-target « mono-symbole » (ex. Strate
+ *  Vive ne cible QUE les Pierres). L'EFFET fizzle déjà si le move ne correspond pas
+ *  (applyStrateVive / applyGardienPierre / … font `if (me.move !== "rock") return`) ;
+ *  cette table aligne l'INDICATEUR de ciblage dessus → il n'allume QUE les cases du
+ *  bon symbole, jamais les autres créatures (Alex 2026-06-25 « indicateurs justes »).
+ *  Rempli par VOIE au fil des passes — MONTAGNE d'abord, les autres ensuite une par une. */
+export const LANE_TARGET_MOVE: Partial<Record<CardId, Move>> = {
+  // ── Voie Montagne — Pierre-only ──
+  "strate-vive":    "rock",
+  "gardien-pierre": "rock",
+};
+
+/** Libellé court FR d'un symbole, pour les labels de ciblage (« Cible ta Pierre »). */
+const MOVE_LABEL_FR: Record<Move, string> = {
+  rock: "Pierre", paper: "Feuille", scissors: "Ciseau", lizard: "Lézard", spock: "Spock",
+};
+
 /** Mana GAGNÉ IMMÉDIATEMENT ce tour par une carte « tempo » (façon Pièce de
  *  Hearthstone) — Alex 2026-06-13. Disponible pour la PLANIFICATION du même
  *  tour (sinon Sablier ne servait à rien : son +2 atterrissait à la résolution
@@ -211,8 +228,12 @@ export function isValidLaneTarget(
   const opp  = lanes[lane][playerSide === "a" ? "b" : "a"];
   if (targeting.kind === "spell" && targeting.targetKind === "lane") {
     const tgtSide = LANE_SPELL_TARGET_SIDE[targeting.id] ?? "my-creature";
-    if (tgtSide === "my-creature") return isPlayerRow && !!mine;
-    if (tgtSide === "opp-creature") return !isPlayerRow && !!opp;
+    // Restriction de MOVE (ex. Strate Vive = Pierre-only) : l'indicateur n'allume
+    // que la créature du bon symbole, pour COLLER à l'effet (qui fizzle sinon).
+    const reqMove = LANE_TARGET_MOVE[targeting.id];
+    const moveOk = (c: { move: Move } | null): boolean => !reqMove || (!!c && c.move === reqMove);
+    if (tgtSide === "my-creature") return isPlayerRow && !!mine && moveOk(mine);
+    if (tgtSide === "opp-creature") return !isPlayerRow && !!opp && moveOk(opp);
     if (tgtSide === "my-empty-opp-occupied") return isPlayerRow && !mine && !!opp;
     if (tgtSide === "my-empty") return isPlayerRow && !mine;
     if (tgtSide === "both-occupied") return isPlayerRow && !!mine && !!opp;
@@ -228,8 +249,9 @@ export function targetLabelFor(targeting: ArenaTargeting, slotHasCreature = fals
   }
   if (targeting.kind === "spell" && targeting.targetKind === "lane") {
     const tgtSide = LANE_SPELL_TARGET_SIDE[targeting.id] ?? "my-creature";
-    if (tgtSide === "my-creature") return "✦ Cible ta créature";
-    if (tgtSide === "opp-creature") return "✦ Cible cette créature";
+    const reqMove = LANE_TARGET_MOVE[targeting.id];
+    if (tgtSide === "my-creature") return reqMove ? `✦ Cible ta ${MOVE_LABEL_FR[reqMove]}` : "✦ Cible ta créature";
+    if (tgtSide === "opp-creature") return reqMove ? `✦ Cible cette ${MOVE_LABEL_FR[reqMove]}` : "✦ Cible cette créature";
     if (tgtSide === "my-empty-opp-occupied") return "✦ Mirror ici";
     if (tgtSide === "my-empty") return "✦ Ici";
     if (tgtSide === "both-occupied") return "✦ Échanger";

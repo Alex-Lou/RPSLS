@@ -36,7 +36,7 @@ export const CARDS: Record<CardId, RankedCard> = {
     art: "/Cards Bonus/second-wind.png",
   },
   prescience: {
-    id: "prescience", cost: 1, rarity: "common", voie: "spock",
+    id: "prescience", cost: 1, rarity: "common", voie: "lizard",
     target: "none", palette: "cyan", glyph: "🔮",
     nameKey: "ranked.cards.prescience.name", descKey: "ranked.cards.prescience.desc",
     targetHintKey: "ranked.cards.prescience.targetHint",

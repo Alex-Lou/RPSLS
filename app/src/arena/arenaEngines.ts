@@ -52,11 +52,19 @@ export function riseEngineOnCounterWin(hero: HeroState): HeroState {
 
 /* ───────────────────────── Effets (lus aux bons points) ───────────────────────── */
 
-/** 🌿 Régén Forêt de fin de tour : Sève PV, ou 2+Sève si Verger actif. */
+/** 🌿 Régén Forêt de fin de tour : Sève PV, CAP 2/tour (Verger inclus). Alex
+ *  2026-06-27 (« Forêt encore increvable, IA toujours à 20 alors que je suis à
+ *  9 ») : le cap 3/tour précédent (nerf depuis 5) out-healait toujours tout débit
+ *  atteignable en 20 PV → mur, pas sustain. 2/tour reste un GRIND fort (≈ +30 PV
+ *  sur un long match) mais un adversaire agressif peut enfin gagner la course.
+ *  Sans Verger : min(2, Sève) (ramp 0→2). Verger (soin éternel) : min(2, Sève+1)
+ *  → plancher 1 garanti, mais plus de sur-soin. Identité sustain préservée, mur
+ *  cassé. RESTE UN LEVIER À AJUSTER selon le ressenti device (descendre à 1 si
+ *  toujours oppressant). */
 export function seveHealAmount(hero: HeroState): number {
   if (hero.affinity !== "paper") return 0;
   const seve = hero.seveStack ?? 0;
-  return hero.vergerActive ? 2 + seve : seve;
+  return Math.min(2, hero.vergerActive ? seve + 1 : seve);
 }
 
 /** ✂️ Bonus d'ATK GLOBAL appliqué à chaque créature du camp Tranchant (baseline

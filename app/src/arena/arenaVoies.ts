@@ -69,7 +69,7 @@ export const SIGNATURE_DECK: Partial<Record<Move, CardId[]>> = {
   lizard: [
     "mascarade", "reflet-echo", "echappee",          // tempo / cycle / fuite
     "mirror", "mascarade-enchainee", "fuite-masquee", // copie + montée d'Esquive
-    "prescience", "tide",                            // pioche + poussée tempo (neutres)
+    "prescience", "tide",                            // pioche + poussée tempo (Préscience = signature Mirage)
     "coup-dans-lombre",                              // DÉGÂTS signature (= charges d'Esquive, imblocable)
   ],
   scissors: [
