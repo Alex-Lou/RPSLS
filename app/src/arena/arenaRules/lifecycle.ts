@@ -51,21 +51,26 @@ export function advanceToNextTurn(board: BoardState): BoardState {
   alog("hand", `a hand=[${board.a.hand.join(",")}] deck=${board.a.deck.length} discard=${board.a.discard.length} mana=${board.a.mana}/${board.a.maxMana}`);
   alog("hand", `b hand=[${board.b.hand.join(",")}] deck=${board.b.deck.length} discard=${board.b.discard.length} mana=${board.b.mana}/${board.b.maxMana}`);
   // ÉCONOMIE EN PHASES (Alex 2026-06-17) : T1-3 = invocations seulement (cap 0).
-  // Dès T4, le PLAFOND de main monte par paliers (3, +1 tous les 3 tours). À
-  // chaque hausse de palier → « CHUTE DE DECK » : on REMPLIT la main jusqu'au
-  // nouveau cap. ENTRE les paliers, la pioche-sur-kill refait +1 (jusqu'au cap).
-  // Jamais au-dessus du cap du moment. Pioches SPÉCIALES (Larcin, sorts) à part.
+  // FLUX DE CARTES — modèle « catch-up vers un plancher, plafonné » (Alex
+  // 2026-06-27, analyse CCG). Deux moments seulement :
+  //  1. CHUTE DE DECK pleine = UNIQUEMENT au déblocage Phase 1→2 (capPrev===0,
+  //     T4) : ton deck tombe et remplit ta main d'un coup (le moment voulu).
+  //  2. Ensuite, JAMAIS de gros lot : on remonte la main vers un petit PLANCHER
+  //     (HAND_FLOOR) à HAND_STEP MAX/tour. Anti-point-mort (ton idée : jamais
+  //     coincé à 0 en milieu/fin), MAIS lissé → après avoir vidé ta main tu
+  //     récupères 2 puis 1, pas 5 d'un coup. Au-dessus du plancher = MAIGRE
+  //     (chaque carte compte). Le cap monté (5→6→7) = plafond de RÉTENTION
+  //     (sorts / chute), pas une cible de pioche auto. Sorts (Cascade…) à part.
+  const HAND_FLOOR = 3; // main visée par le catch-up (maigre mais jouable)
+  const HAND_STEP = 2;  // pioche MAX/tour hors chute de deck → zéro gros lot
   const capNext = arenaHandCap(nextTurn);
   const capPrev = arenaHandCap(board.turn);
   const drawFor = (h: HeroState): number => {
     const room = Math.max(0, capNext - h.hand.length);
-    if (capNext > capPrev) return room;                 // nouveau palier → remplir (chute de deck)
-    // PIOCHE DE TEMPO (Alex 2026-06-23 « les cartes défilent sans problème, il manque
-    // du contrôle ») : +1 SEULEMENT si la main est BASSE (≤2), plus à chaque kill. Avant,
-    // le kill-bonus refaisait +1 à chaque créature tuée → main toujours pleine, zéro rareté.
-    // Maintenant tu cours plus maigre : chaque carte compte, tu repioches quand tu en as
-    // VRAIMENT besoin (anti-starvation), pas en récompense d'agressivité.
-    return h.hand.length <= 2 ? Math.min(1, room) : 0;
+    if (room <= 0) return 0;
+    if (capNext > capPrev && capPrev === 0) return room; // déblocage Phase 2 : chute pleine
+    // Catch-up doux vers le plancher, plafonné à HAND_STEP/tour.
+    return Math.min(HAND_STEP, Math.max(0, HAND_FLOOR - h.hand.length), room);
   };
   const drawA = drawFor(board.a);
   const drawB = drawFor(board.b);
