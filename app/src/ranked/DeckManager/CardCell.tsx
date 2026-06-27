@@ -5,6 +5,7 @@ import { isCastOnDraw } from "../../arena/arenaCastOnDraw";
 import { CardImage } from "../CardImage";
 import type { CardId } from "../rankedTypes";
 import { RARITY_DOT, UNLOCK_HINTS } from "./deckManagerConstants";
+import { FuseGlyph, BoltGlyph } from "../../icons";
 
 /** Single card cell — the entire visual was extracted from the old inline
  *  rendering so the new layout reuses it inside each mana group AND so a
@@ -64,14 +65,14 @@ export function CardCell({
           className="absolute top-0.5 right-0.5 z-10 px-1 h-3.5 rounded-full bg-amber-400/95 flex items-center justify-center shadow ring-1 ring-amber-200/60"
           title="Fusionnable sur la Forge (Arena)"
         >
-          <span className="text-[8px] leading-none">⚗</span>
+          <FuseGlyph className="w-2 h-2 text-zinc-900" />
         </div>
       ) : castDraw ? (
         <div
           className="absolute top-0.5 right-0.5 z-10 px-1 h-3.5 rounded-full bg-sky-400/95 flex items-center justify-center shadow ring-1 ring-sky-200/70"
           title="Se déclenche À LA PIOCHE (Cast When Drawn)"
         >
-          <span className="text-[8px] leading-none">⚡</span>
+          <BoltGlyph className="w-2 h-2 text-zinc-900" />
         </div>
       ) : !showFusion ? (
         <div

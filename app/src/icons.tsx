@@ -135,3 +135,58 @@ export function MysteryHand({ size = "lg" }: { size?: "sm" | "md" | "lg" | "xl" 
     </div>
   );
 }
+
+/* ───────────────────────── Glyphes SVG monochromes ─────────────────────────
+ * Remplacent les émojis user-facing (règle dure « zéro émoji », Alex 2026-06-24).
+ * Monochromes via currentColor → teintés par la couleur de texte du parent (donc
+ * par le thème). Tailles via className (w-/h-). Inline, sans canvas, cross-WebView. */
+
+interface GlyphProps { className?: string }
+
+/** ✦ — étoile 4 branches (déco / premium). */
+export function SparkleGlyph({ className = "" }: GlyphProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden className={className}>
+      <path d="M12 1.5l1.9 8.6 8.6 1.9-8.6 1.9L12 22.5l-1.9-8.6L1.5 12l8.6-1.9z" />
+    </svg>
+  );
+}
+
+/** ⚡ — éclair (mana / cast-à-la-pioche). */
+export function BoltGlyph({ className = "" }: GlyphProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden className={className}>
+      <path d="M13 2L4 14h6l-2 8 11-13h-7z" />
+    </svg>
+  );
+}
+
+/** ⚠ — triangle d'alerte. */
+export function WarnGlyph({ className = "" }: GlyphProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" aria-hidden className={className}>
+      <path d="M12 4l9 16H3z" />
+      <path d="M12 10v4" />
+      <circle cx="12" cy="17" r="0.7" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/** ⚗ — fiole/alambic (Forge / fusion). */
+export function FuseGlyph({ className = "" }: GlyphProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" aria-hidden className={className}>
+      <path d="M9.5 3h5M10.5 3v6.5L6 18.5Q5.4 20.5 7.5 20.5h9Q18.6 20.5 18 18.5L13.5 9.5V3" />
+    </svg>
+  );
+}
+
+/** 🎴 — éventail de cartes (main vide / dos de carte). */
+export function CardFanGlyph({ className = "" }: GlyphProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden className={className}>
+      <rect x="7.5" y="5" width="9" height="13" rx="1.4" transform="rotate(-13 12 12)" />
+      <rect x="7.5" y="5" width="9" height="13" rx="1.4" transform="rotate(13 12 12)" />
+    </svg>
+  );
+}

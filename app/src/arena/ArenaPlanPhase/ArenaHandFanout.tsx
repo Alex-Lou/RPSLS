@@ -7,6 +7,7 @@ import { arenaSupported } from "../arenaCardEffects";
 import { arenaSpellCost } from "../arenaSpellHelpers";
 import { isFusible, findFusionResult } from "../arenaFusionCards";
 import type { ArenaTargeting, BoardState, TurnIntent } from "../arenaTypes";
+import { CardFanGlyph, FuseGlyph, WarnGlyph } from "../../icons";
 
 /** Hand strip — tap = commit/target, hold 1.4s = inspect modal, DRAG =
  *  one-gesture commit to a lane. É2 : éventail COURBE (rotate/y par index,
@@ -191,7 +192,7 @@ export function ArenaHandFanout({
                     className="absolute bottom-4 right-0.5 z-10 w-5 h-5 rounded-full flex items-center justify-center text-[11px] leading-none shadow bg-amber-400 text-zinc-900 animate-pulse ring-1 ring-amber-200"
                     title="Fusion possible — tape la Forge !"
                   >
-                    ⚗
+                    <FuseGlyph className="w-3 h-3" />
                   </div>
                 )}
                 {id === "second-wind" && me.hp >= me.maxHp && (
@@ -199,7 +200,7 @@ export function ArenaHandFanout({
                     className="absolute top-0.5 right-0.5 z-10 px-1 py-0.5 rounded-md bg-amber-500/90 text-[8px] font-black text-zinc-900 leading-none shadow"
                     title="Tu es à pleine vie — la carte sera dépensée sans effet"
                   >
-                    ⚠
+                    <WarnGlyph className="w-2.5 h-2.5" />
                   </div>
                 )}
               </button>
@@ -225,8 +226,8 @@ export function ArenaHandFanout({
         </div>
       ) : (
         <div className="flex flex-col items-center gap-1.5 opacity-65">
-          <div className="w-[44px] h-[60px] sm:w-[48px] sm:h-[66px] rounded-lg border-2 border-dashed border-hairline bg-black/15 flex items-center justify-center text-2xl">
-            🎴
+          <div className="w-[44px] h-[60px] sm:w-[48px] sm:h-[66px] rounded-lg border-2 border-dashed border-hairline bg-black/15 flex items-center justify-center">
+            <CardFanGlyph className="w-7 h-7 text-ink-faint" />
           </div>
           <span className="text-[10px] text-ink-faint italic">
             {me.hand.length === 0 && me.deck.length + me.discard.length === 0

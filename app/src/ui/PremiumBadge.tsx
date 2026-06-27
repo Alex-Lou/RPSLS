@@ -11,6 +11,7 @@
  */
 
 import { motion } from "motion/react";
+import { SparkleGlyph } from "../icons";
 
 export type PremiumBadgeVariant = "ribbon" | "pill";
 
@@ -43,7 +44,7 @@ function PremiumRibbon({ label, className }: { label: string; className: string 
       }
     >
       <Shimmer />
-      <span aria-hidden className="relative">✦</span>
+      <SparkleGlyph className="relative w-2.5 h-2.5" />
       <span className="relative">{label}</span>
     </div>
   );
@@ -64,7 +65,7 @@ function PremiumPill({ label, className }: { label: string; className: string })
     >
       <Shimmer />
       <Halo />
-      <span aria-hidden className="relative text-sm leading-none">✦</span>
+      <SparkleGlyph className="relative w-3.5 h-3.5" />
       <span className="relative">{label}</span>
     </motion.span>
   );

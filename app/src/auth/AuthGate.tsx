@@ -26,6 +26,7 @@ import { hapticMatchWin, hapticTap } from "../haptic";
 import { authenticate, signInWithGoogle, isGoogleAvailable, type AuthMode } from "../online/accountAuth";
 import { useStore } from "../store/store";
 import { WELCOME_BONUS as BONUS } from "../engine/economy";
+import { SparkleGlyph } from "../icons";
 
 // Montants du cadeau de bienvenue — SOURCE UNIQUE dans economy.ts
 // (`WELCOME_BONUS`), lue aussi par le serveur via economy_meta.json. AuthGate ne
@@ -155,7 +156,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
             ) : (
               <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col gap-4">
                 <header className="text-center">
-                  <div className="mx-auto mb-2 text-3xl" style={{ filter: "drop-shadow(0 0 12px rgba(217,70,239,0.6))" }}>✦</div>
+                  <div className="mx-auto mb-2 text-fuchsia-300" style={{ filter: "drop-shadow(0 0 12px rgba(217,70,239,0.6))" }}><SparkleGlyph className="w-8 h-8 mx-auto" /></div>
                   <h1 className="text-xl font-black leading-tight text-ink">
                     {t(mode === "signup" ? "auth.title.signup" : "auth.title.login")}
                   </h1>
