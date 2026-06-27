@@ -66,6 +66,7 @@ import { HeroHitFlash } from "./HeroHitFlash";
 import { useArenaIntent } from "./useArenaIntent";
 import { useArenaForge } from "./useArenaForge";
 import { prepareResolveStart } from "./arenaResolvePrep";
+import { recordWatcherMatch, watcherUuid, watcherAppVersion, type WatcherMatchRecord } from "../arenaTelemetry";
 
 // Alex feedback 2026-06-09 point #7 : décompte+GO trop rapide. Bumpé de
 // 1800 → 2600ms pour laisser le "GO!" durer un peu et faire monter le
@@ -311,6 +312,11 @@ export function ArenaGame({
   // Declared BEFORE handleForfeit so the closure binds the real ref.
   const matchEndedRef = useRef(false);
 
+  // Télémétrie Watcher : trajectoire des PV par tour (capturée à chaque tour) +
+  // raison de fin (par défaut KO ; mise à « suddendeath » par la mort subite).
+  const trajRef = useRef<{ self: number[]; opp: number[] }>({ self: [], opp: [] });
+  const endReasonRef = useRef<WatcherMatchRecord["endReason"]>("ko");
+
   // Handle d'annulation du résolveur en cours (Audit anim Build A — fuite mémoire).
   // runResolverFlow programme ~9s de setTimeout ; on garde son cancel() pour
   // couper la chaîne au forfait / rematch / unmount, sinon elle continue sur un
@@ -415,6 +421,16 @@ export function ArenaGame({
     }
   }, [board.lastHeistStolenB]);
 
+  // Télémétrie Watcher : capture les PV des 2 héros une fois par tour (au
+  // changement de board.turn = après la résolution du tour précédent). Volontaire
+  // que la dép soit [board.turn] seul (1 point/tour, pas à chaque frame de combat).
+  useEffect(() => {
+    if (board.phase === "match-end" || board.phase === "sudden-death") return;
+    trajRef.current.self.push(Math.max(0, board.a.hp));
+    trajRef.current.opp.push(Math.max(0, board.b.hp));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [board.turn]);
+
   // Match-end haptic + stat record. Fired once when the phase flips.
   // recordArenaMatch lives in the store and is sync'd to the cloud via the
   // existing playerSync subscriber (fingerprint covers arenaStats now).
@@ -433,6 +449,28 @@ export function ArenaGame({
     // VOIE jouée (joueur + adversaire) journalisée dans l'historique (Alex
     // 2026-06-13). board.a/b.affinity = la Voie choisie par chaque camp.
     recordArenaMatch(outcome, { playerVoie: board.a.affinity, oppVoie: board.b.affinity });
+    // Télémétrie Watcher (Arena Pro vs CPU) — fail-soft, inerte si non configuré.
+    if (board.a.affinity) {
+      recordWatcherMatch({
+        v: 1,
+        id: watcherUuid(),
+        ts: Date.now(),
+        mode: "pro",
+        playerVoie: board.a.affinity,
+        oppVoie: board.b.affinity ?? null,
+        oppKind: "cpu",
+        result: outcome,
+        turns: board.turn,
+        finalHpSelf: Math.max(0, board.a.hp),
+        finalHpOpp: Math.max(0, board.b.hp),
+        finisherFired: !!board.a.finisherUnlocked,
+        oppFinisherFired: !!board.b.finisherUnlocked,
+        hpTrajectorySelf: [...trajRef.current.self, Math.max(0, board.a.hp)],
+        hpTrajectoryOpp: [...trajRef.current.opp, Math.max(0, board.b.hp)],
+        endReason: endReasonRef.current,
+        appVersion: watcherAppVersion,
+      });
+    }
   }, [board.phase, board.a.hp, board.b.hp, recordArenaMatch]);
 
   /* ──────────── Lock & resolve ──────────── */
@@ -503,6 +541,7 @@ export function ArenaGame({
     return (
       <ArenaSuddenDeath
         onResolved={(winner) => {
+          endReasonRef.current = "suddendeath"; // télémétrie : fin par mort subite
           const nextBoard: BoardState = winner === "a"
             ? { ...board, a: { ...board.a, hp: 1 }, b: { ...board.b, hp: 0 }, phase: "match-end" }
             : { ...board, a: { ...board.a, hp: 0 }, b: { ...board.b, hp: 1 }, phase: "match-end" };
