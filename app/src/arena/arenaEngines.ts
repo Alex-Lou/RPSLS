@@ -8,7 +8,7 @@
  * duels, pas en posant passivement — et le cue « ★ » tombe pile sur la lane gagnante.
  *
  *  - 🪨 MONTAGNE = Strates (déjà sur les créatures via voieAtkBonus — pas ici).
- *  - 🌿 FORÊT     = SÈVE    (seveStack)   : régén héros = Sève PV/tour.
+ *  - 🌿 FORÊT     = SÈVE    (seveStack)   : régén héros SI un counter Feuille gagné ce tour (sinon la jauge s'érode).
  *  - ✂️ TRANCHANT = TRANCHE (trancheStack): +Tranche ATK à tes créatures EN JEU
  *    (scopé : honnête vs le board réel — Alex 2026-06-23 « trompeur si je perds 2 lanes »).
  *  - 🦎 MIRAGE    = MIRAGE  (mirageStack) : tes Lézards arrivent +Mirage Esquive.
@@ -19,9 +19,12 @@
  */
 
 import { damageHero, healHero } from "./arenaRules/heroCreature";
+import { BALANCE } from "./arenaBalance";
 import type { Move } from "../engine/game";
 import type { BoardState, HeroState } from "./arenaTypes";
 
+/** Défaut historique du cap d'engine (le moteur lit BALANCE.engine.cap, tunable
+ *  par le Lab). Conservé comme constante de référence/iso. */
 export const ENGINE_CAP = 3;
 
 /** True si la Voie a une jauge d'engine HÉROS (toutes sauf Montagne, dont
@@ -45,32 +48,56 @@ function engineField(affinity: Move | undefined): "rockStack" | "seveStack" | "t
 export function riseEngineOnCounterWin(hero: HeroState): HeroState {
   const field = engineField(hero.affinity);
   if (!field) return hero;
-  const cur = (hero[field] as number | undefined) ?? 0;
-  const next = Math.min(ENGINE_CAP, cur + 1);
-  return next === cur ? hero : { ...hero, [field]: next };
+  // 🌿 FORÊT — on marque que la Sève a été NOURRIE ce tour (un counter Feuille
+  // remporté), AVANT le cap : une Forêt déjà maxée (seve=3) fait un early-return
+  // ci-dessous (next===cur) ; sans poser le flag d'abord, elle se ferait éroder
+  // à tort alors qu'elle joue parfaitement (cf. decaySeveIfStarved).
+  const h = hero.affinity === "paper" && !hero.seveFedThisTurn ? { ...hero, seveFedThisTurn: true } : hero;
+  const cur = (h[field] as number | undefined) ?? 0;
+  const next = Math.min(BALANCE.engine.cap, cur + BALANCE.engine.risePerCounterWin);
+  return next === cur ? h : { ...h, [field]: next };
 }
 
 /* ───────────────────────── Effets (lus aux bons points) ───────────────────────── */
 
-/** 🌿 Régén Forêt de fin de tour : Sève PV, CAP 2/tour (Verger inclus). Alex
- *  2026-06-27 (« Forêt encore increvable, IA toujours à 20 alors que je suis à
- *  9 ») : le cap 3/tour précédent (nerf depuis 5) out-healait toujours tout débit
- *  atteignable en 20 PV → mur, pas sustain. 2/tour reste un GRIND fort (≈ +30 PV
- *  sur un long match) mais un adversaire agressif peut enfin gagner la course.
- *  Sans Verger : min(2, Sève) (ramp 0→2). Verger (soin éternel) : min(2, Sève+1)
- *  → plancher 1 garanti, mais plus de sur-soin. Identité sustain préservée, mur
- *  cassé. RESTE UN LEVIER À AJUSTER selon le ressenti device (descendre à 1 si
- *  toujours oppressant). */
+/** 🌿 Régén Forêt de fin de tour — « Sève entretenue » (Alex 2026-06-27, refonte
+ *  équité : « elle se régénère trop, increvable, revoir bonus/malus »). Le soin
+ *  n'est plus un robinet passif : il n'est accordé QUE les tours où la Forêt a
+ *  NOURRI sa jauge (un counter Feuille remporté ce tour → seveFedThisTurn, posé
+ *  en combat). Turtle passif = 0 PV soigné, ET la jauge s'érode (decaySeveIfStarved)
+ *  → le mur inconditionnel infini est mort. Magnitude inchangée pour la Forêt
+ *  ACTIVE : min(2, Sève) (ramp 0→2). VERGER (finisher « soin éternel ») = seule
+ *  exception : plancher 1 PV/tour GARANTI (ne tarit jamais + gèle l'érosion),
+ *  2 si nourri ce tour. Identité grind préservée, équité rétablie. */
 export function seveHealAmount(hero: HeroState): number {
   if (hero.affinity !== "paper") return 0;
   const seve = hero.seveStack ?? 0;
-  return Math.min(2, hero.vergerActive ? seve + 1 : seve);
+  const fed = !!hero.seveFedThisTurn;
+  if (hero.vergerActive) return fed ? Math.min(BALANCE.foret.seveHealVerger, seve + 1) : 1;
+  return fed ? Math.min(BALANCE.foret.seveHealActive, seve) : 0;
+}
+
+/** 🌿 Érosion de la Sève (Alex 2026-06-27) : si la Forêt n'a pas nourri sa jauge
+ *  ce tour (aucun counter Feuille remporté) et que Verger n'est pas actif, la
+ *  jauge perd 1 cran (plancher 0). Le sustain devient un état à ENTRETENIR :
+ *  turtle passif → 3→2→1→0 → le soin s'auto-éteint. Vrai contre-jeu : wiper les
+ *  Feuilles coupe le robinet ET déclenche l'érosion. Verger gèle (payoff éternel). */
+export function decaySeveIfStarved(hero: HeroState): HeroState {
+  if (hero.affinity !== "paper" || hero.vergerActive || hero.seveFedThisTurn) return hero;
+  const seve = hero.seveStack ?? 0;
+  return seve > 0 ? { ...hero, seveStack: seve - 1 } : hero;
+}
+
+/** Reset du flag « Sève nourrie ce tour » (après lecture par le soin + l'érosion),
+ *  pour qu'il soit re-gagné au tour suivant. */
+function clearSeveFed(hero: HeroState): HeroState {
+  return hero.seveFedThisTurn ? { ...hero, seveFedThisTurn: false } : hero;
 }
 
 /** ✂️ Bonus d'ATK GLOBAL appliqué à chaque créature du camp Tranchant (baseline
  *  atkBuff via endOfTurnReset). 0 hors Tranchant. */
 export function trancheAtkBonus(hero: HeroState): number {
-  return hero.affinity === "scissors" ? (hero.trancheStack ?? 0) : 0;
+  return hero.affinity === "scissors" ? (hero.trancheStack ?? 0) * BALANCE.engine.trancheAtkPerStack : 0;
 }
 
 /** 🦎 Charges d'Esquive bonus accordées à un Lézard fraîchement posé. */
@@ -80,17 +107,22 @@ export function mirageDodgeBonus(hero: HeroState): number {
 
 /** 🖖 Chip inévitable de fin de tour au héros adverse = Cosmos (0-3). */
 export function cosmosChip(hero: HeroState): number {
-  return hero.affinity === "spock" ? (hero.cosmosCount ?? 0) : 0;
+  return hero.affinity === "spock" ? Math.min(BALANCE.cosmos.chipCap, hero.cosmosCount ?? 0) : 0;
 }
 
 /** Fin de tour : applique les effets PASSIFS (régén Forêt sur SOI, chip Cosmos
- *  sur l'ADVERSE). `heroA/heroB` déjà rafraîchis (constellation). Pur, capé. */
+ *  sur l'ADVERSE), PUIS érode la Sève non nourrie et reset le flag du tour.
+ *  `heroA/heroB` déjà rafraîchis (constellation). Pur, capé. */
 export function applyEnginesEndOfTurn(_board: BoardState, heroA: HeroState, heroB: HeroState): { a: HeroState; b: HeroState } {
+  // Soin Sève conditionnel (lit seveFedThisTurn + seveStack du tour courant).
   let a = healHero(heroA, seveHealAmount(heroA));
   let b = healHero(heroB, seveHealAmount(heroB));
   const aChip = cosmosChip(a), bChip = cosmosChip(b);
   if (aChip > 0) b = damageHero(b, aChip);
   if (bChip > 0) a = damageHero(a, bChip);
+  // Érosion de la Sève (jauge non nourrie ce tour) puis reset du flag pour le tour suivant.
+  a = clearSeveFed(decaySeveIfStarved(a));
+  b = clearSeveFed(decaySeveIfStarved(b));
   return { a, b };
 }
 
@@ -104,7 +136,7 @@ export function engineGauge(hero: HeroState): { value: number; max: number; acti
   const labels: Record<string, string> = {
     rockStack: "Montagne", seveStack: "Forêt", trancheStack: "Tranchant", mirageStack: "Mirage", cosmosCount: "Cosmos",
   };
-  return { value, max: ENGINE_CAP, active: value >= ENGINE_CAP, label: labels[field] };
+  return { value, max: BALANCE.engine.cap, active: value >= BALANCE.engine.cap, label: labels[field] };
 }
 
 /** Phrase d'effet pour le CUE de montée (« ce que ça fait »). */

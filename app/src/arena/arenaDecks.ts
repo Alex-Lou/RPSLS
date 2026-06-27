@@ -54,7 +54,7 @@ export const CPU_ARENA_DECK: CardId[] = [
  *  carte morte ; étendu en copies-par-rareté + cap légendaires (parité joueur).
  *  Les neutres restants (supernova/heist…) ne lui sont plus auto-injectés : il
  *  pousse via la carte DÉGÂTS signature de sa Voie. */
-function buildCpuSignatureDeck(affinity: Move): CardId[] {
+export function buildCpuSignatureDeck(affinity: Move): CardId[] {
   const SINGLE_COPY_CARDS = new Set<CardId>(["oracle", "heist"]);
   const sig = (SIGNATURE_DECK[affinity] ?? []).filter((c) => isDeckable(c) && cpuCanPlay(c));
   const out: CardId[] = [];

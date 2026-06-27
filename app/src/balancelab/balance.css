@@ -1,0 +1,366 @@
+/* ───────────────────────────────────────────────────────────────────────────
+   VOIE BALANCE LAB — peau cyberpunk (near-black + 4 néons).
+   Règle de lisibilité : le glow vit sur les CONTOURS et TITRES ; les CHIFFRES
+   lus (win-rates, tours) restent nets, contraste plein, zéro text-shadow.
+   ─────────────────────────────────────────────────────────────────────────── */
+:root {
+  --bg-0: #05070d;
+  --bg-1: #0a0e18;
+  --bg-2: #111726;
+  --grid: #18324a;
+  --ink: #cfe7ff;
+  --ink-dim: #6c8299;
+
+  --neon-cyan: #2af5ff;
+  --neon-magenta: #ff3df0;
+  --neon-lime: #8dff3a;
+  --neon-amber: #ffb627;
+  --neon-violet: #b66bff;
+
+  /* mapping Voie → néon (cohérent partout dans la viz) */
+  --voie-rock: var(--neon-amber);
+  --voie-paper: var(--neon-lime);
+  --voie-scissors: var(--neon-magenta);
+  --voie-lizard: var(--neon-violet);
+  --voie-spock: var(--neon-cyan);
+
+  --font-display: "Orbitron", sans-serif;
+  --font-ui: "Rajdhani", sans-serif;
+  --font-num: "Share Tech Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-0);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  min-height: 100vh;
+}
+
+/* Quadrillage technique + scanlines, plein écran, sous le contenu. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+  opacity: 0.12;
+}
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: repeating-linear-gradient(transparent 0 2px, rgba(0, 0, 0, 0.25) 2px 3px);
+  opacity: 0.35;
+}
+
+.lab {
+  position: relative;
+  z-index: 2;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+}
+
+/* ── Header ── */
+.lab-header {
+  border-bottom: 1px solid color-mix(in oklab, var(--neon-cyan) 30%, transparent);
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+}
+.lab-title {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 30px;
+  letter-spacing: 4px;
+  margin: 0;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 12px color-mix(in oklab, var(--neon-cyan) 70%, transparent);
+  animation: lab-flicker 1.4s ease-out 1 both;
+}
+.lab-sub {
+  font-size: 13px;
+  color: var(--ink-dim);
+  margin-top: 6px;
+  letter-spacing: 0.5px;
+}
+@keyframes lab-flicker {
+  0% { opacity: 0.2; }
+  10% { opacity: 1; }
+  12% { opacity: 0.4; }
+  16% { opacity: 1; }
+  40% { opacity: 0.85; }
+  42% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+/* ── Controls ── */
+.lab-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.lab-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: var(--ink-dim);
+  text-transform: uppercase;
+}
+.lab-field select {
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 1px solid color-mix(in oklab, var(--neon-cyan) 35%, transparent);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-family: var(--font-num);
+  font-size: 13px;
+  letter-spacing: 0;
+  outline: none;
+}
+.lab-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-end;
+  padding-bottom: 8px;
+  cursor: pointer;
+}
+.lab-check input {
+  accent-color: var(--neon-cyan);
+  width: 16px;
+  height: 16px;
+}
+.lab-run {
+  align-self: flex-end;
+  background: color-mix(in oklab, var(--neon-cyan) 16%, var(--bg-2));
+  color: var(--neon-cyan);
+  border: 1px solid var(--neon-cyan);
+  border-radius: 6px;
+  padding: 9px 22px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  box-shadow: 0 0 12px color-mix(in oklab, var(--neon-cyan) 40%, transparent);
+  transition: filter 0.15s;
+}
+.lab-run:hover:not(:disabled) {
+  filter: brightness(1.25);
+}
+.lab-run:disabled {
+  opacity: 0.5;
+  cursor: progress;
+  box-shadow: none;
+}
+.lab-meta {
+  align-self: flex-end;
+  padding-bottom: 9px;
+  font-family: var(--font-num);
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+/* ── Progress ── */
+.lab-progress {
+  position: relative;
+  height: 22px;
+  background: var(--bg-2);
+  border: 1px solid color-mix(in oklab, var(--neon-cyan) 25%, transparent);
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 18px;
+}
+.lab-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, color-mix(in oklab, var(--neon-cyan) 60%, transparent), var(--neon-cyan));
+  box-shadow: 0 0 14px var(--neon-cyan);
+  transition: width 0.12s linear;
+}
+.lab-progress-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-num);
+  font-size: 12px;
+  color: var(--ink);
+}
+
+/* ── Grille de panneaux ── */
+.lab-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.lab-panel {
+  background: var(--bg-1);
+  border: 1px solid color-mix(in oklab, var(--neon-cyan) 22%, transparent);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: inset 0 0 24px rgba(42, 245, 255, 0.04);
+}
+.lab-panel-wide {
+  grid-column: 1 / -1;
+}
+.lab-panel-head {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 2.5px;
+  color: var(--ink);
+  padding: 10px 14px;
+  border-bottom: 1px solid color-mix(in oklab, var(--neon-cyan) 18%, transparent);
+  background: color-mix(in oklab, var(--neon-cyan) 6%, transparent);
+}
+.lab-panel-body {
+  padding: 12px 14px;
+}
+.lab-canvas-wrap {
+  width: 100%;
+}
+.lab-canvas-wrap canvas {
+  display: block;
+  width: 100%;
+}
+.lab-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 8px;
+  font-family: var(--font-num);
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+.lab-empty {
+  color: var(--ink-dim);
+  font-size: 13px;
+  padding: 20px;
+  text-align: center;
+}
+
+/* ── Diagnostic ── */
+.lab-diag {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lab-diag-item {
+  font-size: 13.5px;
+  line-height: 1.45;
+  padding: 9px 12px;
+  border-left: 3px solid var(--ink-dim);
+  background: var(--bg-2);
+  border-radius: 0 5px 5px 0;
+}
+.lab-diag-icon {
+  display: inline-block;
+  width: 1.4em;
+  font-size: 11px;
+  opacity: 0.85;
+}
+.lab-diag-item.sev-high {
+  border-left-color: var(--neon-magenta);
+  color: #ffd6fb;
+}
+.lab-diag-item.sev-warn {
+  border-left-color: var(--neon-amber);
+  color: #ffe9c2;
+}
+.lab-diag-item.sev-ok {
+  border-left-color: var(--neon-lime);
+  color: #e2ffce;
+}
+
+/* ── Sliders d'équilibrage ── */
+.lab-sliders-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.lab-sliders-hint {
+  font-size: 12px;
+  color: var(--ink-dim);
+  letter-spacing: 0.5px;
+}
+.lab-reset {
+  background: transparent;
+  color: var(--neon-amber);
+  border: 1px solid color-mix(in oklab, var(--neon-amber) 45%, transparent);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-family: var(--font-num);
+  font-size: 12px;
+  cursor: pointer;
+}
+.lab-reset:hover {
+  filter: brightness(1.2);
+}
+.lab-sliders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px 22px;
+}
+.lab-slider-group-head {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid color-mix(in oklab, currentColor 25%, transparent);
+}
+.lab-slider {
+  display: grid;
+  grid-template-columns: 1fr 96px 28px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+.lab-slider-label {
+  font-size: 12px;
+  color: var(--ink);
+}
+.lab-slider input[type="range"] {
+  width: 100%;
+  accent-color: var(--neon-cyan);
+  cursor: pointer;
+}
+.lab-slider-val {
+  font-family: var(--font-num);
+  font-size: 13px;
+  text-align: right;
+  color: var(--ink-dim);
+}
+.lab-slider-val.modified {
+  color: var(--neon-amber);
+  font-weight: 700;
+}
+
+@media (max-width: 820px) {
+  .lab-grid {
+    grid-template-columns: 1fr;
+  }
+}

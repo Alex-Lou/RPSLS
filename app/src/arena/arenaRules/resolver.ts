@@ -1,6 +1,7 @@
 import { alog, csnap } from "../arenaLog";
 import { AFFINITY_TO_FINISHER } from "../arenaFinishers";
 import { applyEnginesEndOfTurn, engineMaxed, trancheAtkBonus, mirageDodgeBonus } from "../arenaEngines";
+import { BALANCE } from "../arenaBalance";
 // resolveCombat vit dans ./arenaCombat (déplacé 2026-06-09 : arenaRules > 700 l).
 // Le cycle arenaRules<->arenaCombat tient car arenaCombat n'importe que les
 // primitives feuilles (creatureEffectiveAtk/damageCreature/damageHero), sans
@@ -174,7 +175,7 @@ export function applySummons(board: BoardState, intent: TurnIntent, side: Side):
     // MIRAGE : un Lézard de la Voie arrive avec +mirageStack charges d'Esquive
     // (borné 5 — Mirage dépasse volontairement le cap normal de 3 = son identité).
     lane[side] = created.move === "lizard"
-      ? { ...created, dodgeCharges: Math.min(5, created.dodgeCharges + mirageDodgeBonus(hero)) }
+      ? { ...created, dodgeCharges: Math.min(BALANCE.mirage.dodgeCapOnSummon, created.dodgeCharges + mirageDodgeBonus(hero)) }
       : created;
     lanes[summon.lane] = lane;
     if (replaced) {

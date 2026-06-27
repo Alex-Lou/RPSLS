@@ -23,6 +23,7 @@ import {
 import { MANA_CAP, type BoardState, type Creature, type LaneIndex, type LaneState, type PlayedSpell, type Side } from "./arenaTypes";
 import { CARDS } from "../ranked/cards";
 import { STRATE_CAP } from "./arenaRules/heroCreature";
+import { BALANCE } from "./arenaBalance";
 import { alog } from "./arenaLog";
 
 /** Jet de Caillou — 2 dégâts à une créature adverse. Bloqué par Ancre/Logique. */
@@ -92,7 +93,7 @@ export function applyMascaradeEnchainee(board: BoardState, side: Side, spell: Pl
     alog("spell", `💤 ${side} Mascarade Enchaînée L${spell.lane} ne fait rien : pas de Lézard à toi sur cette lane.`);
     return board;
   }
-  return withMyCreatureOnLane(board, side, spell.lane, { ...me, dodgeCharges: Math.min(3, me.dodgeCharges + 1) });
+  return withMyCreatureOnLane(board, side, spell.lane, { ...me, dodgeCharges: Math.min(BALANCE.mirage.dodgeSpellCap, me.dodgeCharges + 1) });
 }
 
 /** Fuite Masquée (Mirage) — mon Lézard ciblé gagne +2 charges d'Esquive (cap 3)
@@ -104,7 +105,7 @@ export function applyFuiteMasquee(board: BoardState, side: Side, spell: PlayedSp
     alog("spell", `💤 ${side} Fuite Masquée L${spell.lane} ne fait rien : pas de Lézard à toi sur cette lane.`);
     return board;
   }
-  return withMyCreatureOnLane(board, side, spell.lane, { ...me, dodgeCharges: Math.min(3, me.dodgeCharges + 2), atkBuff: me.atkBuff - 1 });
+  return withMyCreatureOnLane(board, side, spell.lane, { ...me, dodgeCharges: Math.min(BALANCE.mirage.dodgeSpellCap, me.dodgeCharges + 2), atkBuff: me.atkBuff - 1 });
 }
 
 /** Coup de Taille (Tranchant) — mon Ciseau ciblé RÉCUPÈRE sa Perforation
@@ -129,7 +130,7 @@ export function applyAcuite(board: BoardState, side: Side, spell: PlayedSpell): 
     return board;
   }
   return withMyCreatureOnLane(board, side, spell.lane, {
-    ...me, combatBlunted: false, voieAtkBonus: Math.min(2, me.voieAtkBonus + 1),
+    ...me, combatBlunted: false, voieAtkBonus: Math.min(BALANCE.tranchant.acuiteAtkCap, me.voieAtkBonus + 1),
   });
 }
 
@@ -143,7 +144,7 @@ export function applyPhotosynthese(board: BoardState, side: Side, spell: PlayedS
     alog("spell", `💤 ${side} Photosynthèse L${spell.lane} ne fait rien : pas de créature à toi sur cette lane.`);
     return board;
   }
-  const healed = healCreature(me, 2);
+  const healed = healCreature(me, BALANCE.foret.photosyntheseHeal);
   return withMyCreatureOnLane(board, side, spell.lane, {
     ...healed, voieAtkBonus: Math.min(STRATE_CAP, healed.voieAtkBonus + 1),
   });
@@ -180,13 +181,13 @@ export function applyLoiCausalite(board: BoardState, side: Side, spell: PlayedSp
  *  mana max actuel, PLAFONNÉS à 6 (anti-burst-éco). Récompense le ramp
  *  Offre/Dilatation/Sablier. Inévitabilité d'éco, distincte de Singularité
  *  (qui scale sur le nombre de créatures). */
-const CONVERGENCE_DMG_CAP = 6;
 export function applyConvergence(board: BoardState, side: Side): BoardState {
   const oppS = oppSide(side);
   const myHero = side === "a" ? board.a : board.b;
   const oppHero = oppS === "a" ? board.a : board.b;
-  const dmg = Math.min(CONVERGENCE_DMG_CAP, myHero.maxMana);
-  alog("spell", `${side} CONVERGENCE COSMIQUE → ${dmg} dmg héros ${oppS} (= mon mana max, max ${CONVERGENCE_DMG_CAP})`);
+  const cap = BALANCE.cosmos.convergenceDmgCap;
+  const dmg = Math.min(cap, myHero.maxMana);
+  alog("spell", `${side} CONVERGENCE COSMIQUE → ${dmg} dmg héros ${oppS} (= mon mana max, max ${cap})`);
   return withSideHero(board, oppS, damageHero(oppHero, dmg));
 }
 

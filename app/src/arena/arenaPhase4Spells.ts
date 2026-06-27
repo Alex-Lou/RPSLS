@@ -16,6 +16,7 @@
 import { damageHero, healHero } from "./arenaRules";
 import { withSideHero, oppSide } from "./arenaSpellHelpers";
 import { type BoardState, type Side } from "./arenaTypes";
+import { BALANCE } from "./arenaBalance";
 import { alog } from "./arenaLog";
 
 /** Éboulis Final (Montagne) — dégâts au héros adverse = (nombre de mes Pierres
@@ -28,27 +29,28 @@ export function applyEboulisFinal(board: BoardState, side: Side): BoardState {
     const me = side === "a" ? lane.a : lane.b;
     if (me && me.move === "rock") { rocks += 1; strates += me.voieAtkBonus; }
   }
-  const dmg = Math.min(8, rocks * 2 + strates);
+  const cap = BALANCE.montagne.eboulisCap;
+  const dmg = Math.min(cap, rocks * BALANCE.montagne.eboulisPerRock + strates);
   if (dmg <= 0) {
     alog("spell", `💤 ${side} Éboulis Final ne fait rien : aucune Pierre sur ton plateau.`);
     return board;
   }
   const oppHero = oppS === "a" ? board.a : board.b;
-  alog("spell", `${side} ÉBOULIS FINAL → ${rocks} Pierre(s) + ${strates} Strate(s) = ${dmg} dmg héros ${oppS} (max 8)`);
+  alog("spell", `${side} ÉBOULIS FINAL → ${rocks} Pierre(s) + ${strates} Strate(s) = ${dmg} dmg héros ${oppS} (max ${cap})`);
   return withSideHero(board, oppS, damageHero(oppHero, dmg));
 }
 
 /** Drain Vital (Forêt) — 4 dégâts au héros adverse PUIS 4 PV rendus à mon héros
  *  (la vie circule). Priorité tardive (après les dégâts) pour que l'anim soit
  *  dégât→soin, comme Veine de Gaïa / Second Souffle. */
-const DRAIN_AMOUNT = 4;
 export function applyDrainVital(board: BoardState, side: Side): BoardState {
   const oppS = oppSide(side);
+  const amt = BALANCE.foret.drainAmount;
   const oppHero = oppS === "a" ? board.a : board.b;
-  let b = withSideHero(board, oppS, damageHero(oppHero, DRAIN_AMOUNT));
+  let b = withSideHero(board, oppS, damageHero(oppHero, amt));
   const myHero = side === "a" ? b.a : b.b;
-  b = withSideHero(b, side, healHero(myHero, DRAIN_AMOUNT));
-  alog("spell", `${side} DRAIN VITAL → ${DRAIN_AMOUNT} dmg héros ${oppS} + ${DRAIN_AMOUNT} PV à moi`);
+  b = withSideHero(b, side, healHero(myHero, amt));
+  alog("spell", `${side} DRAIN VITAL → ${amt} dmg héros ${oppS} + ${amt} PV à moi`);
   return b;
 }
 
@@ -62,13 +64,14 @@ export function applyCoupDansLombre(board: BoardState, side: Side): BoardState {
     const me = side === "a" ? lane.a : lane.b;
     if (me && me.move === "lizard") charges += me.dodgeCharges;
   }
-  const dmg = Math.min(6, charges);
+  const cap = BALANCE.mirage.coupDansLombreCap;
+  const dmg = Math.min(cap, charges);
   if (dmg <= 0) {
     alog("spell", `💤 ${side} Coup dans l'Ombre ne fait rien : aucune charge d'Esquive sur tes Lézards.`);
     return board;
   }
   const oppHero = oppS === "a" ? board.a : board.b;
-  alog("spell", `${side} COUP DANS L'OMBRE → ${charges} charge(s) d'Esquive = ${dmg} dmg héros ${oppS} (max 6)`);
+  alog("spell", `${side} COUP DANS L'OMBRE → ${charges} charge(s) d'Esquive = ${dmg} dmg héros ${oppS} (max ${cap})`);
   return withSideHero(board, oppS, damageHero(oppHero, dmg));
 }
 
@@ -82,13 +85,14 @@ export function applyIntricationQuantique(board: BoardState, side: Side): BoardS
     const me = side === "a" ? lane.a : lane.b;
     if (me && me.move === "spock") spocks += 1;
   }
-  const dmg = Math.min(6, spocks + (spocks >= 2 ? 1 : 0));
+  const cap = BALANCE.cosmos.intricationCap;
+  const dmg = Math.min(cap, spocks + (spocks >= 2 ? 1 : 0));
   if (dmg <= 0) {
     alog("spell", `💤 ${side} Intrication Quantique ne fait rien : aucun Spock sur ton plateau.`);
     return board;
   }
   const oppHero = oppS === "a" ? board.a : board.b;
-  alog("spell", `${side} INTRICATION QUANTIQUE → ${spocks} Spock(s) = ${dmg} dmg héros ${oppS} (max 6)`);
+  alog("spell", `${side} INTRICATION QUANTIQUE → ${spocks} Spock(s) = ${dmg} dmg héros ${oppS} (max ${cap})`);
   return withSideHero(board, oppS, damageHero(oppHero, dmg));
 }
 

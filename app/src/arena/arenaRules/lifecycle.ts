@@ -76,7 +76,8 @@ export function advanceToNextTurn(board: BoardState): BoardState {
   const drawB = drawFor(board.b);
   // Lot D-bis Round 10 — hooks runtime Finishers persistants :
   // VERGER : la régén est désormais gérée par l'ENGINE SÈVE en endOfTurnCleanup
-  //          (seveHealAmount = 2+Sève si Verger actif) — plus rien ici.
+  //          (seveHealAmount « Sève entretenue » : conditionnel au counter Feuille,
+  //          Verger = 1/tour plancher) — plus rien ici.
   // MÉTAMORPHOSE : si metamorphoseActive, tous mes Lézard refill dodgeCharges
   // Note : LAME est traité in-combat (cf arenaCombat), pas ici.
   let lanesAfterFinishers = board.lanes;
@@ -95,8 +96,9 @@ export function advanceToNextTurn(board: BoardState): BoardState {
     alog("turn", `b MÉTAMORPHOSE → Lézard dodge refresh`);
   }
   // Régén Verger ÉTERNEL (Forêt) désormais gérée par l'ENGINE SÈVE en
-  // endOfTurnCleanup (seveHealAmount = 2+Sève si Verger actif, sinon Sève) → on
-  // ne soigne PLUS ici, sinon double-soin. Les noms restent pour la pioche.
+  // endOfTurnCleanup (seveHealAmount « Sève entretenue » : soin conditionnel au
+  // counter Feuille, Verger = 1/tour plancher) → on ne soigne PLUS ici, sinon
+  // double-soin. Les noms restent pour la pioche.
   const heroAVerger = board.a;
   const heroBVerger = board.b;
   // Filet de sécurité (Alex 2026-06-11) : si après la pioche la main est VIDE,

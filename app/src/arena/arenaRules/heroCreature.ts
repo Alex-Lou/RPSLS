@@ -1,4 +1,5 @@
 import { CREATURE_STATS, type Creature, type HeroState, type Side } from "../arenaTypes";
+import { BALANCE } from "../arenaBalance";
 import type { Move } from "../../engine/game";
 
 /* ───────────────────────── Hero helpers ───────────────────────── */
@@ -28,12 +29,14 @@ export function makeCreature(move: Move, side: Side, affinity?: Move): Creature 
   //   Ciseaux : hp +1 (HP 2 au lieu de 1 — survit à un échange)
   //   Spock   : voieAtkBonus +1 (ATK perm 3 au lieu de 2)
   //   Feuille : wiltSkipNext true → Fanaison ralentie (wilt tous les 2 tours)
-  //   Lézard  : dodgeCharges 2 (au lieu de 1 — survit à 2 saves Esquive)
-  const voieRockCharges = matchesAffinity && move === "rock" ? 2 : (move === "rock" ? 1 : 0);
-  const voieScissorsHpBonus = matchesAffinity && move === "scissors" ? 1 : 0;
-  const voieAtkBonus = matchesAffinity && move === "spock" ? 1 : 0;
-  // Lot B Round 8 : Lézard base 1 charge dodge, Voie Lézard 2 charges.
-  const dodgeCharges = move === "lizard" ? (matchesAffinity ? 2 : 1) : 0;
+  //   Lézard  : dodgeCharges 2 (au lieu de 1) + voieAtkBonus +1 (ATK 2 au lieu
+  //             de 1 — l'esquive devait pouvoir CONVERTIR ; sim : Lézard pur mur
+  //             ne gagnait jamais, Mirage à 20%).
+  const voieRockCharges = matchesAffinity && move === "rock" ? BALANCE.montagne.voieProvocationCharges : (move === "rock" ? 1 : 0);
+  const voieScissorsHpBonus = matchesAffinity && move === "scissors" ? BALANCE.tranchant.voieScissorsHp : 0;
+  const voieAtkBonus = matchesAffinity && (move === "spock" || move === "lizard") ? BALANCE.engine.voieAtkBonus : 0;
+  // Lot B Round 8 : Lézard base 1 charge dodge, Voie Lézard 2 charges (tunable).
+  const dodgeCharges = move === "lizard" ? (matchesAffinity ? BALANCE.mirage.voieLizardDodge : 1) : 0;
   // Voie Feuille : flag persistent + toggle wiltSkipNext démarre à true.
   // 1er endOfTurnReset SKIP (Feuille reste ATK 3 ce tour), 2e wilt à 1, 3e
   // SKIP, 4e wilt à 2, 5e SKIP, etc. → Fanaison divisée par 2.
@@ -137,7 +140,11 @@ export function healCreature(c: Creature, amount: number): Creature {
 export const STRATE_CAP = 3;
 export function gainStrateIfHeld(c: Creature, ownerAffinity: Move | undefined, wasFreshlySummoned: boolean): Creature {
   if (ownerAffinity !== "rock" || c.move !== "rock" || wasFreshlySummoned || c.voieAtkBonus >= STRATE_CAP) return c;
-  return { ...c, voieAtkBonus: c.voieAtkBonus + 1 };
+  // Une Pierre qui TIENT épaissit le mur : +1 ATK ET +1 PV (le mur grossit en
+  // menace ET en durabilité). Le +PV est plafonné en lockstep avec STRATE_CAP
+  // (early-return ci-dessus) → max +3 PV. Rend la Montagne réellement increvable
+  // à la défense (sim : sans ça elle finissait à 6 PV et fondait vs heal/chip).
+  return { ...c, voieAtkBonus: c.voieAtkBonus + BALANCE.montagne.strateAtk, hp: c.hp + BALANCE.montagne.strateHp };
 }
 
 export function endOfTurnReset(c: Creature, vergerActive = false, trancheBonus = 0): Creature {

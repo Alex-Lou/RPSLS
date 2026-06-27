@@ -14,6 +14,7 @@ import {
   withMyCreatureOnLane, withOppCreatureOnLane, withSideHero, oppSide,
 } from "./arenaSpellHelpers";
 import { CREATURE_STATS, MANA_CAP, type BoardState, type Creature, type LaneState, type PlayedSpell, type Side } from "./arenaTypes";
+import { BALANCE } from "./arenaBalance";
 import { alog } from "./arenaLog";
 
 /** Spock's Détaché malus — ANY of MY buffs (Aegis, Surge, Tide, etc.) that
@@ -69,10 +70,10 @@ export function applyRiposte(board: BoardState, side: Side, spell: PlayedSpell):
   return withMyCreatureOnLane(board, side, spell.lane, { ...c, ripostePrimed: true });
 }
 
-/** Second Wind — heal +4 HP to my hero. */
+/** Second Wind — heal my hero (BALANCE.foret.secondWindHeal, défaut 4). */
 export function applySecondWind(board: BoardState, side: Side): BoardState {
   const hero = side === "a" ? board.a : board.b;
-  return withSideHero(board, side, healHero(hero, 4));
+  return withSideHero(board, side, healHero(hero, BALANCE.foret.secondWindHeal));
 }
 
 /** Precision — +2 ATK this turn to my creature. Spock Détaché ignores it. */

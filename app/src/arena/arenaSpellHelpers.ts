@@ -7,6 +7,7 @@
  */
 
 import { CARDS } from "../ranked/cards";
+import { BALANCE } from "./arenaBalance";
 import type { CardId } from "../ranked/rankedTypes";
 import type { BoardState, Creature, HeroState, LaneState, Side } from "./arenaTypes";
 
@@ -19,7 +20,7 @@ export function arenaSpellCost(
   hero: Pick<HeroState, "calculActive">, id: CardId,
 ): number {
   const base = CARDS[id].cost;
-  return hero.calculActive ? Math.max(0, base - 1) : base;
+  return hero.calculActive ? Math.max(0, base - BALANCE.cosmos.calculDiscount) : base;
 }
 
 /** Read the creature on `lane` owned by `side`. Null if empty. */

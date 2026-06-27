@@ -6,7 +6,7 @@
  *
  * Effets :
  * - 🪨 FORTERESSE  : tes Pierres existantes prennent 🛡 + ATK base 3 perm
- * - 📄 VERGER       : Fanaison off + heal hero +1/tour persistent
+ * - 📄 VERGER       : Fanaison off + heal hero 1/tour plancher (2 si counter Feuille), persistent
  * - ✂️ LAME         : ton Tranchant pierce TOUT (Aegis, Provoc, anti-taunt)
  * - 🦎 MÉTAMORPHOSE : Esquive infinie (dodge refresh chaque tour)
  * - 🖖 CALCUL       : tous tes sorts coûtent −1m (min 0)
@@ -19,6 +19,7 @@
 
 import { alog } from "./arenaLog";
 import { VOIE_DEF } from "./arenaVoies";
+import { BALANCE } from "./arenaBalance";
 import { CARDS } from "../ranked/cards";
 import type { BoardState, LaneState, Side } from "./arenaTypes";
 import type { CardId } from "../ranked/rankedTypes";
@@ -97,7 +98,7 @@ function applyForteresse(board: BoardState, side: Side): BoardState {
       b = mutateLaneCreature(b, side, i, (cur) => ({
         ...cur,
         divineShield: true,
-        voieAtkBonus: (cur.voieAtkBonus ?? 0) + 2,
+        voieAtkBonus: (cur.voieAtkBonus ?? 0) + BALANCE.montagne.forteresseAtk,
       }));
       count++;
     }
@@ -107,7 +108,8 @@ function applyForteresse(board: BoardState, side: Side): BoardState {
 }
 
 /** Effet VERGER ÉTERNEL — Fanaison off (wiltedSteps=0 sur toutes mes Feuilles)
- *  + flag vergerActive pour heal +1/tour persistent (cf endOfTurnReset). */
+ *  + flag vergerActive : Fanaison gelée (endOfTurnReset) ET soin Sève qui ne tarit
+ *  jamais — 1 PV/tour plancher, 2 si counter Feuille gagné (cf seveHealAmount). */
 function applyVerger(board: BoardState, side: Side): BoardState {
   let b = board;
   let count = 0;
@@ -122,7 +124,7 @@ function applyVerger(board: BoardState, side: Side): BoardState {
   b = side === "a"
     ? { ...b, a: { ...hero, vergerActive: true } }
     : { ...b, b: { ...hero, vergerActive: true } };
-  alog("spell", `${side} FINISHER VERGER → ${count} Feuille(s) Fanaison off + heal +1/tour`);
+  alog("spell", `${side} FINISHER VERGER → ${count} Feuille(s) Fanaison off + heal 1-2/tour (Sève entretenue)`);
   return b;
 }
 

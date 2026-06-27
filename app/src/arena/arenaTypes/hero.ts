@@ -51,6 +51,12 @@ export interface HeroState {
   trancheStack?: number; // ✂️ Tranchant — +ATK global au camp (cap 3)
   mirageStack?: number;  // 🦎 Mirage — +Esquive au summon des Lézards (cap 3)
   cosmosCount?: number;  // 🖖 Cosmos — chip inévitable/tour (cap 3)
+  /** 🌿 FORÊT — « Sève nourrie ce tour » (Alex 2026-06-27, refonte « Sève
+   *  entretenue »). Posé en combat quand une Feuille remporte un counter
+   *  (riseEngineOnCounterWin), lu en fin de tour par seveHealAmount (soin
+   *  conditionnel) + decaySeveIfStarved (érosion), puis reset. Sustain à
+   *  ENTRETENIR : pas de win Feuille ce tour = 0 soin + jauge −1. Match-local. */
+  seveFedThisTurn?: boolean;
   /** Lot C — flag "Finisher déjà débloqué", évite de redéclencher l'effet
    *  d'unlock à chaque tour une fois la jauge d'engine pleine. Set à true au
    *  moment où engineMaxed(hero) devient vrai pour la 1ère fois (cf. resolver

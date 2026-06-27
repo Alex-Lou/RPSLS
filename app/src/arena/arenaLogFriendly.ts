@@ -54,7 +54,7 @@ export function friendlyArenaLog(e: ArenaLogEntry): string | null {
   if ((x = m.match(/^([ab]) MASCARADE L(\d) : (\w+) → (\w+)(?: \(counter (\w+)\))?/)))
     return `🎭 ${who(x[1])} : sur la ${lane(x[2])}, ${mv(x[3])} se déguise en ${mv(x[4])}${x[5] ? ` pour contrer ${mv(x[5])}` : ""}`;
   if ((x = m.match(/^([ab]) VERGER/)))
-    return `🌿 ${who(x[1])} : le Verger régénère son héros (+1 ❤)`;
+    return `🌿 ${who(x[1])} : le Verger régénère son héros`;
   if ((x = m.match(/^([ab]) MÉTAMORPHOSE/)))
     return `🦎 ${who(x[1])} : Métamorphose recharge l'esquive des Lézards`;
   if (/FINISHER UNLOCKED/i.test(m)) {
