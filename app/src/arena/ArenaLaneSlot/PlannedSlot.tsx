@@ -3,7 +3,6 @@
  * (ghost-preview, dashed border, "en attente"). Présentationnel pur.
  */
 
-import { motion } from "motion/react";
 import { MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "../../icons";
 import { type Creature, type LaneIndex } from "../arenaTypes";
 
@@ -19,9 +18,11 @@ export function PlannedSlot({
   const pal = MOVE_PALETTE[plannedSummon.move];
   const rim = moveRim(pal.hex);
   const plannedContent = (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.7 }}
-      animate={{ opacity: 1, scale: 1 }}
+    <div
+      // SYMBOLE POSÉ = INSTANTANÉ, ZÉRO anim d'enclenchement (Alex 2026-06-27
+      // « j'en veux plus de cette petite anim d'activation, juste le symbole mis
+      // et c'est tout ») : les animations sont réservées aux ÉVÉNEMENTS (buff /
+      // carte / mort), jamais au simple placement. Plus aucun motion ici.
       className="aspect-[5/4] w-full rounded-xl relative flex items-center justify-center overflow-hidden"
       style={{
         background: "linear-gradient(160deg, rgba(20,22,32,0.55) 0%, rgba(10,12,20,0.55) 100%)",
@@ -31,11 +32,9 @@ export function PlannedSlot({
     >
       <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded bg-black/55 backdrop-blur-sm flex items-center gap-0.5" aria-label="en attente">
         {[0, 1, 2].map((i) => (
-          <motion.span
+          <span
             key={i}
-            animate={{ opacity: [0.25, 1, 0.25], scale: [0.85, 1.1, 0.85] }}
-            transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut", delay: i * 0.18 }}
-            className="w-1 h-1 rounded-full bg-emerald-300 shadow-[0_0_4px_rgba(110,231,183,0.7)]"
+            className="w-1 h-1 rounded-full bg-emerald-300/70 shadow-[0_0_4px_rgba(110,231,183,0.7)]"
           />
         ))}
       </span>
@@ -48,7 +47,7 @@ export function PlannedSlot({
           {plannedSummon.move}
         </span>
       </div>
-    </motion.div>
+    </div>
   );
   // Croix rouge d'ANNULATION (Alex 2026-06-12 "0 souplesse") — retire
   // l'invocation planifiée sur la lane. Rendue en SIBLING du contenu (pas

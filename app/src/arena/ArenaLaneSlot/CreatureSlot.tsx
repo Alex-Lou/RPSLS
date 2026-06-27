@@ -105,11 +105,17 @@ function CreatureSlotInner({
   const reactAnim = creatureReactAnim({ chargeAttack, dodgedHit, hitShake, debuffPulse, healFlash, buffPulse, isPlayer });
   return (
     <motion.div
-      layout
-      // ENTRÉE D'INVOCATION dramatisée (Alex 2026-06-13) : la créature
-      // JAILLIT de son camp (offset + rotation) et atterrit avec un
-      // overshoot spring — fini le simple fondu.
-      initial={{ opacity: 0, y: isPlayer ? 20 : -20, scale: 0.55, rotate: isPlayer ? -6 : 6 }}
+      // PAS de `layout` (Alex 2026-06-26) : prop orpheline (aucun layoutId/LayoutGroup,
+      // grille 3 colonnes + aspect fixes → zéro reflow à animer). À la mort, la case
+      // s'unmount instantanément (pas d'AnimatePresence) mais `layout` projetait un
+      // FANTÔME du corps mort ~1s → « double à la mort ». Retiré = 1 mort = 1 anim.
+      // PAS D'ENTRÉE animée (Alex 2026-06-27) : l'ancienne « invocation dramatisée »
+      // faisait JAILLIR la case depuis le bas avec rotation + overshoot spring = la
+      // « rotation ~45° qui plonge puis se redresse juste AVANT le combat » qu'il ne
+      // veut plus. initial=false → la créature posée APPARAÎT en place, point. Les
+      // anims (charge/atk, dégât, buff, soin, mort) restent intactes : ce sont des
+      // ÉVÉNEMENTS, pas l'enclenchement.
+      initial={false}
       animate={{ opacity: 1, ...reactAnim }}
       transition={
         chargeAttack

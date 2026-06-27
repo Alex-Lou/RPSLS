@@ -41,7 +41,11 @@ export function DeathShatter({ move, isPlayer }: { move: Creature["move"]; isPla
         className="absolute inset-0 flex items-center justify-center"
         style={{ filter: "drop-shadow(0 0 10px rgba(244,63,94,0.8))" }}
       >
-        <MoveGlyph move={move} className="w-12 h-12" />
+        {/* MÊME taille que le corps vivant (CreatureSlot) — Alex 2026-06-26 : en
+         *  w-12 c'était un raster DIFFÉRENT à re-décoder au montage → sur WebView
+         *  sous charge le glyphe mort peignait en retard = impression de « fantôme
+         *  qui traîne ». Même classe = image déjà décodée, l'implosion part net. */}
+        <MoveGlyph move={move} className="w-[3.8rem] h-[3.8rem] sm:w-[4.35rem] sm:h-[4.35rem]" />
       </motion.div>
       {/* ÉCLATS — fragments qui jaillissent du centre. */}
       {DEATH_SHARDS.map((s, i) => (
