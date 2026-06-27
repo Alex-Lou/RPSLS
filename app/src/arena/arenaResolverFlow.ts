@@ -16,13 +16,14 @@ import {
   endOfTurnCleanup,
   resolveLaneCombatAt,
 } from "./arenaRules";
-import { CREATURE_STATS, TURN_HARD_CAP, moveCountersMove, type BoardState, type LaneIndex, type TurnIntent } from "./arenaTypes";
+import { CREATURE_STATS, TURN_HARD_CAP, moveCountersMove, type BoardState, type LaneIndex, type Side, type TurnIntent } from "./arenaTypes";
 import type { Move } from "../engine/game";
 import type { CardId } from "../ranked/rankedTypes";
 import { alog } from "./arenaLog";
 import { isDominantSpell } from "./arenaFinishers";
 import { spellPriority } from "./arenaCardEffects";
 import { SPELLS_WITH_SIGNATURE } from "./ArenaSpellFX";
+import type { ProjectileFX } from "./ArenaProjectileFX";
 
 /** Snapshot helper — log compact d'une lane avec flags. Réutilise le même
  *  format que advanceToNextTurn pour cohérence à travers le pipeline. */
@@ -92,6 +93,9 @@ export interface ResolverFlowArgs {
    *  ou FATAL au héros, typé par le MOVE de l'attaquant (Ciseaux → entaille,
    *  Pierre → ébranlement…). Cf. ArenaImpactFX. */
   setImpactFX?: (fx: { move: Move; power: "strong" | "fatal"; key: number } | null) => void;
+  /** Projectiles « cailloux » lane→lane — Jet de Caillou (1) + Éboulement AOE (N).
+   *  Liste de tirs posée d'un coup (Alex 2026-06-24/25). Optionnel (tests/headless). */
+  setProjectileFX?: (shots: ProjectileFX[]) => void;
   /** Called BEFORE the resolver advances to the next turn — clears the
    *  player's pending intent and stops the "resolving" lock. */
   onSettle: (finalBoard: BoardState) => void;
@@ -136,7 +140,7 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
   const {
     startBoard, playerIntent, cpuIntent,
     setBoard, setOppPreview, setPlayerPreview, setResolveStep,
-    setCombatLane, setCombatChargers, setHeroHit, setTauntBlock, setAntiTaunt, setSpellFX, setImpactFX,
+    setCombatLane, setCombatChargers, setHeroHit, setTauntBlock, setAntiTaunt, setSpellFX, setImpactFX, setProjectileFX,
     onSettle, onAdvanceTurn, onMatchEnd,
   } = args;
 
@@ -161,16 +165,18 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
     if (aborted) return;
     let b = startBoard;
     b = applyAllSpells(b, playerIntent, cpuIntent);
-    setBoard(b);
     setResolveStep("spells");
-    // Flash de strip sur le héros qui ENCAISSE un sort de dégât direct (Supernova,
-    // Trou Noir, Heist…) — Alex 2026-06-17 « la Supernova doit aussi animer le
-    // strip de celui qui la prend dans la poire ». On compare les PV avant/après
-    // l'application des sorts ; le perdant de PV voit son strip flasher (même
-    // langage visuel qu'un coup de lane). Le heal (Second Souffle) ne déclenche
-    // rien (diff positive). lane=0 = placeholder (non lu pour un sort).
-    if (b.a.hp < startBoard.a.hp) setHeroHit({ side: "you", lane: 0, key: Date.now() });
-    if (b.b.hp < startBoard.b.hp) setHeroHit({ side: "opp", lane: 0, key: Date.now() + 1 });
+    // COMMIT du board (mort/dégâts/héros) — emballé pour pouvoir être DIFFÉRÉ à
+    // l'impact du caillou (cf. plus bas). Flash de strip sur le héros qui ENCAISSE
+    // un sort de dégât direct (Supernova, Trou Noir, Heist…) : on compare les PV
+    // avant/après ; le perdant de PV voit son strip flasher (Alex 2026-06-17). Le
+    // heal (diff positive) ne déclenche rien. lane=0 = placeholder (non lu).
+    const commitSpellBoard = () => {
+      if (aborted) return;
+      setBoard(b);
+      if (b.a.hp < startBoard.a.hp) setHeroHit({ side: "you", lane: 0, key: Date.now() });
+      if (b.b.hp < startBoard.b.hp) setHeroHit({ side: "opp", lane: 0, key: Date.now() + 1 });
+    };
     // SPELL-SPOTLIGHT séquencé (Alex 2026-06-23 « carte à l'avant → anim →
     // dissolution → suivante, sinon ça se mélange »). Le board est déjà appliqué
     // d'un coup ci-dessus (correctness inchangée) ; ici on rejoue les SIGNATURES
@@ -193,9 +199,56 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
         }, at);
       });
     }
-    // Durée de la phase SORTS = file complète, OU une base mini (SPELLS_MS) si
-    // aucune carte à signature (les sorts ciblés réagissent in-slot, pas ici).
-    const spellsPhaseMs = Math.max(SPELLS_MS, spellAcc + 150);
+    // Projectile « Jet de Caillou » (Alex 2026-06-24) : cue lane→lane indépendant
+    // des signatures plein-board. Pour chaque jet-caillou joué QUI A TOUCHÉ (garde
+    // de applyJetCaillou sur startBoard : cible présente, non ancrée, non immunisée),
+    // on lance un caillou (léger décalage si plusieurs). La mort éventuelle reste
+    // gérée par DeathShatter (diff de board) ; ici purement cosmétique.
+    let projectileFired = false;
+    if (setProjectileFX) {
+      const shots: ProjectileFX[] = [];
+      let k = 0;
+      const oppOnLane = (side: Side, l: LaneIndex) => (side === "a" ? startBoard.lanes[l].b : startBoard.lanes[l].a);
+      const hits = (side: Side, l: LaneIndex): boolean => {
+        const o = oppOnLane(side, l);
+        return !!o && !o.anchored && !o.spellImmune; // garde de applyJetCaillou (cible réelle)
+      };
+      const collect = (intent: TurnIntent, side: Side) => {
+        const toSide: Side = side === "a" ? "b" : "a";
+        for (const sp of intent.spells) {
+          if (sp.kind !== "lane") continue;
+          if (sp.id === "jet-caillou") {
+            // Tir unique : seulement s'il touche une vraie cible (sinon un impact
+            // sur une case vide mentirait).
+            if (hits(side, sp.lane)) shots.push({ fromSide: side, toSide, lane: sp.lane, key: fxBaseKey + 7000 + k++ });
+          } else if (sp.id === "eboulement") {
+            // AOE COSMÉTIQUE : on montre TOUJOURS la roche tomber sur la lane
+            // ciblée + les 2 voisines (in-board), même case vide/ancrée — Alex
+            // « je vois l'effet central mais pas l'impact des 2 côtés ». La roche
+            // est purement visuelle (mort/dégâts = board diff + DeathShatter), donc
+            // un impact d'éboulement sur une lane vide ne ment pas (ça s'éboule).
+            for (const l of [sp.lane, sp.lane - 1, sp.lane + 1] as LaneIndex[]) {
+              if (l < 0 || l > 2) continue;
+              shots.push({ fromSide: side, toSide, lane: l, key: fxBaseKey + 7000 + k++ });
+            }
+          }
+        }
+      };
+      collect(playerIntent, "a");
+      collect(cpuIntent, "b");
+      if (shots.length > 0) { setProjectileFX(shots); projectileFired = true; }
+    }
+    // COMMIT : si des cailloux volent, on RETARDE le commit du board jusqu'à leur
+    // IMPACT (~780ms = TRAVEL_MS 0.95s × 0.82 dans ArenaProjectileFX) → la créature
+    // touchée disparaît PILE au slam de la roche, pas à la pose (Alex 2026-06-26).
+    // Sinon (aucun tir), commit immédiat — comportement inchangé.
+    const PROJECTILE_IMPACT_MS = 780;
+    if (projectileFired) window.setTimeout(commitSpellBoard, PROJECTILE_IMPACT_MS);
+    else commitSpellBoard();
+    // Durée de la phase SORTS = file complète, OU une base mini (SPELLS_MS), ET au
+    // moins l'impact du caillou si tir (sinon SUMMONS pré-committerait le board et
+    // ferait disparaître la créature avant l'arrivée de la roche).
+    const spellsPhaseMs = Math.max(SPELLS_MS, spellAcc + 150, projectileFired ? PROJECTILE_IMPACT_MS + 250 : 0);
     logBoardSnapshot(b, "post-spells");
 
     // ─── Step 2: SUMMONS ───

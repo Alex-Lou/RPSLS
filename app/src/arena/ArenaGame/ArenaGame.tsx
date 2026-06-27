@@ -60,6 +60,7 @@ import {
 import { setMatchExit } from "../../matchExitStore";
 import { buildCpuDeckMirroring, buildPlayerDeck, resolveArenaDeckSource } from "../arenaDecks";
 import { runResolverFlow, type ResolveStep } from "../arenaResolverFlow";
+import type { ProjectileFX } from "../ArenaProjectileFX";
 import { BoardFillSlot } from "./BoardFillSlot";
 import { HeroHitFlash } from "./HeroHitFlash";
 import { useArenaIntent } from "./useArenaIntent";
@@ -200,6 +201,16 @@ export function ArenaGame({
     const idImpact = window.setTimeout(() => setImpactFX(null), 900);
     return () => window.clearTimeout(idImpact);
   }, [impactFX?.key]);
+  // Projectile Jet de Caillou (Alex 2026-06-24) — purgé par timer nettoyé pour
+  // qu'un 2e jet identique re-déclenche (transition de key). 1800ms = fin réelle
+  // de l'anim (impact ~1.48s + stagger AOE ~0.18s) + petite marge ; au-delà, on
+  // tenait l'essaim de nœuds monté ~540ms après qu'il soit invisible (perf).
+  const [projectileShots, setProjectileShots] = useState<ProjectileFX[]>([]);
+  useEffect(() => {
+    if (projectileShots.length === 0) return;
+    const id = window.setTimeout(() => setProjectileShots([]), 1800);
+    return () => window.clearTimeout(id);
+  }, [projectileShots]);
   // LE TRACÉ — cue « ★ ARÊTE TRACÉE » quand la constellation du JOUEUR (board.a)
   // MONTE. Rend le mécanisme visible : tu vois la cause→effet (« counter de Voie
   // gagné → arête tracée »). One-shot, purgé par timer nettoyé (leak-free).
@@ -466,6 +477,7 @@ export function ArenaGame({
       setAntiTaunt,
       setSpellFX,
       setImpactFX,
+      setProjectileFX: setProjectileShots,
       onSettle: () => setIntent({ spells: [], summons: [] }),
       onAdvanceTurn: () => {
         setResolving(false);
@@ -587,6 +599,7 @@ export function ArenaGame({
             tauntBlock={tauntBlock}
             antiTaunt={antiTaunt}
             spellFX={spellFX}
+            projectileShots={projectileShots}
             oppName={oppName}
             oppAvatar={oppAvatar}
             targeting={targeting}

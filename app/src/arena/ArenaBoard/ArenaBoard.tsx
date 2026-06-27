@@ -28,6 +28,7 @@ import { useT } from "../../i18n";
 import { ArenaHeroStrip } from "../ArenaHeroStrip";
 import { ArenaSpellsReveal } from "../ArenaSpellsReveal";
 import { ArenaSpellFX } from "../ArenaSpellFX";
+import { ArenaProjectileFX, type ProjectileFX } from "../ArenaProjectileFX";
 import { ArenaHpVignette } from "../ArenaHpVignette";
 import { isValidLaneTarget, targetLabelFor, LANE_SPELL_TARGET_SIDE } from "../arenaTypes";
 import type { ArenaTargeting, BoardState, LaneIndex, Side, TurnIntent } from "../arenaTypes";
@@ -77,6 +78,8 @@ export interface ArenaBoardProps {
   /** Signatures FX plein-board (Genèse, Supernova…) — déclenché au step
    *  SPELLS. null au repos. Cf. ArenaSpellFX. */
   spellFX?: { ids: CardId[]; key: number } | null;
+  /** Projectiles « cailloux » lane→lane — Jet de Caillou (1) + Éboulement AOE (N). */
+  projectileShots?: ProjectileFX[];
   /** Identité cosmétique CPU (strip adverse) — nom réel + portrait hero_*.png
    *  au lieu de « CPU » + 🤖 (Alex 2026-06-13). */
   oppName?: string;
@@ -115,7 +118,7 @@ export interface ArenaBoardProps {
   fillHeight?: number;
 }
 
-export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPreview, resolveStep, combatLane = null, combatChargers = [], heroHit = null, tauntBlock = null, antiTaunt = null, spellFX = null, oppName, oppAvatar, targeting, onLaneTap, onRemoveSpell, onRemoveSummon, forgeYou = null, forgeOpp = null, onForgeTap, forgeFlashKey = null, forgeRecoverKey = null, forgeHighlight = null, fillHeight }: ArenaBoardProps) {
+export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPreview, resolveStep, combatLane = null, combatChargers = [], heroHit = null, tauntBlock = null, antiTaunt = null, spellFX = null, projectileShots = [], oppName, oppAvatar, targeting, onLaneTap, onRemoveSpell, onRemoveSummon, forgeYou = null, forgeOpp = null, onForgeTap, forgeFlashKey = null, forgeRecoverKey = null, forgeHighlight = null, fillHeight }: ArenaBoardProps) {
   // SECOUSSE D'IMPACT (Alex 2026-06-12) : à chaque tick de combat (combatLane
   // change), le pad tremble brièvement, calé sur l'apex du slam (~0.3s après
   // le départ de la charge). Animation controls = pas de remount des lanes.
@@ -186,6 +189,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
 
   return (
     <div
+      data-arena-board-root
       className="relative w-full max-w-3xl landscape:max-w-4xl mx-auto px-0.5 flex flex-col gap-0 sm:gap-0.5 [@media(max-height:560px)]:max-w-md"
       style={{ minHeight: fillHeight ? fillHeight : undefined }}
     >
@@ -365,7 +369,18 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
         <LaneRow
           lanes={board.lanes}
           renderSide={playerSide}
-          intent={intent}
+          // APERÇU D'INVOCATION de MA rangée — visible TANT QUE la créature n'est
+          // pas encore posée : planification + RÉVÉLATION + SORTS (avant summons).
+          // On ne le COUPE qu'à partir de SUMMONS/COMBAT/SETTLE :
+          //  • à summons la vraie créature REMPLACE l'aperçu (transition nette) ;
+          //  • en combat, si elle MEURT, le ternaire d'ArenaLaneSlot (creature null
+          //    → plannedSummon+showPlanned → PlannedSlot) ne retombe PLUS sur
+          //    l'aperçu fantôme statique sous le DeathShatter (= « double immobile »,
+          //    bug capturé).
+          // Avant je coupais dès resolveStep!==null → l'aperçu DISPARAISSAIT à
+          // reveal/spells puis ne réapparaissait qu'à summons = flicker « je le vois,
+          // vois plus, revois » (Alex 2026-06-27). Là : aperçu → créature, zéro trou.
+          intent={resolveStep === "summons" || resolveStep === "combat" || resolveStep === "settle" ? null : intent}
           isPlayer={true}
           combatLane={combatLane}
           combatChargers={combatChargers}
@@ -388,6 +403,9 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
 
       {/* PLAYER HERO STRIP déplacé dans ArenaPlanPhase (juste au-dessus du
        *  picker) pour être à 1px des moves (Alex 2026-06-11). N'est plus ici. */}
+      {/* Projectile Jet de Caillou — overlay ancré sur la racine du board
+       *  (data-arena-board-root), positionné via les data-arena-lane/-side. */}
+      <ArenaProjectileFX shots={projectileShots} />
     </div>
   );
 }
