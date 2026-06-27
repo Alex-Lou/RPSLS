@@ -43,7 +43,7 @@ export function CurrencyBadges({ onClick, size = "compact", inert, showStars }: 
   const isFull = size === "full";
 
   return (
-    <div className={"flex items-stretch gap-2 " + (isFull ? "" : "w-full")}>
+    <div className="flex items-stretch gap-2 w-full">
       <CurrencyChip
         icon="/MenuIcons/IconConstellationPro/monnaie-eclats.png"
         value={eclats}
@@ -121,7 +121,10 @@ function CurrencyChip({
         // chips sit inside narrower cards.
         "relative inline-flex items-center justify-center gap-1.5 rounded-full ring-1 bg-gradient-to-br backdrop-blur-sm transition " +
         ring + " " + toneFrom + " " + toneTo + " " +
-        (big ? "px-3 py-1.5" : "flex-1 px-2.5 py-1.5") + " " +
+        // full = aussi flex-1 (partage la largeur) + min-w-0 (Alex 2026-06-27) :
+        // en largeur-auto, 3 badges à 6 chiffres DÉBORDAIENT/coupaient sur petits
+        // écrans. Maintenant ils s'étalent et tiennent toujours dans le conteneur.
+        (big ? "flex-1 min-w-0 px-3 py-1.5" : "flex-1 px-2.5 py-1") + " " +
         (interactive ? "cursor-pointer hover:brightness-110" : "")
       }
     >
@@ -132,14 +135,24 @@ function CurrencyChip({
           src={icon}
           alt=""
           draggable={false}
-          // Agrandies (Alex 2026-06-13) : poussière/étoile paraissaient
-          // minuscules (PNG très "padés"). +50% pour qu'elles respirent.
-          className={(big ? "w-7 h-7" : "w-6 h-6") + " object-contain drop-shadow-[0_1px_3px_rgba(0,0,0,0.55)] shrink-0 -my-1"}
+          // Agrandies (Alex 2026-06-13) : PNG très "padés". Le -my-1 (icône qui
+          // déborde la pilule) était gardé en FULL (lobby, OK) mais RETIRÉ en
+          // compact + icône w-6→w-5 (Alex 2026-06-27 « bulles menu coupées au
+          // dessus/dessous ») → la pilule menu est auto-contenue, plus de clip.
+          className={(big ? "w-7 h-7 -my-1" : "w-5 h-5") + " object-contain drop-shadow-[0_1px_3px_rgba(0,0,0,0.55)] shrink-0"}
         />
       ) : (
         <span className={big ? "text-base" : "text-sm leading-none"}>{icon}</span>
       )}
-      <span className={"font-black tabular-nums " + text + " " + (big ? "text-sm" : "text-[13px] leading-none")}>
+      <span
+        className={"font-black tabular-nums " + text + " " + (big ? "text-sm" : "text-[13px] leading-none")}
+        // Police ÉPINGLÉE (Alex 2026-06-26) : le nombre héritait de --font-body
+        // du thème ; les thèmes à police display (Audiowide/Cinzel/Bebas…) n'ont
+        // pas de chiffres tabulaires → digits larges/hauts qui DÉBORDENT la pilule.
+        // Inter (toujours bundlée) + tnum/lnum = métriques fixes, identiques dans
+        // tous les thèmes. Taille inchangée (le défaut était family/figures).
+        style={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", fontFeatureSettings: '"tnum" 1, "lnum" 1' }}
+      >
         {formatCompact(value)}
       </span>
       {accent === "ready" && (

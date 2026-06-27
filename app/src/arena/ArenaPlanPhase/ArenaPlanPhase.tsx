@@ -348,11 +348,15 @@ export function ArenaPlanPhase({
                 </div>
               ))}
             </div>
-            {/* INDICATEUR de phase (Alex 2026-06-17 : « Ouverture » se lisait comme
-             *  un bouton « appuyer pour ouvrir ») → « PHASE 1 », un statut non
-             *  actionnable qui annonce la « PHASE 2 · DÉPLOIEMENT » de la révélation,
-             *  sans dire QUAND les cartes arrivent (surprise préservée). */}
-            <div className="text-[8px] uppercase tracking-[0.32em] font-black text-amber-200/60">Phase 1</div>
+            {/* INDICATEUR de phase + DÉCOMPTEUR (Alex 2026-06-25 : « un décompteur de
+             *  tour avant l'apparition des cartes, à côté des retournées »). Les cartes
+             *  se débloquent au tour OPENING_TURNS+1 → tours restants = (OPENING_TURNS+1)−turn. */}
+            <div className="flex flex-col items-center leading-tight gap-0.5">
+              <div className="text-[8px] uppercase tracking-[0.32em] font-black text-amber-200/60">Phase 1</div>
+              <div className="px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-300/40 text-[9px] font-black text-amber-100 tabular-nums uppercase tracking-wide">
+                Cartes dans {OPENING_TURNS + 1 - board.turn} tour{OPENING_TURNS + 1 - board.turn > 1 ? "s" : ""}
+              </div>
+            </div>
           </div>
         ) : (
           <ArenaHandFanout

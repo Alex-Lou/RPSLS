@@ -16,6 +16,7 @@
  */
 
 import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
 import { hapticTap, hapticMatchStart } from "../haptic";
@@ -106,6 +107,24 @@ export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
 
   return (
     <div className="relative flex-1 flex flex-col items-center justify-center min-h-0 p-3 gap-3 landscape:gap-2">
+      {/* RETOUR au menu Constellation Pro (mode / voie / deck) — Alex 2026-06-26.
+       *  Flèche ← AMBRE flottante en haut-gauche (décalée à DROITE du burger, même
+       *  offset que le back-button standard du jeu) → SORTIE de la rangée d'action
+       *  pour ne plus écraser « COMMENCER LE MATCH ». Portal body : échappe à tout
+       *  ancêtre transformé (Motion) → pas de dérive du fixed. onCancel = arena_lobby. */}
+      {createPortal(
+        <button
+          onClick={() => { hapticTap(); onCancel(); }}
+          aria-label="Retour au menu Constellation Pro"
+          title="Retour au menu"
+          className="fixed z-30 w-11 h-11 rounded-2xl bg-amber-500/20 backdrop-blur border border-amber-400/60 text-amber-200 flex items-center justify-center active:scale-95 transition shadow-lg top-[calc(max(var(--sai-top),32px)+10px)] left-[calc(max(var(--sai-left),12px)+44px+8px)] md:top-3 md:left-3"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>,
+        document.body,
+      )}
       <h2 className="text-center text-[11px] uppercase tracking-[0.3em] font-black text-emerald-300/90">
         ⚔ Pré-match · Constellation Pro
       </h2>
@@ -151,25 +170,21 @@ export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
         )}
       </AnimatePresence>
 
-      {/* Action row — "?" (training only) + COMMENCER + ANNULER. In a real
-       *  tournament / online match the rules button is hidden so the other
-       *  player isn't kept waiting while this one reads. */}
-      <div className="flex items-center justify-center gap-2 mt-2 landscape:mt-0">
-        {isTraining && (
-          <button
-            onClick={() => { hapticTap(); setHowOpen(true); }}
-            className="w-11 h-11 rounded-full bg-zinc-900 border border-emerald-700/50 text-emerald-300 text-base font-black active:scale-95 shadow-md"
-            aria-label="Comment ça marche"
-            title="Comment ça marche"
-          >
-            ?
-          </button>
-        )}
+      {/* Action row — COMMENCER vraiment CENTRÉ (colonnes 1fr symétriques) et le
+       *  « ? » (règles, training only) poussé à DROITE dans sa colonne (Alex
+       *  2026-06-27). En tournoi/online le « ? » est masqué (l'autre joueur
+       *  n'attend pas). Colonne droite vide = COMMENCER reste centré. */}
+      {/* COMMENCER CENTRÉ : un spacer gauche de la MÊME largeur que le « ? »
+       *  (w-11) équilibre la rangée → le bouton tombe pile au centre, le « ? »
+       *  à sa droite (Alex 2026-06-27). Spacer gauche rétrécissable (sans
+       *  shrink-0) → sur un écran étroit il s'efface au lieu de déborder. */}
+      <div className="flex items-center justify-center gap-2 mt-2 landscape:mt-0 w-full">
+        <div className="w-11" aria-hidden />
         <button
           onClick={confirm}
           disabled={phase !== "landed"}
           className={
-            "px-6 py-2 rounded-xl font-black text-white text-sm transition " +
+            "shrink-0 px-6 py-2 rounded-xl font-black text-white text-sm whitespace-nowrap transition " +
             (phase === "landed" ? "shadow-lg" : "bg-zinc-800 text-zinc-500 cursor-not-allowed")
           }
           style={phase === "landed" ? {
@@ -181,13 +196,18 @@ export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
         >
           ✓ COMMENCER LE MATCH
         </button>
-        <button
-          onClick={() => { hapticTap(); onCancel(); }}
-          className="px-3 py-2 rounded-lg bg-zinc-800/80 border border-zinc-700 text-zinc-400 text-[11px] font-bold"
-          aria-label="Retour menu"
-        >
-          ✕
-        </button>
+        {isTraining ? (
+          <button
+            onClick={() => { hapticTap(); setHowOpen(true); }}
+            className="shrink-0 w-11 h-11 rounded-full bg-zinc-900 border border-emerald-700/50 text-emerald-300 text-base font-black active:scale-95 shadow-md"
+            aria-label="Comment ça marche"
+            title="Comment ça marche"
+          >
+            ?
+          </button>
+        ) : (
+          <div className="w-11" aria-hidden />
+        )}
       </div>
 
       <p className="text-center text-[10px] text-zinc-500 max-w-sm">

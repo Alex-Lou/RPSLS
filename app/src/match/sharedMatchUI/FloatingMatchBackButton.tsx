@@ -59,7 +59,7 @@ export const FloatingMatchBackButton = forwardRef<
             fixed z-30 w-11 h-11 rounded-2xl bg-black/55 backdrop-blur border border-hairline
             flex items-center justify-center text-ink active:scale-95 transition shadow-lg
             hover:bg-black/70
-            top-[max(var(--sai-top),32px)]
+            top-[calc(max(var(--sai-top),32px)+10px)]
             left-[calc(max(var(--sai-left),12px)+44px+8px)]
             md:top-3
             md:left-3

@@ -76,8 +76,13 @@ export function LobbyIdentityRow({
       >
         {isImage ? <img src={avatar} alt="" className="w-full h-full object-cover" style={avatarImgStyle(avatar)} /> : avatar}
       </div>
-      <span className="flex-1 min-w-0 font-bold text-sm truncate">{name}</span>
-      <div className="shrink-0 flex items-center gap-1.5">{chips}</div>
+      {/* Nom sur SA ligne (pleine largeur → s'affiche en entier), chips sur la
+       *  ligne JUSTE en dessous (Alex 2026-06-27 « le nom était coupé par les
+       *  chips sur la même ligne »). */}
+      <div className="flex-1 min-w-0 flex flex-col gap-1">
+        <span className="font-bold text-sm truncate">{name}</span>
+        {chips && <div className="flex items-center gap-1.5 flex-wrap">{chips}</div>}
+      </div>
     </Tag>
   );
 }
@@ -142,7 +147,7 @@ export function ModeLobbyShell({
        *  Kotlin n'injecte pas --sai-top (≈ hauteur d'une barre de statut). */}
       <div
         className="shrink-0 flex items-center gap-2"
-        style={{ marginTop: "calc(var(--sai-top, 32px) - 2.5rem)" }}
+        style={{ marginTop: "calc(var(--sai-top, 32px) - 3.5rem)" }}
       >
         <InlineBurger />
         <div className="flex-1 min-w-0 text-center">

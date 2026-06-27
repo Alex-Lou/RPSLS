@@ -200,7 +200,7 @@ export function ModeSelect({
                 <ModeIcon mode="ranked_constellation" />
                 <div className="min-w-0 w-full">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-semibold text-sm sm:text-base">{t("mode.ranked_constellation")}</span>
+                    <span className="font-semibold text-xs sm:text-sm">{t("mode.ranked_constellation")}</span>
                     <span className="text-[9px] uppercase tracking-wider text-amber-200 bg-amber-500/30 px-1 rounded-full">
                       NEW · CARDS
                     </span>

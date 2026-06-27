@@ -223,7 +223,7 @@ export function ArenaLobby({
        *  qui écartait les blocs pour remplir la hauteur → ils suivent le gap
        *  fixe de la zone contenu et restent collés en haut. Sur petit écran,
        *  overflow-y-auto du shell prend le relais → scroll normal. */}
-      <div className="shrink-0 flex items-center justify-center">
+      <div className="shrink-0 flex items-center justify-center my-2">
         <CurrencyBadges size="full" onClick={onGoShop} />
       </div>
 
@@ -336,7 +336,7 @@ export function ArenaLobby({
       <motion.button
         whileTap={{ scale: 0.98 }}
         onClick={onManageDeck}
-        className="bg-surface rounded-2xl px-4 py-3 flex items-center justify-between hover:bg-hairline transition"
+        className="bg-surface rounded-2xl px-4 py-3 mt-2 flex items-center justify-between hover:bg-hairline transition"
         style={{ border: "1px solid color-mix(in oklab, var(--theme-primary) 35%, transparent)" }}
       >
         <div className="flex items-center gap-2.5">

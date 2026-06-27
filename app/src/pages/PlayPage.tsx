@@ -124,7 +124,7 @@ export function PlayPage({
         // pas de padding interne). -mt-11→-mt-4 (Alex 2026-06-23) : -mt-11 plaçait
         // la carte à ~4px sous la safe-area → DANS la barre de statut Android. -mt-4
         // garde ~32px de marge au-dessus de --sai-top (≥24px) → dégage le notch.
-        <UserHeader onNavigate={onNavigate ?? (() => {})} className="px-0 -mt-4" />
+        <UserHeader onNavigate={onNavigate ?? (() => {})} className="px-0 -mt-8" />
       )}
       <AnimatePresence mode="wait">
         {view.kind === "select" && (
