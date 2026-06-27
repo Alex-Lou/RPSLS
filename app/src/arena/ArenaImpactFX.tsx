@@ -75,7 +75,10 @@ function ScissorsSlash({ fatal }: { fatal: boolean }) {
           animate={{ opacity: [0, 1, 1, 0], scaleX: [0, 1, 1, 1] }}
           transition={{ duration: 0.5, times: [0, 0.22, 0.6, 1], ease: "easeOut" }}
           className="w-[160%] h-1.5 origin-left"
-          style={{ rotate: "-26deg", background: "linear-gradient(to right, transparent, #fff 25%, #fff 75%, transparent)", boxShadow: `0 0 26px 7px ${glow}` }}
+          // PERF (Alex 2026-06-26) : plus de box-shadow flou 26px/7px sur cette barre
+          // qui balaie tout l'écran (re-composité = saccade du « coup de ciseaux »).
+          // Le dégradé blanc reste franc et bien lisible.
+          style={{ rotate: "-26deg", background: "linear-gradient(to right, transparent, #fff 25%, #fff 75%, transparent)" }}
         />
       </div>
       {/* Fissures radiantes (écran cassé) — STAGGER (Alex 2026-06-17, Pro-37) :

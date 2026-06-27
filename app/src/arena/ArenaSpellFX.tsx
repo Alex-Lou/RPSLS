@@ -29,6 +29,7 @@ import { isDominantSpell } from "./arenaFinishers";
 import { CARDS } from "../ranked/cards";
 import { CardImage } from "../ranked/CardImage";
 import { useT } from "../i18n";
+import { useGfxAllows } from "../graphics/graphicsQuality";
 
 /* Particules radiales déterministes (pas de Math.random → SSR/replay sûrs,
  * et même semence = même éclat, ce qui suffit visuellement). */
@@ -245,7 +246,7 @@ const SIGNATURES: Partial<Record<CardId, () => ReactElement>> = {
         animate={{ opacity: [0, 1, 1, 0], x: ["-130%", "0%", "12%", "130%"] }}
         transition={{ duration: 0.5, times: [0, 0.4, 0.55, 1], ease: "easeOut" }}
         className="absolute left-1/2 top-1/2 w-56 h-2 -ml-28 -mt-1 origin-center"
-        style={{ rotate: "-18deg", background: "linear-gradient(90deg, transparent, #e2e8f0 35%, #ffffff 50%, #fb7185 65%, transparent)", boxShadow: "0 0 20px 3px rgba(244,63,94,0.85)" }}
+        style={{ rotate: "-18deg", background: "linear-gradient(90deg, transparent, #e2e8f0 35%, #ffffff 50%, #fb7185 65%, transparent)" }}
       />
       <Shockwave color="rgba(251,113,133,0.9)" dur={0.6} max={3.4} />
       <Sparks count={12} radius={120} color="rgba(254,205,211,0.95)" dur={0.6} size={6} />
@@ -314,7 +315,7 @@ const SIGNATURES: Partial<Record<CardId, () => ReactElement>> = {
         animate={{ opacity: [0, 1, 1, 0], x: ["-130%", "0%", "12%", "130%"] }}
         transition={{ duration: 0.45, times: [0, 0.4, 0.55, 1], ease: "easeOut" }}
         className="absolute left-1/2 top-1/2 w-60 h-2.5 origin-center"
-        style={{ marginLeft: -120, marginTop: -5, rotate: "-22deg", background: "linear-gradient(90deg, transparent, #ffffff 45%, #ef4444 60%, transparent)", boxShadow: "0 0 22px 3px rgba(220,38,38,0.9)" }}
+        style={{ marginLeft: -120, marginTop: -5, rotate: "-22deg", background: "linear-gradient(90deg, transparent, #ffffff 45%, #ef4444 60%, transparent)" }}
       />
       <Shockwave color="rgba(239,68,68,0.9)" dur={0.55} max={3.6} />
       <Sparks count={14} radius={130} color="rgba(254,202,202,0.95)" dur={0.6} size={6} />
@@ -328,6 +329,11 @@ export const SPELLS_WITH_SIGNATURE = Object.keys(SIGNATURES) as CardId[];
 
 export function ArenaSpellFX({ fx }: { fx: { ids: CardId[]; key: number } | null }) {
   const t = useT();
+  // PERF (Alex 2026-06-26 « tranchant définitif saccadé ») : le boom plein-board
+  // (~14 nœuds composités/blend) est désormais gaté. En 'low' (auto-downgrade FPS
+  // ou réglage manuel), on garde la carte + la vignette mais on COUPE la signature
+  // → le finisher Tranchant et les autres ne saccadent plus sur appareil faible.
+  const heavyOk = useGfxAllows("spellSignatureHeavy");
   // SPELL-SPOTLIGHT (Alex 2026-06-23 « carte à l'avant → anim → dissolution →
   // suivante, sinon ça se mélange »). Le résolveur émet désormais UNE carte à la
   // fois (file séquencée) → on prend la 1ʳᵉ signature présente. Chaque carte a SON
@@ -393,7 +399,7 @@ export function ArenaSpellFX({ fx }: { fx: { ids: CardId[]; key: number } | null
             {/* LA SIGNATURE — AU-DESSUS de la carte, montée RETARDÉE : elle explose
              *  quand la carte se dissout → le boom est enfin VISIBLE plein cadre. */}
             <AnimatePresence>
-              {showSig && (
+              {showSig && heavyOk && (
                 <motion.div
                   key="sig"
                   initial={{ scale: dominant ? 1.35 : 1.1, opacity: 0 }}

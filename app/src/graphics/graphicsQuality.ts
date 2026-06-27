@@ -76,6 +76,7 @@ const MIN_LEVEL: Record<string, GraphicsLevel> = {
   premiumThemes: "medium", // ThemedBackdrop WebGL continu (20 scènes) — STATIQUE en 'low'
   quartzScene: "medium", // QuartzBackdrop SVG/SMIL continu — STATIQUE en 'low'
   stormRainLayer: "medium", // pluie premium (overlay) — COUPÉE en 'low'
+  spellSignatureHeavy: "medium", // boom plein-board des finishers/légendaires (Arène) — en 'low' on garde carte+vignette, on coupe les ~14 nœuds composités/blend (Alex 2026-06-26 « tranchant définitif saccadé »)
 };
 
 /** Contenu PREMIUM (PAYANT) — thèmes premium + traînées de toucher. RÈGLE
