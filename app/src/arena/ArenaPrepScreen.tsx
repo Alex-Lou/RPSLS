@@ -23,6 +23,7 @@ import { hapticTap, hapticMatchStart } from "../haptic";
 import { ArenaHowItWorks } from "./ArenaHowItWorks";
 import { THEMES } from "../theme/theme";
 import { oppPersona } from "../ranked/personaSeed";
+import { Coin } from "../ranked/MatchPrepScreen/Coin";
 import type { BackgroundId, PadId, ThemeId } from "../types";
 
 // CPU apparence : bundle COHÉRENT pad+fond+thème (oppPersona) — Alex
@@ -133,7 +134,25 @@ export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
        *  pièce au centre) en flex-1 réparti pour profiter de la largeur. */}
       <div className="flex items-center justify-center gap-4 sm:gap-6 landscape:w-full landscape:max-w-2xl landscape:justify-between landscape:gap-2">
         <Portrait name={playerName} avatar={playerAvatar} side="you" themeColor={youTheme?.primary ?? "#a78bfa"} highlight={phase === "landed" && winner === "you"} />
-        <SimpleCoin phase={phase} winner={winner} youColor={youTheme?.primary ?? "#a78bfa"} oppColor={oppTheme?.primary ?? "#f43f5e"} onTap={flip} />
+        {/* Pile-ou-face UNIFIÉ : on réutilise le vrai `Coin` du Classé (faces en
+         *  dégradé conique, encoches, glint, étincelles) au lieu de l'ancien
+         *  SimpleCoin maison. Le `Coin` est présentationnel (pas tappable) → on
+         *  l'enveloppe dans un bouton pour garder le « touche la pièce » du Pro.
+         *  `size` compact (84) pour rentrer dans le trio VS sans déborder. */}
+        <button
+          onClick={flip}
+          disabled={phase !== "idle"}
+          aria-label="Lancer la pièce"
+          className="shrink-0 bg-transparent border-0 p-0 disabled:cursor-default"
+        >
+          <Coin
+            phase={phase}
+            winner={winner}
+            youTheme={youTheme ?? { primary: "#a78bfa", secondary: "#7c3aed" }}
+            oppTheme={oppTheme ?? { primary: "#f43f5e", secondary: "#9f1239" }}
+            size={84}
+          />
+        </button>
         <Portrait name={cpu.name} avatar={cpu.avatar} side="opp" themeColor={oppTheme?.primary ?? "#f43f5e"} highlight={phase === "landed" && winner === "opp"} />
       </div>
 
@@ -184,7 +203,7 @@ export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
           onClick={confirm}
           disabled={phase !== "landed"}
           className={
-            "shrink-0 px-6 py-2 rounded-xl font-black text-white text-sm whitespace-nowrap transition " +
+            "shrink-0 px-4 py-2 rounded-xl font-black text-white text-sm whitespace-nowrap transition " +
             (phase === "landed" ? "shadow-lg" : "bg-zinc-800 text-zinc-500 cursor-not-allowed")
           }
           style={phase === "landed" ? {
@@ -265,104 +284,5 @@ function Portrait({ name, avatar, side, themeColor, highlight }: {
         <span className="text-xs font-bold text-zinc-100 truncate max-w-[100px]">{name}</span>
       </div>
     </motion.div>
-  );
-}
-
-/* ───────────────────────── Simple Coin ───────────────────────── */
-
-function SimpleCoin({ phase, winner, youColor, oppColor, onTap }: {
-  phase: "idle" | "flipping" | "landed";
-  winner: "you" | "opp" | null;
-  youColor: string;
-  oppColor: string;
-  onTap: () => void;
-}) {
-  const SPINS = 5;
-  const target = phase === "idle" ? 0 : SPINS * 360 + (winner === "opp" ? 180 : 0);
-  const winColor = winner === "opp" ? oppColor : youColor;
-  return (
-    <button
-      onClick={onTap}
-      disabled={phase !== "idle"}
-      className="relative flex items-center justify-center"
-      style={{ width: 88, height: 88, perspective: 800 }}
-      aria-label="Lancer la pièce"
-    >
-      {/* Halo */}
-      <motion.div
-        animate={{ opacity: phase === "landed" ? 0.7 : phase === "flipping" ? 0.4 : 0.25 }}
-        transition={{ duration: 0.3 }}
-        className="absolute rounded-full blur-2xl"
-        style={{ width: 110, height: 110, background: `radial-gradient(circle, ${winColor}80, transparent 70%)` }}
-      />
-      {/* Shockwave */}
-      <AnimatePresence>
-        {phase === "landed" && (
-          <motion.div
-            initial={{ opacity: 0.7, scale: 0.5 }}
-            animate={{ opacity: 0, scale: 2.4 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-            className="absolute rounded-full"
-            style={{ width: 70, height: 70, border: `2px solid ${winColor}` }}
-          />
-        )}
-      </AnimatePresence>
-      {/* Coin body — toss arc + spin */}
-      <motion.div
-        animate={
-          phase === "idle"
-            ? { y: [0, -5, 0] }
-            : { y: [0, -55, -40, 4, 0], scale: [1, 1.12, 1.04, 1.02, 1] }
-        }
-        transition={
-          phase === "idle"
-            ? { duration: 2.4, ease: "easeInOut", repeat: Infinity }
-            : { duration: 1.6, ease: [0.22, 0.68, 0.36, 1], times: [0, 0.35, 0.6, 0.9, 1] }
-        }
-        style={{ width: 70, height: 70, willChange: "transform" }}
-        className="relative"
-      >
-        <motion.div
-          animate={{
-            rotateY: target,
-            rotateX: phase === "flipping" ? [0, 18, 0] : 0,
-          }}
-          transition={
-            phase === "idle"
-              ? { duration: 0 }
-              : {
-                  rotateY: { duration: 1.6, ease: [0.18, 0.6, 0.32, 1] },
-                  rotateX: { duration: 1.6, ease: "easeInOut" },
-                }
-          }
-          style={{ transformStyle: "preserve-3d", width: 70, height: 70, willChange: "transform" }}
-          className="relative"
-        >
-          {/* Face TOI */}
-          <CoinFace label="TOI" bg={youColor} side="front" />
-          {/* Face OPP */}
-          <CoinFace label="ADV" bg={oppColor} side="back" />
-        </motion.div>
-      </motion.div>
-    </button>
-  );
-}
-
-function CoinFace({ label, bg, side }: { label: string; bg: string; side: "front" | "back" }) {
-  return (
-    <div
-      className="absolute inset-0 rounded-full flex items-center justify-center text-[11px] font-black text-white shadow-2xl"
-      style={{
-        background: `radial-gradient(circle at 30% 30%, ${bg}, ${bg}cc 55%, ${bg}66)`,
-        border: "3px solid rgba(255,255,255,0.6)",
-        boxShadow: `inset 0 0 12px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.5), 0 0 18px ${bg}66`,
-        transform: side === "back" ? "rotateY(180deg)" : undefined,
-        backfaceVisibility: "hidden",
-        textShadow: "0 1px 2px rgba(0,0,0,0.6)",
-        letterSpacing: "0.15em",
-      }}
-    >
-      {label}
-    </div>
   );
 }

@@ -2,7 +2,6 @@ import { motion, AnimatePresence } from "motion/react";
 
 /* ─────────── The coin ─────────── */
 
-const COIN = 120;
 /** Coin-flip total duration. Was 2.6s — felt draggy. 1.6s lands punchier
  *  without losing the toss arc. Used by both the parent state machine (timer
  *  → setPhase("landed")) and the Coin component (all motion transitions). */
@@ -10,13 +9,17 @@ export const FLIP_DURATION_MS = 1600;
 const FLIP_DURATION_S = FLIP_DURATION_MS / 1000;
 
 export function Coin({
-  phase, winner, youTheme, oppTheme,
+  phase, winner, youTheme, oppTheme, size = 120,
 }: {
   phase: "idle" | "flipping" | "landed";
   winner: "you" | "opp" | null;
   youTheme: { primary: string; secondary: string };
   oppTheme: { primary: string; secondary: string };
+  /** Pixel diameter of the coin. Default 120 (Classé prep). The Pro prep
+   *  passes a smaller value so the rich coin fits its compact VS trio. */
+  size?: number;
 }) {
+  const COIN = size;
   // 4 spins is still plenty of "wow" inside 1.6s — the previous 8 spins felt
   // dragged out (and cost 2880° of GPU compositing).
   const SPINS = 4;

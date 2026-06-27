@@ -63,7 +63,7 @@ const VOIE_FICHE: Record<Move, { but: string; plus: string; moins: string; perso
     but: "Aligner 3 Feuilles vivantes.",
     plus: "ÉTOUFFE : tes Feuilles annulent la Provocation des Pierres adverses. Le contre naturel de la Montagne.",
     moins: "Très fragile (1 PV). FANAISON : tes Feuilles perdent de l'ATK au fil des tours.",
-    perso: "En Voie, Fanaison ralentie. Finisher VERGER : Fanaison désactivée + tu regagnes 1 PV/tour.",
+    perso: "En Voie, Fanaison ralentie. Finisher VERGER : Fanaison désactivée + 1-2 PV/tour garantis.",
   },
   scissors: {
     but: "Aligner 3 Ciseaux vivants.",
