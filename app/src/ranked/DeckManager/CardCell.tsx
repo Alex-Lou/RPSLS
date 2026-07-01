@@ -84,7 +84,7 @@ export function CardCell({
        *  renders the glyph as a fallback when card.art is null; superimposing
        *  another glyph on top of the actual art read as visual clutter). */}
       <div className="absolute bottom-0 left-0 right-0 z-10 bg-black/65 backdrop-blur-sm py-0.5 px-1 flex flex-col items-center gap-0">
-        <span className="text-[7px] font-bold uppercase text-white/95 text-center leading-tight truncate w-full">
+        <span className="text-[8px] font-bold uppercase text-white/95 text-center leading-tight truncate w-full">
           {t(card.nameKey)}
         </span>
         <span className={"text-[7px] font-bold leading-none " + RARITY_COLOR[card.rarity]}>

@@ -13,12 +13,13 @@ import { motion } from "motion/react";
 import { CARDS } from "./cards";
 import { CardImage } from "./CardImage";
 import type { CardId } from "./rankedTypes";
+import { fanGeometry } from "./handFan";
 import { useT } from "../i18n";
 
 /** True on short viewports (landscape phones) where the hand must shrink so
  *  the board + move picker still fit. Self-contained so callers don't thread
  *  a flag through. */
-function useShortViewport(maxH = 540): boolean {
+function useShortViewport(maxH = 560): boolean {
   const [short, setShort] = useState(
     typeof window !== "undefined" ? window.innerHeight < maxH : false,
   );
@@ -47,15 +48,6 @@ const GLOW_BY_RARITY: Record<string, string> = {
   epic: "shadow-violet-500/30",
   legendary: "shadow-amber-400/40",
 };
-
-/** Fan geometry for a given hand size — angle per slot, vertical lift of the
- *  outermost cards, and horizontal overlap. */
-function fanGeometry(total: number) {
-  if (total <= 1) return { spread: 0, lift: 0, overlap: 0 };
-  if (total === 2) return { spread: 7, lift: 3, overlap: 8 };
-  if (total === 3) return { spread: 9, lift: 5, overlap: 12 };
-  return { spread: 8, lift: 7, overlap: 16 }; // 4 cards
-}
 
 export function CardHand({
   hand, mana, braiseStacks = 0, selected, playedId = null, onSelect, disabled = false, augurCooldown = 0,
@@ -94,7 +86,7 @@ export function CardHand({
       // cards rise UPWARD from the centre (yLift is applied as a negative y
       // in CardThumb), so paddingTop reserves room for that rise plus the
       // selected/played lift. Compact (landscape) shrinks the reserve.
-      style={{ paddingTop: geo.lift + (compact ? 14 : 26), paddingBottom: 2 }}
+      style={{ paddingTop: geo.lift + (compact ? 6 : 10), paddingBottom: 2 }}
     >
       {hand.map((id, i) => {
         const card = CARDS[id];
@@ -198,8 +190,8 @@ function CardThumb({
       className={
         "relative rounded-xl overflow-hidden transition bg-surface-raised " +
         (compact
-          ? "w-[44px] h-[60px] "
-          : "w-[56px] h-[76px] sm:w-[68px] sm:h-[92px] ") +
+          ? "w-[36px] h-[48px] "
+          : "w-[45px] h-[60px] sm:w-[52px] sm:h-[70px] ") +
         "ring-2 " + ring + " " + glow +
         (!playable ? " grayscale cursor-not-allowed" : "")
       }
@@ -225,7 +217,7 @@ function CardThumb({
       )}
       {/* Name at bottom */}
       <div className="absolute bottom-0 left-0 right-0 bg-black/70 backdrop-blur-sm py-0.5 z-10">
-        <div className="text-[6px] sm:text-[7px] font-bold uppercase tracking-wider text-center text-white/90 truncate px-0.5">
+        <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-center text-white/90 truncate px-0.5">
           {t(card.nameKey)}
         </div>
       </div>

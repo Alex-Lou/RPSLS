@@ -9,15 +9,7 @@
  */
 
 import { motion, AnimatePresence } from "motion/react";
-
-/** Same shape as CardHand.fanGeometry, kept locally so both files stay
- *  independent — change only on intent, not by importing across components. */
-function fanGeometry(total: number) {
-  if (total <= 1) return { spread: 0, lift: 0, overlap: 0 };
-  if (total === 2) return { spread: 7, lift: 3, overlap: 8 };
-  if (total === 3) return { spread: 9, lift: 5, overlap: 12 };
-  return { spread: 8, lift: 7, overlap: 16 };
-}
+import { fanGeometry } from "./handFan";
 
 export function OppHandIndicator({
   size,

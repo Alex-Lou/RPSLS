@@ -59,6 +59,9 @@ export interface LanesBoardProps {
   onLaneClick?: (lane: LaneTarget) => void;
   onOppLaneClick?: (lane: LaneTarget) => void;
   augurTargeting?: boolean;
+  /** Une carte à cibler sur TES lanes est sélectionnée → surligne les 3 cases
+   *  joueur dans la couleur du thème (Alex 2026-07). Pick phase uniquement. */
+  myLaneTargeting?: boolean;
   /** When provided (the pick phase wraps the board in BoardFillSlot), the board
    *  pins itself to this measured px height and centres its content — a fixed
    *  frame like Constellation Pro, so chips appearing/disappearing below no
@@ -71,7 +74,7 @@ export function LanesBoard({
   youName, opponentName,
   picks, oppPicks, augurRevealed, oracleRevealed,
   myCard, oppCard, mode, laneResults, oppHandSize, compassPeek,
-  onLaneClick, onOppLaneClick, augurTargeting = false, fillHeight,
+  onLaneClick, onOppLaneClick, augurTargeting = false, myLaneTargeting = false, fillHeight,
 }: LanesBoardProps) {
   // The pad is the player's own — unless a coin-flipped arena overrides it
   // for this duel (see ranked/arena.tsx).
@@ -79,7 +82,7 @@ export function LanesBoard({
   return (
     <div
       className={
-        "relative w-full max-w-2xl rounded-2xl overflow-hidden " +
+        "relative shrink-0 w-full max-w-2xl rounded-2xl overflow-hidden " +
         "border border-emerald-900/40 " +
         "shadow-[inset_0_0_36px_rgba(0,0,0,0.55)] " +
         "[@media(max-height:560px)]:max-w-md" +
@@ -117,12 +120,14 @@ export function LanesBoard({
         )}
       </AnimatePresence>
 
-      <div className="relative p-3 sm:p-4 flex flex-col gap-3 sm:gap-4 [@media(max-height:560px)]:p-1.5 [@media(max-height:560px)]:gap-1.5">
+      <div className="relative p-1.5 sm:p-2 flex flex-col gap-1.5 sm:gap-2 [@media(max-height:560px)]:p-1 [@media(max-height:560px)]:gap-1">
       <div className="flex items-center justify-between gap-2 px-0.5">
-        <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-rose-300/90 truncate">
+        <div className="min-w-0 flex-1 text-[10px] uppercase tracking-[0.25em] font-bold text-rose-300/90 truncate">
           ✦ {opponentName}
         </div>
-        {oppHandSize !== undefined && <OppHandIndicator size={oppHandSize} />}
+        {oppHandSize !== undefined && (
+          <div className="shrink-0"><OppHandIndicator size={oppHandSize} /></div>
+        )}
       </div>
       {/* Crépuscule (Twilight): lane index that's been sealed card-immune by
           either side this round. Threaded into both rows for a consistent
@@ -150,6 +155,7 @@ export function LanesBoard({
         laneResults={laneResults}
         twilightLane={twilightFor(myCard, oppCard)}
         onLaneClick={onLaneClick}
+        targeting={myLaneTargeting}
       />
       <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-emerald-300/90 truncate px-0.5">
         ✦ {youName}
@@ -235,7 +241,7 @@ function OpponentRow({
 }
 
 function PlayerRow({
-  picks, myCard, mode, laneResults, twilightLane, onLaneClick,
+  picks, myCard, mode, laneResults, twilightLane, onLaneClick, targeting = false,
 }: {
   picks: [Move | null, Move | null, Move | null];
   myCard: PlayedCard | null;
@@ -243,6 +249,8 @@ function PlayerRow({
   laneResults?: LaneResult[];
   twilightLane?: LaneTarget | null;
   onLaneClick?: (lane: LaneTarget) => void;
+  /** Une carte-lane est sélectionnée → toutes tes cases peuvent l'accueillir. */
+  targeting?: boolean;
 }) {
   return (
     <div className="grid grid-cols-3 gap-2 sm:gap-3 [@media(max-height:560px)]:gap-1.5">
@@ -264,6 +272,7 @@ function PlayerRow({
             twilightMarked={twilightLane === lane}
             onClick={() => onLaneClick?.(lane)}
             disabled={mode !== "picking"}
+            targeting={targeting}
           />
         );
       })}
@@ -285,7 +294,7 @@ function FaceDownCard({ index: _index, pulsing: _pulsing, clickable = false, onC
   // Compass-marked lane gets a cyan tint that reads as "incoming danger".
   // Twilight gets an amber tint that reads as "sealed / immune".
   const cls =
-    "aspect-[5/4] w-full rounded-xl border-2 flex items-center justify-center transition " +
+    "aspect-square w-full rounded-xl border-2 flex items-center justify-center transition " +
     (clickable
       ? "border-violet-400/60 bg-violet-500/25 cursor-pointer hover:bg-violet-500/35 ring-2 ring-violet-400/40"
       : twilightMarked
@@ -374,7 +383,7 @@ function FaceUpOppCard({ move, verdict, revealed, preReveal }: {
       initial={{ opacity: 0, scale: 0.7, rotateY: 90 }}
       animate={revealed ? { opacity: 1, scale: 1, rotateY: 0 } : { opacity: 0.3, scale: 0.85, rotateY: 90 }}
       transition={{ type: "spring", stiffness: 280, damping: 22 }}
-      className={"aspect-[5/4] w-full rounded-xl ring-2 flex items-center justify-center " + ring + " " + (preReveal ? "bg-violet-500/20" : "bg-surface-2")}
+      className={"aspect-square w-full rounded-xl ring-2 flex items-center justify-center " + ring + " " + (preReveal ? "bg-violet-500/20" : "bg-surface-2")}
       style={{ transformPerspective: 800 }}
     >
       <Hand move={move} size="md" emphasis={verdict === "win" ? "winner" : verdict === "loss" ? "loser" : "default"} />
@@ -382,12 +391,14 @@ function FaceUpOppCard({ move, verdict, revealed, preReveal }: {
   );
 }
 
-function LaneSlot({ index, pick, favoured, verdict, cardHere, twilightMarked = false, onClick, disabled }: {
+function LaneSlot({ index, pick, favoured, verdict, cardHere, twilightMarked = false, onClick, disabled, targeting = false }: {
   index: number; pick: Move | null; favoured: boolean;
   verdict: "win" | "loss" | "draw" | null; cardHere: PlayedCard | null;
   /** Crépuscule: amber tint on this lane on the player's row. */
   twilightMarked?: boolean;
   onClick: () => void; disabled: boolean;
+  /** Carte-lane sélectionnée → cette case peut l'accueillir : surlignage thème. */
+  targeting?: boolean;
 }) {
   const t = useT();
   const identity = laneIdentityAt(index);
@@ -421,12 +432,21 @@ function LaneSlot({ index, pick, favoured, verdict, cardHere, twilightMarked = f
         onClick={onClick}
         disabled={disabled}
         className={
-          "aspect-[5/4] w-full rounded-xl border-2 transition flex items-center justify-center relative ring-2 " +
-          (verdictRing ?? twilightRing ?? (favoured ? ringFav : ringIdle)) + " " +
-          (pick
-            ? (twilightSurface ?? "border-emerald-400/50 bg-emerald-600/25")
-            : (twilightSurface ?? "border-dashed border-hairline bg-surface-2"))
+          "aspect-square w-full rounded-xl border-2 transition flex items-center justify-center relative ring-2 " +
+          (targeting
+            ? "cursor-pointer border-transparent ring-transparent"
+            : (verdictRing ?? twilightRing ?? (favoured ? ringFav : ringIdle)) + " " +
+              (pick
+                ? (twilightSurface ?? "border-emerald-400/50 bg-emerald-600/25")
+                : (twilightSurface ?? "border-dashed border-hairline bg-surface-2")))
         }
+        // Surlignage THÈME (Alex 2026-07) : case pouvant accueillir la carte-lane
+        // sélectionnée. L'inline boxShadow remplace l'anneau Tailwind → glow thémé.
+        style={targeting ? {
+          borderColor: "color-mix(in oklab, var(--theme-primary) 75%, transparent)",
+          background: "color-mix(in oklab, var(--theme-primary) 18%, rgba(10,12,20,0.5))",
+          boxShadow: "0 0 0 2px color-mix(in oklab, var(--theme-primary) 60%, transparent), 0 0 20px -5px var(--theme-primary)",
+        } : undefined}
       >
         {pick ? (
           <Hand move={pick} size="md" emphasis={verdict === "win" ? "winner" : verdict === "loss" ? "loser" : "default"} />

@@ -35,7 +35,7 @@ export function DeckSlot({
     >
       <CardImage id={cardId} glyphSize="text-2xl" />
       <div className="absolute bottom-0 left-0 right-0 bg-black/70 py-0.5 z-10">
-        <div className="text-[7px] font-bold uppercase text-center text-white/90">{t(card.nameKey)}</div>
+        <div className="text-[8px] font-bold uppercase text-center text-white/90">{t(card.nameKey)}</div>
       </div>
     </button>
   );

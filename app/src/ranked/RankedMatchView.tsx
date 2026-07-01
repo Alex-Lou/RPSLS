@@ -7,7 +7,7 @@
  * `RankedPickPhase` and `RankedRevealPhase`.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import type { Move } from "../engine/game";
 import type { LaneResult, PlayerSlot } from "../online/online";
@@ -17,9 +17,10 @@ import {
   CinematicMatchEnd,
   FloatingMatchBackButton,
   useAndroidBackPrompt,
-  ScaleToFit,
   type MatchBackHandle,
 } from "../match/sharedMatchUI";
+import { InlineBurger } from "../ui/ModeLobbyShell";
+import { setBurgerHidden } from "../Sidebar";
 import { LoadingTip } from "../flavor/LoadingTip";
 import { RankedPickPhase } from "./RankedPickPhase";
 import { RankedRevealPhase } from "./RankedRevealPhase";
@@ -141,6 +142,13 @@ export interface RankedMatchViewProps {
 
 type Phase = "matched" | "picking" | "reveal-intro" | "reveal" | "match-end";
 
+/** Délai avant que l'en-tête ne bumpe le score, en phase reveal. La phase reveal
+ *  commence par le décompte « PIERRE-FEUILLE-… TIREZ » (RevealCountdown, 1400ms),
+ *  PUIS RankedRevealPhase monte et fait sa cascade de lanes (+200/800/1400ms) +
+ *  verdict (+1500ms) → les résultats finissent de s'afficher vers ~2900ms. On
+ *  bumpe le score JUSTE APRÈS, à 3000ms, pour ne pas spoiler (Alex 2026-07). */
+const REVEAL_SCORE_DELAY_MS = 3000;
+
 export function RankedMatchView({
   nickname, match,
   round, lastResult, end,
@@ -156,6 +164,22 @@ export function RankedMatchView({
     if (round) return "picking";
     return "matched";
   })();
+
+  // Hauteur de board mesurée en phase PICK (BoardFillSlot) — RÉUTILISÉE telle
+  // quelle par la phase reveal → le plateau garde EXACTEMENT la même taille d'une
+  // phase à l'autre (fini le pad qui rétrécit/grandit). MAJ seulement si ça bouge.
+  const [pickBoardH, setPickBoardH] = useState(0);
+
+  // Burger flottant global OFF pendant le match (Alex 2026-07) : on le remplace
+  // par le burger INLINE de la rangée de score → plus aucun chevauchement du nom.
+  useEffect(() => {
+    setBurgerHidden(true);
+    return () => setBurgerHidden(false);
+  }, []);
+
+  // Handle du back-guard : le bouton retour INLINE (droite de la rangée) déclenche
+  // le MÊME modal de confirmation forfait que le back Android (cf. RankedBackGuard).
+  const backHandleRef = useRef<MatchBackHandle | null>(null);
 
   // Splash visible 2.5s after mount.
   const [showSplash, setShowSplash] = useState(true);
@@ -176,13 +200,33 @@ export function RankedMatchView({
     return () => window.clearTimeout(id);
   }, [lastResult]);
 
-  const youWins = roundWinsYou;
-  const oppWins = roundWinsOpp;
+  // Score AFFICHÉ dans l'en-tête — DÉCALÉ pendant le reveal (Alex 2026-07). Si on
+  // bumpe le score dès que la manche résout, le joueur SAIT qui a gagné AVANT même
+  // que l'animation ne le montre (spoiler + temps perdu). On garde donc l'ancien
+  // score pendant la cascade de reveal (lanes 200/800/1400ms + verdict 1500ms),
+  // puis on le met à jour JUSTE APRÈS (les chiffres roulent à ce moment-là).
+  const [shownWins, setShownWins] = useState({ you: roundWinsYou, opp: roundWinsOpp });
+  useEffect(() => {
+    if (phase === "reveal") {
+      const id = window.setTimeout(
+        () => setShownWins({ you: roundWinsYou, opp: roundWinsOpp }),
+        REVEAL_SCORE_DELAY_MS,
+      );
+      return () => window.clearTimeout(id);
+    }
+    // Hors reveal (pick / matched / fin de match) : le score est à jour tout de suite.
+    setShownWins({ you: roundWinsYou, opp: roundWinsOpp });
+  }, [phase, roundWinsYou, roundWinsOpp]);
 
   return (
-    <div className="relative flex flex-col gap-2 sm:gap-3 flex-1 min-h-0 overflow-hidden">
+    <div className="relative flex flex-col gap-1 sm:gap-2 flex-1 min-h-0 overflow-hidden pt-0 -mt-6 [@media(max-height:560px)]:-mt-3">
+      {/* -mt-6 : récupère l'espace haut gaspillé (le pt-12 global de <main> pour
+          le burger) UNIQUEMENT dans le match → tout remonte, le bouton Verrouiller
+          rentre dans la vue sans scroll. Ciblé match, les menus ne bougent pas.
+          Le burger vit maintenant DANS la rangée d'en-tête (plus de flottant), donc
+          plus aucun besoin de réserver la bande du haut. */}
       {onLeave && (
-        <RankedBackGuard onLeave={onLeave} label={t("lanes.forfeitMatch")} />
+        <RankedBackGuard ref={backHandleRef} onLeave={onLeave} label={t("lanes.forfeitMatch")} />
       )}
 
       <AnimatePresence>
@@ -194,14 +238,33 @@ export function RankedMatchView({
         )}
       </AnimatePresence>
 
+      {/* En-tête en DEUX rangées (Alex 2026-07, retour device) : flanquer le
+          score entre les boutons l'écrasait (nom coupé, chiffres serrés). Rangée
+          1 = les 2 boutons sur LEUR ligne, inchangés (burger gauche, retour
+          droite). Rangée 2 = le score PLEINE LARGEUR en dessous → il respire,
+          plus rien n'est coupé. Le burger/back flottants restent masqués. */}
+      <div className="shrink-0 flex items-center justify-between">
+        <InlineBurger className="w-9 h-9 sm:w-10 sm:h-10" />
+        {onLeave && (
+          <InlineBackButton
+            onClick={() => backHandleRef.current?.triggerConfirm()}
+            label={t("lanes.forfeitMatch")}
+          />
+        )}
+      </div>
+
+      {/* Score pleine largeur SOUS les boutons. `compact` = barre resserrée
+          (padding + chiffres réduits). Caption RETIRÉE (Alex 2026-07 « prend de
+          la place pour rien ») → une ligne de gagnée pour que le bouton Verrouiller
+          rentre sans scroll ; le n° de manche reste affiché à la résolution. */}
       <MatchScoreBar
+        compact
         youName={nickname}
         oppName={match.opponent || "—"}
-        youScore={youWins}
-        oppScore={oppWins}
+        youScore={shownWins.you}
+        oppScore={shownWins.opp}
         youTag={t("lanes.you")}
         oppTag={t("lanes.opponent")}
-        caption={t("lanes.scoreCaption", { round: round?.no ?? 1, target: match.winTo })}
       />
 
       {/* Match-end is rendered FULL-BLEED (no ScaleToFit). The cinematic +
@@ -270,15 +333,18 @@ export function RankedMatchView({
             onCancelCard={onCancelCard}
             onLock={onLock}
             revealAugurFor={revealAugurFor}
+            onBoardMeasure={(h) => setPickBoardH((p) => (Math.abs(p - h) > 1 ? h : p))}
           />
         </div>
       )}
 
-      {/* MATCHED + REVEAL gardent ScaleToFit — contenu à hauteur quasi-statique
-          qui doit juste ne jamais déborder le score/Lock sur petit écran. */}
+      {/* MATCHED + REVEAL — plus de ScaleToFit (c'était la source du board qui
+          change d'échelle entre pick et reveal). Le board rend en hauteur
+          NATURELLE, identique à la phase pick → taille du plateau STABLE d'une
+          phase à l'autre. Scroll de secours si l'écran est trop court (jamais
+          de clip), au lieu de tout rétrécir. */}
       {(phase === "matched" || phase === "reveal") && (
-      <ScaleToFit className="relative">
-        <div className="w-full flex flex-col items-center py-1">
+      <div className="relative flex-1 min-h-0 w-full overflow-y-auto flex flex-col items-center py-1">
         {phase === "matched" && !showSplash && (
           <div className="flex flex-col items-center gap-3 max-w-sm px-4">
             <div className="text-sm text-ink-muted">{t("lanes.preparingFirstRound")}</div>
@@ -302,10 +368,10 @@ export function RankedMatchView({
             yourTotal={lastResult.yourTotal}
             oppTotal={lastResult.oppTotal}
             oppHandSize={oppHandSize}
+            boardH={pickBoardH}
           />
         )}
-        </div>
-      </ScaleToFit>
+      </div>
       )}
     </div>
   );
@@ -393,23 +459,58 @@ function unique<T>(arr: T[]): T[] {
 
 /** Wraps FloatingMatchBackButton so the Android system back button (which
  *  would otherwise blow past every confirm) routes to the same modal as the
- *  visible back arrow. */
-function RankedBackGuard({ onLeave, label }: { onLeave: () => void; label: string }) {
-  const handleRef = useRef<MatchBackHandle | null>(null);
-  useAndroidBackPrompt(() => handleRef.current?.triggerConfirm());
+ *  inline back arrow. Le bouton flottant est `hidden` : le retour est désormais
+ *  rendu INLINE dans la rangée d'en-tête (à droite du score), qui déclenche le
+ *  même modal via le handle exposé ici. */
+const RankedBackGuard = forwardRef<MatchBackHandle, { onLeave: () => void; label: string }>(
+  function RankedBackGuard({ onLeave, label }, ref) {
+    const handleRef = useRef<MatchBackHandle | null>(null);
+    useAndroidBackPrompt(() => handleRef.current?.triggerConfirm());
+    useImperativeHandle(ref, () => ({
+      triggerConfirm: () => handleRef.current?.triggerConfirm(),
+    }), []);
+    return (
+      <FloatingMatchBackButton
+        ref={handleRef}
+        hidden
+        onClick={onLeave}
+        label={label}
+        confirm={{
+          title: "Quitter le match ?",
+          body: "Tu vas perdre la manche en cours. Ce sera compté comme défaite et appliquera la pénalité de LP si applicable.",
+          confirmLabel: "Forfait",
+          cancelLabel: "Continuer",
+          severity: "danger",
+        }}
+      />
+    );
+  },
+);
+
+/** Bouton retour INLINE themed — miroir de l'InlineBurger (même gabarit + même
+ *  traitement color-mix var(--theme-*)) pour une symétrie parfaite [burger] …
+ *  [retour] de part et d'autre du score. Ne fait QUE déclencher le modal forfait
+ *  (via le handle du RankedBackGuard) : aucune logique de sortie propre ici. */
+function InlineBackButton({ onClick, label }: { onClick: () => void; label: string }) {
   return (
-    <FloatingMatchBackButton
-      ref={handleRef}
-      onClick={onLeave}
-      label={label}
-      confirm={{
-        title: "Quitter le match ?",
-        body: "Tu vas perdre la manche en cours. Ce sera compté comme défaite et appliquera la pénalité de LP si applicable.",
-        confirmLabel: "Forfait",
-        cancelLabel: "Continuer",
-        severity: "danger",
+    <motion.button
+      whileTap={{ scale: 0.92 }}
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      data-no-touchfx
+      className="shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-xl border flex items-center justify-center active:scale-95 transition backdrop-blur"
+      style={{
+        background: "color-mix(in oklab, var(--theme-primary) 16%, rgba(10,12,20,0.82))",
+        borderColor: "color-mix(in oklab, var(--theme-primary) 55%, transparent)",
+        color: "color-mix(in oklab, var(--theme-primary) 80%, #fff)",
+        boxShadow: "0 0 16px -6px var(--theme-primary), inset 0 1px 0 rgba(255,255,255,0.08)",
       }}
-    />
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M15 18l-6-6 6-6" />
+      </svg>
+    </motion.button>
   );
 }
 
@@ -435,13 +536,13 @@ function MatchFoundSplash({ you, opp }: { you: string; opp: string }) {
         initial={{ scale: 0.4, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ delay: 0.15, type: "spring", stiffness: 220, damping: 12 }}
-        className="flex items-center gap-6 sm:gap-10"
+        className="flex items-center justify-center gap-4 sm:gap-8 w-full max-w-md px-4"
       >
         <NameTag name={you} accent="emerald" align="right" />
         <motion.div
           animate={{ rotate: [0, -8, 8, -4, 4, 0], scale: [1, 1.2, 1] }}
           transition={{ duration: 0.9, delay: 0.4 }}
-          className="text-5xl sm:text-7xl font-black bg-gradient-to-br from-fuchsia-300 to-rose-400 bg-clip-text text-transparent"
+          className="shrink-0 text-5xl sm:text-7xl font-black bg-gradient-to-br from-fuchsia-300 to-rose-400 bg-clip-text text-transparent"
         >
           VS
         </motion.div>
@@ -475,12 +576,13 @@ function NameTag({
     ? "from-emerald-300 to-teal-400"
     : "from-rose-300 to-fuchsia-400";
   return (
-    <div className={"flex flex-col " + (align === "right" ? "items-end" : "items-start")}>
+    <div className={"flex-1 min-w-0 flex flex-col " + (align === "right" ? "items-end" : "items-start")}>
       <div className="text-[10px] uppercase tracking-[0.3em] text-ink-faint">
         {accent === "emerald" ? t("lanes.you") : t("lanes.opponent")}
       </div>
       <div className={
-        "mt-1 text-xl sm:text-3xl font-black truncate max-w-[32vw] sm:max-w-[28vw] bg-gradient-to-r " +
+        "mt-1 text-xl sm:text-3xl font-black truncate w-full bg-gradient-to-r " +
+        (align === "right" ? "text-right " : "text-left ") +
         grad + " bg-clip-text text-transparent"
       }>
         {name || "Anonymous"}

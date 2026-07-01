@@ -15,7 +15,7 @@ export function ManaBar({
 }) {
   const available = mana - spent;
   return (
-    <div className="flex items-center gap-2 bg-violet-500/15 border border-violet-400/30 rounded-xl px-3 py-1.5">
+    <div className="shrink-0 flex items-center gap-2 bg-violet-500/15 border border-violet-400/30 rounded-xl px-3 py-1.5">
       {/* Big number */}
       <motion.span
         key={available}

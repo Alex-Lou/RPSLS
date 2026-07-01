@@ -230,7 +230,7 @@ export function BracketPage({
       {!selecting && joined && !playerMatch && !eliminated && tournament.phase === "running" && (
         <div className="flex flex-col items-center gap-2 py-2 max-w-sm mx-auto px-4">
           <div className="text-center text-[11px] text-ink-faint">
-            Les matchs CPU se jouent… Patiente.
+            Les autres joueurs terminent leur manche… patiente encore un peu 🙂
           </div>
           <LoadingTip rotateMs={4000} className="justify-center text-center" />
         </div>

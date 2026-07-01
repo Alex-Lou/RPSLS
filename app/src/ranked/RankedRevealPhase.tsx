@@ -49,12 +49,15 @@ export interface RankedRevealPhaseProps {
   yourTotal: number;
   oppTotal: number;
   oppHandSize: number;
+  /** Hauteur de board mesurée en phase pick — le reveal la RÉUTILISE pour un
+   *  plateau strictement identique d'une phase à l'autre (0 = hauteur naturelle). */
+  boardH?: number;
 }
 
 export function RankedRevealPhase({
   youName, opponentName,
   yourPicks, oppPicks, myCard, oppCard, augurRevealed,
-  laneResults, bonuses, roundWinner, yourTotal, oppTotal, oppHandSize,
+  laneResults, bonuses, roundWinner, yourTotal, oppTotal, oppHandSize, boardH = 0,
 }: RankedRevealPhaseProps) {
   const t = useT();
 
@@ -103,6 +106,7 @@ export function RankedRevealPhase({
     >
       <div className="w-full flex items-center justify-center">
         <LanesBoard
+          fillHeight={boardH || undefined}
           youName={youName}
           opponentName={opponentName}
           picks={yourPicks as [Move, Move, Move]}
@@ -387,7 +391,7 @@ function CardLine({
         {isYou ? "Toi" : "Adv."}
       </span>
       <span className="text-sm shrink-0 self-center">🃏</span>
-      <span className="text-xs leading-snug">
+      <span className="text-xs leading-snug line-clamp-2 min-w-0">
         <b className={"font-bold " + (isYou ? "text-emerald-200" : "text-rose-200")}>{t(meta.nameKey)}</b>
         <span className="text-ink-muted"> — {t(meta.descKey)}</span>
       </span>

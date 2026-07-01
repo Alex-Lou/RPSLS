@@ -1292,7 +1292,7 @@ export function RankedGame({
         cardPlayed={cardPlayed}
         augurRevealed={augurRevealed}
         mana={mana}
-        manaMax={(battle.passives.includes("cadence") ? 5 : MAX_MANA) + manaMaxBoostRef.current}
+        manaMax={(battle.passives.includes("cadence") ? MAX_MANA + 1 : MAX_MANA) + manaMaxBoostRef.current}
         passives={battle.passives}
         braiseStacks={braiseStacks}
         activeEffects={{

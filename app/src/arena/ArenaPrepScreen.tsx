@@ -206,11 +206,14 @@ export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
             "shrink-0 px-4 py-2 rounded-xl font-black text-white text-sm whitespace-nowrap transition " +
             (phase === "landed" ? "shadow-lg" : "bg-zinc-800 text-zinc-500 cursor-not-allowed")
           }
+          // TAILLE STRICTEMENT CONSTANTE (Alex 2026-07) : le GRIS (avant pièce) est
+          // la « bonne taille » de référence. On NE change QUE le fond + l'ombre au
+          // « landed ». fontFamily/letterSpacing RETIRÉS : appliqués seulement au
+          // landed, ils élargissaient le texte → le bouton auto-width grandissait.
+          // Le bleu a désormais EXACTEMENT la taille du gris, seule la couleur change.
           style={phase === "landed" ? {
             background: "linear-gradient(to right, var(--theme-primary), var(--theme-secondary))",
             boxShadow: "0 4px 18px -4px color-mix(in oklab, var(--theme-primary) 60%, transparent)",
-            fontFamily: "var(--font-headline)",
-            letterSpacing: "0.1em",
           } : undefined}
         >
           ✓ COMMENCER LE MATCH

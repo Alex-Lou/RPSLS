@@ -13,7 +13,6 @@ import { hapticAlert, hapticTap } from "../haptic";
 import { hapticTick, PickShock } from "../match/sharedMatchUI";
 import { useT } from "../i18n";
 import { LanesBoard } from "./LanesBoard";
-import { BoardFillSlot } from "../arena/ArenaGame/BoardFillSlot";
 import { CardHand } from "./CardHand";
 import { ManaBar } from "./ManaBar";
 import { CARDS } from "./cards";
@@ -60,6 +59,9 @@ export interface RankedPickPhaseProps {
   onClearLane: (lane: LaneTarget) => void;
   onLock: () => void;
   revealAugurFor: (lane: LaneTarget) => Move;
+  /** Remonte la hauteur mesurée du board (BoardFillSlot) pour que la phase reveal
+   *  réutilise EXACTEMENT la même taille → plateau stable d'une phase à l'autre. */
+  onBoardMeasure?: (h: number) => void;
 }
 
 export function RankedPickPhase({
@@ -80,6 +82,11 @@ export function RankedPickPhase({
   const reservedMana = cardPlayed ? Math.max(1, CARDS[cardPlayed.id].cost - braiseStacks) : 0;
   const isAugurTargeting = selectedCard === "augur";
   const isOracleTargeting = selectedCard === "oracle";
+  // Carte à cibler sur TES lanes (aegis/surge/precision/anchor/…) → on surligne
+  // TES 3 cases dans la couleur du thème pour montrer où la poser (Alex 2026-07).
+  // Les cartes héros/self s'auto-jouent (jamais « sélectionnées ») → aucune lane
+  // surlignée pour elles ⇒ le surlignage distingue carte-lane vs carte-héros.
+  const isMyLaneTargeting = !!selectedCard && CARDS[selectedCard]?.target === "lane";
 
   function handleMyLaneTap(lane: LaneTarget) {
     if (selectedCard) {
@@ -160,13 +167,13 @@ export function RankedPickPhase({
   })();
 
   return (
-    <div className="w-full flex-1 min-h-0 flex flex-col items-center gap-1.5 sm:gap-3 pb-2 sm:pb-3">
+    <div className="w-full flex-1 min-h-0 overflow-y-auto flex flex-col items-center gap-0.5 sm:gap-1 pb-0.5 sm:pb-1">
       {showTimer && <TimerBar startedAt={startedAt} durationMs={deadlineMs} />}
 
       {/* Targeting hint — rendered in a FIXED-height slot (always reserved)
           so selecting a card doesn't change the layout height and make the
           scale-to-fit wrapper bounce (shrink then grow). */}
-      <div className="h-7 flex items-center justify-center shrink-0">
+      <div className="h-6 flex items-center justify-center shrink-0">
         <AnimatePresence>
           {targetingHint && (
             <motion.div
@@ -188,49 +195,40 @@ export function RankedPickPhase({
         </AnimatePresence>
       </div>
 
-      {/* Board — figé par BoardFillSlot : il mesure la hauteur dispo et la pose
-          en px sur le board (cadre fixe comme en Pro). Le board est DANS le slot
-          mesuré ; le mobilier (chips/mana/main/picker/Lock) reste DEHORS, en
-          siblings sous lui → leur apparition/disparition ne re-scale plus tout
-          l'écran (fix du pad qui « paniquait »). */}
-      <BoardFillSlot>
-        {(slotH) => (
-          <LanesBoard
-            fillHeight={slotH}
-            youName={youName}
-            opponentName={opponentName}
-            picks={picks}
-            oppPicks={null}
-            augurRevealed={augurRevealed}
-            oracleRevealed={oracleRevealed}
-            myCard={cardPlayed}
-            oppCard={null}
-            mode="picking"
-            oppHandSize={oppHandSize}
-            compassPeek={compassRevealed}
-            onLaneClick={handleMyLaneTap}
-            onOppLaneClick={handleOppLaneTap}
-            augurTargeting={isAugurTargeting || isOracleTargeting}
-          />
-        )}
-      </BoardFillSlot>
+      {/* Board — PLEINE LARGEUR, hauteur NATURELLE, JAMAIS rétréci. Plus de
+          BoardFillSlot (son transform:scale rapetissait tout le pad + le centrait
+          = les « marges géantes » qu'Alex voyait). Si trop haut sur petit écran,
+          le conteneur scrolle (shrink-0 partout) au lieu de tout rapetisser. */}
+      <LanesBoard
+        youName={youName}
+        opponentName={opponentName}
+        picks={picks}
+        oppPicks={null}
+        augurRevealed={augurRevealed}
+        oracleRevealed={oracleRevealed}
+        myCard={cardPlayed}
+        oppCard={null}
+        mode="picking"
+        oppHandSize={oppHandSize}
+        compassPeek={compassRevealed}
+        onLaneClick={handleMyLaneTap}
+        onOppLaneClick={handleOppLaneTap}
+        augurTargeting={isAugurTargeting || isOracleTargeting}
+        myLaneTargeting={isMyLaneTargeting}
+      />
 
       {/* Strip: Boussole reveal + passives + Oracle Inverse peek + Braise
           discount + cross-round V3 effects. Every chip is a compact pill so
           the ScaleToFit wrapper keeps the Lock button on-screen even with
           many active effects. */}
-      {(compassRevealed || passives.length > 0
-        || (oppHandRevealed && oppHandRevealed.length > 0)
-        || braiseStacks > 0
-        || (activeEffects && (
-          activeEffects.mascaradePoison || activeEffects.bonusManaNext > 0 ||
-          activeEffects.cascadeArmed || activeEffects.echoActive ||
-          activeEffects.anchorRoundsLeft > 0 || activeEffects.gaiaCharged
-        ))
-      ) && (
-        <div className="w-full max-w-md flex flex-wrap items-center justify-center gap-1.5 px-1">
+      {/* TOUJOURS monté, hauteur 1 ligne réservée + scroll horizontal : les chips
+          qui apparaissent/changent ne re-mesurent plus le board → fin du rescale
+          du pad entre les manches (le strip restait le dernier coupable). Les noms
+          de carte sont tronqués pour borner la largeur de chaque chip. */}
+      <div className="w-full max-w-md min-h-[0.5rem] shrink-0 flex items-center px-1">
+        <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto w-full">
           {compassRevealed && (
-            <span className="text-[11px] font-bold rounded-full px-2 py-0.5 bg-sky-500/20 border border-sky-400/40 text-sky-200">
+            <span className="shrink-0 whitespace-nowrap text-[11px] font-bold rounded-full px-2 py-0.5 bg-sky-500/20 border border-sky-400/40 text-sky-200">
               {compassRevealed.cardId
                 ? (compassRevealed.lane === null
                     ? t("ranked.compass.cardOnly", { name: t(CARDS[compassRevealed.cardId].nameKey) })
@@ -243,21 +241,21 @@ export function RankedPickPhase({
           {passives.map((id) => (
             <span
               key={id}
-              className="text-[11px] font-bold rounded-full px-2 py-0.5 bg-violet-500/15 border border-violet-400/30 text-violet-200 inline-flex items-center gap-1"
+              className="shrink-0 max-w-[42vw] text-[11px] font-bold rounded-full px-2 py-0.5 bg-violet-500/15 border border-violet-400/30 text-violet-200 inline-flex items-center gap-1"
               title={t(CARDS[id].descKey)}
             >
-              <span aria-hidden>{CARDS[id].glyph}</span>
-              {t(CARDS[id].nameKey)}
+              <span aria-hidden className="shrink-0">{CARDS[id].glyph}</span>
+              <span className="truncate">{t(CARDS[id].nameKey)}</span>
             </span>
           ))}
           {oppHandRevealed && oppHandRevealed.map((id, i) => (
             <span
               key={`peek-${id}-${i}`}
-              className="text-[11px] font-bold rounded-full px-2 py-0.5 bg-fuchsia-500/15 border border-fuchsia-400/40 text-fuchsia-200 inline-flex items-center gap-1"
+              className="shrink-0 max-w-[42vw] text-[11px] font-bold rounded-full px-2 py-0.5 bg-fuchsia-500/15 border border-fuchsia-400/40 text-fuchsia-200 inline-flex items-center gap-1"
               title={t(CARDS[id].descKey)}
             >
-              <span aria-hidden>🔮 {CARDS[id].glyph}</span>
-              {t(CARDS[id].nameKey)}
+              <span aria-hidden className="shrink-0">🔮 {CARDS[id].glyph}</span>
+              <span className="truncate">{t(CARDS[id].nameKey)}</span>
             </span>
           ))}
           {braiseStacks > 0 && (
@@ -282,7 +280,7 @@ export function RankedPickPhase({
             <EffectChip icon="🛡️" tone="emerald" label="Bouclier de Gaïa chargé — 1 défaite absorbée" />
           )}
         </div>
-      )}
+      </div>
 
       {/* Mana + your fanned hand — bottom-of-board zone, near the move
           picker so cards and moves are reachable by the same thumb. */}
@@ -310,7 +308,7 @@ export function RankedPickPhase({
         disabled={!allFilled}
         aria-label={allFilled ? t("lanes.lockButton") : t("lanes.pickRemaining", { n: remaining })}
         className={
-          "shrink-0 mt-1 sm:mt-2 px-7 py-2.5 rounded-2xl font-bold text-white text-sm transition " +
+          "shrink-0 mt-1.5 sm:mt-2 px-7 py-2 rounded-2xl font-bold text-white text-sm transition " +
           (allFilled
             ? "shadow-lg hover:scale-[1.02]"
             : "bg-hairline text-ink-faint cursor-not-allowed")
@@ -359,7 +357,7 @@ function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void
             transition={{ delay: 0.05 * i }}
             whileHover={{ y: -4, scale: 1.04 }}
             whileTap={{ scale: 0.86 }}
-            className="relative aspect-[4/5] rounded-xl flex flex-col items-center justify-center gap-0.5 py-1 text-white transition"
+            className="relative h-[46px] sm:h-[52px] rounded-xl flex flex-col items-center justify-center gap-0.5 py-1 text-white transition"
             // Dark glass surface so the white-silhouette PNG glyph reads
             // unambiguously on every theme. The per-move identity comes
             // from the rim + glow, which now blend ~45% toward the active
@@ -372,7 +370,7 @@ function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void
             }}
           >
             <PickShock show={shockMove === mv} />
-            <MoveGlyph move={mv} className="w-12 h-12 sm:w-14 sm:h-14" />
+            <MoveGlyph move={mv} className="w-[35px] h-[35px] sm:w-[39px] sm:h-[39px]" />
             <span className="text-[11px] sm:text-xs uppercase tracking-wider font-bold leading-none" style={{ color: moveRim(pal.hex) }}>{mv}</span>
           </motion.button>
         );
@@ -405,7 +403,7 @@ function EffectChip({
   return (
     <span
       className={
-        "text-[11px] font-bold rounded-full px-2 py-0.5 border inline-flex items-center gap-1 " +
+        "shrink-0 whitespace-nowrap text-[11px] font-bold rounded-full px-2 py-0.5 border inline-flex items-center gap-1 " +
         EFFECT_PALETTE[tone]
       }
     >
@@ -449,7 +447,7 @@ function TimerBar({ startedAt, durationMs }: { startedAt: number; durationMs: nu
         key={num}
         initial={{ scale: critical ? 1.4 : 1 }}
         animate={{ scale: 1 }}
-        className={"text-lg sm:text-xl font-mono tabular-nums w-14 text-right font-extrabold " +
+        className={"text-lg sm:text-xl font-mono tabular-nums min-w-[2.5em] text-right font-extrabold " +
           (critical ? "text-rose-300" : urgent ? "text-amber-300" : "text-ink")}
       >{num}s</motion.span>
       <div className="flex-1 h-2.5 rounded-full bg-hairline overflow-hidden">

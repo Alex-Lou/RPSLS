@@ -59,7 +59,7 @@ export function RollingScore({
  */
 export function MatchScoreBar({
   youName, oppName, youScore, oppScore, caption,
-  youTag, oppTag, youStreak = 0, oppStreak = 0,
+  youTag, oppTag, youStreak = 0, oppStreak = 0, compact = false,
 }: {
   youName: string;
   oppName: string;
@@ -71,10 +71,17 @@ export function MatchScoreBar({
   oppTag?: string;
   youStreak?: number;
   oppStreak?: number;
+  /** Opt-in slimmer bar (Alex 2026-07) : padding + chiffres réduits pour rendre
+   *  de la hauteur quand une rangée de boutons vit AU-DESSUS (Constellation
+   *  Classé). Défaut false → tous les autres modes gardent la taille pleine. */
+  compact?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between rounded-2xl bg-surface border border-hairline px-3 sm:px-4 py-2.5 sm:py-3 min-w-0">
+      <div className={
+        "flex items-center justify-between rounded-2xl bg-surface border border-hairline min-w-0 px-3 sm:px-4 " +
+        (compact ? "py-1.5 sm:py-2" : "py-2.5 sm:py-3")
+      }>
         <div className="flex flex-col min-w-0 flex-1">
           {youTag && (
             <span className="text-[12px] sm:text-xs uppercase tracking-wider text-ink-muted font-medium">{youTag}</span>
@@ -84,10 +91,10 @@ export function MatchScoreBar({
             <StreakBadge streak={youStreak} />
           </span>
         </div>
-        <div className="px-2 sm:px-3 flex items-center gap-1">
-          <RollingScore value={youScore} color="emerald" size="lg" />
+        <div className="shrink-0 px-2 sm:px-3 flex items-center justify-center gap-1">
+          <RollingScore value={youScore} color="emerald" size={compact ? "md" : "lg"} />
           <span className="text-ink-muted px-0.5 font-bold">:</span>
-          <RollingScore value={oppScore} color="rose" size="lg" />
+          <RollingScore value={oppScore} color="rose" size={compact ? "md" : "lg"} />
         </div>
         <div className="flex flex-col text-right min-w-0 flex-1">
           {oppTag && (

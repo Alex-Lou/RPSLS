@@ -17,7 +17,7 @@ export function FighterCard({
       animate={highlight ? { scale: [1, 1.05, 1] } : { scale: 1 }}
       transition={{ duration: 0.5 }}
       className={
-        "flex-1 rounded-2xl p-3 flex flex-col items-center gap-1.5 border transition " +
+        "flex-1 origin-center rounded-2xl p-3 flex flex-col items-center gap-1.5 border transition " +
         (highlight ? "border-white/50 shadow-lg" : "border-hairline")
       }
       style={{

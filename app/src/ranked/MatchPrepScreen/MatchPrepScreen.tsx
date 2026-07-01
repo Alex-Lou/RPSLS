@@ -184,7 +184,7 @@ export function MatchPrepScreen({
       {/* VS — you vs opponent, each with avatar + theme swatch. */}
       <div className="flex items-stretch gap-2">
         <FighterCard name={youName} avatar={youAvatar} theme={youTheme} tag="Toi" highlight={winner === "you"} />
-        <div className="flex items-center text-lg font-black text-ink-faint">VS</div>
+        <div className="shrink-0 flex items-center text-lg font-black text-ink-faint">VS</div>
         <FighterCard name={oppName} avatar={oppAvatar} theme={oppTheme} tag="Adv." highlight={winner === "opp"} />
       </div>
 
@@ -195,7 +195,21 @@ export function MatchPrepScreen({
           À qui le terrain ?
         </div>
 
-        <Coin phase={phase} winner={winner} youTheme={youTheme} oppTheme={oppTheme} />
+        {/* Pièce TAPPABLE comme en Constellation Pro (Alex 2026-07) : en local on
+         *  touche la pièce pour lancer (fini le bouton « Lancer la pièce »). En
+         *  online la pièce reste pilotée par le serveur → non tappable. */}
+        {isOnline ? (
+          <Coin phase={phase} winner={winner} youTheme={youTheme} oppTheme={oppTheme} />
+        ) : (
+          <button
+            onClick={flip}
+            disabled={phase !== "idle"}
+            aria-label="Lancer la pièce"
+            className="shrink-0 bg-transparent border-0 p-0 disabled:cursor-default"
+          >
+            <Coin phase={phase} winner={winner} youTheme={youTheme} oppTheme={oppTheme} />
+          </button>
+        )}
 
         <AnimatePresence mode="wait">
           {phase === "landed" && winner ? (
@@ -264,13 +278,15 @@ export function MatchPrepScreen({
             </div>
           ) : (
             <p key="hint" className="text-[11px] text-ink-faint text-center max-w-xs">
-              La pièce décide quel thème + pad habille le plateau pendant le duel.
+              {phase === "flipping"
+                ? "La pièce tourne…"
+                : "🪙 Touche la pièce — elle décide quel thème + pad habille le plateau."}
             </p>
           )}
         </AnimatePresence>
 
-        {phase !== "landed" ? (
-          isOnline ? (
+        {isOnline ? (
+          phase !== "landed" ? (
             // Online mode: one button only — "Je suis prêt". The coin is
             // server-driven, so no local trigger. Tap is idempotent on the
             // server; we disable the button locally for UX clarity AND when
@@ -298,47 +314,53 @@ export function MatchPrepScreen({
               </motion.button>
             </div>
           ) : (
-            <div className="flex flex-col items-center gap-2 w-full">
-              <motion.button
-                whileTap={{ scale: 0.96 }}
-                onClick={flip}
-                disabled={phase === "flipping"}
-                className="w-full max-w-xs py-3 rounded-2xl font-bold text-white bg-themed shadow-lg disabled:opacity-60"
-                style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
-              >
-                {phase === "flipping" ? "La pièce tourne…" : "🪙 Lancer la pièce"}
-              </motion.button>
+            // Online mode after the coin lands: parent navigates onward when
+            // `lanes_round_start` arrives. Show a holding hint so the user
+            // understands the wait is intentional (~3s, matches server pause).
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-[11px] font-bold text-ink-muted text-center"
+            >
+              Le duel commence…
+            </motion.div>
+          )
+        ) : (
+          // LOCAL — calqué sur le Pré-match Constellation Pro (Alex 2026-07) :
+          // UN SEUL bouton COMMENCER, grisé (désactivé) tant que la pièce n'a pas
+          // atterri, puis dégradé thémé + activable — TAILLE STRICTEMENT CONSTANTE
+          // (px-4 py-2, jamais de changement d'échelle). Fini les 2 boutons
+          // « Lancer la pièce » (py-3) → « Commencer le duel » (py-3.5) qui
+          // changeaient de taille. « Céder le terrain » reste en lien discret tant
+          // qu'on n'a pas encore décidé (idle).
+          <div className="flex flex-col items-center gap-2 w-full">
+            <button
+              onClick={start}
+              disabled={phase !== "landed"}
+              className={
+                "shrink-0 px-4 py-2 rounded-xl font-black text-white text-sm whitespace-nowrap transition " +
+                (phase === "landed" ? "shadow-lg" : "bg-zinc-800 text-zinc-500 cursor-not-allowed")
+              }
+              // TAILLE STRICTEMENT CONSTANTE (Alex 2026-07) : le GRIS est la « bonne
+              // taille » de référence. On NE change QUE fond + ombre au « landed ».
+              // fontFamily/letterSpacing RETIRÉS (ils n'étaient au landed que → texte
+              // élargi → bouton auto-width grandi). Le bleu = taille EXACTE du gris.
+              style={phase === "landed" ? {
+                background: "linear-gradient(to right, var(--theme-primary), var(--theme-secondary))",
+                boxShadow: "0 4px 18px -4px color-mix(in oklab, var(--theme-primary) 60%, transparent)",
+              } : undefined}
+            >
+              ✓ COMMENCER LE MATCH
+            </button>
+            {phase === "idle" && (
               <button
                 onClick={concede}
-                disabled={phase === "flipping"}
-                className="text-[11px] font-bold text-ink-muted hover:text-white transition disabled:opacity-40"
+                className="text-[11px] font-bold text-ink-muted hover:text-white transition"
               >
                 Céder le terrain à l'adversaire
               </button>
-            </div>
-          )
-        ) : isOnline ? (
-          // Online mode after the coin lands: parent navigates onward when
-          // `lanes_round_start` arrives. Show a holding hint so the user
-          // understands the wait is intentional (~3s, matches server pause).
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-[11px] font-bold text-ink-muted text-center"
-          >
-            Le duel commence…
-          </motion.div>
-        ) : (
-          <motion.button
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={start}
-            className="w-full max-w-xs py-3.5 rounded-2xl font-bold text-white bg-themed shadow-lg shadow-themed hover:scale-[1.01] transition"
-            style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
-          >
-            Commencer le duel →
-          </motion.button>
+            )}
+          </div>
         )}
       </div>
     </motion.div>

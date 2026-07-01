@@ -124,7 +124,7 @@ function CurrencyChip({
         // full = aussi flex-1 (partage la largeur) + min-w-0 (Alex 2026-06-27) :
         // en largeur-auto, 3 badges à 6 chiffres DÉBORDAIENT/coupaient sur petits
         // écrans. Maintenant ils s'étalent et tiennent toujours dans le conteneur.
-        (big ? "flex-1 min-w-0 px-3 py-1.5" : "flex-1 px-2.5 py-1") + " " +
+        (big ? "flex-1 min-w-0 px-3 py-1.5" : "flex-1 min-w-0 px-2.5 py-1") + " " +
         (interactive ? "cursor-pointer hover:brightness-110" : "")
       }
     >
