@@ -163,6 +163,14 @@ export function ArenaPlanPhase({
     setInspecting(null);
     const targetKind = CARD_TARGET_KIND[id] ?? "global";
     if (targetKind === "self" || targetKind === "global" || targetKind === "hero") {
+      // FORGE UX (Alex 2026-06-29) : une carte FUSIBLE self/global/hero ne s'auto-joue
+      // PLUS au tap — on l'ARME → la Forge s'illumine « Déposer » (dépôt au TAP, fini le
+      // long-press). Le 2e tap sur la carte = JOUER (cf. commitCard). Les NON-fusibles
+      // gardent l'auto-jeu instantané (zéro friction ajoutée).
+      if (isFusible(id)) {
+        setTargeting({ kind: "spell", id, targetKind });
+        return;
+      }
       onAddSpell({ id, kind: targetKind } as PlayedSpell);
       return;
     }
@@ -181,6 +189,16 @@ export function ArenaPlanPhase({
     alog("hand", `TAP card ${id}${disabled ? " (disabled)" : ""}`);
     if (disabled) return;
     if (targeting?.kind === "spell" && targeting.id === id) {
+      // FORGE UX (Alex 2026-06-29) : carte déjà armée. Pour une FUSIBLE self/global/hero,
+      // le 2e tap = JOUER (le 1er a armé + illuminé la Forge → tu choisis : tap Forge =
+      // déposer, re-tap carte = jouer). Pour le reste : re-tap = annuler (inchangé).
+      const tk = CARD_TARGET_KIND[id] ?? "global";
+      if (isFusible(id) && (tk === "self" || tk === "global" || tk === "hero")) {
+        hapticTap();
+        onAddSpell({ id, kind: tk } as PlayedSpell);
+        setTargeting(null);
+        return;
+      }
       hapticTap();
       setTargeting(null);
       return;

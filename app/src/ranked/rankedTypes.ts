@@ -36,13 +36,19 @@ export type CardId =
   | "roue-destin" | "phenix" | "singularite"                            // legendaries (4-5)
   // ── Voie MONTAGNE — cartes signature (Arena 2026-06-22) ──
   | "eboulement" | "contrefort" | "strate-vive"                         // common / rare / rare
-  | "gardien-pierre" | "veine-gaia"                                     // rare / epic
+  | "gardien-pierre" | "veine-gaia" | "barricade"                       // rare / epic / common (anti-aggro)
+  | "ecrasement" | "veine-minerale" | "grondement"                      // epic anti-heal / common pioche / rare chip récurrent
   // ── Voie MIRAGE — cartes signature (Arena 2026-06-22) ──
   | "reflet-echo" | "mascarade-enchainee" | "fuite-masquee"             // common / rare / rare
+  // ── Voie MIRAGE — nouvelles cartes (Arena 2026-06-28) ──
+  | "derobade" | "frappe-spectrale" | "sillage-spectral"                // common / rare / rare
+  | "faux-semblant" | "nuee-spectrale" | "eclipse"                      // epic / legendary / rare
   // ── Voie TRANCHANT — cartes signature (Arena 2026-06-22) ──
   | "coup-de-taille" | "acuite" | "frenesie"                            // rare / rare / rare
+  | "estafilade" | "saignee" | "fureur-emoussee"                        // common reach / rare draw / common payoff Émoussé (2026-06-30)
   // ── Voie FORÊT — cartes signature (Arena 2026-06-23) ──
   | "ramure" | "photosynthese" | "ronces"                               // rare / rare / common
+  | "greffe"                                                            // common pioche flavor Forêt (2026-06-30)
   // ── Voie COSMOS — cartes signature (Arena 2026-06-23) ──
   | "dilatation-temporelle" | "loi-de-causalite" | "convergence-cosmique" // common / rare / epic
   // ── Cartes de DÉGÂTS signature par Voie (Arena 2026-06-23) ──
@@ -61,7 +67,13 @@ export type CardId =
   // ── Cartes de FUSION (Forge Arena 2026-06-13) — créées par la Forge
   //    uniquement, jamais dans collection/decks/packs/pioche ──
   | "frappe-parfaite" | "bastion" | "avalanche" | "source-vitale"
-  | "omniscience" | "cocon" | "apocalypse" | "imposteur";
+  | "omniscience" | "cocon" | "apocalypse" | "imposteur"
+  | "citadelle" | "cataclysme"                                          // fusions Voie MONTAGNE (2026-06-30)
+  | "estocade"                                                          // fusion Voie TRANCHANT (2026-06-30)
+  | "bosquet-epineux"                                                   // fusion Voie FORÊT (2026-06-30)
+  | "effacement"                                                        // fusion Voie COSMOS (2026-06-30)
+  // ── Fusions Voie MIRAGE (Arena 2026-06-28) ──
+  | "galerie-des-glaces" | "mascarade-souveraine" | "apotheose-spectrale";
 
 export type CardRarity = "common" | "rare" | "epic" | "legendary";
 

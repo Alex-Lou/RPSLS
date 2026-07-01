@@ -145,7 +145,9 @@ function applyLame(board: BoardState, side: Side): BoardState {
  *  max(.,1) ne donnait qu'1 charge : il DÉGRADAIT même un Lézard de Voie (2
  *  charges), et un coup de combat + un sort le même tour le tuait — en
  *  contradiction directe avec le texte « Esquive infinie / intouchables ». */
-export const METAMORPHOSE_DODGE = 9;
+// Métamorphose recharge l'Esquive au CAP GLOBAL (BALANCE.mirage.dodgeCumulativeCap,
+// tunable) chaque tour — au lieu d'un « 9 intouchable » sans contre-jeu (audit
+// 2026-06-28 : Mirage injuste/illisible, 19 esquives/partie). Refresh = oui, infini = non.
 
 /** Effet MÉTAMORPHOSE — flag metamorphoseActive + Lézards rechargés à
  *  METAMORPHOSE_DODGE (intouchables), refresh à chaque endOfTurnReset. */
@@ -155,7 +157,7 @@ function applyMetamorphose(board: BoardState, side: Side): BoardState {
   for (let i = 0; i < 3; i++) {
     const c = b.lanes[i][side];
     if (c && c.move === "lizard") {
-      b = mutateLaneCreature(b, side, i, (cur) => ({ ...cur, dodgeCharges: Math.max(cur.dodgeCharges, METAMORPHOSE_DODGE) }));
+      b = mutateLaneCreature(b, side, i, (cur) => ({ ...cur, dodgeCharges: Math.max(cur.dodgeCharges, BALANCE.mirage.dodgeCumulativeCap) }));
       count++;
     }
   }

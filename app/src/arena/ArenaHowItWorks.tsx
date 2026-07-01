@@ -113,16 +113,13 @@ export function ArenaHowItWorks({ onClose }: { onClose: () => void }) {
           />
           <Section
             title="⚗️ LA FORGE — fusionner deux cartes"
-            body="La petite case « Forge » au centre-droite du pad est ta table d'alchimie. DÉPOSER (gratuit) : sélectionne une carte de ta main puis tape ta Forge — la carte y reste posée, visible des deux camps, reprenable d'un tap. FUSIONNER : sélectionne son PARTENAIRE en main (badge ⚗ qui devient OR) et tape la Forge → les deux cartes se consument et la carte fusionnée (plus puissante, coût = somme −1) arrive dans ta main. Aucun tour perdu, aucun mana au dépôt."
+            body="La petite case « Forge » au centre-droite du pad est ta table d'alchimie. DÉPOSER (gratuit) : sélectionne une carte de ta main puis tape ta Forge — elle y reste posée, visible des deux camps, reprenable d'un tap. FUSIONNER : sélectionne son PARTENAIRE en main (badge ⚗ qui devient OR) et tape la Forge → les deux cartes se consument et la carte fusionnée (plus puissante) arrive sur ta Forge. La récupérer en main coûte 1 mana, puis tu la joues comme un sort. Aucun tour perdu, aucun mana au dépôt."
             sub={[
-              "🎯 Précision + Surcharge = FRAPPE PARFAITE (+6 ATK)",
-              "🏰 Aegis + Ancre = BASTION (bouclier + ancre + provoc rechargée)",
-              "🏔️ Jet de Caillou ×2 = AVALANCHE (3 dégâts à 2 créatures)",
-              "⛲ Sève + Second Souffle = SOURCE VITALE (+3 créature ET +3 héros)",
-              "👁️ Oracle + Coup d'Œil = OMNISCIENCE (pioche 3 + main adverse révélée 2 tours)",
-              "🛡 Toile Gluante + Malédiction = COCON (n'attaque pas + −2 ATK)",
-              "☄️ Supernova + Gravité = APOCALYPSE (4 dégâts à toutes + 4 au héros)",
-              "🎭 Larcin + Mascarade = IMPOSTEUR (vole 1 carte + lit la main)",
+              "🃏 Toute carte avec le badge ⚗ a une recette — LONG-PRESS la carte pour voir SA recette exacte + le résultat (toujours à jour, même quand de nouvelles fusions arrivent).",
+              "Quelques exemples pour l'idée :",
+              "🏰 Aegis + Ancre = BASTION (forteresse : bouclier + ancre + provoc)",
+              "☄️ Supernova + Singularité = APOCALYPSE (4 dégâts à toutes + 4 au héros)",
+              "🦎 Chaque Voie a SES fusions — ex. Mirage : Nuée + Coup dans l'Ombre = APOTHÉOSE SPECTRALE",
               "Badge ⚗ fuchsia = la carte a une recette · OR pulsant = son partenaire est sur ta Forge, fusion possible MAINTENANT.",
             ]}
           />

@@ -198,3 +198,53 @@ export function AntiTauntChip({
     </AnimatePresence>
   );
 }
+
+/** RIPOSTE D'ESQUIVE CHIP — répond au « pourquoi l'attaquant meurt sans raison ? »
+ *  (Alex 2026-06-28). Pop sur la lane de l'ATTAQUANT quand il frappe un Lézard qui
+ *  esquive : le Lézard se dérobe ET contre-attaque. Note « pourquoi », légère. */
+export function RiposteChip({
+  riposteFX, playerSide,
+}: {
+  riposteFX: { attackerSide: "a" | "b"; lane: LaneIndex; key: number } | null;
+  playerSide: Side;
+}) {
+  return (
+    <AnimatePresence>
+      {riposteFX && (
+        <motion.div
+          key={"riposte-" + riposteFX.key}
+          initial={{ opacity: 0, scale: 0.75, y: riposteFX.attackerSide === playerSide ? 18 : -18 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.9 }}
+          transition={{ type: "spring", stiffness: 320, damping: 22 }}
+          className={
+            "absolute z-40 pointer-events-none " +
+            (riposteFX.attackerSide === playerSide ? "bottom-[42%] " : "top-[42%] ") +
+            (riposteFX.lane === 0 ? "left-[6%]" :
+             riposteFX.lane === 2 ? "right-[6%]" :
+             "left-1/2 -translate-x-1/2")
+          }
+        >
+          <div
+            className="relative flex items-center gap-2 px-3 py-1.5 rounded-2xl backdrop-blur-sm shadow-2xl"
+            style={{
+              background: "linear-gradient(135deg, rgba(34,211,238,0.94) 0%, rgba(124,58,237,0.94) 100%)",
+              border: "1px solid rgba(255,255,255,0.4)",
+              boxShadow: "0 6px 24px -4px rgba(124,58,237,0.5), 0 0 16px rgba(34,211,238,0.4), inset 0 1px 0 rgba(255,255,255,0.2)",
+            }}
+          >
+            <span className="text-base leading-none drop-shadow">✨⚔</span>
+            <div className="flex flex-col items-start leading-none">
+              <span className="text-[7.5px] uppercase tracking-[0.2em] font-black text-white/90">
+                🦎 Esquive
+              </span>
+              <span className="text-[10.5px] uppercase tracking-[0.12em] font-black text-white drop-shadow">
+                Riposte !
+              </span>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}

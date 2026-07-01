@@ -92,14 +92,28 @@ export function creatureEffectiveAtk(c: Creature): number {
   return Math.max(0, base);
 }
 
+/** Esquive consommée — −1 charge. Un LÉZARD GRANDIT (+ATK perm) à CHAQUE esquive
+ *  réussie : l'évasion se CONVERTIT en menace (win-con Mirage, Alex 2026-06-28).
+ *  `BALANCE.mirage.dodgeGrowAtk = 0` → iso-comportement (juste le décrément). Le
+ *  point de passage UNIQUE de toute esquive (combat + sorts) pour ne rien rater. */
+export function dodgeSave(c: Creature): Creature {
+  const dodgeCharges = c.dodgeCharges - 1;
+  if (c.move !== "lizard" || BALANCE.mirage.dodgeGrowAtk <= 0) return { ...c, dodgeCharges };
+  // Le grandit est PLAFONNÉ (dodgeGrowAtkCap) — fini l'ATK exponentielle d'un
+  // Lézard qui esquive 9× (audit 2026-06-28).
+  const voieAtkBonus = Math.min(BALANCE.mirage.dodgeGrowAtkCap, c.voieAtkBonus + BALANCE.mirage.dodgeGrowAtk);
+  return { ...c, dodgeCharges, voieAtkBonus };
+}
+
 /** Apply damage to a creature, honoring its defenses in order:
  *   1. Esquive (Lézard dodgeCharges) — intrinsèque, prioritaire sur divineShield.
- *      Consume 1 charge. Voie Lézard = 2 charges initiales.
+ *      Consume 1 charge (et fait grandir le Lézard, cf. dodgeSave). Voie = 2 charges.
  *   2. Divine Shield (Aegis spell) — consommé au 1er dégât.
  *  Returns the new creature, or null if it died. */
 export function damageCreature(c: Creature, dmg: number): Creature | null {
   if (dmg <= 0) return c;
-  if (c.dodgeCharges > 0) return { ...c, dodgeCharges: c.dodgeCharges - 1 };
+  if (c.phasedOut) return c; // ÉCLIPSE N2 : créature en phase = intouchable (zéro dégât, ne consomme même pas d'Esquive) — couvre AoE Gravité/Apocalypse qui ignorent l'Ancre
+  if (c.dodgeCharges > 0) return dodgeSave(c);
   if (c.divineShield) return { ...c, divineShield: false };
   const hp = c.hp - dmg;
   if (hp <= 0) return null;
@@ -178,6 +192,8 @@ export function endOfTurnReset(c: Creature, vergerActive = false, trancheBonus =
     anchored: false,
     ripostePrimed: false,
     cannotAttack: false, // Toile Gluante expire en fin de tour
+    phasedOut: false,    // Éclipse expire en fin de tour
+    justRevived: false,  // flamme de renaissance Phénix consommée
     summonedThisTurn: false,
     wiltedSteps: wilted,
     wiltSkipNext: nextSkip,

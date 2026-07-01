@@ -1,6 +1,6 @@
 import { alog, csnap } from "../arenaLog";
 import { AFFINITY_TO_FINISHER } from "../arenaFinishers";
-import { applyEnginesEndOfTurn, engineMaxed, trancheAtkBonus, mirageDodgeBonus } from "../arenaEngines";
+import { applyEnginesEndOfTurn, engineMaxed, trancheAtkBonus, mirageDodgeBonus, mirageAtkBonus, riseEngineOnHeld } from "../arenaEngines";
 import { BALANCE } from "../arenaBalance";
 // resolveCombat vit dans ./arenaCombat (déplacé 2026-06-09 : arenaRules > 700 l).
 // Le cycle arenaRules<->arenaCombat tient car arenaCombat n'importe que les
@@ -27,6 +27,7 @@ import {
   type TurnIntent,
 } from "../arenaTypes";
 import { makeCreature, endOfTurnReset, gainStrateIfHeld } from "./heroCreature";
+import { drawCards } from "./boardInit";
 import type { CardId } from "../../ranked/rankedTypes";
 import type { Move } from "../../engine/game";
 
@@ -47,12 +48,14 @@ export function resolveTurn(
 ): BoardState {
   let b = board;
 
-  // ─── 1. Spell phase ─── (fairness fix: intercalate sides by priority)
-  b = applyAllSpells(b, intentA, intentB);
-
-  // ─── 2. Summon phase ───
+  // ─── 1. Summon phase ─── (Alex 2026-06-29 : invocations AVANT les sorts → un
+  //     sort de zone comme Éboulement touche les voisines TOUT JUSTE invoquées,
+  //     au lieu de frapper une lane encore vide. Ordre miroité dans runResolverFlow.)
   b = applySummons(b, intentA, "a");
   b = applySummons(b, intentB, "b");
+
+  // ─── 2. Spell phase ─── (intercale les deux camps par priorité)
+  b = applyAllSpells(b, intentA, intentB);
 
   // ─── 3. Combat phase ───
   b = resolveCombat(b);
@@ -173,9 +176,15 @@ export function applySummons(board: BoardState, intent: TurnIntent, side: Side):
     // Mirage déjà accumulée par tes victoires passées.
     const created = makeCreature(summon.move, side, hero.affinity);
     // MIRAGE : un Lézard de la Voie arrive avec +mirageStack charges d'Esquive
-    // (borné 5 — Mirage dépasse volontairement le cap normal de 3 = son identité).
+    // (borné dodgeCapOnSummon) ET +mirageStack ATK perm (mirageAtkBonus, payoff
+    // offensif 2026-06-30) — insaisissable ET tranchant : la jauge convertit
+    // enfin en pression (frappes imblocables) au lieu de turtle pur.
     lane[side] = created.move === "lizard"
-      ? { ...created, dodgeCharges: Math.min(BALANCE.mirage.dodgeCapOnSummon, created.dodgeCharges + mirageDodgeBonus(hero)) }
+      ? {
+          ...created,
+          dodgeCharges: Math.min(BALANCE.mirage.dodgeCapOnSummon, created.dodgeCharges + mirageDodgeBonus(hero)),
+          voieAtkBonus: created.voieAtkBonus + mirageAtkBonus(hero),
+        }
       : created;
     lanes[summon.lane] = lane;
     if (replaced) {
@@ -211,12 +220,19 @@ export function endOfTurnCleanup(board: BoardState): BoardState {
   const revive = (snap: { lane: LaneIndex; move: Move }[] | undefined, side: Side): void => {
     if (!snap || snap.length === 0) return;
     const aff = side === "a" ? board.a.affinity : board.b.affinity;
+    // NERF Forêt (Alex 2026-06-30) : Phénix ne ressuscite plus qu'UNE créature (la
+    // 1re tombée) au lieu de TOUT le board → casse la « forteresse inkillable » (le
+    // board ne se vidait jamais, coupant la win-condition lane-vide→héros). Reste un
+    // sauvetage légendaire fort. Voie-agnostique (ne casse pas les decks non-Forêt).
+    let revived = 0;
     for (const { lane, move } of snap) {
+      if (revived >= 1) break;
       const cur = side === "a" ? lanes[lane].a : lanes[lane].b;
       if (!cur) {
-        const reborn: Creature = { ...makeCreature(move, side, aff), hp: 1, summonedThisTurn: false };
+        const reborn: Creature = { ...makeCreature(move, side, aff), hp: 1, summonedThisTurn: false, justRevived: true };
         lanes[lane] = side === "a" ? { ...lanes[lane], a: reborn } : { ...lanes[lane], b: reborn };
         alog("turn", `${side} 🔥 PHÉNIX → ${move} renaît à 1 PV (L${lane})`);
+        revived++;
       }
     }
   };
@@ -241,18 +257,44 @@ export function endOfTurnCleanup(board: BoardState): BoardState {
     }
     return { ...hero, finisherUnlocked: true, hand };
   };
+  // 🪨 MONTAGNE — la jauge Strates monte AUSSI si une Pierre de la Voie a TENU ce
+  // tour (rock survivant, pas fraîchement posé) : on lie la jauge au « tenir » (=
+  // la win-condition snowball), pas au seul counter-win qui gèle Montagne (cf.
+  // riseEngineOnHeld, parallèle au fix Mirage). Posé AVANT refreshConstellation pour
+  // que Forteresse se débloque sur la jauge montée. Affinité rock-gated dans la fn.
+  const aHeldRock = board.lanes.some((l) => !!l.a && l.a.move === "rock" && !l.a.summonedThisTurn);
+  const bHeldRock = board.lanes.some((l) => !!l.b && l.b.move === "rock" && !l.b.summonedThisTurn);
+  const heroA0 = aHeldRock ? riseEngineOnHeld(board.a) : board.a;
+  const heroB0 = bHeldRock ? riseEngineOnHeld(board.b) : board.b;
   // ENGINES de Voie (Sève régén + Cosmos chip) appliqués APRÈS la constellation,
   // sur les héros rafraîchis. Pur/capé/additif (cf. arenaEngines).
   const engines = applyEnginesEndOfTurn(
     board,
-    refreshConstellation(board.a, "a"),
-    refreshConstellation(board.b, "b"),
+    refreshConstellation(heroA0, "a"),
+    refreshConstellation(heroB0, "b"),
   );
+  // SILLAGE SPECTRAL (Mirage 2026-06-28) — aura active : si un de mes Lézards a
+  // esquivé ce tour (flag posé en combat, cf. arenaCombat), je pioche 1 (cap
+  // 1/tour). Lu sur board.X (post-combat), pioche appliquée sur engines.X.
+  let aHero = engines.a;
+  let bHero = engines.b;
+  if (aHero.sillageActive && board.a.sillageDodgedThisTurn) {
+    aHero = drawCards(aHero, 1);
+    alog("turn", `a 🌀 SILLAGE SPECTRAL → esquive ce tour = pioche 1`);
+  }
+  if (bHero.sillageActive && board.b.sillageDodgedThisTurn) {
+    bHero = drawCards(bHero, 1);
+    alog("turn", `b 🌀 SILLAGE SPECTRAL → esquive ce tour = pioche 1`);
+  }
+  // Reset des flags PER-TOUR : Mirage (Sillage esquive + Nuée imblocable) + Montagne
+  // (Écrasement soin coupé — lu par seveHealAmount juste au-dessus, puis remis à 0).
+  aHero = { ...aHero, sillageDodgedThisTurn: false, nueeActive: false, healLockedThisTurn: false };
+  bHero = { ...bHero, sillageDodgedThisTurn: false, nueeActive: false, healLockedThisTurn: false };
   return {
     ...board,
     lanes,
-    a: engines.a,
-    b: engines.b,
+    a: aHero,
+    b: bHero,
     phenixReviveA: undefined, // snapshot Phénix consommé
     phenixReviveB: undefined,
   };

@@ -61,19 +61,35 @@ export const CARD_TARGET_KIND: Partial<Record<CardId, SpellTargetKind>> = {
   "strate-vive":    "lane",
   "gardien-pierre": "lane",
   contrefort:       "self",
+  barricade:        "self",
+  "veine-minerale": "self",
+  grondement:       "self",
+  ecrasement:       "hero",
   "veine-gaia":     "self",
   // ── Voie Mirage (2026-06-22) ──
   "mascarade-enchainee": "lane",
   "fuite-masquee":       "lane",
   "reflet-echo":         "self",
+  // ── Voie Mirage — nouvelles cartes (2026-06-28) ──
+  derobade:           "lane",
+  "frappe-spectrale": "lane",
+  "faux-semblant":    "lane",
+  "sillage-spectral": "self",
+  "nuee-spectrale":   "self",
+  eclipse:            "lane",
   // ── Voie Tranchant (2026-06-22) ──
   "coup-de-taille": "lane",
   acuite:           "lane",
   frenesie:         "self",
+  estafilade:       "lane",
+  saignee:          "self",
+  "fureur-emoussee": "self",
+  estocade:         "self",
   // ── Voie Forêt (2026-06-23) ──
   ramure:            "self",
   photosynthese:     "lane",
   ronces:            "lane",
+  greffe:            "self",
   // ── Voie Cosmos (2026-06-23) ──
   "dilatation-temporelle": "self",
   "loi-de-causalite":      "lane",
@@ -101,11 +117,19 @@ export const CARD_TARGET_KIND: Partial<Record<CardId, SpellTargetKind>> = {
   "frappe-parfaite": "lane",
   bastion:           "lane",
   avalanche:         "global",
+  citadelle:         "self",
+  cataclysme:        "hero",
   "source-vitale":   "lane",
+  "bosquet-epineux": "lane",
+  effacement:        "lane",
   omniscience:       "global",
   cocon:             "lane",
   apocalypse:        "global",
   imposteur:         "global",
+  // ── Fusions Mirage (2026-06-28) ──
+  "galerie-des-glaces":   "global",
+  "mascarade-souveraine": "lane",
+  "apotheose-spectrale":  "global",
 };
 
 /** Active targeting state shared across the board + plan phase so that
@@ -146,9 +170,15 @@ export const LANE_SPELL_TARGET_SIDE: Partial<Record<CardId, LaneTargetSide>> = {
   // ── Voie Mirage (2026-06-22) ──
   "mascarade-enchainee": "my-creature",
   "fuite-masquee":       "my-creature",
+  // ── Voie Mirage — nouvelles cartes (2026-06-28) ──
+  derobade:           "my-creature", // cible TON Lézard à déplacer
+  "frappe-spectrale": "my-creature", // cible TON Lézard qui dépense l'esquive
+  eclipse:            "my-creature", // cible TON Lézard à faire disparaître
+  "faux-semblant":    "opp-creature", // cible la créature adverse à déguiser
   // ── Voie Tranchant (2026-06-22) ──
   "coup-de-taille": "my-creature",
   acuite:           "my-creature",
+  estafilade:       "my-creature", // cible TON Ciseau qui fend vers le héros
   // ── Voie Forêt (2026-06-23) ──
   photosynthese:    "my-creature",
   ronces:           "my-creature",
@@ -168,7 +198,11 @@ export const LANE_SPELL_TARGET_SIDE: Partial<Record<CardId, LaneTargetSide>> = {
   "frappe-parfaite": "my-creature",
   bastion:           "my-creature",
   "source-vitale":   "my-creature",
+  "bosquet-epineux": "my-creature",
+  effacement:        "opp-creature",
   cocon:             "opp-creature",
+  // ── Fusions Mirage (2026-06-28) ──
+  "mascarade-souveraine": "both-occupied",
 };
 
 /** Restriction de MOVE pour les cartes lane-target « mono-symbole » (ex. Strate
@@ -181,6 +215,15 @@ export const LANE_TARGET_MOVE: Partial<Record<CardId, Move>> = {
   // ── Voie Montagne — Pierre-only ──
   "strate-vive":    "rock",
   "gardien-pierre": "rock",
+  // ── Voie Mirage — Lézard-only (Alex 2026-06-28 : ne plus gâcher la carte sur
+  //    un autre symbole ; l'effet fizzlait déjà, l'indicateur s'aligne enfin) ──
+  "mascarade-enchainee": "lizard",
+  "fuite-masquee":       "lizard",
+  // ── nouvelles cartes (2026-06-28) — ciblent TON Lézard (Faux-Semblant cible
+  //    l'adverse, donc PAS ici) ──
+  derobade:           "lizard",
+  "frappe-spectrale": "lizard",
+  eclipse:            "lizard",
 };
 
 /** Libellé court FR d'un symbole, pour les labels de ciblage (« Cible ta Pierre »). */

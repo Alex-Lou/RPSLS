@@ -6,12 +6,10 @@ import {
   type ArenaMatchResult,
   type BoardState,
   type HeroState,
-  type LaneState,
   type Side,
 } from "../arenaTypes";
 import { creatureEffectiveAtk } from "./heroCreature";
 import { drawCards } from "./boardInit";
-import { METAMORPHOSE_DODGE } from "../arenaFinishers";
 
 /* ───────────────────────── Turn lifecycle ───────────────────────── */
 
@@ -78,23 +76,13 @@ export function advanceToNextTurn(board: BoardState): BoardState {
   // VERGER : la régén est désormais gérée par l'ENGINE SÈVE en endOfTurnCleanup
   //          (seveHealAmount « Sève entretenue » : conditionnel au counter Feuille,
   //          Verger = 1/tour plancher) — plus rien ici.
-  // MÉTAMORPHOSE : si metamorphoseActive, tous mes Lézard refill dodgeCharges
+  // MÉTAMORPHOSE — BURST UNIQUE (Alex 2026-06-28) : la recharge d'Esquive se fait
+  // UNE FOIS au cast (cf arenaFinishers.applyMetamorphose), PLUS chaque tour. Un
+  // Lézard ne subit qu'1 attaque/lane/tour → une recharge ≥1/tour le rendait
+  // MATHÉMATIQUEMENT intouchable (device : 30 esquives, 17-0). Désormais il épuise
+  // ses charges puis redevient mortel → finisher dévastateur mais TUABLE.
   // Note : LAME est traité in-combat (cf arenaCombat), pas ici.
-  let lanesAfterFinishers = board.lanes;
-  if (board.a.metamorphoseActive) {
-    lanesAfterFinishers = lanesAfterFinishers.map((l) => ({
-      ...l,
-      a: l.a && l.a.move === "lizard" ? { ...l.a, dodgeCharges: Math.max(l.a.dodgeCharges, METAMORPHOSE_DODGE) } : l.a,
-    })) as [LaneState, LaneState, LaneState];
-    alog("turn", `a MÉTAMORPHOSE → Lézard dodge refresh`);
-  }
-  if (board.b.metamorphoseActive) {
-    lanesAfterFinishers = lanesAfterFinishers.map((l) => ({
-      ...l,
-      b: l.b && l.b.move === "lizard" ? { ...l.b, dodgeCharges: Math.max(l.b.dodgeCharges, METAMORPHOSE_DODGE) } : l.b,
-    })) as [LaneState, LaneState, LaneState];
-    alog("turn", `b MÉTAMORPHOSE → Lézard dodge refresh`);
-  }
+  const lanesAfterFinishers = board.lanes;
   // Régén Verger ÉTERNEL (Forêt) désormais gérée par l'ENGINE SÈVE en
   // endOfTurnCleanup (seveHealAmount « Sève entretenue » : soin conditionnel au
   // counter Feuille, Verger = 1/tour plancher) → on ne soigne PLUS ici, sinon

@@ -79,6 +79,27 @@ export interface HeroState {
   /** Lot D — flag CALCUL QUANTIQUE : tous mes sorts coûtent −1m (min 0).
    *  Vérifié dans applyAllSpells.cost. */
   calculActive?: boolean;
+  /** SILLAGE SPECTRAL (Mirage, 2026-06-28) — aura active après cast : la 1ère
+   *  fois qu'un de mes Lézards esquive CHAQUE tour, je pioche 1. `sillageActive`
+   *  persiste tout le match ; `sillageDodgedThisTurn` est posé en combat à
+   *  l'esquive, lu + reset en endOfTurnCleanup (cap 1 pioche/tour). */
+  sillageActive?: boolean;
+  sillageDodgedThisTurn?: boolean;
+  /** NUÉE SPECTRALE (Mirage, 2026-06-28) — CE TOUR, mes Lézards sont
+   *  imblocables : ils ignorent le RPSLS-lock (ne meurent pas), bypassent leur
+   *  lane et frappent le héros adverse. Posé au cast, lu en combat, reset en
+   *  endOfTurnCleanup. */
+  nueeActive?: boolean;
+  /** ÉCRASEMENT TELLURIQUE (Montagne, 2026-06-30) — CE TOUR, ce héros ne peut PAS
+   *  être soigné par la régen Forêt (Sève/Verger) : posé sur l'adverse au cast, lu
+   *  par seveHealAmount en endOfTurnCleanup, reset juste après. Perce le mur de
+   *  régen Forêt (talon Montagne #2). */
+  healLockedThisTurn?: boolean;
+  /** GRONDEMENT (Montagne, 2026-06-30) — aura PERSISTANTE : chaque fin de tour, le
+   *  héros adverse subit des dégâts = mes Strates en jeu (cap grondementCap). Posé
+   *  au cast, lu en endOfTurnCleanup (applyEnginesEndOfTurn), JAMAIS reset (aura
+   *  tout le match). Counterable : wiper mes Pierres coupe le chip. */
+  tremorActive?: boolean;
   /** Persona du CPU (Alex 2026-06-11) — choisie au match start côté CPU.
    *  Module les heuristiques de l'IA : agression, focus sur sa Voie, focus
    *  sur contrer la Voie joueur, défensivité. undefined côté joueur. */

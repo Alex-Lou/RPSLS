@@ -261,7 +261,7 @@ function CreatureSlotInner({
       {/* 🕸 TOILE GLUANTE — voile lime + badge tant que la créature est
        *  engluée (cannotAttack, expire en fin de tour). L'UI ne ment pas :
        *  ⚔ affiche déjà 0, ceci montre POURQUOI. */}
-      {creature.cannotAttack && (
+      {creature.cannotAttack && !creature.phasedOut && (
         <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 15 }} aria-hidden>
           <div
             className="absolute inset-0 rounded-xl"
@@ -274,6 +274,54 @@ function CreatureSlotInner({
             title="Engluée — ne peut pas attaquer ce tour"
           >
             🕸️
+          </motion.span>
+        </div>
+      )}
+      {/* 🌘 ÉCLIPSE — créature EN PHASE : voile cyan + liseré pulsant + badge tant
+       *  qu'elle est intouchable (phasedOut, expire fin de tour). Elle survit à
+       *  tout ce tour mais n'attaque pas → on rend l'intangibilité LISIBLE.
+       *  Perf-safe : box-shadow STATIQUE, on n'anime que l'opacity (cf. halo Provoc). */}
+      {creature.phasedOut && (
+        <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 16 }} aria-hidden>
+          <div
+            className="absolute inset-0 rounded-xl"
+            style={{ background: "radial-gradient(circle, rgba(34,211,238,0.20) 0%, rgba(129,140,248,0.10) 55%, transparent 82%)" }}
+          />
+          <motion.div
+            initial={{ opacity: 0.4 }}
+            animate={{ opacity: [0.4, 0.85, 0.4] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute inset-0 rounded-xl"
+            style={{ boxShadow: "inset 0 0 0 2px rgba(34,211,238,0.55), inset 0 0 16px rgba(34,211,238,0.4)" }}
+          />
+          <span
+            className="absolute top-1 left-1/2 -translate-x-1/2 text-[12px] drop-shadow"
+            title="En phase (Éclipse) — intouchable ce tour, n'attaque pas"
+          >
+            🌘
+          </span>
+        </div>
+      )}
+      {/* 🔥 PHÉNIX — flamme de RENAISSANCE : quand une créature revient
+       *  (justRevived), une flamme or→rouge s'élève UNE fois (rise + fade).
+       *  Per-turn (flag effacé au reset suivant). One-shot, leak-free. */}
+      {creature.justRevived && (
+        <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 21 }} aria-hidden>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: [0, 0.9, 0], scale: [0.5, 1.4, 1.8] }}
+            transition={{ duration: 1.0, times: [0, 0.4, 1], ease: "easeOut" }}
+            className="absolute inset-0 rounded-xl"
+            style={{ background: "radial-gradient(circle at 50% 70%, rgba(251,146,60,0.8) 0%, rgba(249,115,22,0.4) 40%, transparent 72%)", mixBlendMode: "screen" }}
+          />
+          <motion.span
+            initial={{ opacity: 0, y: 10, scale: 0.6 }}
+            animate={{ opacity: [0, 1, 0], y: -18, scale: 1.2 }}
+            transition={{ duration: 1.0, ease: "easeOut" }}
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl"
+            style={{ filter: "drop-shadow(0 0 8px rgba(249,115,22,0.9))" }}
+          >
+            🔥
           </motion.span>
         </div>
       )}
@@ -316,7 +364,7 @@ function CreatureSlotInner({
             : { rotateY: 0, scale: 1, filter: "brightness(1)" }
         }
         transition={disguiseFlash ? { duration: 0.7, times: [0, 0.55, 1] } : { duration: 0.2 }}
-        style={{ transformStyle: "preserve-3d", lineHeight: 0 }}
+        style={{ transformStyle: "preserve-3d", lineHeight: 0, opacity: creature.phasedOut ? 0.4 : 1 }}
       >
         {/* É3 (audit UX 2026-06-12) : glyphe +~9% — slot INCHANGÉ. */}
         <MoveGlyph move={creature.move} className="w-[3.8rem] h-[3.8rem] sm:w-[4.35rem] sm:h-[4.35rem]" />

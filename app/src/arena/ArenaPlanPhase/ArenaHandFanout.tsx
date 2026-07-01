@@ -5,8 +5,8 @@ import { useT } from "../../i18n";
 import type { CardId } from "../../ranked/rankedTypes";
 import { arenaSupported } from "../arenaCardEffects";
 import { arenaSpellCost } from "../arenaSpellHelpers";
-import { isFusible, findFusionResult } from "../arenaFusionCards";
-import type { ArenaTargeting, BoardState, TurnIntent } from "../arenaTypes";
+import { isFusible, findFusionResult, fusionPartnersOf } from "../arenaFusionCards";
+import { CARD_TARGET_KIND, type ArenaTargeting, type BoardState, type TurnIntent } from "../arenaTypes";
 import { CardFanGlyph, FuseGlyph, WarnGlyph } from "../../icons";
 
 /** Hand strip — tap = commit/target, hold 1.4s = inspect modal, DRAG =
@@ -80,6 +80,14 @@ export function ArenaHandFanout({
             const cannotAfford = manaLeft < arenaSpellCost(me, id);
             const isTargeting = targeting?.kind === "spell" && targeting.id === id;
             const isInspecting = inspecting === id;
+            // FORGE UX (Alex 2026-06-30) : une carte FUSIBLE self/global/hero s'ARME
+            // au tap (au lieu d'auto-jouer) → sans cue, le joueur croit la carte
+            // « morte ». Quand elle est armée on affiche les DEUX destinations :
+            // « retape = jouer » (strip) ET « ⚗ Forge » (dépôt). Les cartes-lane
+            // sont exclues (elles tapent une lane = flux familier, jamais « 2 taps »).
+            const tk = CARD_TARGET_KIND[id] ?? "global";
+            const isFusibleUtilityArmed =
+              isTargeting && isFusible(id) && (tk === "self" || tk === "global" || tk === "hero");
             // É2 — géométrie de l'éventail : rotation répartie (max ±12°),
             // creux parabolique vers les bords, carte active redressée +
             // remontée au-dessus des voisines.
@@ -195,6 +203,21 @@ export function ArenaHandFanout({
                     <FuseGlyph className="w-3 h-3" />
                   </div>
                 )}
+                {/* ⚗ FUSIONNABLE DEPUIS LA MAIN (Alex 2026-06-28) : badge fuchsia
+                 *  affiché UNIQUEMENT quand le PARTENAIRE de cette carte est AUSSI
+                 *  dans ta main (forge vide) → tu vois quelles 2 marier, sans le
+                 *  clutter de l'ancien badge toujours-affiché. */}
+                {!board.forgeA && fusionPartnersOf(id).some((r) => {
+                  const p = r.a === id ? r.b : r.a;
+                  return p === id ? me.hand.filter((h) => h === id).length >= 2 : me.hand.includes(p);
+                }) && (
+                  <div
+                    className="absolute bottom-4 right-0.5 z-10 w-5 h-5 rounded-full flex items-center justify-center text-[11px] leading-none shadow bg-fuchsia-500 text-white ring-1 ring-fuchsia-300"
+                    title="Fusionnable : tu as le partenaire en main — dépose une carte sur la Forge puis fusionne"
+                  >
+                    <FuseGlyph className="w-3 h-3" />
+                  </div>
+                )}
                 {id === "second-wind" && me.hp >= me.maxHp && (
                   <div
                     className="absolute top-0.5 right-0.5 z-10 px-1 py-0.5 rounded-md bg-amber-500/90 text-[8px] font-black text-zinc-900 leading-none shadow"
@@ -204,6 +227,26 @@ export function ArenaHandFanout({
                   </div>
                 )}
               </button>
+              {/* DUAL-ACTION HINT (Alex 2026-06-30) — AU-DESSUS d'une carte
+               *  FUSIBLE utilitaire ARMÉE : les 2 destinations possibles, pour
+               *  que le joueur ne croie plus la carte « morte ». « Retape = jouer »
+               *  (strip) + « ⚗ ou Forge » (dépôt — la case Forge s'illumine déjà
+               *  « Déposer »). N'apparaît que sur la carte active armée. */}
+              {fanActive && isFusibleUtilityArmed && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.12 }}
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50 pointer-events-none flex items-center gap-1 whitespace-nowrap"
+                >
+                  <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-zinc-900 text-[8px] font-black uppercase tracking-wide shadow-lg flex items-center gap-0.5 animate-pulse">
+                    <span className="text-[10px] leading-none">▸</span>Retape = jouer
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded-full bg-fuchsia-500 text-white text-[8px] font-black uppercase tracking-wide shadow-lg ring-1 ring-fuchsia-300 flex items-center gap-0.5">
+                    <FuseGlyph className="w-2.5 h-2.5" />ou Forge
+                  </span>
+                </motion.div>
+              )}
               {/* Pill NOM — SOUS la carte touchée (Alex 2026-06-13 : "le nom
                *  sous elle, pas ailleurs"). Enfant du wrapper éventail → suit
                *  la carte (position + scale), centrée dessous, jamais tronquée. */}

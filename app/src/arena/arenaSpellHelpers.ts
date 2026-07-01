@@ -17,10 +17,18 @@ import type { BoardState, Creature, HeroState, LaneState, Side } from "./arenaTy
  *  et l'IA (budget mana). Avant, le discount n'existait qu'à la résolution :
  *  l'UI bloquait au coût plein → le Finisher Spock était injouable en pratique. */
 export function arenaSpellCost(
-  hero: Pick<HeroState, "calculActive">, id: CardId,
+  hero: Pick<HeroState, "calculActive" | "affinity" | "cosmosCount">, id: CardId,
 ): number {
   const base = CARDS[id].cost;
-  return hero.calculActive ? Math.max(0, base - BALANCE.cosmos.calculDiscount) : base;
+  let cost = hero.calculActive ? Math.max(0, base - BALANCE.cosmos.calculDiscount) : base;
+  // Jauge VIVANTE Cosmos (Alex 2026-06-30) : à cosmosCount≥2 tes sorts coûtent
+  // −tempoDiscount (tempo/ramp = identité CONTRÔLE). Donne enfin un payoff de
+  // jauge PAR TOUR (les 4 autres Voies en ont un ; Cosmos n'avait qu'un compteur
+  // de finisher → jauge morte/solipsiste). Non-dégât, quasi-neutre (Lab-validé).
+  if (hero.affinity === "spock" && (hero.cosmosCount ?? 0) >= 2) {
+    cost = Math.max(0, cost - BALANCE.cosmos.tempoDiscount);
+  }
+  return cost;
 }
 
 /** Read the creature on `lane` owned by `side`. Null if empty. */

@@ -24,6 +24,8 @@ import { isDominantSpell } from "./arenaFinishers";
 import { spellPriority } from "./arenaCardEffects";
 import { SPELLS_WITH_SIGNATURE } from "./ArenaSpellFX";
 import type { ProjectileFX } from "./ArenaProjectileFX";
+import type { LaneOutcome, LaneResult } from "./arenaTelemetry";
+import { BALANCE } from "./arenaBalance";
 
 /** Snapshot helper — log compact d'une lane avec flags. Réutilise le même
  *  format que advanceToNextTurn pour cohérence à travers le pipeline. */
@@ -84,6 +86,10 @@ export interface ResolverFlowArgs {
    *  Pierre, because the attacker carries Étouffe (Paper) / Logique (Spock)
    *  which cancel Provocation. `bypassedSide` owns the bypassed Pierre. */
   setAntiTaunt: (b: { bypassedSide: "a" | "b"; rockLane: LaneIndex; cause: "paper" | "spock"; key: number } | null) => void;
+  /** Riposte d'esquive (Mirage) — set quand un Lézard va esquiver un counter et
+   *  contre-attaquer : pop un chip sur la lane de l'ATTAQUANT (« meurt sans raison »
+   *  → enfin expliqué, Alex 2026-06-28). Optionnel (tests/headless). */
+  setRiposteFX?: (b: { attackerSide: "a" | "b"; lane: LaneIndex; key: number } | null) => void;
   /** Signature FX plein-board (Genèse, Supernova…) — déclenché au step SPELLS
    *  avec les ids de TOUS les sorts joués ce tour. ArenaSpellFX ne joue que
    *  ceux qui ont une signature ; le reste s'appuie sur les réactions
@@ -103,6 +109,10 @@ export interface ResolverFlowArgs {
   onAdvanceTurn: () => void;
   /** Match-end haptics — fired once if either hero hit 0 HP. */
   onMatchEnd?: (winnerIsPlayer: boolean) => void;
+  /** Télémétrie Watcher (observationnel, fail-soft) — appelé 1× par lane APRÈS
+   *  résolution du combat, avec l'issue DÉJÀ calculée par le résolveur (aucune
+   *  logique de combat dupliquée). Optionnel (tests/headless). ZÉRO effet gameplay. */
+  onLaneResolved?: (outcome: LaneOutcome) => void;
 }
 
 /** Pacing constants — RALENTIES (Alex 2026-06-23 « tout va vite, je m'y perds »).
@@ -140,8 +150,8 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
   const {
     startBoard, playerIntent, cpuIntent,
     setBoard, setOppPreview, setPlayerPreview, setResolveStep,
-    setCombatLane, setCombatChargers, setHeroHit, setTauntBlock, setAntiTaunt, setSpellFX, setImpactFX, setProjectileFX,
-    onSettle, onAdvanceTurn, onMatchEnd,
+    setCombatLane, setCombatChargers, setHeroHit, setTauntBlock, setAntiTaunt, setRiposteFX, setSpellFX, setImpactFX, setProjectileFX,
+    onSettle, onAdvanceTurn, onMatchEnd, onLaneResolved,
   } = args;
 
   // Annulation (Audit anim Build A — fuite mémoire). Le résolveur programme une
@@ -164,6 +174,16 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
   window.setTimeout(() => {
     if (aborted) return;
     let b = startBoard;
+    // INVOCATIONS AVANT SORTS (Alex 2026-06-29) : on POSE + commit les créatures
+    // fraîches AVANT de résoudre les sorts → Éboulement & co agissent sur les
+    // voisines tout juste invoquées (fini « le sort frappe le ghost, la créature se
+    // forme après »). postSummonBoard = état lu par les projectiles (cibles réelles).
+    b = applySummons(b, playerIntent, "a");
+    b = applySummons(b, cpuIntent, "b");
+    const postSummonBoard = b;
+    setBoard(b);
+    setOppPreview(null);
+    setPlayerPreview(null);
     b = applyAllSpells(b, playerIntent, cpuIntent);
     setResolveStep("spells");
     // COMMIT du board (mort/dégâts/héros) — emballé pour pouvoir être DIFFÉRÉ à
@@ -208,7 +228,7 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
     if (setProjectileFX) {
       const shots: ProjectileFX[] = [];
       let k = 0;
-      const oppOnLane = (side: Side, l: LaneIndex) => (side === "a" ? startBoard.lanes[l].b : startBoard.lanes[l].a);
+      const oppOnLane = (side: Side, l: LaneIndex) => (side === "a" ? postSummonBoard.lanes[l].b : postSummonBoard.lanes[l].a);
       const hits = (side: Side, l: LaneIndex): boolean => {
         const o = oppOnLane(side, l);
         return !!o && !o.anchored && !o.spellImmune; // garde de applyJetCaillou (cible réelle)
@@ -251,16 +271,12 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
     const spellsPhaseMs = Math.max(SPELLS_MS, spellAcc + 150, projectileFired ? PROJECTILE_IMPACT_MS + 250 : 0);
     logBoardSnapshot(b, "post-spells");
 
-    // ─── Step 2: SUMMONS ───
+    // ─── Step 2: invocations DÉJÀ posées en tête (Alex 2026-06-29) — ce beat
+    //     espace juste le combat après la phase SORTS. ───
     window.setTimeout(() => {
       if (aborted) return;
-      b = applySummons(b, playerIntent, "a");
-      b = applySummons(b, cpuIntent, "b");
-      setBoard(b);
-      setOppPreview(null);
-      setPlayerPreview(null);
       setResolveStep("summons");
-      logBoardSnapshot(b, "post-summons");
+      logBoardSnapshot(b, "pre-combat");
 
       // ─── Step 3: COMBAT — lane by lane ───
       window.setTimeout(() => {
@@ -385,6 +401,16 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
               const powA = b.a.hp - dmgA <= 0 ? "fatal" : null; // plein-écran fatal-only (Audit anim Build A)
               if (powA && lane.b && setImpactFX) setImpactFX({ move: lane.b.move, power: powA, key: Date.now() + 1 });
             }
+            // RIPOSTE D'ESQUIVE (Mirage) — cue « pourquoi l'attaquant tombe » : un
+            // Lézard qui va esquiver le counter contre-attaque (cf. dodgeSave + riposte
+            // arenaCombat). On pop le chip sur la lane de l'ATTAQUANT (miroir exact des
+            // conditions de save d'arenaCombat).
+            if (setRiposteFX && BALANCE.mirage.dodgeRiposte > 0 && bothPresent) {
+              const bRiposte = counterAB && !counterBA && lane.b!.move === "lizard" && lane.b!.dodgeCharges > 0 && !aLame;
+              const aRiposte = counterBA && !counterAB && lane.a!.move === "lizard" && lane.a!.dodgeCharges > 0 && !bLame;
+              if (bRiposte) setRiposteFX({ attackerSide: "a", lane: laneIdx, key: Date.now() + 2 });
+              else if (aRiposte) setRiposteFX({ attackerSide: "b", lane: laneIdx, key: Date.now() + 3 });
+            }
           }, LANE_CHARGE_MS * 0.55);
           window.setTimeout(() => {
             if (aborted) return;
@@ -408,6 +434,36 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
               alog("combat", `L${laneIdx} POST-RESOLVE same-ref (pas de mutation)`);
             }
             setBoard(b);
+            // Télémétrie Watcher (Tier B) — issue de la lane, à partir des valeurs
+            // DÉJÀ calculées ci-dessus + le diff de board (prevB → b). Fail-soft,
+            // observationnel : ne touche jamais au gameplay.
+            if (onLaneResolved) {
+              try {
+                const selfMove = lane.a?.move ?? null;
+                const oppMove = lane.b?.move ?? null;
+                const result: LaneResult =
+                  lane.a && lane.b
+                    ? counterAB ? "counterWinSelf" : counterBA ? "counterWinOpp" : "mirror"
+                    : lane.a ? "emptySelf" : lane.b ? "emptyOpp" : "none";
+                onLaneResolved({
+                  lane: laneIdx,
+                  selfMove,
+                  oppMove,
+                  result,
+                  killSelf: !!prevB.lanes[laneIdx].a && !b.lanes[laneIdx].a,
+                  killOpp: !!prevB.lanes[laneIdx].b && !b.lanes[laneIdx].b,
+                  saved:
+                    (counterAB && !counterBA && !!prevB.lanes[laneIdx].b && !!b.lanes[laneIdx].b) ||
+                    (counterBA && !counterAB && !!prevB.lanes[laneIdx].a && !!b.lanes[laneIdx].a),
+                  splashToOpp: bDeflectorLane === null ? splashAtoB : 0,
+                  splashToSelf: aDeflectorLane === null ? splashBtoA : 0,
+                  directToOpp: aHitsB && bDeflectorLane === null ? atkA : 0,
+                  directToSelf: bHitsA && aDeflectorLane === null ? atkB : 0,
+                });
+              } catch {
+                /* télémétrie fail-soft — jamais bloquer la résolution */
+              }
+            }
             // Alex feedback 2026-06-09 "résolution complète des 3 lanes" : NE
             // PLUS early-exit sur match-end interim. On résout les 3 lanes
             // pour permettre l'égalité (a≤0 ET b≤0). Verdict final calculé

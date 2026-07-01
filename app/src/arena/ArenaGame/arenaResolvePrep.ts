@@ -30,6 +30,8 @@ export function prepareResolveStart(board: BoardState, intent: TurnIntent, cpuIn
   startBoard: BoardState;
   safeIntent: TurnIntent;
   safeCpuIntent: TurnIntent;
+  spentA: CardId[]; // vraies cartes dépensées ce tour (télémétrie Watcher, observationnel)
+  spentB: CardId[];
 } {
   const safeIntent = truncateIntentByCaps(intent);
   const safeCpuIntent = truncateIntentByCaps(cpuIntent);
@@ -57,5 +59,5 @@ export function prepareResolveStart(board: BoardState, intent: TurnIntent, cpuIn
     a: { ...board.a, hand: aSpent.hand, discard: [...board.a.discard, ...aSplit.toDiscard], exiled: [...board.a.exiled, ...aSplit.toExile] },
     b: { ...board.b, hand: bSpent.hand, discard: [...board.b.discard, ...bSplit.toDiscard], exiled: [...board.b.exiled, ...bSplit.toExile] },
   };
-  return { startBoard, safeIntent, safeCpuIntent };
+  return { startBoard, safeIntent, safeCpuIntent, spentA: aSpent.spent, spentB: bSpent.spent };
 }

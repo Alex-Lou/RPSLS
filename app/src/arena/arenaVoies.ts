@@ -61,32 +61,45 @@ export const VOIE_DEF: Record<Move, VoieDef> = {
  *  actuel. Réversible : retirer l'entrée = retour au libre. Cf. VOIE-ARCHETYPES.md. */
 export const SIGNATURE_DECK: Partial<Record<Move, CardId[]>> = {
   rock: [
-    "anchor", "jet-caillou", "eboulement",   // défense + removal précoce / AOE
+    "anchor", "barricade", "jet-caillou", "eboulement", // défense + anti-aggro + removal / AOE
     "rempart", "contrefort", "strate-vive",  // mur + bouclier + escalade ATK
+    "veine-minerale", "grondement",          // pioche + aura chip récurrent (Alex 2026-06-30)
     "veine-gaia", "gardien-pierre",          // sustain + verrou tardif (riposte/ancre)
-    "eboulis-final",                         // DÉGÂTS signature (= Pierres × 2 + Strates)
+    "ecrasement", "eboulis-final",           // perce-mur anti-heal + DÉGÂTS signature
   ],
   lizard: [
-    "mascarade", "reflet-echo", "echappee",          // tempo / cycle / fuite
-    "mirror", "mascarade-enchainee", "fuite-masquee", // copie + montée d'Esquive
-    "prescience", "tide",                            // pioche + poussée tempo (Préscience = signature Mirage)
-    "coup-dans-lombre",                              // DÉGÂTS signature (= charges d'Esquive, imblocable)
+    // DECK RESSERRÉ 15→12 (Alex 2026-06-29, confort-fusion) : retiré echappee +
+    // tide (tempo neutres) + fuite-masquee (doublon d'Esquive le + faible, −1 ATK)
+    // → moins de dilution, les MOITIÉS de fusion + le closer remontent plus souvent
+    // (deck ~28→~22 cartes). Les retirées restent dispo au DeckManager. Réversible.
+    "mascarade", "reflet-echo",                      // illusion / cycle (ingrédients fusion)
+    "mirror", "mascarade-enchainee",                 // copie (ingrédient fusion) + montée d'Esquive
+    "prescience",                                    // pioche signature
+    "coup-dans-lombre",                              // DÉGÂTS signature (= Esquive, imblocable ; ingrédient fusion)
+    "derobade", "frappe-spectrale", "eclipse",       // repositionnement / dépense d'esquive / sauvetage
+    "sillage-spectral", "faux-semblant",             // aura tempo (esquive→pioche) / illusion offensive (ingrédient fusion)
+    "nuee-spectrale",                                // closer légendaire (ingrédient fusion)
   ],
   scissors: [
+    // (Alex 2026-06-30) double-mot GARDÉ : c'est la puissance brute qui gagne la
+    // course d'usure vs Forêt (le trim coûtait le matchup 54→46 au sim). Les 3
+    // nouvelles cartes ajoutent des RÔLES (reach/pioche/anti-fade), pas du buff.
     "precision", "surge", "surcharge",          // burst ATK précoce
     "coup-de-taille", "acuite", "frenesie",     // perforation + re-affûtage + frénésie
-    "riposte", "double-mot",                    // punition + doublement d'ATK (le finisher
-    "taillade-mortelle",                        // DÉGÂTS signature (burst brut, légendaire auto-exilée)
-  ],                                            // Lame est injecté en main à 3⭐, PAS deckable)
+    "riposte", "double-mot",                    // punition + doublement d'ATK
+    "estafilade", "saignee", "fureur-emoussee", // reach + pioche aggro + payoff Émoussé (anti-fade)
+    "taillade-mortelle",                        // DÉGÂTS signature (Lame injecté à 3⭐, PAS deckable)
+  ],
   paper: [
-    "seve", "second-wind", "sangsue",            // soin créature + sustain héros + vol de vie
+    "seve", "second-wind", "sangsue",            // soin créature + sustain héros + vol de vie (capé)
     "rempart", "ramure", "phenix",               // mur PV + bouclier vivant + renaissance
-    "photosynthese", "ronces",                   // régen+ATK perm + représailles épineuses
-    "drain-vital",                               // DÉGÂTS signature (drain : 4 dmg + 4 PV à toi)
+    "photosynthese", "ronces",                   // régen+ATK perm + représailles épineuses (riposte)
+    "greffe",                                    // pioche flavor (texture non-soin, profondeur deck — Alex 2026-06-30)
+    "drain-vital",                               // DÉGÂTS signature (drain : 2 dmg + 2 PV à toi, nerf)
   ],                                             // (Verger éternel injecté à 3⭐, PAS deckable)
   spock: [
     "dilatation-temporelle", "sablier", "offre",  // ramp bas → ce-tour → permanent
-    "chronomancien", "augur", "loi-de-causalite", // burst tempo + lecture de main + stase
+    "chronomancien", "loi-de-causalite",          // burst tempo + stase (Augure RETIRÉ du Pro : révéler la main ne prédit pas les invocations — cf. ARENA_EXCLUDED)
     "trou-noir", "convergence-cosmique",          // removal froid + inévitabilité-éco
     "intrication-quantique",                      // DÉGÂTS signature (= mes Spock, +1 si ≥2)
   ],                                              // (Grand Calcul injecté à 3⭐, PAS deckable)

@@ -15,6 +15,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { CardImage } from "../ranked/CardImage";
 import { FORGE_RECOVER_COST } from "./arenaTypes";
+import { gfxDensity } from "../graphics/graphicsQuality";
 import type { CardId } from "../ranked/rankedTypes";
 
 /** ⚗️ FORGE SLOT — la 4e case de chaque joueur (bande centrale du pad).
@@ -195,8 +196,13 @@ export function FusionBurst({ size = 1 }: { size?: number }) {
   // `size` : 1 = petit flash LOCAL sur la forge ; ~1.6 = grande célébration
   // CENTRÉE sur le plateau (Alex 2026-06-17 « à peine visible/hyper pauvre »).
   // Tout est dimensionné par `size` (cadre + rayons des particules + glyphe).
-  const IMPLODE = Array.from({ length: 14 }, (_, i) => i);
-  const SPARKLES = Array.from({ length: 22 }, (_, i) => i);
+  // PERF FUSION (Alex 2026-06-30 « ça bouffe de la ressource au moment de la
+  // fusion ») : on scale le nombre de particules par le palier graphique (low 0.45
+  // / medium 0.75 / high 1) — comme les autres particules de célébration. Le décode
+  // de l'image (gros PNG) est traité à part via decoding="async" (cardArt).
+  const d = gfxDensity();
+  const IMPLODE = Array.from({ length: Math.round(14 * d) }, (_, i) => i);
+  const SPARKLES = Array.from({ length: Math.round(22 * d) }, (_, i) => i);
   const ang = (i: number, n: number) => ((360 / n) * i + (i % 2) * 13) * (Math.PI / 180);
   const box = 88 * size;
   return (

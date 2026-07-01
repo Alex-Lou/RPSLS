@@ -22,8 +22,9 @@
  */
 
 import { alog, csnap } from "./arenaLog";
-import { creatureEffectiveAtk, damageCreature, damageHero } from "./arenaRules";
-import { riseEngineOnCounterWin } from "./arenaEngines";
+import { creatureEffectiveAtk, damageCreature, damageHero, dodgeSave } from "./arenaRules";
+import { riseEngineOnCounterWin, riseMirageOnDodge } from "./arenaEngines";
+import { BALANCE } from "./arenaBalance";
 import { moveCountersMove } from "./arenaTypes";
 import type {
   BoardState,
@@ -44,7 +45,7 @@ function bluntOnCombat(c: Creature): Creature {
 /** Variant used by Tranchant (Scissors) attackers — bypasses divineShield.
  *  Returns null if the creature dies. */
 function damageCreaturePierce(c: Creature, dmg: number): Creature | null {
-  if (c.dodgeCharges > 0) return { ...c, dodgeCharges: c.dodgeCharges - 1 };
+  if (c.dodgeCharges > 0) return dodgeSave(c);
   const newHp = c.hp - dmg;
   if (newHp <= 0) return null;
   return { ...c, hp: newHp };
@@ -77,6 +78,32 @@ function resolveLaneCombat(boardIn: BoardState, laneIdx: LaneIndex): BoardState 
   const ca = lane.a;
   const cb = lane.b;
   alog("combat", `L${laneIdx} ENTER ca=${ca?.move ?? "∅"} cb=${cb?.move ?? "∅"}`);
+
+  // ÉCLIPSE (Mirage 2026-06-28) — une créature EN PHASE gèle sa lane ce tour :
+  // ni elle ni l'adverse n'agit ; elle est intouchable (survit) et n'attaque pas.
+  if ((ca && ca.phasedOut) || (cb && cb.phasedOut)) {
+    alog("combat", `L${laneIdx} ÉCLIPSE — lane gelée (créature en phase, intouchable)`);
+    return board;
+  }
+  // NUÉE SPECTRALE (Mirage 2026-06-28) — mes Lézards imblocables ce tour : ils
+  // IGNORENT le RPSLS-lock (ne meurent pas), bypassent leur lane et frappent le
+  // héros adverse de leur ATK. Court-circuite le combat de cette lane.
+  const aNuee = !!ca && ca.move === "lizard" && !!board.a.nueeActive;
+  const bNuee = !!cb && cb.move === "lizard" && !!board.b.nueeActive;
+  if (aNuee || bNuee) {
+    let out = board;
+    if (aNuee && ca) {
+      const atk = creatureEffectiveAtk(ca);
+      out = { ...out, b: damageHero(out.b, atk) };
+      alog("combat", `L${laneIdx} NUÉE a → Lézard imblocable frappe héros b (${atk}), survit`);
+    }
+    if (bNuee && cb) {
+      const atk = creatureEffectiveAtk(cb);
+      out = { ...out, a: damageHero(out.a, atk) };
+      alog("combat", `L${laneIdx} NUÉE b → Lézard imblocable frappe héros a (${atk}), survit`);
+    }
+    return out;
+  }
 
   // 🔴 BUG FIX 2026-06-09 (TDZ "Cannot access 'c' before initialization") :
   // hasAntiTaunt + findDeflector + consumeProvocation déclarés ICI (top
@@ -155,8 +182,21 @@ function resolveLaneCombat(boardIn: BoardState, laneIdx: LaneIndex): BoardState 
       const aLamePierce = board.a.lameActive && ca.move === "scissors";
       if (cb.dodgeCharges > 0 && !aLamePierce) {
         alog("combat", `L${laneIdx} A wins → ESQUIVE save B (charge ${cb.dodgeCharges} → ${cb.dodgeCharges - 1})`);
-        lanes[laneIdx] = { a: winnerA, b: { ...cb, dodgeCharges: cb.dodgeCharges - 1 } };
-        return { ...board, lanes };
+        // RIPOSTE D'ESQUIVE (Mirage, win-con) : l'attaquant qui frappe un Lézard
+        // esquiveur encaisse l'ATK de ce Lézard. Convertit l'évasion en menace
+        // (change l'issue du counter — le seul levier qui marche en RPSLS-lock).
+        const riposteB = cb.move === "lizard" && BALANCE.mirage.dodgeRiposte > 0
+          ? Math.round(creatureEffectiveAtk(cb) * BALANCE.mirage.dodgeRiposte) : 0;
+        const survivorA = riposteB > 0 ? damageCreature(winnerA, riposteB) : winnerA;
+        if (riposteB > 0) alog("combat", `L${laneIdx} → RIPOSTE Esquive ${riposteB} sur l'attaquant (${survivorA ? "survit" : "tué"})`);
+        lanes[laneIdx] = { a: survivorA, b: dodgeSave(cb) };
+        // SILLAGE SPECTRAL (Mirage) : b a esquivé → 1re esquive du tour = pioche (cleanup).
+        // ENGINE MIRAGE (2026-06-30) : un Lézard de la Voie qui esquive « gagne
+        // l'échange » → sa jauge monte (riseMirageOnDodge), même vs Pierre/Ciseaux.
+        const bDodged = cb.move === "lizard"
+          ? riseMirageOnDodge({ ...board.b, sillageDodgedThisTurn: true })
+          : { ...board.b, sillageDodgedThisTurn: true };
+        return { ...board, lanes, b: bDodged };
       }
       if (cb.divineShield && !aLamePierce) {
         // Tranchant : ne perce que si charge non encore consummée.
@@ -232,8 +272,18 @@ function resolveLaneCombat(boardIn: BoardState, laneIdx: LaneIndex): BoardState 
       const bLamePierce = board.b.lameActive && cb.move === "scissors";
       if (ca.dodgeCharges > 0 && !bLamePierce) {
         alog("combat", `L${laneIdx} B wins → ESQUIVE save A (charge ${ca.dodgeCharges} → ${ca.dodgeCharges - 1})`);
-        lanes[laneIdx] = { a: { ...ca, dodgeCharges: ca.dodgeCharges - 1 }, b: winnerB };
-        return { ...board, lanes };
+        // RIPOSTE D'ESQUIVE (Mirage) — symétrique du branch A-wins.
+        const riposteA = ca.move === "lizard" && BALANCE.mirage.dodgeRiposte > 0
+          ? Math.round(creatureEffectiveAtk(ca) * BALANCE.mirage.dodgeRiposte) : 0;
+        const survivorB = riposteA > 0 ? damageCreature(winnerB, riposteA) : winnerB;
+        if (riposteA > 0) alog("combat", `L${laneIdx} → RIPOSTE Esquive ${riposteA} sur l'attaquant (${survivorB ? "survit" : "tué"})`);
+        lanes[laneIdx] = { a: dodgeSave(ca), b: survivorB };
+        // SILLAGE SPECTRAL (Mirage) : a a esquivé → 1re esquive du tour = pioche (cleanup).
+        // ENGINE MIRAGE (2026-06-30) : Lézard de Voie qui esquive → jauge +1 (cf. A-wins).
+        const aDodged = ca.move === "lizard"
+          ? riseMirageOnDodge({ ...board.a, sillageDodgedThisTurn: true })
+          : { ...board.a, sillageDodgedThisTurn: true };
+        return { ...board, lanes, a: aDodged };
       }
       if (ca.divineShield && !bLamePierce) {
         const canPierce = cb.pierces && !cb.pierceUsed;
@@ -347,6 +397,17 @@ function resolveLaneCombat(boardIn: BoardState, laneIdx: LaneIndex): BoardState 
       const d = findDeflector(out, "a");
       out = d ? consumeProvocation(out, d) : { ...out, a: damageHero(out.a, spB) };
       alog("combat", `L${laneIdx} MIROIR B tue A, surplus ${spB} → ${d ? `DÉVIÉ L${d.lane}` : "héros a"}`);
+    }
+    // SILLAGE SPECTRAL (Mirage) : esquive détectée en miroir (charge consommée)
+    // → 1re esquive du tour = pioche (résolu en endOfTurnCleanup). ENGINE MIRAGE
+    // (2026-06-30) : si le Lézard de Voie a esquivé → jauge +1 (riseMirageOnDodge).
+    if (newA && newA.dodgeCharges < ca.dodgeCharges) {
+      out = { ...out, a: { ...out.a, sillageDodgedThisTurn: true } };
+      if (ca.move === "lizard") out = { ...out, a: riseMirageOnDodge(out.a) };
+    }
+    if (newB && newB.dodgeCharges < cb.dodgeCharges) {
+      out = { ...out, b: { ...out.b, sillageDodgedThisTurn: true } };
+      if (cb.move === "lizard") out = { ...out, b: riseMirageOnDodge(out.b) };
     }
     return out;
   }

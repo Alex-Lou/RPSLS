@@ -12,7 +12,13 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
  * la place SANS scaler les cartes (≠ ScaleToFit qui, lui, rétrécissait tout, y
  * compris la main). La main reste DEHORS du slot → jamais rétrécie.
  */
-export function BoardFillSlot({ children }: { children: (h: number) => ReactNode }) {
+export function BoardFillSlot({ children, onMeasure }: {
+  children: (h: number) => ReactNode;
+  /** Rapporte la hauteur dispo mesurée (px) — permet à une AUTRE phase (ex. le
+   *  reveal Classé) de réutiliser EXACTEMENT la même taille de board → plateau
+   *  stable d'une phase à l'autre. */
+  onMeasure?: (h: number) => void;
+}) {
   const slotRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const [availH, setAvailH] = useState(0);
@@ -23,6 +29,7 @@ export function BoardFillSlot({ children }: { children: (h: number) => ReactNode
     const measure = () => {
       const ah = slot.clientHeight;
       setAvailH(ah);
+      if (ah > 0) onMeasure?.(ah);
       // Le board reçoit minHeight=ah → il REMPLIT quand le contenu rentre
       // (espace en trop → centre du pad). S'il dépasse (écran trop court), on
       // réduit UNIQUEMENT à ce moment (jamais de coupe) — sinon scale 1 et les

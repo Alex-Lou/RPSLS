@@ -21,6 +21,7 @@ import {
 import { MANA_CAP, moveCountersMove, type BoardState, type Creature, type LaneState, type PlayedSpell, type Side } from "./arenaTypes";
 import { MOVES, type Move } from "../engine/game";
 import { alog } from "./arenaLog";
+import { BALANCE } from "./arenaBalance";
 import type { CardId } from "../ranked/rankedTypes";
 
 /** Gaia — heal hero +6 HP. */
@@ -72,6 +73,76 @@ export function applyContrefort(board: BoardState, side: Side): BoardState {
     return side === "a" ? { ...lane, a: buffed } : { ...lane, b: buffed };
   }) as [LaneState, LaneState, LaneState];
   return { ...board, lanes };
+}
+
+/** Barricade (Montagne, 2026-06-30) — ANTI-AGGRO instantané (coût 1) : +1 PV à
+ *  toutes mes créatures ET mes Pierres regagnent leurs charges de Provocation (le
+ *  mur se redresse → encaisse le rush early en attendant que la jauge Strates
+ *  monte). Comble le talon #1 (survie early-game). Spock ignoré (Détaché). Lit
+ *  BALANCE.montagne.voieProvocationCharges INLINE (frontière de module arenaBalance). */
+export function applyBarricade(board: BoardState, side: Side): BoardState {
+  const charges = BALANCE.montagne.voieProvocationCharges;
+  const lanes = board.lanes.map((lane) => {
+    const me = side === "a" ? lane.a : lane.b;
+    if (!me || me.move === "spock") return lane;
+    const buffed: Creature = {
+      ...me,
+      hp: me.hp + 1,
+      ...(me.move === "rock"
+        ? { taunt: true, provocationCharges: Math.max(me.provocationCharges, charges) }
+        : {}),
+    };
+    return side === "a" ? { ...lane, a: buffed } : { ...lane, b: buffed };
+  }) as [LaneState, LaneState, LaneState];
+  alog("spell", `${side} BARRICADE → +1 PV camp + Pierres regagnent Provocation (${charges})`);
+  return { ...board, lanes };
+}
+
+/** Veine Minérale (Montagne, 2026-06-30) — PIOCHE thématique : pioche 1 carte,
+ *  +1 de plus si je contrôle ≥2 Pierres (la pioche récompense le mur établi).
+ *  Comble le zéro-pioche du kit Montagne (trouver son closer / ses anti-aggro). */
+export function applyVeineMinerale(board: BoardState, side: Side): BoardState {
+  const hero = side === "a" ? board.a : board.b;
+  let rocks = 0;
+  for (const lane of board.lanes) {
+    const me = side === "a" ? lane.a : lane.b;
+    if (me && me.move === "rock") rocks++;
+  }
+  const n = 1 + (rocks >= 2 ? 1 : 0);
+  alog("spell", `${side} VEINE MINÉRALE → pioche ${n} (${rocks} Pierre(s))`);
+  return withSideHero(board, side, drawCards(hero, n));
+}
+
+/** Greffe (Forêt, 2026-06-30) — PIOCHE thématique : pioche 1 carte, +1 si je
+ *  contrôle ≥2 Feuilles (la greffe récompense la forêt développée). Comble le
+ *  zéro-pioche du kit Forêt ET ajoute enfin une carte NON-soin (texture/profondeur
+ *  de deck) sans renforcer le sustain — parallèle de Veine Minérale (rock) /
+ *  Saignée (scissors) : chaque Voie a sa pioche flavor. */
+export function applyGreffe(board: BoardState, side: Side): BoardState {
+  const hero = side === "a" ? board.a : board.b;
+  let leaves = 0;
+  for (const lane of board.lanes) {
+    const me = side === "a" ? lane.a : lane.b;
+    if (me && me.move === "paper") leaves++;
+  }
+  const n = 1 + (leaves >= 3 ? 1 : 0); // bonus rare (board plein) → surtout un cantrip neutre, pas un robinet d'avantage (anti-ré-inflate Forêt)
+  alog("spell", `${side} GREFFE → pioche ${n} (${leaves} Feuille(s))`);
+  return withSideHero(board, side, drawCards(hero, n));
+}
+
+/** Grondement (Montagne, 2026-06-30) — AURA récurrente : pose tremorActive sur le
+ *  héros → chaque fin de tour, le héros adverse subit des dégâts = mes Strates en
+ *  jeu (cap grondementCap). 2e axe de dégâts (anti back-load d'Éboulis Final).
+ *  COUNTERABLE (≠ chip Cosmos imparable) : wiper mes Pierres coupe le chip. Aura
+ *  permanente (pas reset). Re-cast = no-op (déjà actif). Lu en endOfTurnCleanup. */
+export function applyGrondement(board: BoardState, side: Side): BoardState {
+  const hero = side === "a" ? board.a : board.b;
+  if (hero.tremorActive) {
+    alog("spell", `💤 ${side} Grondement déjà actif (aura permanente).`);
+    return board;
+  }
+  alog("spell", `${side} GRONDEMENT → aura : chaque fin de tour, dégâts héros adverse = mes Strates`);
+  return withSideHero(board, side, { ...hero, tremorActive: true });
 }
 
 /** Veine de Gaïa (Montagne) — soigne mon héros de +2 PV par PIERRE que je
@@ -204,14 +275,16 @@ export function applyMascarade(board: BoardState, side: Side, spell: PlayedSpell
   return withMyCreatureOnLane(board, side, spell.lane, disguised);
 }
 
-/** Sangsue — heal hero by the effective ATK of my creature on the lane.
- *  Uses creatureEffectiveAtk so the value matches what the creature
- *  actually deals in combat (CREATURE_STATS + atkBuff). */
+/** Sangsue — heal hero by the effective ATK of my creature on the lane, CAPÉ
+ *  (BALANCE.foret.sangsueCap). Uses creatureEffectiveAtk so the value matches
+ *  what the creature actually deals in combat (CREATURE_STATS + atkBuff). Le cap
+ *  coupe le double-dip compoundant avec Photosynthèse (+1 ATK perm) qui rendait
+ *  le vol de vie infini (Alex 2026-06-30, passe nerf Forêt). */
 export function applySangsue(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   if (spell.kind !== "lane") return board;
   const c = getMyCreatureOnLane(board, side, spell.lane);
   if (!c) return board;
-  const atk = creatureEffectiveAtk(c);
+  const atk = Math.min(BALANCE.foret.sangsueCap, creatureEffectiveAtk(c));
   const hero = side === "a" ? board.a : board.b;
   return withSideHero(board, side, healHero(hero, atk));
 }

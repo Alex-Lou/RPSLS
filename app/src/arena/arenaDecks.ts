@@ -25,10 +25,19 @@ import type { TurnIntent } from "./arenaTypes";
 import type { CardId } from "../ranked/rankedTypes";
 import type { Move } from "../engine/game";
 
+/** Cartes VOLONTAIREMENT exclues du Pro/Arène (Alex 2026-07). Augure révèle la
+ *  MAIN adverse : pertinent en Classé (tu peux anticiper la carte qu'il jouera)
+ *  mais TROMPEUR en Pro, où les « coups » sont des invocations RPSLS (mana), PAS
+ *  des cartes en main → voir sa main ne prédit RIEN. Reste pleinement jouable en
+ *  Classé (isDeckable est PUREMENT arène). Point d'exclusion UNIQUE : couvre le
+ *  deck joueur, le deck CPU ET l'éditeur (DeckManager) d'un seul coup. */
+const ARENA_EXCLUDED = new Set<CardId>(["augur"]);
+
 /** True si la carte peut être placée dans un deck (player ou CPU).
  *  Les Finishers Constellation Pro sont injectés UNIQUEMENT à 3⭐ via
  *  arenaRules.applySummons — pas drawables, pas draftables. */
 export function isDeckable(id: CardId): boolean {
+  if (ARENA_EXCLUDED.has(id)) return false;
   // Cartes « à la pioche » (Cast When Drawn) : DECKABLES mais PAS des sorts —
   // arenaSupported reste false (→ playCard les bloque comme sorts), donc on les
   // autorise explicitement ici. Cf. arenaCastOnDraw.

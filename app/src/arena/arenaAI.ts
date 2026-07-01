@@ -97,13 +97,14 @@ const CPU_PLAYABLE = new Set<CardId>([
   "jet-caillou", "seve", "coup-oeil", "toile-gluante", "gravite",
   "doppelganger", "purge", "roue-destin", "phenix", "singularite",
   // ── Voie Montagne (2026-06-22) ──
-  "eboulement", "strate-vive", "contrefort", "gardien-pierre", "veine-gaia",
+  "eboulement", "strate-vive", "contrefort", "gardien-pierre", "veine-gaia", "barricade",
+  "ecrasement", "veine-minerale", "grondement",
   // ── Voie Mirage (2026-06-22) ──
   "reflet-echo", "mascarade-enchainee", "fuite-masquee",
   // ── Voie Tranchant (2026-06-22) ──
-  "coup-de-taille", "acuite", "frenesie",
+  "coup-de-taille", "acuite", "frenesie", "estafilade", "saignee", "fureur-emoussee",
   // ── Voie Forêt (2026-06-23) ──
-  "ramure", "photosynthese", "ronces",
+  "ramure", "photosynthese", "ronces", "greffe",
   // ── Voie Cosmos (2026-06-23) ──
   "dilatation-temporelle", "loi-de-causalite", "convergence-cosmique",
   // ── Dégâts signature par Voie (2026-06-23) ──
@@ -351,7 +352,17 @@ function pickBestMove(
   };
   // Cas lane VIDE : opportunité de poser SA Voie pour build sa Constellation.
   if (!opp) {
-    if (myAffinity && Math.random() < bias.affinityBuildChance) {
+    // 🦎 MIRAGE — engagement renforcé sur les Lézards : tout le kit Mirage
+    //   (Frappe/Nuée/Faux-Semblant/Éclipse + montée d'Esquive) est Lézard-gated,
+    //   et un Lézard de Voie arrive avec des charges d'Esquive (il survit à un
+    //   counter). Sans densité de Lézards, le kit fizzle = carburant absent
+    //   (constaté sim : Mirage 19%, le CPU posait surtout des counters non-Lézard).
+    //   Les autres Voies gardent leur build chance (leur symbole GAGNE le RPSLS,
+    //   pas besoin de sur-densité). Plancher 0.75 pour Mirage uniquement.
+    const buildChance = myAffinity === "lizard"
+      ? Math.max(bias.affinityBuildChance, 0.75)
+      : bias.affinityBuildChance;
+    if (myAffinity && Math.random() < buildChance) {
       return myAffinity;
     }
     // Sinon bag défensif (mêmes proportions qu'avant) — varié.
@@ -540,6 +551,25 @@ function buildSpellTarget(
       });
       return hasBuffable ? { id, kind: "self" } : null;
     }
+    case "barricade": {
+      // Anti-aggro : +PV camp + recharge Provoc des Pierres. Utile avec ≥1 créature
+      // non-Spock (idéalement une Pierre, mais le +PV sert tout le board).
+      const hasBuffable = ([0, 1, 2] as LaneIndex[]).some((l) => {
+        const c = sideCreature(board, side, l);
+        return !!c && c.move !== "spock";
+      });
+      return hasBuffable ? { id, kind: "self" } : null;
+    }
+    case "veine-minerale":
+    case "greffe":
+      // Pioche : toujours bon (le moteur cape la main). Self.
+      return { id, kind: "self" };
+    case "grondement": {
+      // Aura chip récurrent : utile si j'ai ≥1 Pierre et pas déjà active.
+      const me = side === "a" ? board.a : board.b;
+      const hasRock = ([0, 1, 2] as LaneIndex[]).some((l) => sideCreature(board, side, l)?.move === "rock");
+      return !me.tremorActive && hasRock ? { id, kind: "self" } : null;
+    }
     case "veine-gaia": {
       // Soin = 2×Pierres : ne tente que blessé ET avec ≥1 Pierre.
       const me = side === "a" ? board.a : board.b;
@@ -564,6 +594,57 @@ function buildSpellTarget(
       }
       return bestLane === null ? null : { id, kind: "lane", lane: bestLane };
     }
+    // ── Voie Mirage — nouvelles cartes (2026-06-29) : sans ces cases le CPU
+    //    Mirage ne les jouait JAMAIS (default → null), constaté au Watcher. ──
+    case "derobade": {
+      // Repositionne un Lézard vers une lane vide : utile avec un Lézard ET ≥1 lane vide.
+      const hasEmpty = ([0, 1, 2] as LaneIndex[]).some((l) => !sideCreature(board, side, l));
+      if (!hasEmpty) return null;
+      for (let i = 0; i < 3; i++) {
+        if (sideCreature(board, side, i as LaneIndex)?.move === "lizard") return { id, kind: "lane", lane: i as LaneIndex };
+      }
+      return null;
+    }
+    case "frappe-spectrale": {
+      // Dépense 1 Esquive → ATK imblocable : cible le Lézard à charge le plus fort.
+      let bestLane: LaneIndex | null = null;
+      let best = -1;
+      for (let i = 0; i < 3; i++) {
+        const c = sideCreature(board, side, i as LaneIndex);
+        if (c && c.move === "lizard" && c.dodgeCharges > 0) {
+          const s = CREATURE_STATS.lizard.atk + c.voieAtkBonus;
+          if (s > best) { best = s; bestLane = i as LaneIndex; }
+        }
+      }
+      return bestLane === null ? null : { id, kind: "lane", lane: bestLane };
+    }
+    case "faux-semblant": {
+      // Déguise une créature adverse FACE à mon Lézard → kill garanti (skip Ancre/Logique).
+      for (let i = 0; i < 3; i++) {
+        const me = sideCreature(board, side, i as LaneIndex);
+        const opp = sideCreature(board, oppSide, i as LaneIndex);
+        if (me?.move === "lizard" && opp && !opp.anchored && !opp.spellImmune) return { id, kind: "lane", lane: i as LaneIndex };
+      }
+      return null;
+    }
+    case "eclipse": {
+      // Met un Lézard en phase (sauvetage) : utile s'il fait face à une créature adverse.
+      for (let i = 0; i < 3; i++) {
+        if (sideCreature(board, side, i as LaneIndex)?.move === "lizard" && sideCreature(board, oppSide, i as LaneIndex)) return { id, kind: "lane", lane: i as LaneIndex };
+      }
+      return null;
+    }
+    case "sillage-spectral": {
+      // Aura tempo (esquive → pioche) : pose-la si j'ai ≥1 Lézard et pas déjà active.
+      const me = side === "a" ? board.a : board.b;
+      const hasLizard = ([0, 1, 2] as LaneIndex[]).some((l) => sideCreature(board, side, l)?.move === "lizard");
+      return !me.sillageActive && hasLizard ? { id, kind: "self" } : null;
+    }
+    case "nuee-spectrale": {
+      // Closer imblocable : utile seulement avec ≥1 Lézard (sinon 0 dégât).
+      const hasLizard = ([0, 1, 2] as LaneIndex[]).some((l) => sideCreature(board, side, l)?.move === "lizard");
+      return hasLizard ? { id, kind: "self" } : null;
+    }
     // ── Voie Tranchant (2026-06-22) ──
     case "coup-de-taille":
     case "acuite": {
@@ -583,6 +664,30 @@ function buildSpellTarget(
       // Buff board scissors : utile avec ≥1 Ciseau.
       const hasScissors = ([0, 1, 2] as LaneIndex[]).some((l) => sideCreature(board, side, l)?.move === "scissors");
       return hasScissors ? { id, kind: "self" } : null;
+    }
+    case "estafilade": {
+      // Reach : mon Ciseau frappe le héros direct → cible le Ciseau au plus gros ATK.
+      let bestLane: LaneIndex | null = null;
+      let best = -1;
+      for (let i = 0; i < 3; i++) {
+        const c = sideCreature(board, side, i as LaneIndex);
+        if (c && c.move === "scissors") {
+          const s = CREATURE_STATS.scissors.atk + c.atkBuff + c.voieAtkBonus;
+          if (s > best) { best = s; bestLane = i as LaneIndex; }
+        }
+      }
+      return bestLane === null ? null : { id, kind: "lane", lane: bestLane };
+    }
+    case "saignee":
+      // Pioche : toujours bon (le moteur cape la main). Self.
+      return { id, kind: "self" };
+    case "fureur-emoussee": {
+      // Payoff Émoussé : utile seulement si j'ai ≥1 Ciseau émoussé.
+      const hasBlunted = ([0, 1, 2] as LaneIndex[]).some((l) => {
+        const c = sideCreature(board, side, l);
+        return !!c && c.move === "scissors" && c.combatBlunted;
+      });
+      return hasBlunted ? { id, kind: "self" } : null;
     }
     // ── Voie Forêt (2026-06-23) ──
     case "ramure": {
@@ -616,6 +721,11 @@ function buildSpellTarget(
       return { id, kind: "hero" };
     case "eboulis-final": {
       // Dégât = Pierres + Strates : ne tente que si j'ai ≥1 Pierre.
+      const hasRock = ([0, 1, 2] as LaneIndex[]).some((l) => sideCreature(board, side, l)?.move === "rock");
+      return hasRock ? { id, kind: "hero" } : null;
+    }
+    case "ecrasement": {
+      // Perce-mur : dégât = Pierres×2 + coupe le soin adverse. Tente si ≥1 Pierre.
       const hasRock = ([0, 1, 2] as LaneIndex[]).some((l) => sideCreature(board, side, l)?.move === "rock");
       return hasRock ? { id, kind: "hero" } : null;
     }

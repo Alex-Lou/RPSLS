@@ -129,6 +129,14 @@ export interface Creature {
    *  ATK effectif forcé à 0 ET son counter est annulé en combat (elle survit
    *  mais n'inflige rien). Per-turn (reset par endOfTurnReset). */
   cannotAttack?: boolean;
+  /** ÉCLIPSE (Mirage, 2026-06-28) : la créature est EN PHASE ce tour —
+   *  intouchable (sa lane est GELÉE en combat : ni elle ni l'adverse n'agit,
+   *  elle survit) et ne peut pas attaquer. Per-turn (reset par endOfTurnReset). */
+  phasedOut?: boolean;
+  /** PHÉNIX (2026-06-12) : TRUE sur une créature qui vient de RENAÎTRE (revive à
+   *  1 PV en endOfTurnCleanup) → CreatureSlot joue une flamme de renaissance.
+   *  Per-turn (effacé au endOfTurnReset suivant). */
+  justRevived?: boolean;
   /** Per-turn flags. */
   divineShield: boolean;
   /** Anchor: this creature is immune to ENEMY spell effects this turn. */

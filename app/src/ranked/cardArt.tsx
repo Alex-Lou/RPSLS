@@ -44,6 +44,7 @@ export function CardArt({ card, alt }: { card: RankedCard; alt: string }) {
       alt={alt}
       className={CARD_ART_IMG_CLASS}
       draggable={false}
+      decoding="async"
     />
   );
 }

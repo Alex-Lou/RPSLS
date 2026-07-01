@@ -150,9 +150,12 @@ export function applyPhotosynthese(board: BoardState, side: Side, spell: PlayedS
   });
 }
 
-/** Ronces (Forêt) — ma créature ciblée gagne Riposte (tue son tueur en combat)
- *  ET un bouclier (divineShield). Représailles épineuses sans verrou (≠ Gardien
- *  de Pierre qui ancre). Toute créature. */
+/** Ronces (Forêt) — ma créature ciblée gagne Riposte (tue son tueur en combat).
+ *  Représailles épineuses sans verrou (≠ Gardien de Pierre qui ancre). Toute
+ *  créature. NERF Forêt (Alex 2026-06-30) : retrait du divineShield — Ronces ne
+ *  doit pas être un double-mur (riposte ET encaisse) sur un commun à 2 mana, ce
+ *  qui CASSAIT la RPSLS-lock côté Forêt (elle survivait au 1er coup ET tuait son
+ *  counter) → racine du crush vs Lézard/Rock/Spock. La riposte (identité) reste. */
 export function applyRonces(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   if (spell.kind !== "lane") return board;
   const me = getMyCreatureOnLane(board, side, spell.lane);
@@ -160,7 +163,7 @@ export function applyRonces(board: BoardState, side: Side, spell: PlayedSpell): 
     alog("spell", `💤 ${side} Ronces L${spell.lane} ne fait rien : pas de créature à toi sur cette lane.`);
     return board;
   }
-  return withMyCreatureOnLane(board, side, spell.lane, { ...me, ripostePrimed: true, divineShield: true });
+  return withMyCreatureOnLane(board, side, spell.lane, { ...me, ripostePrimed: true });
 }
 
 /** Loi de Causalité (Cosmos) — STASE : la créature adverse ciblée ne peut pas
@@ -178,7 +181,7 @@ export function applyLoiCausalite(board: BoardState, side: Side, spell: PlayedSp
 }
 
 /** Convergence Cosmique (Cosmos) — dégâts directs au héros adverse égaux à MON
- *  mana max actuel, PLAFONNÉS à 6 (anti-burst-éco). Récompense le ramp
+ *  mana max actuel, PLAFONNÉS à convergenceDmgCap (=3, anti-burst-éco). Récompense le ramp
  *  Offre/Dilatation/Sablier. Inévitabilité d'éco, distincte de Singularité
  *  (qui scale sur le nombre de créatures). */
 export function applyConvergence(board: BoardState, side: Side): BoardState {
@@ -215,9 +218,11 @@ export function applyCoupOeil(board: BoardState, side: Side): BoardState {
   const reveal = priciest ? [priciest] : [];
   let b = withSideHero(board, side, drawCards(hero, 1));
   // augurRevealedB = ce que A voit de la main de B (même convention qu'Augur).
+  // turns=2 : advanceToNextTurn décrémente aussitôt → reste visible 1 planif (même
+  // bug/fix qu'Imposteur, Alex 2026-06-28 ; 1 aurait été effacé direct).
   b = side === "a"
-    ? { ...b, augurRevealedB: reveal, augurTurnsLeftB: 1 }
-    : { ...b, augurRevealedA: reveal, augurTurnsLeftA: 1 };
+    ? { ...b, augurRevealedB: reveal, augurTurnsLeftB: 2 }
+    : { ...b, augurRevealedA: reveal, augurTurnsLeftA: 2 };
   alog("spell", `${side} COUP D'ŒIL → pioche 1 + révèle ${priciest ?? "(main vide)"}`);
   return b;
 }

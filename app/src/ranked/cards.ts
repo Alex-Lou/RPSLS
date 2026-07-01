@@ -553,6 +553,34 @@ export const CARDS: Record<CardId, RankedCard> = {
     nameKey: "ranked.cards.veine-gaia.name", descKey: "ranked.cards.veine-gaia.desc",
     targetHintKey: "ranked.cards.veine-gaia.targetHint", art: "/Cards Bonus/Veine de Gaïa.png",
   },
+  "barricade": {
+    // Anti-aggro (Alex 2026-06-30) — art à fournir ; glyph fallback (art:null) en attendant.
+    id: "barricade", cost: 1, rarity: "common", voie: "rock",
+    target: "none", palette: "zinc", glyph: "🚧",
+    nameKey: "ranked.cards.barricade.name", descKey: "ranked.cards.barricade.desc",
+    targetHintKey: "ranked.cards.barricade.targetHint", art: "/Cards Bonus/Barricade.png",
+  },
+  "ecrasement": {
+    // Anti-heal / perce-mur Forêt (Alex 2026-06-30) — art à fournir, glyph fallback.
+    id: "ecrasement", cost: 3, rarity: "epic", voie: "rock",
+    target: "none", palette: "zinc", glyph: "🗿",
+    nameKey: "ranked.cards.ecrasement.name", descKey: "ranked.cards.ecrasement.desc",
+    targetHintKey: "ranked.cards.ecrasement.targetHint", art: "/Cards Bonus/Écrasement Tellurique.png",
+  },
+  "veine-minerale": {
+    // Pioche (comble le zéro-draw du kit) — art à fournir, glyph fallback.
+    id: "veine-minerale", cost: 2, rarity: "common", voie: "rock",
+    target: "none", palette: "zinc", glyph: "⛏️",
+    nameKey: "ranked.cards.veine-minerale.name", descKey: "ranked.cards.veine-minerale.desc",
+    targetHintKey: "ranked.cards.veine-minerale.targetHint", art: "/Cards Bonus/Prospection.png",
+  },
+  "grondement": {
+    // Aura : 2e axe de dégâts récurrent (anti back-load) — art à fournir, glyph fallback.
+    id: "grondement", cost: 3, rarity: "rare", voie: "rock",
+    target: "none", palette: "zinc", glyph: "🌋",
+    nameKey: "ranked.cards.grondement.name", descKey: "ranked.cards.grondement.desc",
+    targetHintKey: "ranked.cards.grondement.targetHint", art: "/Cards Bonus/Grondement.png",
+  },
   /* ──── Voie MIRAGE — cartes signature (Arena 2026-06-22, art:null = glyph) ──── */
   "reflet-echo": {
     id: "reflet-echo", cost: 1, rarity: "common", voie: "lizard",
@@ -591,6 +619,27 @@ export const CARDS: Record<CardId, RankedCard> = {
     nameKey: "ranked.cards.frenesie.name", descKey: "ranked.cards.frenesie.desc",
     targetHintKey: "ranked.cards.frenesie.targetHint", art: "/Cards Bonus/Frénésie.png",
   },
+  "estafilade": {
+    // Reach (Alex 2026-06-30) — art à fournir, glyph fallback.
+    id: "estafilade", cost: 1, rarity: "common", voie: "scissors",
+    target: "lane", palette: "rose", glyph: "🪒",
+    nameKey: "ranked.cards.estafilade.name", descKey: "ranked.cards.estafilade.desc",
+    targetHintKey: "ranked.cards.estafilade.targetHint", art: "/Cards Bonus/Estafilade.png",
+  },
+  "saignee": {
+    // Card-advantage aggro — art à fournir, glyph fallback.
+    id: "saignee", cost: 2, rarity: "rare", voie: "scissors",
+    target: "none", palette: "rose", glyph: "🩸",
+    nameKey: "ranked.cards.saignee.name", descKey: "ranked.cards.saignee.desc",
+    targetHintKey: "ranked.cards.saignee.targetHint", art: "/Cards Bonus/Saignée.png",
+  },
+  "fureur-emoussee": {
+    // Payoff Émoussé — art à fournir, glyph fallback.
+    id: "fureur-emoussee", cost: 1, rarity: "common", voie: "scissors",
+    target: "none", palette: "rose", glyph: "💢",
+    nameKey: "ranked.cards.fureur-emoussee.name", descKey: "ranked.cards.fureur-emoussee.desc",
+    targetHintKey: "ranked.cards.fureur-emoussee.targetHint", art: "/Cards Bonus/Fureur Émoussée.png",
+  },
   /* ──── Voie FORÊT — cartes signature (Arena 2026-06-23, art:null = glyph) ──── */
   "ramure": {
     id: "ramure", cost: 3, rarity: "rare", voie: "paper",
@@ -609,6 +658,13 @@ export const CARDS: Record<CardId, RankedCard> = {
     target: "lane", palette: "emerald", glyph: "🥀",
     nameKey: "ranked.cards.ronces.name", descKey: "ranked.cards.ronces.desc",
     targetHintKey: "ranked.cards.ronces.targetHint", art: "/Cards Bonus/Ronces.png",
+  },
+  "greffe": {
+    // Pioche flavor Forêt (Alex 2026-06-30) — texture non-soin + profondeur deck ; art à fournir.
+    id: "greffe", cost: 1, rarity: "common", voie: "paper",
+    target: "none", palette: "emerald", glyph: "🌱",
+    nameKey: "ranked.cards.greffe.name", descKey: "ranked.cards.greffe.desc",
+    targetHintKey: "ranked.cards.greffe.targetHint", art: "/Cards Bonus/Greffe.png",
   },
   /* ──── Voie COSMOS — cartes signature (Arena 2026-06-23, art:null = glyph) ──── */
   "dilatation-temporelle": {
@@ -647,6 +703,43 @@ export const CARDS: Record<CardId, RankedCard> = {
     target: "none", palette: "indigo", glyph: "🌑",
     nameKey: "ranked.cards.coup-dans-lombre.name", descKey: "ranked.cards.coup-dans-lombre.desc",
     targetHintKey: "ranked.cards.coup-dans-lombre.targetHint", art: "/Cards Bonus/Coup dans l'Ombre.png",
+  },
+  // ── Voie Mirage — nouvelles cartes (Alex 2026-06-28) ──
+  "derobade": {
+    id: "derobade", cost: 1, rarity: "common", voie: "lizard",
+    target: "lane", palette: "cyan", glyph: "🌫️",
+    nameKey: "ranked.cards.derobade.name", descKey: "ranked.cards.derobade.desc",
+    targetHintKey: "ranked.cards.derobade.targetHint", art: "/Cards Bonus/derobade.png",
+  },
+  "frappe-spectrale": {
+    id: "frappe-spectrale", cost: 2, rarity: "rare", voie: "lizard",
+    target: "lane", palette: "indigo", glyph: "👻",
+    nameKey: "ranked.cards.frappe-spectrale.name", descKey: "ranked.cards.frappe-spectrale.desc",
+    targetHintKey: "ranked.cards.frappe-spectrale.targetHint", art: "/Cards Bonus/frappe-spectrale.png",
+  },
+  "sillage-spectral": {
+    id: "sillage-spectral", cost: 2, rarity: "rare", voie: "lizard",
+    target: "none", palette: "violet", glyph: "🌀",
+    nameKey: "ranked.cards.sillage-spectral.name", descKey: "ranked.cards.sillage-spectral.desc",
+    targetHintKey: "ranked.cards.sillage-spectral.targetHint", art: "/Cards Bonus/sillage-spectral.png",
+  },
+  "faux-semblant": {
+    id: "faux-semblant", cost: 3, rarity: "epic", voie: "lizard",
+    target: "lane", palette: "violet", glyph: "🎭",
+    nameKey: "ranked.cards.faux-semblant.name", descKey: "ranked.cards.faux-semblant.desc",
+    targetHintKey: "ranked.cards.faux-semblant.targetHint", art: "/Cards Bonus/faux-semblant.png",
+  },
+  "nuee-spectrale": {
+    id: "nuee-spectrale", cost: 4, rarity: "legendary", voie: "lizard",
+    target: "none", palette: "indigo", glyph: "🌠",
+    nameKey: "ranked.cards.nuee-spectrale.name", descKey: "ranked.cards.nuee-spectrale.desc",
+    targetHintKey: "ranked.cards.nuee-spectrale.targetHint", art: "/Cards Bonus/nuee-spectrale.png",
+  },
+  "eclipse": {
+    id: "eclipse", cost: 2, rarity: "rare", voie: "lizard",
+    target: "lane", palette: "violet", glyph: "🌘",
+    nameKey: "ranked.cards.eclipse.name", descKey: "ranked.cards.eclipse.desc",
+    targetHintKey: "ranked.cards.eclipse.targetHint", art: "/Cards Bonus/eclipse.png",
   },
   "intrication-quantique": {
     id: "intrication-quantique", cost: 3, rarity: "rare", voie: "spock",
@@ -737,22 +830,54 @@ export const CARDS: Record<CardId, RankedCard> = {
     targetHintKey: "ranked.cards.frappe-parfaite.targetHint", art: "/Cards Bonus/Frappe parfaite.png",
   },
   "bastion": {
-    id: "bastion", cost: 1, rarity: "rare", kind: "fusion",
-    target: "lane", palette: "sky", glyph: "🏰",
+    id: "bastion", cost: 2, rarity: "rare", kind: "fusion", voie: "rock",
+    target: "lane", palette: "zinc", glyph: "🏰",
     nameKey: "ranked.cards.bastion.name", descKey: "ranked.cards.bastion.desc",
     targetHintKey: "ranked.cards.bastion.targetHint", art: "/Cards Bonus/BASTION.png",
   },
   "avalanche": {
-    id: "avalanche", cost: 1, rarity: "rare", kind: "fusion",
+    id: "avalanche", cost: 1, rarity: "rare", kind: "fusion", voie: "rock",
     target: "none", palette: "zinc", glyph: "🏔️",
     nameKey: "ranked.cards.avalanche.name", descKey: "ranked.cards.avalanche.desc",
     targetHintKey: "ranked.cards.avalanche.targetHint", art: "/Cards Bonus/AVALANCHE.png",
+  },
+  "citadelle": {
+    id: "citadelle", cost: 3, rarity: "epic", kind: "fusion", voie: "rock",
+    target: "none", palette: "zinc", glyph: "🏯",
+    nameKey: "ranked.cards.citadelle.name", descKey: "ranked.cards.citadelle.desc",
+    targetHintKey: "ranked.cards.citadelle.targetHint", art: "/Cards Bonus/Citadelle.png",
+  },
+  "cataclysme": {
+    id: "cataclysme", cost: 4, rarity: "legendary", kind: "fusion", voie: "rock",
+    target: "none", palette: "zinc", glyph: "⛰️",
+    nameKey: "ranked.cards.cataclysme.name", descKey: "ranked.cards.cataclysme.desc",
+    targetHintKey: "ranked.cards.cataclysme.targetHint", art: "/Cards Bonus/Cataclysme.png",
+  },
+  "estocade": {
+    id: "estocade", cost: 3, rarity: "epic", kind: "fusion", voie: "scissors",
+    target: "none", palette: "rose", glyph: "⚔️",
+    nameKey: "ranked.cards.estocade.name", descKey: "ranked.cards.estocade.desc",
+    targetHintKey: "ranked.cards.estocade.targetHint", art: "/Cards Bonus/Estocade.png",
   },
   "source-vitale": {
     id: "source-vitale", cost: 1, rarity: "rare", kind: "fusion",
     target: "lane", palette: "emerald", glyph: "⛲",
     nameKey: "ranked.cards.source-vitale.name", descKey: "ranked.cards.source-vitale.desc",
     targetHintKey: "ranked.cards.source-vitale.targetHint", art: "/Cards Bonus/SOURCE VITALE.png",
+  },
+  "bosquet-epineux": {
+    // Fusion ronces+photosynthese (Alex 2026-06-30) — gardien épineux fortifié ; art à fournir.
+    id: "bosquet-epineux", cost: 3, rarity: "epic", kind: "fusion", voie: "paper",
+    target: "lane", palette: "emerald", glyph: "🌳",
+    nameKey: "ranked.cards.bosquet-epineux.name", descKey: "ranked.cards.bosquet-epineux.desc",
+    targetHintKey: "ranked.cards.bosquet-epineux.targetHint", art: "/Cards Bonus/Bosquet Épineux.png",
+  },
+  "effacement": {
+    // Fusion loi-de-causalité+trou-noir (Alex 2026-06-30) — contrôle total ; art à fournir.
+    id: "effacement", cost: 4, rarity: "epic", kind: "fusion", voie: "spock",
+    target: "lane", palette: "indigo", glyph: "⬛",
+    nameKey: "ranked.cards.effacement.name", descKey: "ranked.cards.effacement.desc",
+    targetHintKey: "ranked.cards.effacement.targetHint", art: "/Cards Bonus/Effacement.png",
   },
   "omniscience": {
     id: "omniscience", cost: 2, rarity: "epic", kind: "fusion",
@@ -777,6 +902,25 @@ export const CARDS: Record<CardId, RankedCard> = {
     target: "none", palette: "violet", glyph: "🎭",
     nameKey: "ranked.cards.imposteur.name", descKey: "ranked.cards.imposteur.desc",
     targetHintKey: "ranked.cards.imposteur.targetHint", art: "/Cards Bonus/IMPOSTEUR.png",
+  },
+  // ── Fusions Voie Mirage (Alex 2026-06-28) ──
+  "galerie-des-glaces": {
+    id: "galerie-des-glaces", cost: 2, rarity: "epic", voie: "lizard", kind: "fusion",
+    target: "none", palette: "cyan", glyph: "🪞",
+    nameKey: "ranked.cards.galerie-des-glaces.name", descKey: "ranked.cards.galerie-des-glaces.desc",
+    targetHintKey: "ranked.cards.galerie-des-glaces.targetHint", art: "/Cards Bonus/galerie-des-glaces.png",
+  },
+  "mascarade-souveraine": {
+    id: "mascarade-souveraine", cost: 3, rarity: "epic", voie: "lizard", kind: "fusion",
+    target: "lane", palette: "violet", glyph: "👑",
+    nameKey: "ranked.cards.mascarade-souveraine.name", descKey: "ranked.cards.mascarade-souveraine.desc",
+    targetHintKey: "ranked.cards.mascarade-souveraine.targetHint", art: "/Cards Bonus/mascarade-souveraine.png",
+  },
+  "apotheose-spectrale": {
+    id: "apotheose-spectrale", cost: 4, rarity: "legendary", voie: "lizard", kind: "fusion",
+    target: "none", palette: "indigo", glyph: "🌌",
+    nameKey: "ranked.cards.apotheose-spectrale.name", descKey: "ranked.cards.apotheose-spectrale.desc",
+    targetHintKey: "ranked.cards.apotheose-spectrale.targetHint", art: "/Cards Bonus/apotheose-spectrale.png",
   },
 };
 

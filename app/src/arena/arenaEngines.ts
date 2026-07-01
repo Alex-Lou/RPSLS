@@ -21,7 +21,7 @@
 import { damageHero, healHero } from "./arenaRules/heroCreature";
 import { BALANCE } from "./arenaBalance";
 import type { Move } from "../engine/game";
-import type { BoardState, HeroState } from "./arenaTypes";
+import type { BoardState, HeroState, Side } from "./arenaTypes";
 
 /** Défaut historique du cap d'engine (le moteur lit BALANCE.engine.cap, tunable
  *  par le Lab). Conservé comme constante de référence/iso. */
@@ -58,6 +58,40 @@ export function riseEngineOnCounterWin(hero: HeroState): HeroState {
   return next === cur ? h : { ...h, [field]: next };
 }
 
+/** 🦎 MIRAGE — la jauge monte AUSSI quand un Lézard de la Voie ESQUIVE en combat
+ *  (Alex 2026-06-30, session mécanique). Racine du problème Mirage (sim 19%,
+ *  finisher 2%) : la règle « la jauge monte sur counter GAGNÉ » GÈLE Mirage vs
+ *  Pierre/Ciseaux — le Lézard y PERD toujours le RPSLS, ne gagne jamais de counter,
+ *  donc ne progresse jamais → finisher quasi mort → crush 2% vs Montagne. Or
+ *  l'identité de Mirage n'est PAS de remporter le RPSLS mais de l'ESQUIVER :
+ *  esquiver = « gagner l'échange » (survivre à un coup qui devait tuer). On étend
+ *  donc la règle canonique « on gagne sa Voie en la JOUANT » au cas Mirage. Même
+ *  cap/incrément que riseEngineOnCounterWin. Lézard-only + affinité-gated (un héros
+ *  non-Mirage qui aurait un Lézard esquiveur ne progresse pas par erreur). */
+export function riseMirageOnDodge(hero: HeroState): HeroState {
+  if (hero.affinity !== "lizard") return hero;
+  const cur = hero.mirageStack ?? 0;
+  const next = Math.min(BALANCE.engine.cap, cur + BALANCE.engine.risePerCounterWin);
+  return next === cur ? hero : { ...hero, mirageStack: next };
+}
+
+/** 🪨 MONTAGNE — la jauge monte AUSSI quand une Pierre de la Voie a TENU un tour
+ *  (Alex 2026-06-30, audit Montagne). MÊME pathologie que Mirage : la règle « la
+ *  jauge monte sur counter GAGNÉ » GÈLE Montagne — rock PERD vs paper/spock ET est
+ *  « Lente » (ATK 0 au tour de pose → ne tue pas tout de suite) → counter rarement
+ *  remporté → finisher Forteresse à ~5-6% → snowball jamais lancé. Or l'identité de
+ *  Montagne n'est PAS de remporter le RPSLS mais de TENIR : une Pierre qui survit un
+ *  tour fait DÉJÀ grossir le mur (gainStrateIfHeld) — on lie la jauge à ce même
+ *  signal « tenir » (« on gagne sa Voie en la JOUANT », comme l'esquive pour Mirage).
+ *  +1/tour si AU MOINS une Pierre a tenu (déclenché en endOfTurnCleanup). Rock-only +
+ *  affinité-gated. Même cap/incrément. Additif (garde le rise-on-counter-win). */
+export function riseEngineOnHeld(hero: HeroState): HeroState {
+  if (hero.affinity !== "rock") return hero;
+  const cur = hero.rockStack ?? 0;
+  const next = Math.min(BALANCE.engine.cap, cur + BALANCE.engine.risePerCounterWin);
+  return next === cur ? hero : { ...hero, rockStack: next };
+}
+
 /* ───────────────────────── Effets (lus aux bons points) ───────────────────────── */
 
 /** 🌿 Régén Forêt de fin de tour — « Sève entretenue » (Alex 2026-06-27, refonte
@@ -71,6 +105,7 @@ export function riseEngineOnCounterWin(hero: HeroState): HeroState {
  *  2 si nourri ce tour. Identité grind préservée, équité rétablie. */
 export function seveHealAmount(hero: HeroState): number {
   if (hero.affinity !== "paper") return 0;
+  if (hero.healLockedThisTurn) return 0; // ÉCRASEMENT (Montagne) — soin coupé ce tour
   const seve = hero.seveStack ?? 0;
   const fed = !!hero.seveFedThisTurn;
   if (hero.vergerActive) return fed ? Math.min(BALANCE.foret.seveHealVerger, seve + 1) : 1;
@@ -105,21 +140,51 @@ export function mirageDodgeBonus(hero: HeroState): number {
   return hero.affinity === "lizard" ? (hero.mirageStack ?? 0) : 0;
 }
 
+/** 🦎 +ATK PERM accordé à un Lézard de Voie fraîchement posé = mirageStack
+ *  (Alex 2026-06-30, payoff offensif). La jauge ne donnait QUE de l'Esquive
+ *  (+survie = turtle) : Mirage montait sa jauge MAIS ne convertissait jamais
+ *  (sim : finisher 78% une fois la jauge câblée sur l'esquive, mais dmg 9.8 le
+ *  plus bas → « courant d'air »). On rend l'évasion OFFENSIVE comme la thèse le
+ *  veut : un Lézard insaisissable devient aussi TRANCHANT → ses frappes
+ *  imblocables (Frappe Spectrale, Nuée, lane vide → héros) montent avec la jauge.
+ *  L'Esquive reste (survie) ; l'ATK s'ajoute (menace). Cap = engine.cap (3). */
+export function mirageAtkBonus(hero: HeroState): number {
+  return hero.affinity === "lizard" ? (hero.mirageStack ?? 0) : 0;
+}
+
 /** 🖖 Chip inévitable de fin de tour au héros adverse = Cosmos (0-3). */
 export function cosmosChip(hero: HeroState): number {
   return hero.affinity === "spock" ? Math.min(BALANCE.cosmos.chipCap, hero.cosmosCount ?? 0) : 0;
 }
 
+/** 🪨 Chip récurrent GRONDEMENT (Montagne) — dégâts/tour au héros adverse = mes
+ *  Strates en jeu (somme des voieAtkBonus de mes Pierres), capé grondementCap. 0
+ *  si l'aura n'est pas active ou hors Montagne. COUNTERABLE (dépend de mes Pierres
+ *  vivantes) — distinct du chip Cosmos (hero-based, imparable). */
+export function montagneTremor(board: BoardState, hero: HeroState, side: Side): number {
+  if (hero.affinity !== "rock" || !hero.tremorActive) return 0;
+  let strates = 0;
+  for (const lane of board.lanes) {
+    const me = side === "a" ? lane.a : lane.b;
+    if (me && me.move === "rock") strates += me.voieAtkBonus;
+  }
+  return Math.min(BALANCE.montagne.grondementCap, strates);
+}
+
 /** Fin de tour : applique les effets PASSIFS (régén Forêt sur SOI, chip Cosmos
  *  sur l'ADVERSE), PUIS érode la Sève non nourrie et reset le flag du tour.
  *  `heroA/heroB` déjà rafraîchis (constellation). Pur, capé. */
-export function applyEnginesEndOfTurn(_board: BoardState, heroA: HeroState, heroB: HeroState): { a: HeroState; b: HeroState } {
+export function applyEnginesEndOfTurn(board: BoardState, heroA: HeroState, heroB: HeroState): { a: HeroState; b: HeroState } {
   // Soin Sève conditionnel (lit seveFedThisTurn + seveStack du tour courant).
   let a = healHero(heroA, seveHealAmount(heroA));
   let b = healHero(heroB, seveHealAmount(heroB));
   const aChip = cosmosChip(a), bChip = cosmosChip(b);
   if (aChip > 0) b = damageHero(b, aChip);
   if (bChip > 0) a = damageHero(a, bChip);
+  // 🪨 GRONDEMENT (Montagne) — chip récurrent counterable (mes Strates en jeu, capé).
+  const aTremor = montagneTremor(board, a, "a"), bTremor = montagneTremor(board, b, "b");
+  if (aTremor > 0) b = damageHero(b, aTremor);
+  if (bTremor > 0) a = damageHero(a, bTremor);
   // Érosion de la Sève (jauge non nourrie ce tour) puis reset du flag pour le tour suivant.
   a = clearSeveFed(decaySeveIfStarved(a));
   b = clearSeveFed(decaySeveIfStarved(b));
@@ -145,7 +210,7 @@ export function engineEffectText(affinity: Move | undefined): string {
     case "rock":     return "tes Pierres se renforcent";
     case "paper":    return "ton héros se régénère plus fort";
     case "scissors": return "tes créatures en jeu frappent plus fort";
-    case "lizard":   return "tes Lézards deviennent insaisissables";
+    case "lizard":   return "tes Lézards insaisissables frappent plus fort";
     case "spock":    return "l'inévitable ronge le héros adverse";
     default: return "";
   }

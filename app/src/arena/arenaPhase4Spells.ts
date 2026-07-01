@@ -40,9 +40,29 @@ export function applyEboulisFinal(board: BoardState, side: Side): BoardState {
   return withSideHero(board, oppS, damageHero(oppHero, dmg));
 }
 
-/** Drain Vital (Forêt) — 4 dégâts au héros adverse PUIS 4 PV rendus à mon héros
- *  (la vie circule). Priorité tardive (après les dégâts) pour que l'anim soit
- *  dégât→soin, comme Veine de Gaïa / Second Souffle. */
+/** Écrasement Tellurique (Montagne, 2026-06-30) — PERCE-MUR : dégâts au héros
+ *  adverse = (mes Pierres × eboulisPerRock) ET le héros adverse ne peut PAS être
+ *  soigné ce tour (healLockedThisTurn → coupe la régen Forêt Sève/Verger). Comble
+ *  le talon #2 : la Forêt se re-soigne en boucle et annule Éboulis Final. 0 Pierre
+ *  = coupe quand même le soin (le rocher écrase), mais 0 dégât. */
+export function applyEcrasement(board: BoardState, side: Side): BoardState {
+  const oppS = oppSide(side);
+  let rocks = 0;
+  for (const lane of board.lanes) {
+    const me = side === "a" ? lane.a : lane.b;
+    if (me && me.move === "rock") rocks += 1;
+  }
+  const dmg = rocks * BALANCE.montagne.eboulisPerRock;
+  const oppHero = oppS === "a" ? board.a : board.b;
+  const locked = { ...oppHero, healLockedThisTurn: true };
+  alog("spell", `${side} ÉCRASEMENT TELLURIQUE → ${dmg} dmg héros ${oppS} (${rocks} Pierre(s)) + soin coupé ce tour`);
+  return withSideHero(board, oppS, damageHero(locked, dmg));
+}
+
+/** Drain Vital (Forêt) — drainAmount dégâts au héros adverse PUIS autant de PV
+ *  rendus à mon héros (la vie circule ; drainAmount=2 depuis le nerf Forêt).
+ *  Priorité tardive (après les dégâts) pour que l'anim soit dégât→soin, comme
+ *  Veine de Gaïa / Second Souffle. */
 export function applyDrainVital(board: BoardState, side: Side): BoardState {
   const oppS = oppSide(side);
   const amt = BALANCE.foret.drainAmount;
@@ -55,7 +75,7 @@ export function applyDrainVital(board: BoardState, side: Side): BoardState {
 }
 
 /** Coup dans l'Ombre (Mirage) — coup IMBLOCABLE au héros adverse = total des
- *  charges d'Esquive de mes Lézards (plafond 6). Récompense la ressource Esquive
+ *  charges d'Esquive de mes Lézards (plafond coupDansLombreCap=3). Récompense la ressource Esquive
  *  cultivée (Mascarade Enchaînée / Fuite Masquée). */
 export function applyCoupDansLombre(board: BoardState, side: Side): BoardState {
   const oppS = oppSide(side);
@@ -76,8 +96,8 @@ export function applyCoupDansLombre(board: BoardState, side: Side): BoardState {
 }
 
 /** Intrication Quantique (Cosmos) — 1 dégât au héros adverse par Spock que JE
- *  contrôle (+1 si j'en ai ≥2), plafond 6. Inévitabilité du board Cosmos
- *  (distinct de Singularité qui compte les 2 camps, et de Convergence = mana). */
+ *  contrôle (+1 si j'en ai ≥2), plafond intricationCap (=3). Inévitabilité du board
+ *  Cosmos (distinct de Singularité qui compte les 2 camps, et de Convergence = mana). */
 export function applyIntricationQuantique(board: BoardState, side: Side): BoardState {
   const oppS = oppSide(side);
   let spocks = 0;

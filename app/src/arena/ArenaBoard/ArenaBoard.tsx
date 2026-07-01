@@ -36,7 +36,7 @@ import type { CardId } from "../../ranked/rankedTypes";
 import { InlineBurger } from "../../ui/ModeLobbyShell";
 import { setBurgerHidden } from "../../Sidebar";
 import { MoveGlyph } from "../../icons";
-import { AugurFlash, TauntBlockChip, AntiTauntChip } from "./ArenaBoardChips";
+import { AugurFlash, TauntBlockChip, AntiTauntChip, RiposteChip } from "./ArenaBoardChips";
 import { ArenaCenterBand } from "./ArenaCenterBand";
 import { ArenaFuseReveal } from "./ArenaFuseReveal";
 import { ArenaOppCardInspect } from "./ArenaOppCardInspect";
@@ -75,6 +75,10 @@ export interface ArenaBoardProps {
    *  attacker's Étouffe (Feuille) / Logique (Spock) cancelled the defender's
    *  charged Pierre Provocation. Pops a chip on the bypassed Pierre. */
   antiTaunt?: { bypassedSide: "a" | "b"; rockLane: LaneIndex; cause: "paper" | "spock"; key: number } | null;
+  /** Riposte d'esquive (Mirage) — set quand un attaquant frappe un Lézard qui
+   *  esquive : pop un chip « ✨ Esquive → ⚔ Riposte » sur la lane de l'attaquant,
+   *  pour expliquer pourquoi il encaisse/meurt (Alex 2026-06-28 « meurt sans raison »). */
+  riposteFX?: { attackerSide: "a" | "b"; lane: LaneIndex; key: number } | null;
   /** Signatures FX plein-board (Genèse, Supernova…) — déclenché au step
    *  SPELLS. null au repos. Cf. ArenaSpellFX. */
   spellFX?: { ids: CardId[]; key: number } | null;
@@ -118,7 +122,7 @@ export interface ArenaBoardProps {
   fillHeight?: number;
 }
 
-export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPreview, resolveStep, combatLane = null, combatChargers = [], heroHit = null, tauntBlock = null, antiTaunt = null, spellFX = null, projectileShots = [], oppName, oppAvatar, targeting, onLaneTap, onRemoveSpell, onRemoveSummon, forgeYou = null, forgeOpp = null, onForgeTap, forgeFlashKey = null, forgeRecoverKey = null, forgeHighlight = null, fillHeight }: ArenaBoardProps) {
+export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPreview, resolveStep, combatLane = null, combatChargers = [], heroHit = null, tauntBlock = null, antiTaunt = null, riposteFX = null, spellFX = null, projectileShots = [], oppName, oppAvatar, targeting, onLaneTap, onRemoveSpell, onRemoveSummon, forgeYou = null, forgeOpp = null, onForgeTap, forgeFlashKey = null, forgeRecoverKey = null, forgeHighlight = null, fillHeight }: ArenaBoardProps) {
   // SECOUSSE D'IMPACT (Alex 2026-06-12) : à chaque tick de combat (combatLane
   // change), le pad tremble brièvement, calé sur l'apex du slam (~0.3s après
   // le départ de la charge). Animation controls = pas de remount des lanes.
@@ -272,6 +276,8 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
       <TauntBlockChip tauntBlock={tauntBlock} playerSide={playerSide} />
 
       <AntiTauntChip antiTaunt={antiTaunt} playerSide={playerSide} />
+
+      <RiposteChip riposteFX={riposteFX} playerSide={playerSide} />
 
       {/* DÉFILÉ CROUPIER — toutes les cartes jouées de chaque côté arrivent
        *  face cachée, flip et glissent vers leur position de repos en cascade

@@ -14,13 +14,15 @@
  * de TYPES de cartes (soin/buff/défense/…) qui sous-tend les recettes.
  */
 
-import { drawCards, damageHero, healHero, damageCreature, healCreature } from "./arenaRules";
+import { drawCards, damageHero, healHero, damageCreature, healCreature, makeCreature } from "./arenaRules";
+import { STRATE_CAP } from "./arenaRules/heroCreature";
 import {
   getMyCreatureOnLane, getOppCreatureOnLane,
   withMyCreatureOnLane, withOppCreatureOnLane, withSideHero, oppSide,
 } from "./arenaSpellHelpers";
-import type { BoardState, Creature, LaneState, PlayedSpell, Side } from "./arenaTypes";
+import type { BoardState, Creature, LaneIndex, LaneState, PlayedSpell, Side } from "./arenaTypes";
 import { alog } from "./arenaLog";
+import { BALANCE } from "./arenaBalance";
 import type { CardId } from "../ranked/rankedTypes";
 
 /* ───────────────── Taxonomie de TYPES (Alex 2026-06-13) ─────────────────
@@ -62,13 +64,26 @@ export interface FusionRecipe {
 
 export const FUSION_RECIPES: FusionRecipe[] = [
   { a: "precision",   b: "surge",        result: "frappe-parfaite" }, // +6 ATK
-  { a: "aegis",       b: "anchor",       result: "bastion" },         // bouclier+ancre+provoc
+  { a: "rempart",     b: "anchor",       result: "bastion" },         // bouclier+ancre+provoc (FIX 2026-06-30 : aegis→rempart, aegis hors deck rock = recette injouable en Montagne, même bug que Cosmos)
   { a: "jet-caillou", b: "jet-caillou",  result: "avalanche" },       // 3 dmg ×2 créatures
   { a: "seve",        b: "second-wind",  result: "source-vitale" },   // +3 créature ET +3 héros
-  { a: "oracle",      b: "coup-oeil",    result: "omniscience" },     // pioche 3 + main révélée
+  { a: "oracle",      b: "augur",        result: "omniscience" },     // pioche 3 + main révélée (FIX 2026-06-28 : augur NEUTRE au lieu de coup-oeil voie:spock = recette était injouable)
   { a: "toile-gluante", b: "curse",      result: "cocon" },           // n'attaque pas + −2 ATK
-  { a: "supernova",   b: "gravite",      result: "apocalypse" },      // 4 dmg all + 4 héros
+  { a: "supernova",   b: "singularite",  result: "apocalypse" },      // 4 dmg all + 4 héros (FIX 2026-06-28 : singularité NEUTRE au lieu de gravité voie:spock = recette était injouable)
   { a: "heist",       b: "mascarade",    result: "imposteur" },       // vol + main révélée
+  // ── Fusions Voie MIRAGE (Alex 2026-06-28) — 2 signatures lizard → résultat lizard, forgeabilité garantie ──
+  { a: "mirror",         b: "reflet-echo",      result: "galerie-des-glaces" },   // reflets sur les lanes vides
+  { a: "mascarade",      b: "faux-semblant",    result: "mascarade-souveraine" }, // contrôle TOTAL d'une lane
+  { a: "nuee-spectrale", b: "coup-dans-lombre", result: "apotheose-spectrale" },  // closer imblocable + burst d'esquives
+  // ── Fusions Voie MONTAGNE (Alex 2026-06-30) — ingrédients tous dans SIGNATURE_DECK.rock (forgeabilité garantie) ──
+  { a: "rempart",     b: "strate-vive",  result: "citadelle" },       // mur board-wide : +1 Strate + 2 PV à TOUTES mes Pierres
+  { a: "eboulis-final", b: "contrefort", result: "cataclysme" },      // closer : gros burst granite (Pierres×3) qui IGNORE le soin
+  // ── Fusion Voie TRANCHANT (Alex 2026-06-30) — les 2 ingrédients sont dans SIGNATURE_DECK.scissors ──
+  { a: "coup-de-taille", b: "frenesie",  result: "estocade" },        // closer perforant board : tous mes Ciseaux +2 ATK + re-perforation + dé-émoussés
+  // ── Fusion Voie FORÊT (Alex 2026-06-30) — les 2 ingrédients sont dans SIGNATURE_DECK.paper ──
+  { a: "ronces",      b: "photosynthese", result: "bosquet-epineux" }, // gardien épineux fortifié : riposte + bouclier + croissance (version PREMIUM de Ronces nerfée)
+  // ── Fusion Voie COSMOS (Alex 2026-06-30) — les 2 ingrédients sont dans SIGNATURE_DECK.spock (corrige la pire parité fusion : Cosmos en avait 0 forgeable) ──
+  { a: "loi-de-causalite", b: "trou-noir", result: "effacement" },    // contrôle total : efface 1 créature adverse + fige tout le reste de son board
 ];
 
 /** Résultat de fusion pour une paire (ordre indifférent), ou null. */
@@ -111,7 +126,7 @@ export function applyBastion(board: BoardState, side: Side, spell: PlayedSpell):
     ...c,
     divineShield: true,
     anchored: true,
-    provocationCharges: c.move === "rock" ? Math.max(c.provocationCharges, 2) : c.provocationCharges,
+    provocationCharges: c.move === "rock" ? Math.max(c.provocationCharges, BALANCE.montagne.voieProvocationCharges) : c.provocationCharges,
   };
   return withMyCreatureOnLane(board, side, spell.lane, fortified);
 }
@@ -131,6 +146,58 @@ export function applyAvalanche(board: BoardState, side: Side): BoardState {
   return b;
 }
 
+/** Citadelle (Montagne, 2026-06-30) — la citadelle se dresse : TOUTES mes Pierres
+ *  gagnent +1 Strate (ATK perm, capé STRATE_CAP) ET +2 PV. Mur board-wide qui
+ *  amorce le snowball d'un coup (rempart + strate-vive fusionnés). */
+export function applyCitadelle(board: BoardState, side: Side): BoardState {
+  let count = 0;
+  const lanes = board.lanes.map((lane) => {
+    const me = side === "a" ? lane.a : lane.b;
+    if (!me || me.move !== "rock") return lane;
+    count += 1;
+    const strated: Creature = { ...me, voieAtkBonus: Math.min(STRATE_CAP, me.voieAtkBonus + 1), hp: me.hp + 2 };
+    return side === "a" ? { ...lane, a: strated } : { ...lane, b: strated };
+  }) as [LaneState, LaneState, LaneState];
+  alog("spell", `${side} CITADELLE → +1 Strate + 2 PV à ${count} Pierre(s)`);
+  return { ...board, lanes };
+}
+
+/** Cataclysme (Montagne, 2026-06-30) — le CLOSER : dégâts au héros adverse =
+ *  (mes Pierres × 3 + Strates), plafonné 14, ET le héros adverse ne peut pas être
+ *  soigné ce tour (healLockedThisTurn → perce le mur de régen Forêt). Le coup de
+ *  grâce que le soin ne rattrape pas (eboulis-final + contrefort fusionnés). */
+export function applyCataclysme(board: BoardState, side: Side): BoardState {
+  const oppS = oppSide(side);
+  let rocks = 0, strates = 0;
+  for (const lane of board.lanes) {
+    const me = side === "a" ? lane.a : lane.b;
+    if (me && me.move === "rock") { rocks += 1; strates += me.voieAtkBonus; }
+  }
+  const dmg = Math.min(14, rocks * 3 + strates);
+  const oppHero = oppS === "a" ? board.a : board.b;
+  const locked = { ...oppHero, healLockedThisTurn: true };
+  alog("spell", `${side} CATACLYSME → ${dmg} dmg héros ${oppS} (${rocks} Pierre(s) + ${strates} Strate(s)) + soin coupé`);
+  return withSideHero(board, oppS, damageHero(locked, dmg));
+}
+
+/** Estocade (Tranchant, 2026-06-30) — closer perforant BOARD-WIDE : TOUS mes
+ *  Ciseaux gagnent +2 ATK ce tour, RÉCUPÈRENT leur Perforation (pierceUsed:false →
+ *  re-percent l'Aegis) ET se RÉ-AFFÛTENT (combatBlunted retiré). « La lame affûtée
+ *  frappe partout et perce tout » — permet de finir la course à travers les murs
+ *  (Aegis/Bouclier). Fusion coup-de-taille + frenesie. */
+export function applyEstocade(board: BoardState, side: Side): BoardState {
+  let count = 0;
+  const lanes = board.lanes.map((lane) => {
+    const me = side === "a" ? lane.a : lane.b;
+    if (!me || me.move !== "scissors") return lane;
+    count++;
+    const sharp: Creature = { ...me, atkBuff: me.atkBuff + 2, pierceUsed: false, combatBlunted: false };
+    return side === "a" ? { ...lane, a: sharp } : { ...lane, b: sharp };
+  }) as [LaneState, LaneState, LaneState];
+  alog("spell", `${side} ESTOCADE → ${count} Ciseau·x : +2 ATK, perforation rechargée, dé-émoussés`);
+  return { ...board, lanes };
+}
+
 /** Source Vitale — +3 PV à ta créature ciblée ET +3 PV à ton héros. */
 export function applySourceVitale(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   if (spell.kind !== "lane") return board;
@@ -139,6 +206,46 @@ export function applySourceVitale(board: BoardState, side: Side, spell: PlayedSp
   if (c) b = withMyCreatureOnLane(b, side, spell.lane, healCreature(c, 3));
   const hero = side === "a" ? b.a : b.b;
   return withSideHero(b, side, healHero(hero, 3));
+}
+
+/** Bosquet Épineux (Forêt, 2026-06-30) — fusion ronces+photosynthese. La version
+ *  PREMIUM de Ronces (le commun a perdu son bouclier au nerf Forêt) : ma Feuille
+ *  ciblée devient un gardien épineux fortifié — Riposte (tue son tueur) + Bouclier
+ *  (encaisse un coup) + croissance (+1 ATK perm, plafond Strate) + soin Photosynthèse.
+ *  Réactif (punit l'attaquant), SINGLE-TARGET (un gardien, pas le board) → ajoute du
+ *  counterplay lisible sans recréer le mur board-wide. */
+export function applyBosquetEpineux(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
+  if (spell.kind !== "lane") return board;
+  const c = getMyCreatureOnLane(board, side, spell.lane);
+  if (!c) return board;
+  const guard: Creature = {
+    ...healCreature(c, BALANCE.foret.photosyntheseHeal),
+    ripostePrimed: true, divineShield: true,
+    voieAtkBonus: Math.min(STRATE_CAP, c.voieAtkBonus + 1),
+  };
+  alog("spell", `${side} BOSQUET ÉPINEUX → Feuille fortifiée (riposte + bouclier + croissance)`);
+  return withMyCreatureOnLane(board, side, spell.lane, guard);
+}
+
+/** Effacement (Cosmos, 2026-06-30) — fusion loi-de-causalite+trou-noir. CONTRÔLE
+ *  TOTAL d'un tour : EFFACE la créature adverse ciblée (comme Trou Noir) ET FIGE
+ *  toutes les AUTRES créatures adverses (cannotAttack, comme Loi de Causalité).
+ *  Spock immunisé / créature ancrée épargnés (cohérence). Closer de contrôle, zéro
+ *  dégât inévitable — identité Cosmos. */
+export function applyEffacement(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
+  if (spell.kind !== "lane") return board;
+  let b = board;
+  const target = getOppCreatureOnLane(b, side, spell.lane);
+  if (target && !target.spellImmune) b = withOppCreatureOnLane(b, side, spell.lane, null);
+  for (const l of [0, 1, 2] as LaneIndex[]) {
+    if (l === spell.lane) continue;
+    const opp = getOppCreatureOnLane(b, side, l);
+    if (opp && !opp.anchored && !opp.spellImmune) {
+      b = withOppCreatureOnLane(b, side, l, { ...opp, cannotAttack: true });
+    }
+  }
+  alog("spell", `${side} EFFACEMENT L${spell.lane} : créature effacée + board adverse figé`);
+  return b;
 }
 
 /** Omniscience — pioche 3 + la main adverse ENTIÈRE révélée 2 tours. */
@@ -195,6 +302,70 @@ export function applyImposteur(board: BoardState, side: Side): BoardState {
     alog("spell", `${side} IMPOSTEUR → vole [${stolen}] + lit la main adverse`);
   }
   const opp2 = oppS === "a" ? b.a : b.b;
-  if (side === "a") return { ...b, augurRevealedB: opp2.hand.slice(), augurTurnsLeftB: 1 };
-  return { ...b, augurRevealedA: opp2.hand.slice(), augurTurnsLeftA: 1 };
+  // turns=2 (PAS 1) — advanceToNextTurn décrémente AUSSITÔT de 1 : 1→0 = la main
+  // est effacée avant que tu la voies (bug Alex 2026-06-28). 2→1 = visible pendant
+  // ta prochaine planif (= « 1 tour » de révélation réel, comme Augur/Omniscience).
+  if (side === "a") return { ...b, augurRevealedB: opp2.hand.slice(), augurTurnsLeftB: 2 };
+  return { ...b, augurRevealedA: opp2.hand.slice(), augurTurnsLeftA: 2 };
+}
+
+/* ───────────── Fusions Voie MIRAGE (Alex 2026-06-28) ───────────── */
+
+/** Galerie des Glaces (Miroir + Reflet-Écho) — une armée de reflets : un Lézard
+ *  apparaît sur CHACUNE de tes lanes vides (Lents au summon, Voie si affinité
+ *  lizard). L'illusion qui se démultiplie. */
+export function applyGalerieDesGlaces(board: BoardState, side: Side): BoardState {
+  const aff = side === "a" ? board.a.affinity : board.b.affinity;
+  let b = board;
+  let count = 0;
+  for (let i = 0 as LaneIndex; i < 3; i = (i + 1) as LaneIndex) {
+    if (!getMyCreatureOnLane(b, side, i)) {
+      b = withMyCreatureOnLane(b, side, i, makeCreature("lizard", side, aff));
+      count += 1;
+    }
+  }
+  alog("spell", `${side} GALERIE DES GLACES → ${count} reflet(s) Lézard sur les lanes vides`);
+  return b;
+}
+
+/** Mascarade Souveraine (Mascarade + Faux-Semblant) — contrôle TOTAL d'une lane :
+ *  TA créature devient un Lézard ET l'adverse une Feuille DÉPOUILLÉE (Esquive +
+ *  Aegis retirés) → ton Lézard la CONTRE et la tue à coup sûr. Besoin des deux
+ *  créatures. Ancre/Logique (Spock) protègent l'adverse. */
+export function applyMascaradeSouveraine(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
+  if (spell.kind !== "lane") return board;
+  const me = getMyCreatureOnLane(board, side, spell.lane);
+  const opp = getOppCreatureOnLane(board, side, spell.lane);
+  if (!me || !opp) {
+    alog("spell", `💤 ${side} Mascarade Souveraine L${spell.lane} : il faut une créature DES DEUX côtés.`);
+    return board;
+  }
+  if (opp.anchored || opp.spellImmune) {
+    alog("spell", `💤 ${side} Mascarade Souveraine L${spell.lane} : cible ancrée ou immunisée (Spock).`);
+    return board;
+  }
+  // summonedThisTurn:false → un Lézard TRANSFORMÉ n'est pas « fraîchement invoqué »
+  // (pas de malus Lente ce tour ; le kill RPSLS marche de toute façon, c'est pour le splash).
+  let b = withMyCreatureOnLane(board, side, spell.lane, { ...me, move: "lizard", summonedThisTurn: false });
+  b = withOppCreatureOnLane(b, side, spell.lane, { ...opp, move: "paper", dodgeCharges: 0, divineShield: false });
+  alog("spell", `${side} MASCARADE SOUVERAINE L${spell.lane} : ta créature → Lézard, l'adverse → Feuille dépouillée (kill garanti)`);
+  return b;
+}
+
+/** Apothéose Spectrale (Nuée + Coup dans l'Ombre) — l'apex : CE TOUR tes Lézards
+ *  deviennent imblocables (cf. arenaCombat nueeActive) ET burst IMMÉDIAT au héros
+ *  adverse = total de tes charges d'Esquive. Le « bouton kill » de Mirage. */
+export function applyApotheoseSpectrale(board: BoardState, side: Side): BoardState {
+  const hero = side === "a" ? board.a : board.b;
+  let b = withSideHero(board, side, { ...hero, nueeActive: true });
+  let charges = 0;
+  for (const lane of b.lanes) {
+    const c = side === "a" ? lane.a : lane.b;
+    if (c && c.move === "lizard") charges += c.dodgeCharges;
+  }
+  const oppS = oppSide(side);
+  const oppHero = oppS === "a" ? b.a : b.b;
+  if (charges > 0) b = withSideHero(b, oppS, damageHero(oppHero, charges));
+  alog("spell", `${side} APOTHÉOSE SPECTRALE → Lézards imblocables ce tour + burst ${charges} (esquives) au héros ${oppS}`);
+  return b;
 }

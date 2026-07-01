@@ -66,7 +66,8 @@ import { HeroHitFlash } from "./HeroHitFlash";
 import { useArenaIntent } from "./useArenaIntent";
 import { useArenaForge } from "./useArenaForge";
 import { prepareResolveStart } from "./arenaResolvePrep";
-import { recordWatcherMatch, watcherUuid, watcherAppVersion, type WatcherMatchRecord } from "../arenaTelemetry";
+import { recordWatcherMatch, watcherUuid, watcherAppVersion, watcherEnabled, createTurnRecorder, buildTurnPlays, buildCardLedger, type WatcherMatchRecord, type TurnRecorder } from "../arenaTelemetry";
+import { startMatchFps, stopMatchFps } from "../../graphics/fpsSampler";
 
 // Alex feedback 2026-06-09 point #7 : décompte+GO trop rapide. Bumpé de
 // 1800 → 2600ms pour laisser le "GO!" durer un peu et faire monter le
@@ -268,6 +269,9 @@ export function ArenaGame({
    *  the bypassed Pierre so the player SEES why it didn't defend (Alex's
    *  recurring "pourquoi MA Pierre ne défend pas ?"). */
   const [antiTaunt, setAntiTaunt] = useState<{ bypassedSide: "a" | "b"; rockLane: LaneIndex; cause: "paper" | "spock"; key: number } | null>(null);
+  /** Riposte d'esquive (Mirage) — pop un chip sur la lane de l'attaquant quand il
+   *  frappe un Lézard qui esquive : explique « pourquoi il meurt » (Alex 2026-06-28). */
+  const [riposteFX, setRiposteFX] = useState<{ attackerSide: "a" | "b"; lane: LaneIndex; key: number } | null>(null);
   /** Anim Larcin (Heist) — pop quand un côté cast heist au step reveal-opp.
    *  Carte volée traverse l'écran en arc avec sillage doré, flip à l'arrivée. */
   const [heistAnim, setHeistAnim] = useState<{ caster: "you" | "opp"; stolen?: CardId; key: number } | null>(null);
@@ -316,6 +320,19 @@ export function ArenaGame({
   // raison de fin (par défaut KO ; mise à « suddendeath » par la mort subite).
   const trajRef = useRef<{ self: number[]; opp: number[] }>({ self: [], opp: [] });
   const endReasonRef = useRef<WatcherMatchRecord["endReason"]>("ko");
+  // Enregistreur de déroulé v:2 (Tier A+B) — observationnel, inerte si le Watcher
+  // n'est pas configuré. begin() au lock, lane() en combat, end() au settle.
+  const turnRecRef = useRef<TurnRecorder | null>(null);
+  if (!turnRecRef.current) turnRecRef.current = createTurnRecorder(watcherEnabled());
+  const turnRec = turnRecRef.current;
+
+  // Profil FPS de la partie (rAF continu, zéro overhead) — démarré à l'entrée de
+  // l'écran de combat, arrêté + joint au MatchRecord à l'enregistrement (fin de
+  // partie). Observationnel, fail-soft. Ne mesure que si le Watcher est configuré.
+  useEffect(() => {
+    if (watcherEnabled()) startMatchFps();
+    return () => { stopMatchFps(); };
+  }, []);
 
   // Handle d'annulation du résolveur en cours (Audit anim Build A — fuite mémoire).
   // runResolverFlow programme ~9s de setTimeout ; on garde son cancel() pour
@@ -403,6 +420,13 @@ export function ArenaGame({
     return () => window.clearTimeout(id);
   }, [antiTaunt?.key]);
 
+  // Auto-clear le chip de riposte d'esquive (même pattern que tauntBlock/antiTaunt).
+  useEffect(() => {
+    if (!riposteFX) return;
+    const id = window.setTimeout(() => setRiposteFX(null), 1_500);
+    return () => window.clearTimeout(id);
+  }, [riposteFX?.key]);
+
   // Trigger anim Larcin — pop quand applyHeist a écrit un side-channel
   // (lastHeistStolenA/B). On watch ces fields ; quand ils changent, on
   // déclenche l'anim avec la VRAIE carte volée (sync exact effet ↔ visuel).
@@ -451,8 +475,20 @@ export function ArenaGame({
     recordArenaMatch(outcome, { playerVoie: board.a.affinity, oppVoie: board.b.affinity });
     // Télémétrie Watcher (Arena Pro vs CPU) — fail-soft, inerte si non configuré.
     if (board.a.affinity) {
+      // Filet : fige le dernier tour si le settle ne l'a pas déjà fait (no-op
+      // sinon — pending est purgé après chaque end). Puis lit le déroulé v:2.
+      try {
+        turnRec.end({
+          hpSelf: Math.max(0, board.a.hp),
+          hpOpp: Math.max(0, board.b.hp),
+          engine: engineGauge(board.a)?.value ?? 0,
+          engineOpp: engineGauge(board.b)?.value ?? 0,
+          finisherUnlocked: !!board.a.finisherUnlocked,
+        });
+      } catch { /* télémétrie fail-soft */ }
+      const turnLog = turnRec.log();
       recordWatcherMatch({
-        v: 1,
+        v: turnLog.length ? 2 : 1,
         id: watcherUuid(),
         ts: Date.now(),
         mode: "pro",
@@ -469,6 +505,8 @@ export function ArenaGame({
         hpTrajectoryOpp: [...trajRef.current.opp, Math.max(0, board.b.hp)],
         endReason: endReasonRef.current,
         appVersion: watcherAppVersion,
+        turnLog: turnLog.length ? turnLog : undefined,
+        fps: stopMatchFps() ?? undefined, // profil FPS de la partie (rAF) — null si trop court
       });
     }
   }, [board.phase, board.a.hp, board.b.hp, recordArenaMatch]);
@@ -498,7 +536,28 @@ export function ArenaGame({
 
     const cpuIntent = cpuArenaDecision(board, "b", difficulty);
     // Pré-calcul PUR extrait dans arenaResolvePrep (troncature/dépense/exil/startBoard ; flux de résolution = ici).
-    const { startBoard, safeIntent, safeCpuIntent } = prepareResolveStart(board, safe, cpuIntent);
+    const { startBoard, safeIntent, safeCpuIntent, spentA, spentB } = prepareResolveStart(board, safe, cpuIntent);
+
+    // Télémétrie Watcher (Tier A) — démarre le tour avec l'état AVANT résolution +
+    // les coups réellement engagés (safeIntent/safeCpuIntent post-trim) + le ledger
+    // des vraies cartes dépensées (id/nom/fusion). Fail-soft, observationnel.
+    try {
+      turnRec.begin({
+        turn: board.turn,
+        manaMax: board.a.maxMana,
+        manaSpent: Math.min(board.a.maxMana, Math.max(0, intentCost(safe) - intentManaGrant(safe))),
+        handStart: board.a.hand.length,
+        deckLeft: board.a.deck.length,
+        plays: buildTurnPlays(safeIntent, board.a.affinity),
+        playsOpp: buildTurnPlays(safeCpuIntent, board.b.affinity),
+        cards: buildCardLedger(spentA, cardFr),
+        cardsOpp: buildCardLedger(spentB, cardFr),
+        hpSelf: Math.max(0, board.a.hp),
+        hpOpp: Math.max(0, board.b.hp),
+        engine: engineGauge(board.a)?.value ?? 0,
+        engineOpp: engineGauge(board.b)?.value ?? 0,
+      });
+    } catch { /* télémétrie fail-soft */ }
 
     resolverCancelRef.current = runResolverFlow({
       startBoard,
@@ -513,10 +572,25 @@ export function ArenaGame({
       setHeroHit,
       setTauntBlock,
       setAntiTaunt,
+      setRiposteFX,
       setSpellFX,
       setImpactFX,
       setProjectileFX: setProjectileShots,
-      onSettle: () => setIntent({ spells: [], summons: [] }),
+      onSettle: (finalBoard) => {
+        setIntent({ spells: [], summons: [] });
+        // Télémétrie Watcher — fige le tour avec l'état APRÈS combat (post-cleanup,
+        // avant l'avance). Couvre aussi le tour fatal (onSettle court au settle même
+        // en match-end). Fail-soft, observationnel.
+        try {
+          turnRec.end({
+            hpSelf: Math.max(0, finalBoard.a.hp),
+            hpOpp: Math.max(0, finalBoard.b.hp),
+            engine: engineGauge(finalBoard.a)?.value ?? 0,
+            engineOpp: engineGauge(finalBoard.b)?.value ?? 0,
+            finisherUnlocked: !!finalBoard.a.finisherUnlocked,
+          });
+        } catch { /* télémétrie fail-soft */ }
+      },
       onAdvanceTurn: () => {
         setResolving(false);
         setBoard((cur) => advanceToNextTurn(cur));
@@ -525,6 +599,7 @@ export function ArenaGame({
         setResolving(false);
         if (winnerIsPlayer) hapticWin(); else hapticLoss();
       },
+      onLaneResolved: (o) => turnRec.lane(o),
     });
   }
 
@@ -637,6 +712,7 @@ export function ArenaGame({
             heroHit={heroHit}
             tauntBlock={tauntBlock}
             antiTaunt={antiTaunt}
+            riposteFX={riposteFX}
             spellFX={spellFX}
             projectileShots={projectileShots}
             oppName={oppName}
