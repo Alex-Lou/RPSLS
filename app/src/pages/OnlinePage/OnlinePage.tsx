@@ -43,12 +43,23 @@ import { MatchFoundSplash, ScoreHeader } from "./MatchFlowSplash";
 import { PickStage, LockedStage, RevealCountdown, RevealStage } from "./MatchFlowRound";
 import { MatchEndScene } from "./MatchEndScene";
 import { QueueRadar } from "./QueueRadar";
+import { consumeOnlineIntent, type OnlineIntent } from "../../online/onlineIntent";
+import { setPlayReturnView } from "../../online/playReturnView";
 export function OnlinePage() {
   const t = useT();
   const player = useStore((s) => s.player);
   const serverConfig = useStore((s) => s.serverConfig);
   const recordMatch = useStore((s) => s.recordMatch);
+  const recordClasseOutcome = useStore((s) => s.recordClasseOutcome);
   const recordAbandon = useStore((s) => s.recordAbandon);
+  // Ladder LOCAL à créditer en fin de match (posé par un hub via onlineIntent) :
+  // "classe" → on bump classeLp EN PLUS du rankLp serveur ; null → rien de local.
+  const ladderRef = useRef<"classe" | null>(null);
+  // Origine « hub Classé » de la session (bug Alex 2026-07) : distinct de ladderRef
+  // (qui est remis à null par backToMenu/leaveMatch). Persiste jusqu'à ce qu'on
+  // revienne EFFECTIVEMENT au hub Classé → tout retour de match (fin ou quit)
+  // renvoie au menu Classé, pas au menu « En ligne ». Survit aux rematchs.
+  const classeReturnRef = useRef(false);
   /** Open state for the themed forfeit-confirm modal (classic 1v1). */
   const [quitOpen, setQuitOpen] = useState(false);
 
@@ -188,6 +199,18 @@ export function OnlinePage() {
   }, [prepCoinWinner, lanesOppPersona, setArenaBg]);
 
   /* ── Lazy create client ── */
+  // Ack du Hello (bug "Anonymous", Alex 2026-07) : le serveur applique le pseudo
+  // du Hello de façon ASYNC (vérif claim-token Redis) — un join_queue envoyé
+  // aussitôt crée le match avec le pseudo par défaut "Anonymous" côté serveur.
+  // On attend donc que le hello soit TRAITÉ (state_loaded, ou error) avant de
+  // rendre le client aux join*. Timeout de garde : serveur froid/legacy sans
+  // state_loaded → on ne bloque pas la file plus de HELLO_ACK_TIMEOUT_MS.
+  const helloAckRef = useRef<(() => void) | null>(null);
+  const HELLO_ACK_TIMEOUT_MS = 4_000;
+  function settleHelloAck() {
+    helloAckRef.current?.();
+    helloAckRef.current = null;
+  }
   function ensureClient(): Promise<OnlineClient> {
     if (clientRef.current && clientRef.current.status === "open") {
       return Promise.resolve(clientRef.current);
@@ -219,15 +242,38 @@ export function OnlinePage() {
         // Leave the banner up — the user can cancel/retry manually.
       }
     };
+    // Envoie le Hello avec le pseudo COURANT (getState), pas la closure du
+    // render : sur un tél fraîchement installé, le pseudo peut se charger APRÈS
+    // la création du client → sinon le serveur nous enregistre en "Anonymous"
+    // et l'adversaire voit ça au "Match trouvé" (bug Alex 2026-07). getState lit
+    // toujours l'état à jour (post-hydratation / post-onboarding).
+    const sendHello = () => {
+      const p = useStore.getState().player;
+      // JAMAIS le placeholder "Anonymous" (Alex 2026-07) : si le pseudo est vide
+      // (invité pas encore nommé), on envoie le défaut lisible "Player 1" —
+      // l'adversaire voit un vrai nom, pas "Anonymous". `getState` = valeur
+      // COURANTE (pas la closure du render). Le joueur peut régler un pseudo
+      // custom dans son profil ; il sera alors transmis tel quel.
+      const nick = (p.nickname && p.nickname.trim()) || "Player 1";
+      c.send({ type: "hello", nickname: nick, player_id: p.id, claim_token: p.claimToken });
+    };
     c.onReconnect = () => {
       // Server session reset on reconnect — re-introduce ourselves so the
       // server has our nickname for the next match.
-      c.send({ type: "hello", nickname: player.nickname || "Anonymous", player_id: player.id, claim_token: player.claimToken });
+      sendHello();
     };
-    return c.connect(url).then(() => {
-      // Send Hello once on connection.
-      c.send({ type: "hello", nickname: player.nickname || "Anonymous", player_id: player.id, claim_token: player.claimToken });
+    return c.connect(url).then(async () => {
+      // Send Hello once on connection — puis ATTENDRE son traitement serveur
+      // (state_loaded/error règle l'ack ; timeout de garde sinon). Garantit que
+      // le join_queue qui suit trouve le pseudo déjà posé côté serveur → fini
+      // le « Anonymous » vu par l'adversaire au match_found.
+      const helloAck = new Promise<void>((res) => { helloAckRef.current = res; });
+      sendHello();
       setActiveClient(c);
+      await Promise.race([
+        helloAck,
+        new Promise<void>((res) => window.setTimeout(res, HELLO_ACK_TIMEOUT_MS)),
+      ]);
       return c;
     });
   }
@@ -246,6 +292,21 @@ export function OnlinePage() {
     };
   }, []);
 
+  // Intention posée par un hub (Classé…) : applique le mode + lance la file
+  // AUTOMATIQUEMENT au montage, et mémorise le ladder à créditer. Consume-once
+  // (une nav ultérieure sans intent laisse le comportement normal du menu).
+  useEffect(() => {
+    const intent = consumeOnlineIntent();
+    if (!intent) return;
+    setMode(intent.mode);
+    if (intent.bestOf) setBestOf(intent.bestOf);
+    if (intent.winTo) setLanesWinTo(intent.winTo);
+    ladderRef.current = intent.ladder ?? null;
+    classeReturnRef.current = intent.ladder === "classe"; // origine hub Classé → retour ciblé
+    if (intent.autoQueue) autoJoinQueue(intent);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /* ── Message handler ── */
   function onMessage(msg: ServerMessage) {
     switch (msg.type) {
@@ -253,6 +314,7 @@ export function OnlinePage() {
         // session id — we don't display it.
         break;
       case "state_loaded":
+        settleHelloAck(); // hello traité côté serveur (pseudo posé) → libère les join*
         if (clientRef.current) handleStateLoaded(msg.state, clientRef.current, msg.claim_token);
         break;
       case "lobby_created":
@@ -355,6 +417,11 @@ export function OnlinePage() {
           timestamp: Date.now(),
           forfeit: msg.forfeit && outcome === "loss",
         });
+        // « vs joueur réel » lancé depuis le hub Classé → crédite AUSSI le
+        // classeLp local (le rankLp serveur est déjà géré) : compter dans les deux.
+        if (ladderRef.current === "classe") {
+          recordClasseOutcome(outcome, msg.forfeit && outcome === "loss");
+        }
         setM((cur) => {
           const won = msg.winner === cur.youAre;
           if (won) hapticMatchWin();
@@ -375,6 +442,7 @@ export function OnlinePage() {
         // Wait for match_end which arrives right after.
         break;
       case "error":
+        settleHelloAck(); // hello rejeté (auth_*) → ne pas bloquer l'attente d'ack
         setErrMsg(`${msg.code}: ${msg.message}`);
         setPhase("error");
         break;
@@ -581,6 +649,31 @@ export function OnlinePage() {
     }
   }
 
+  // Variante auto-file (posée par un hub via onlineIntent) : même logique que
+  // joinQueue mais avec les valeurs de l'intent EXPLICITES (le setMode/setBestOf
+  // du montage n'est pas encore reflété dans le state au moment de l'appel). Vrai
+  // joueur d'abord, fallback CPU à 10s (armBotFallback) — inchangé.
+  async function autoJoinQueue(intent: OnlineIntent) {
+    setErrMsg(null);
+    if (connStatus === "offline") {
+      startBotFallback();
+      return;
+    }
+    setPhase("connecting");
+    armBotFallback();
+    try {
+      const c = await ensureClient();
+      if (phaseRef.current !== "connecting") return;
+      if (intent.mode === "lanes") {
+        c.send({ type: "join_lanes_queue", win_to: intent.winTo ?? lanesWinTo });
+      } else {
+        c.send({ type: "join_queue", best_of: intent.bestOf ?? bestOf });
+      }
+    } catch {
+      if (phaseRef.current === "connecting") startBotFallback();
+    }
+  }
+
   /* ── Bot fallback engine ──
      A self-contained local match that reuses the same cinematic phases as a
      real online game, so the opponent simply "is" the next player you face. */
@@ -731,6 +824,9 @@ export function OnlinePage() {
       timestamp: Date.now(),
       forfeit: false,
     });
+    // Fallback CPU d'un « vs joueur réel » depuis le hub Classé → crédite le
+    // classeLp local aussi (parité avec le vrai match : compter dans les deux).
+    if (ladderRef.current === "classe") recordClasseOutcome(outcome, false);
     setM((c) => ({ ...c, ended: { winner, forfeit: false } }));
     setPhase("match_end");
     pushPlayerState(clientRef.current);
@@ -738,6 +834,9 @@ export function OnlinePage() {
 
   function cancel() {
     disarmBotFallback();
+    // Annuler la file clôt le contexte « vs réel Classé » : un match manuel lancé
+    // ensuite (lobby privé…) NE doit PAS créditer classeLp (Alex — zéro inéquité).
+    ladderRef.current = null;
     clientRef.current?.send({ type: "cancel" });
     setPhase("menu");
     setLobbyCode("");
@@ -752,15 +851,35 @@ export function OnlinePage() {
     clientRef.current?.send({ type: "play_move", mv });
   }
 
+  // Retour au HUB D'ORIGINE quand la session vient du Classé (bug Alex 2026-07) :
+  // au lieu du menu « En ligne » interne, on pose la vue de retour et on demande
+  // à App de rouvrir PlayPage sur le hub Classé. Retourne true si on a navigué
+  // (l'appelant doit s'arrêter là — OnlinePage va se démonter). false sinon.
+  function goToClasseHub(): boolean {
+    if (!classeReturnRef.current) return false;
+    classeReturnRef.current = false;
+    ladderRef.current = null;
+    disarmBotFallback();
+    clearBotTimers();
+    clearRematch();
+    setPlayReturnView("classe_lobby");
+    window.dispatchEvent(new CustomEvent("rpsls:navigate", { detail: "play" }));
+    return true;
+  }
+
   function leaveMatch() {
+    ladderRef.current = null; // quitter un match clôt le contexte « vs réel Classé »
     if (vsBot) { backToMenu(); return; } // local match — nothing to tell the server
     clientRef.current?.send({ type: "leave_match" });
+    if (goToClasseHub()) return; // session Classé → retour au hub Classé, pas au menu En ligne
     setPhase("menu");
     setM(emptyMatch());
   }
 
   function backToMenu() {
+    if (goToClasseHub()) return; // session Classé → retour au hub Classé, pas au menu En ligne
     disarmBotFallback();
+    ladderRef.current = null; // retour menu → contexte Classé clos (pas de fuite classeLp)
     clearBotTimers();
     setVsBot(false);
     playerRecentRef.current = [];

@@ -24,13 +24,7 @@ pub(crate) fn handle_hello(
     auth_token: String,
 ) {
     // Sanitize nickname: strip control chars + RTL/bidi overrides +
-    // zero-width joiners. Cap at 24 chars. CAPTURED here but applied
-    // ONLY in an auth-success branch below — letting a client set the
-    // session nickname before auth check passes would let a wrong-token
-    // Hello still leave someone else's display name attached to this
-    // socket. Pure paranoia: in practice the queued nickname is never
-    // used until queue_join / play_move, which require an authenticated
-    // pid_clean, but cleanliness > coincidence.
+    // zero-width joiners. Cap at 24 chars.
     let pending_nickname: Option<String> = {
         let clean: String = nickname
             .chars()
@@ -49,6 +43,22 @@ pub(crate) fn handle_hello(
             Some(trimmed.to_string())
         } else { None }
     };
+
+    // Adopt the sanitized display name IMMEDIATELY (bug "Anonymous", Alex
+    // 2026-07) : l'ancienne adoption différée aux arms auth-success (post
+    // aller-retour Redis dans le spawn ci-dessous) perdait la course contre le
+    // join_queue envoyé juste après le Hello sur le même socket → le match se
+    // créait avec le pseudo par défaut "Anonymous" et c'est ce que l'adversaire
+    // voyait au match_found. Un pseudo est une donnée d'AFFICHAGE déclarative,
+    // pas une identité : n'importe quel client peut déjà faire adopter le
+    // pseudo qu'il veut avec son PROPRE id+token valides (les pseudos ne sont
+    // ni uniques ni réservés) — l'adoption synchrone n'ouvre donc AUCUNE
+    // surface d'usurpation nouvelle, et aligne ce chemin sur l'arm « invité »
+    // (pid invalide) qui adoptait déjà en synchrone. L'auth (player_id/claim
+    // token) reste, elle, strictement différée aux arms verified ci-dessous.
+    if let Some(ref n) = pending_nickname {
+        session.set_nickname(n.clone());
+    }
 
     // Stable client id for leaderboard attribution + state sync.
     // Prefer an attested identity from auth_token (Google / Apple JWT)
@@ -77,7 +87,6 @@ pub(crate) fn handle_hello(
         let client_token: String = claim_token.chars().filter(|c| !c.is_control()).take(64).collect();
         let client_token = client_token.trim().to_string();
         let session_clone = session.clone();
-        let nick_for_auth = pending_nickname;
 
         // TOFU claim-token verification + state load run in parallel.
         tokio::spawn(async move {
@@ -88,9 +97,8 @@ pub(crate) fn handle_hello(
 
             match stored_token {
                 Some(ref st) if client_token == *st => {
-                    // Token matches — authenticate session AND adopt
-                    // the supplied nickname (only-if-auth-OK).
-                    if let Some(n) = nick_for_auth { session_clone.set_nickname(n); }
+                    // Token matches — authenticate the session. (Le pseudo est
+                    // déjà adopté en synchrone avant ce spawn, cf. plus haut.)
                     session_clone.set_player_id(pid);
                     let state = progress.unwrap_or_default();
                     session_clone.send(ServerMessage::StateLoaded {
@@ -99,8 +107,10 @@ pub(crate) fn handle_hello(
                     });
                 }
                 Some(_) => {
-                    // Token exists but client sent wrong/empty token —
-                    // do NOT adopt the supplied nickname (leaks identity).
+                    // Token exists but client sent wrong/empty token — the
+                    // session stays UNAUTHENTICATED (no player_id). Le pseudo
+                    // d'affichage, lui, reste adopté (cf. adoption synchrone) :
+                    // il est déclaratif, non unique, et n'accorde aucun droit.
                     warn!(player_id = %pid, "claim token mismatch — Hello rejected");
                     session_clone.send(ServerMessage::Error {
                         code: "auth_failed".into(),
@@ -115,7 +125,6 @@ pub(crate) fn handle_hello(
                     // and ask the client to retry with its existing token.
                     match player_state::try_create_claim_token(&pid).await {
                         Ok(Some(new_token)) => {
-                            if let Some(n) = nick_for_auth { session_clone.set_nickname(n); }
                             session_clone.set_player_id(pid);
                             let state = progress.unwrap_or_default();
                             session_clone.send(ServerMessage::StateLoaded {
@@ -141,12 +150,9 @@ pub(crate) fn handle_hello(
                 }
             }
         });
-    } else if let Some(n) = pending_nickname {
-        // Anonymous client (no/invalid player_id) — there's no auth
-        // boundary to cross, so adopting the supplied nickname is safe.
-        // Used for casual play, LAN matches, and old clients pre-TOFU.
-        session.set_nickname(n);
     }
+    // (Client « invité » sans player_id valide : rien de plus à faire — le
+    // pseudo est déjà adopté en synchrone plus haut, comme avant.)
 }
 
 /// Strict player_id validator. Accepts only ASCII alphanumeric + hyphens, of

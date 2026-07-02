@@ -1,4 +1,5 @@
 import { motion } from "motion/react";
+import { MatchScoreBar } from "../../match/sharedMatchUI";
 
 /* ──────────── Cinematic match flow components ──────────── */
 
@@ -96,6 +97,11 @@ function NameTag({
   );
 }
 
+/** Score header du match en ligne classique. Délègue au composant PARTAGÉ
+ *  MatchScoreBar (Alex 2026-07) — avant, ce header avait son propre rendu de
+ *  score qui héritait de la fonte du thème (chiffres serif rognés/empilés
+ *  « 23:2 ») et échappait au fix. Un seul composant de score pour TOUS les
+ *  modes → une seule vérité, chiffres mono nets sur les 12 thèmes. */
 export function ScoreHeader({
   youName,
   opponentName,
@@ -114,41 +120,14 @@ export function ScoreHeader({
   bestOf: number;
 }) {
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between rounded-2xl bg-black/30 border border-white/10 px-4 py-3">
-        <div className="flex flex-col min-w-0 flex-1">
-          <span className="text-[10px] uppercase tracking-wider text-zinc-500">You</span>
-          <span className="font-semibold truncate text-emerald-200">{youName}</span>
-        </div>
-        <div className="text-3xl sm:text-4xl font-black tabular-nums px-4">
-          <motion.span
-            key={youScore}
-            initial={{ scale: 1.6, color: "#10b981" }}
-            animate={{ scale: 1, color: "#6ee7b7" }}
-            transition={{ duration: 0.4 }}
-            className="text-emerald-300 inline-block"
-          >
-            {youScore}
-          </motion.span>
-          <span className="text-zinc-600 mx-2">:</span>
-          <motion.span
-            key={oppScore}
-            initial={{ scale: 1.6, color: "#f43f5e" }}
-            animate={{ scale: 1, color: "#fda4af" }}
-            transition={{ duration: 0.4 }}
-            className="text-rose-300 inline-block"
-          >
-            {oppScore}
-          </motion.span>
-        </div>
-        <div className="flex flex-col text-right min-w-0 flex-1">
-          <span className="text-[10px] uppercase tracking-wider text-zinc-500">Opponent</span>
-          <span className="font-semibold truncate text-rose-200">{opponentName || "—"}</span>
-        </div>
-      </div>
-      <div className="text-center text-[11px] uppercase tracking-[0.25em] text-zinc-500">
-        Round {round} · Best of {bestOf} · First to {target}
-      </div>
-    </div>
+    <MatchScoreBar
+      youName={youName}
+      oppName={opponentName || "—"}
+      youScore={youScore}
+      oppScore={oppScore}
+      youTag="You"
+      oppTag="Opponent"
+      caption={`Round ${round} · Best of ${bestOf} · First to ${target}`}
+    />
   );
 }

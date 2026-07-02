@@ -2,10 +2,27 @@ import { motion, AnimatePresence } from "motion/react";
 
 /* ──────────── RollingScore ──────────── */
 
+/** Fonte des CHIFFRES de score : mono tabulaire GARANTIE, HARD-CODÉE — PAS
+ *  `var(--font-mono)` (Alex 2026-07, 2 rounds de bug « score atroce sur certains
+ *  thèmes »). Une scène peut mettre `--font-mono` sur une police display/serif
+ *  (Casino→Bebas, Holy→IM Fell) → chiffres condensés/old-style illisibles. Et
+ *  la fonte de thème (--font-body serif : Cormorant, IM Fell…) rognait/serrait
+ *  les chiffres. On fige donc les chiffres sur des monos réellement bundlées
+ *  (@fontsource : JetBrains, Fira, Space Mono) → identiques et NETS sur les 12
+ *  palettes ET toutes les scènes. Le score reste « themé » par la COULEUR
+ *  (emerald/rose), pas par la fonte des chiffres. */
+export const SCORE_DIGIT_FONT = '"JetBrains Mono", "Fira Code", "Space Mono", Consolas, monospace';
+
 /**
- * Score digit that slides up/out when its value changes, instead of letting
- * two glyphs stack on top of each other (the "binary score" bug we had in
- * Lanes before lifting state out of LanesMatchView).
+ * Score digit. Refonte robustesse (Alex 2026-07 « le score doit être PARFAIT sur
+ * TOUS les thèmes ») — priorité CORRECTION > fioriture, après 2 rapports de bug :
+ *  - RENDU STATIQUE, sans motion / sans key={value} / sans AnimatePresence : le
+ *    nombre est mis à jour EN PLACE par React → il est PHYSIQUEMENT IMPOSSIBLE
+ *    d'avoir deux chiffres à l'écran (fin du « 01 » / « 13 » / « 23:2 » vus sur
+ *    le WebView Android où l'ancien span animé restait empilé au nouveau).
+ *  - Fonte mono tabulaire garantie (SCORE_DIGIT_FONT) → chiffres nets partout.
+ *  - Pas de hauteur fixe ni d'overflow → aucun glyphe rogné.
+ *  - min-w-[1.2em] : place stable pour 1 chiffre, s'étend seul à 2 (10, 12…).
  */
 export function RollingScore({
   value, color, size = "lg",
@@ -27,23 +44,12 @@ export function RollingScore({
   return (
     <span
       className={
-        "relative inline-block min-w-[1.2em] text-center overflow-hidden font-black tabular-nums " +
+        "inline-flex items-center justify-center min-w-[1.2em] font-black leading-none " +
         sizeCls + " " + palette[color]
       }
-      style={{ height: "1.1em", lineHeight: "1.1em" }}
+      style={{ fontFamily: SCORE_DIGIT_FONT, fontVariantNumeric: "tabular-nums" }}
     >
-      <AnimatePresence mode="popLayout" initial={false}>
-        <motion.span
-          key={value}
-          initial={{ y: "-100%", opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: "100%", opacity: 0 }}
-          transition={{ type: "spring", stiffness: 380, damping: 30 }}
-          className="absolute inset-0 flex items-center justify-center"
-        >
-          {value}
-        </motion.span>
-      </AnimatePresence>
+      {value}
     </span>
   );
 }
@@ -91,9 +97,14 @@ export function MatchScoreBar({
             <StreakBadge streak={youStreak} />
           </span>
         </div>
-        <div className="shrink-0 px-2 sm:px-3 flex items-center justify-center gap-1">
+        {/* Groupe score sur la fonte MONO du thème (chiffres + séparateur) :
+            lisible et aligné sur les 12 palettes — cf. SCORE_DIGIT_FONT. */}
+        <div
+          className="shrink-0 px-2 sm:px-3 flex items-center justify-center gap-1 whitespace-nowrap"
+          style={{ fontFamily: SCORE_DIGIT_FONT }}
+        >
           <RollingScore value={youScore} color="emerald" size={compact ? "md" : "lg"} />
-          <span className="text-ink-muted px-0.5 font-bold">:</span>
+          <span className={"text-ink-muted px-0.5 font-bold " + (compact ? "text-xl" : "text-2xl")}>:</span>
           <RollingScore value={oppScore} color="rose" size={compact ? "md" : "lg"} />
         </div>
         <div className="flex flex-col text-right min-w-0 flex-1">

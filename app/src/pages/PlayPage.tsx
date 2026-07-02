@@ -8,7 +8,7 @@ import { UserHeader } from "../UserHeader";
 import { LocalLanesGame } from "../match/LocalLanesGame";
 import { RankedGame } from "../ranked/RankedGame";
 import { RankedLobby } from "../ranked/RankedLobby";
-import { initialTournament, resolvePlayerMatch, isPlayerEliminated, type TournamentState } from "../ranked/TournamentBracket";
+import { initialTournament, resolvePlayerMatch, isPlayerEliminated, pickCpuOpponent, type TournamentState } from "../ranked/TournamentBracket";
 import { BracketPage } from "../ranked/BracketPage";
 import { DeckManager } from "../ranked/DeckManager";
 import { MatchPrepScreen, type Arena } from "../ranked/MatchPrepScreen";
@@ -21,6 +21,8 @@ import { applyTheme } from "../theme/theme";
 import { levelFromXp } from "../engine/leveling";
 import { Game } from "./play/PlayGame";
 import { ModeSelect, SandboxView, ConstellationLobby, ClasseLobby } from "./play/PlayMenu";
+import { setOnlineIntent } from "../online/onlineIntent";
+import { consumePlayReturnView } from "../online/playReturnView";
 
 type View =
   | { kind: "select" }
@@ -32,8 +34,9 @@ type View =
   | { kind: "ranked_deck"; from?: "ranked" | "arena" }
   | { kind: "ranked_bracket" }
   // Pre-match staging: deck check + pad swap + coin flip for the arena.
-  | { kind: "ranked_prep"; oppName: string; oppAvatar: string }
-  | { kind: "ranked_match"; oppName: string; oppAvatar: string; arena?: Arena }
+  // `direct` = duel rapide hors tournoi (retour lobby, pas de bracket) — Alex 2026-07.
+  | { kind: "ranked_prep"; oppName: string; oppAvatar: string; direct?: boolean }
+  | { kind: "ranked_match"; oppName: string; oppAvatar: string; arena?: Arena; direct?: boolean }
   // Classé (classic 1v1) hub — its own lobby + tournament + match.
   | { kind: "classe_lobby" }
   | { kind: "classe_bracket" }
@@ -64,8 +67,13 @@ export function PlayPage({
     return initialTournament(p.nickname, p.avatar, l.level);
   });
 
-  // Reset to mode-select on explicit Home clicks (not on first mount).
+  // Reset to mode-select on explicit Home clicks (not on first mount) — SAUF si
+  // OnlinePage a posé une vue de retour (match Classé en ligne fini → revenir au
+  // hub Classé, pas à l'accueil). PlayPage remonte à neuf en revenant de la page
+  // En ligne : on lit la vue de retour ici (consume-once) avant tout reset.
   useEffect(() => {
+    const rv = consumePlayReturnView();
+    if (rv === "classe_lobby") { setView({ kind: "classe_lobby" }); return; }
     if (homeNonce && homeNonce > 0) setView({ kind: "select" });
   }, [homeNonce]);
 
@@ -206,6 +214,12 @@ export function PlayPage({
           <RankedLobby
             key="ranked-lobby"
             onBack={() => setView({ kind: "select" })}
+            onQuickMatch={() => {
+              // Duel direct vs CPU (hors tournoi) : adversaire aléatoire du roster,
+              // pré-match (pièce) puis match ; retour au lobby (flag `direct`).
+              const opp = pickCpuOpponent();
+              setView({ kind: "ranked_prep", oppName: opp.name, oppAvatar: opp.avatar, direct: true });
+            }}
             onViewBracket={() => {
               // Fresh start after a finished or lost run, otherwise resume.
               setTournament((t) =>
@@ -252,9 +266,9 @@ export function PlayPage({
               oppThemeId={persona.themeId}
               oppPadId={persona.padId}
               oppBackgroundId={persona.backgroundId}
-              onBack={() => setView({ kind: "ranked_bracket" })}
+              onBack={() => setView(view.direct ? { kind: "ranked_lobby" } : { kind: "ranked_bracket" })}
               onReady={(arena) =>
-                setView({ kind: "ranked_match", oppName: view.oppName, oppAvatar: view.oppAvatar, arena })
+                setView({ kind: "ranked_match", oppName: view.oppName, oppAvatar: view.oppAvatar, arena, direct: view.direct })
               }
             />
           );
@@ -274,8 +288,11 @@ export function PlayPage({
               <RankedGame
                 winTo={3}
                 opponentName={view.oppName}
-                onQuit={() => setView({ kind: "ranked_bracket" })}
+                onQuit={() => setView(view.direct ? { kind: "ranked_lobby" } : { kind: "ranked_bracket" })}
                 onMatchResult={(won) => {
+                  // Duel direct : retour au lobby (le match est déjà enregistré par
+                  // RankedGame — XP/historique). Tournoi : on route dans le bracket.
+                  if (view.direct) { setView({ kind: "ranked_lobby" }); return; }
                   setTournament((t) => resolvePlayerMatch(t, won));
                   setView({ kind: "ranked_bracket" });
                 }}
@@ -290,6 +307,12 @@ export function PlayPage({
             key="classe-lobby"
             onBack={() => setView({ kind: "select" })}
             onQuickMatch={() => setView({ kind: "game", mode: "ranked", bestOf: 5, atouts: true })}
+            onQuickMatchOnline={() => {
+              // vs joueur réel : file RPSLS classique best-of-5, auto-queue, et
+              // crédit du ladder Classé (classeLp) en fin de match (+ rankLp serveur).
+              setOnlineIntent({ mode: "classic", bestOf: 5, autoQueue: true, ladder: "classe" });
+              onNavigate?.("online");
+            }}
             onViewBracket={() => {
               setClasseTournament((t) =>
                 t.phase === "complete" || isPlayerEliminated(t)

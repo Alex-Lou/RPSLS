@@ -4,7 +4,8 @@
  * as the Constellation Lanes mode.
  *
  * Components exported:
- *   - RollingScore: AnimatePresence popLayout digit, no pile-up on change.
+ *   - RollingScore: chiffre STATIQUE (maj en place, ni motion ni key → zéro
+ *     empilement), fonte mono tabulaire garantie sur tous les thèmes.
  *   - CinematicMatchEnd: trophy/skull/handshake glyph that springs in then
  *     gently floats, gradient VICTOIRE/ÉGALITÉ/DÉFAITE wordmark that
  *     breathes, optional forfeit pill, score card, Rematch + Back buttons,
