@@ -6,6 +6,7 @@
 use rpsls_core::constellation::{LanePlay, LaneResult};
 use rpsls_core::{Move, Outcome};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::player_state::PlayerProgress;
 
@@ -92,6 +93,30 @@ pub enum ClientMessage {
     /// Server tracks both sides and only triggers the coin flip when BOTH have
     /// confirmed. Idempotent — clicking twice doesn't reset anything.
     PrepReady,
+
+    /* ──────────── Constellation CCG (Pro / Classée) — relais aveugle ──────────── */
+    /// Enter the CCG matchmaking queue (`win_to` round-wins, e.g. 3 → bo5).
+    /// `variant` sépare les pools (ex. "arena" = Pro, "classe" = Classée) → un
+    /// joueur Pro ne matche jamais un joueur Classée. `ruleset_hash` = empreinte
+    /// des règles du client (cf. arenaNet.arenaRulesetHash) : on n'apparie QUE
+    /// deux clients de MÊME hash → pas de desync dû à un skew de version.
+    /// `#[serde(default)]` : rétro-compatible (anciens clients → "" → pool à part).
+    JoinCcgQueue {
+        win_to: u8,
+        #[serde(default)]
+        variant: String,
+        #[serde(default)]
+        ruleset_hash: String,
+    },
+
+    /// Submit this player's turn intent (3 picks + optional card). The payload
+    /// is OPAQUE to the server (`intent`) — a blind relay forwards it verbatim
+    /// to the opponent, who resolves it locally against the shared seed.
+    CcgTurn { round_no: u32, intent: Value },
+
+    /// Declare the CCG match outcome (the client resolves deterministically and
+    /// tells the server who won so it can close + broadcast the end).
+    CcgResult { winner: Option<PlayerSlot> },
 }
 
 /* ──────────── Server → Client ──────────── */
@@ -232,6 +257,24 @@ pub enum ServerMessage {
     /// authoritative result; the first `LanesRoundStart` arrives a few
     /// seconds later so the verdict has time to land.
     StartCoinFlip { winner: PlayerSlot },
+
+    /* ──────────── Constellation Classée (CCG) — relais aveugle ──────────── */
+    /// CCG match found. `shared_seed` is the key add: both clients feed it to
+    /// their PRNG (`engine/rng`) so they replay the SAME deterministic game
+    /// (deck order, draws, card RNG) — the blind relay never resolves anything.
+    CcgMatchFound {
+        match_id: String,
+        opponent: OpponentInfo,
+        you_are: PlayerSlot,
+        win_to: u8,
+        shared_seed: u64,
+    },
+
+    /// The opponent's turn intent, relayed verbatim (opaque payload).
+    CcgTurnRelay { from: PlayerSlot, round_no: u32, intent: Value },
+
+    /// CCG match has ended (winner declared by a client, or forfeit).
+    CcgMatchEnd { winner: Option<PlayerSlot>, forfeit: bool },
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

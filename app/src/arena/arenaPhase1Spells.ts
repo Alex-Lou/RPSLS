@@ -16,6 +16,7 @@ import {
 import { CREATURE_STATS, MANA_CAP, type BoardState, type Creature, type LaneState, type PlayedSpell, type Side } from "./arenaTypes";
 import { BALANCE } from "./arenaBalance";
 import { alog } from "./arenaLog";
+import type { Rng } from "../engine/rng";
 
 /** Spock's Détaché malus — ANY of MY buffs (Aegis, Surge, Tide, etc.) that
  *  target a Spock creature get ignored silently. Spock lives in autarky.
@@ -113,9 +114,9 @@ export function applyCurse(board: BoardState, side: Side, spell: PlayedSpell): B
 }
 
 /** Prescience — draw 2 cards. */
-export function applyPrescience(board: BoardState, side: Side): BoardState {
+export function applyPrescience(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
   const hero = side === "a" ? board.a : board.b;
-  return withSideHero(board, side, drawCards(hero, 2));
+  return withSideHero(board, side, drawCards(hero, 2, rng));
 }
 
 /** Augur — reveal the opp's hand to the casting side. (Stored on the board
@@ -127,9 +128,9 @@ export function applyAugur(board: BoardState, side: Side): BoardState {
 }
 
 /** Oracle — draw 3 cards. */
-export function applyOracle(board: BoardState, side: Side): BoardState {
+export function applyOracle(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
   const hero = side === "a" ? board.a : board.b;
-  return withSideHero(board, side, drawCards(hero, 3));
+  return withSideHero(board, side, drawCards(hero, 3, rng));
 }
 
 /** Mirror (Miroir) — REWORK (Alex 2026-06-17) : copie la créature adverse d'une
@@ -165,7 +166,7 @@ export function applyMirror(board: BoardState, side: Side, spell: PlayedSpell): 
  *  3 dégâts au héros opp — un Larcin n'est jamais vain.
  *
  *  Cohérent avec l'anim Larcin (carte qui s'arrache de l'opp, vole vers moi). */
-export function applyHeist(board: BoardState, side: Side): BoardState {
+export function applyHeist(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
   const oppS = oppSide(side);
   const oppHero = oppS === "a" ? board.a : board.b;
   if (oppHero.hand.length === 0) {
@@ -173,7 +174,7 @@ export function applyHeist(board: BoardState, side: Side): BoardState {
     return withSideHero(board, oppS, damageHero(oppHero, 3));
   }
   // Pige aléatoire dans la main adverse.
-  const idx = Math.floor(Math.random() * oppHero.hand.length);
+  const idx = Math.floor(rng() * oppHero.hand.length);
   const stolen = oppHero.hand[idx];
   const newOppHand = [...oppHero.hand.slice(0, idx), ...oppHero.hand.slice(idx + 1)];
   let after = withSideHero(board, oppS, { ...oppHero, hand: newOppHand });
@@ -254,10 +255,10 @@ export function applyDoubleMot(board: BoardState, side: Side, spell: PlayedSpell
 }
 
 /** Echo — duplique une carte AU HASARD de ta main (résonance). */
-export function applyEcho(board: BoardState, side: Side): BoardState {
+export function applyEcho(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
   const me = side === "a" ? board.a : board.b;
   if (me.hand.length === 0) return board;
-  const idx = Math.floor(Math.random() * me.hand.length);
+  const idx = Math.floor(rng() * me.hand.length);
   const copy = me.hand[idx];
   alog("spell", `${side} ECHO : duplique [${copy}] en main`);
   return withSideHero(board, side, { ...me, hand: [...me.hand, copy] });

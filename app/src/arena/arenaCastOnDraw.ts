@@ -23,6 +23,7 @@
 
 import { MANA_CAP, type CastFxKind, type CastOnDrawEvent, type HeroState } from "./arenaTypes";
 import type { CardId } from "../ranked/rankedTypes";
+import type { Rng } from "../engine/rng";
 
 interface CastSpec {
   /** Teinte/animation jouée par ArenaCastOnDrawFX. */
@@ -73,13 +74,13 @@ export function isCastOnDraw(id: CardId): boolean {
  *  défaussé (0 si main vide). Deterministe seulement par le RNG du moteur
  *  (même shuffle que arenaRules) — acceptable côté app (pas un workflow). */
 function discardRandom(
-  hand: CardId[], discard: CardId[], n: number,
+  hand: CardId[], discard: CardId[], n: number, rng: Rng = Math.random,
 ): { hand: CardId[]; discard: CardId[]; count: number } {
   const h = hand.slice();
   const d = discard.slice();
   let count = 0;
   for (let k = 0; k < n && h.length > 0; k++) {
-    const j = Math.floor(Math.random() * h.length);
+    const j = Math.floor(rng() * h.length);
     d.push(h[j]);
     h.splice(j, 1);
     count++;
@@ -91,7 +92,7 @@ function discardRandom(
  *  (pour l'anim ⚡) et le nombre de pioches BONUS à effectuer côté drawCards.
  *  Retourne null si `id` n'est pas une carte à la pioche. PURE. */
 export function resolveCastOnDraw(
-  hero: HeroState, id: CardId,
+  hero: HeroState, id: CardId, rng: Rng = Math.random,
 ): { hero: HeroState; event: CastOnDrawEvent; extraDraws: number } | null {
   const spec = CAST_ON_DRAW[id];
   if (!spec) return null;
@@ -129,17 +130,17 @@ export function resolveCastOnDraw(
     parts.push(`PIOCHE ${spec.drawN}`);
   }
   if (spec.discardN) {
-    const r = discardRandom(h.hand, h.discard, spec.discardN);
+    const r = discardRandom(h.hand, h.discard, spec.discardN, rng);
     h = { ...h, hand: r.hand, discard: r.discard };
     if (r.count > 0) parts.push(`DÉFAUSSE ${r.count}`);
   }
   if (spec.coin) {
-    const heads = Math.random() < 0.5;
+    const heads = rng() < 0.5;
     if (heads) {
       h = { ...h, mana: Math.min(MANA_CAP, h.mana + spec.coin.headsManaNow) };
       parts.push(`PILE → +${spec.coin.headsManaNow} MANA`);
     } else {
-      const r = discardRandom(h.hand, h.discard, spec.coin.tailsDiscardN);
+      const r = discardRandom(h.hand, h.discard, spec.coin.tailsDiscardN, rng);
       h = { ...h, hand: r.hand, discard: r.discard };
       parts.push(r.count > 0 ? `FACE → DÉFAUSSE ${r.count}` : "FACE → main vide");
     }

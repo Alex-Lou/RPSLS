@@ -33,6 +33,23 @@ export interface LaneResult {
   points: number;
 }
 
+/* ──────────── Constellation Classée (CCG) — relais aveugle ──────────── */
+
+/** Intention de tour (Constellation Classée) relayée VERBATIM par le serveur
+ *  aveugle. Les formes précises de `card`/`plays` appartiennent à la couche
+ *  ranked (rankedTypes) ; sur le fil, ça doit juste faire l'aller-retour, donc
+ *  `card` reste opaque ici. Les deux clients résolvent localement avec la même
+ *  `shared_seed` (cf. engine/rng). */
+export interface CcgTurnIntent {
+  /** Les 3 coups committés (gauche→droite). */
+  plays: Move[];
+  /** La carte jouée ce tour (PlayedCard, ranked) ou null — opaque ici. */
+  card: unknown | null;
+  /** Compteurs visibles nécessaires au Juge (non-leaky). */
+  handSize: number;
+  deckSize: number;
+}
+
 /** Subset of player state synced to the server for persistence. */
 export interface PlayerProgress {
   xp: number;
@@ -132,7 +149,11 @@ export type ClientMessage =
   | { type: "sync_state"; state: PlayerProgress }
   // Lanes pre-match: this client confirms it's ready for the coin flip.
   // The server only triggers the flip once BOTH sides have sent this.
-  | { type: "prep_ready" };
+  | { type: "prep_ready" }
+  // Constellation Classée (CCG) — relais aveugle (mirror protocol.rs).
+  | { type: "join_ccg_queue"; win_to: number; variant: string; ruleset_hash: string }
+  | { type: "ccg_turn"; round_no: number; intent: CcgTurnIntent }
+  | { type: "ccg_result"; winner: PlayerSlot | null };
 
 /* Server → Client */
 export type ServerMessage =
@@ -210,7 +231,11 @@ export type ServerMessage =
   // Lanes pre-match: both sides confirmed, server has rolled the coin —
   // `winner` is the slot whose arena dresses the duel. Client uses it to
   // play the coin animation locally with the authoritative result.
-  | { type: "start_coin_flip"; winner: PlayerSlot };
+  | { type: "start_coin_flip"; winner: PlayerSlot }
+  // Constellation Classée (CCG) — relais aveugle (mirror protocol.rs).
+  | { type: "ccg_match_found"; match_id: string; opponent: OpponentInfo; you_are: PlayerSlot; win_to: number; shared_seed: number }
+  | { type: "ccg_turn_relay"; from: PlayerSlot; round_no: number; intent: CcgTurnIntent }
+  | { type: "ccg_match_end"; winner: PlayerSlot | null; forfeit: boolean };
 
 /* ──────────── URL helpers ──────────── */
 

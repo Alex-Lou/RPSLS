@@ -24,6 +24,7 @@ import type { BoardState, Creature, LaneIndex, LaneState, PlayedSpell, Side } fr
 import { alog } from "./arenaLog";
 import { BALANCE } from "./arenaBalance";
 import type { CardId } from "../ranked/rankedTypes";
+import type { Rng } from "../engine/rng";
 
 /* ───────────────── Taxonomie de TYPES (Alex 2026-06-13) ─────────────────
  * Chaque carte jouable appartient à UNE famille — base des recettes de
@@ -249,9 +250,9 @@ export function applyEffacement(board: BoardState, side: Side, spell: PlayedSpel
 }
 
 /** Omniscience — pioche 3 + la main adverse ENTIÈRE révélée 2 tours. */
-export function applyOmniscience(board: BoardState, side: Side): BoardState {
+export function applyOmniscience(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
   const hero = side === "a" ? board.a : board.b;
-  let b = withSideHero(board, side, drawCards(hero, 3));
+  let b = withSideHero(board, side, drawCards(hero, 3, rng));
   const opp = side === "a" ? b.b : b.a;
   if (side === "a") b = { ...b, augurRevealedB: opp.hand.slice(), augurTurnsLeftB: 2 };
   else b = { ...b, augurRevealedA: opp.hand.slice(), augurTurnsLeftA: 2 };
@@ -285,7 +286,7 @@ export function applyApocalypse(board: BoardState, side: Side): BoardState {
 
 /** Imposteur — vole 1 carte au hasard de la main adverse (dans TA main,
  *  cap+1 comme Larcin) ET révèle sa main 1 tour. Main vide : 3 dmg héros. */
-export function applyImposteur(board: BoardState, side: Side): BoardState {
+export function applyImposteur(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
   const oppS = oppSide(side);
   const oppHero = oppS === "a" ? board.a : board.b;
   let b = board;
@@ -293,7 +294,7 @@ export function applyImposteur(board: BoardState, side: Side): BoardState {
     alog("spell", `${side} IMPOSTEUR → main adverse vide, 3 dmg héros ${oppS}`);
     b = withSideHero(b, oppS, damageHero(oppHero, 3));
   } else {
-    const idx = Math.floor(Math.random() * oppHero.hand.length);
+    const idx = Math.floor(rng() * oppHero.hand.length);
     const stolen = oppHero.hand[idx];
     const newOppHand = [...oppHero.hand.slice(0, idx), ...oppHero.hand.slice(idx + 1)];
     b = withSideHero(b, oppS, { ...oppHero, hand: newOppHand });

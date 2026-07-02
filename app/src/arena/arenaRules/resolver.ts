@@ -30,6 +30,7 @@ import { makeCreature, endOfTurnReset, gainStrateIfHeld } from "./heroCreature";
 import { drawCards } from "./boardInit";
 import type { CardId } from "../../ranked/rankedTypes";
 import type { Move } from "../../engine/game";
+import type { RngPair } from "../../engine/rng";
 
 /* ───────────────────────── Resolver ───────────────────────── */
 
@@ -45,6 +46,10 @@ export function resolveTurn(
   board: BoardState,
   intentA: TurnIntent,
   intentB: TurnIntent,
+  // Paire de PRNG seedés (un par camp) pour une résolution DÉTERMINISTE en
+  // lockstep Pro online (Alex 2026-07). Défaut undefined → les effets à hasard
+  // gardent Math.random (jeu vs-CPU inchangé ; sim de balance via patch global).
+  rng?: RngPair,
 ): BoardState {
   let b = board;
 
@@ -55,13 +60,13 @@ export function resolveTurn(
   b = applySummons(b, intentB, "b");
 
   // ─── 2. Spell phase ─── (intercale les deux camps par priorité)
-  b = applyAllSpells(b, intentA, intentB);
+  b = applyAllSpells(b, intentA, intentB, rng);
 
   // ─── 3. Combat phase ───
   b = resolveCombat(b);
 
   // ─── 4. End-of-turn reset (buffs drop, but persistent dmg stays) ───
-  b = endOfTurnCleanup(b);
+  b = endOfTurnCleanup(b, rng);
 
   // ─── 5. HP check ───
   if (b.a.hp <= 0 || b.b.hp <= 0) {
@@ -97,7 +102,7 @@ export function truncateIntentByCaps(intent: TurnIntent): TurnIntent {
  *  could react. Same priority across sides : tie-break by side a first
  *  (documented bias — alternative is random which breaks reproducibility).
  *  Same priority WITHIN a side : original tap order (intent.spells order). */
-export function applyAllSpells(board: BoardState, intentA: TurnIntent, intentB: TurnIntent): BoardState {
+export function applyAllSpells(board: BoardState, intentA: TurnIntent, intentB: TurnIntent, rng?: RngPair): BoardState {
   // Alex feedback 2026-06-09 v2 : aligné sur les caps UI (ArenaGame.addSpell)
   // — le filet engine truncate selon les mêmes règles que l'UI (cf.
   // truncateIntentByCaps ci-dessus).
@@ -142,7 +147,11 @@ export function applyAllSpells(board: BoardState, intentA: TurnIntent, intentB: 
       ...b,
       [side]: { ...hero, mana: hero.mana - effectiveCost },
     } as BoardState;
-    const ctx: ArenaSpellContext = { board: b, side, spell };
+    // rng du CAMP qui lance le sort (un PRNG par camp) → les effets à hasard
+    // (Larcin, Roue du Destin, Cascade, Reflet-Écho…) tirent de façon déterministe.
+    // rngPair = paire complète pour les sorts GLOBAUX (Juge/Genèse : chaque camp
+    // pioche de SON flux, pas de celui du lanceur — invariant « un flux par camp »).
+    const ctx: ArenaSpellContext = { board: b, side, spell, rng: side === "a" ? rng?.a : rng?.b, rngPair: rng };
     b = applyArenaSpell(ctx);
     // Réverbération (2026-06-12) : on mémorise le dernier sort NON-réverbération
     // appliqué par CE côté ce tour, pour que Réverbération (priorité plus tardive)
@@ -205,7 +214,7 @@ export function applySummons(board: BoardState, intent: TurnIntent, side: Side):
   return b;
 }
 
-export function endOfTurnCleanup(board: BoardState): BoardState {
+export function endOfTurnCleanup(board: BoardState, rng?: RngPair): BoardState {
   // STRATES (Voie Montagne) appliquées APRÈS le reset, en passant le
   // summonedThisTurn ORIGINAL (avant reset) → une Pierre ne gagne pas de Strate
   // le tour de son arrivée, seulement après avoir TENU un tour. Cf. gainStrateIfHeld.
@@ -279,11 +288,11 @@ export function endOfTurnCleanup(board: BoardState): BoardState {
   let aHero = engines.a;
   let bHero = engines.b;
   if (aHero.sillageActive && board.a.sillageDodgedThisTurn) {
-    aHero = drawCards(aHero, 1);
+    aHero = drawCards(aHero, 1, rng?.a);
     alog("turn", `a 🌀 SILLAGE SPECTRAL → esquive ce tour = pioche 1`);
   }
   if (bHero.sillageActive && board.b.sillageDodgedThisTurn) {
-    bHero = drawCards(bHero, 1);
+    bHero = drawCards(bHero, 1, rng?.b);
     alog("turn", `b 🌀 SILLAGE SPECTRAL → esquive ce tour = pioche 1`);
   }
   // Reset des flags PER-TOUR : Mirage (Sillage esquive + Nuée imblocable) + Montagne

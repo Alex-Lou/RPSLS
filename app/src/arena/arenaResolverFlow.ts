@@ -18,6 +18,7 @@ import {
 } from "./arenaRules";
 import { CREATURE_STATS, TURN_HARD_CAP, moveCountersMove, type BoardState, type LaneIndex, type Side, type TurnIntent } from "./arenaTypes";
 import type { Move } from "../engine/game";
+import type { RngPair } from "../engine/rng";
 import type { CardId } from "../ranked/rankedTypes";
 import { alog } from "./arenaLog";
 import { isDominantSpell } from "./arenaFinishers";
@@ -67,6 +68,10 @@ export interface ResolverFlowArgs {
   startBoard: BoardState;
   playerIntent: TurnIntent;
   cpuIntent: TurnIntent;
+  /** Paire de PRNG seedés (un par camp, cf. engine/rng.ts) — résolution
+   *  DÉTERMINISTE (lockstep Pro online / replay). Optionnel : absent →
+   *  Math.random (comportement historique). */
+  rng?: RngPair;
   setBoard: (b: BoardState) => void;
   setOppPreview: (i: TurnIntent | null) => void;
   setPlayerPreview: (i: TurnIntent | null) => void;
@@ -148,7 +153,7 @@ const VICTORY_REVEAL_MS = 1_600;
  *  observable side-effect. */
 export function runResolverFlow(args: ResolverFlowArgs): () => void {
   const {
-    startBoard, playerIntent, cpuIntent,
+    startBoard, playerIntent, cpuIntent, rng,
     setBoard, setOppPreview, setPlayerPreview, setResolveStep,
     setCombatLane, setCombatChargers, setHeroHit, setTauntBlock, setAntiTaunt, setRiposteFX, setSpellFX, setImpactFX, setProjectileFX,
     onSettle, onAdvanceTurn, onMatchEnd, onLaneResolved,
@@ -184,7 +189,7 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
     setBoard(b);
     setOppPreview(null);
     setPlayerPreview(null);
-    b = applyAllSpells(b, playerIntent, cpuIntent);
+    b = applyAllSpells(b, playerIntent, cpuIntent, rng);
     setResolveStep("spells");
     // COMMIT du board (mort/dégâts/héros) — emballé pour pouvoir être DIFFÉRÉ à
     // l'impact du caillou (cf. plus bas). Flash de strip sur le héros qui ENCAISSE
@@ -486,7 +491,7 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
         const TOTAL_COMBAT_MS = LANE_CHARGE_MS * 3 + LANE_PAUSE_MS * 2 + 200;
         window.setTimeout(() => {
           if (aborted) return;
-          b = endOfTurnCleanup(b);
+          b = endOfTurnCleanup(b, rng);
           const prePhase = b.phase; // phase de jeu AVANT tout flip match-end (pour l'écran d'attente du coup fatal)
           if (b.a.hp <= 0 && b.b.hp <= 0) {
             // Round 10 VRAI BUT D'OR : égalité parfaite → phase sudden-death

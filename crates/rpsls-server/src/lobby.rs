@@ -25,6 +25,17 @@ pub struct QueueEntry {
     pub best_of: u8,
 }
 
+/// File CCG (Pro/Classée) — comme QueueEntry mais avec la clé d'appariement
+/// étendue : on n'apparie que deux joueurs de MÊME `variant` (Pro vs Pro),
+/// MÊME `win_to` ET MÊME `ruleset_hash` (même version de règles → pas de desync).
+#[derive(Debug)]
+struct CcgQueueEntry {
+    player: Arc<Session>,
+    win_to: u8,
+    variant: String,
+    ruleset_hash: String,
+}
+
 #[derive(Debug, Default)]
 pub struct LobbyManager {
     /// Open private lobbies, by code.
@@ -35,6 +46,9 @@ pub struct LobbyManager {
     /// Separate queue for Constellation Lanes matches — same shape but a
     /// different bucket so it never crosses with classic match queueing.
     lanes_queue: Mutex<Vec<QueueEntry>>,
+    /// Separate queue for CCG (Constellation Pro/Classée) matches — its own
+    /// bucket (blind relay, cf. ccg_engine), clé d'appariement étendue.
+    ccg_queue: Mutex<Vec<CcgQueueEntry>>,
 }
 
 impl LobbyManager {
@@ -148,6 +162,48 @@ impl LobbyManager {
 
     pub async fn lanes_queue_position(&self, session_id: &str) -> u32 {
         let q = self.lanes_queue.lock().await;
+        q.iter()
+            .position(|e| e.player.id == session_id)
+            .map(|i| (i + 1) as u32)
+            .unwrap_or(0)
+    }
+
+    /// CCG matchmaking — bucket dédié. N'apparie que deux joueurs de MÊME
+    /// `variant` (Pro/Classée), MÊME `win_to` ET MÊME `ruleset_hash` (même
+    /// version de règles) → aucune paire ne peut desync par skew de version.
+    pub async fn join_or_match_ccg(
+        &self,
+        player: Arc<Session>,
+        win_to: u8,
+        variant: String,
+        ruleset_hash: String,
+    ) -> Option<Arc<Session>> {
+        let mut q = self.ccg_queue.lock().await;
+        if let Some(idx) = q.iter().position(|e| {
+            e.win_to == win_to
+                && e.variant == variant
+                && e.ruleset_hash == ruleset_hash
+                && e.player.id != player.id
+        }) {
+            let entry = q.remove(idx);
+            return Some(entry.player);
+        }
+        q.push(CcgQueueEntry {
+            player,
+            win_to,
+            variant,
+            ruleset_hash,
+        });
+        None
+    }
+
+    pub async fn leave_ccg_queue(&self, session_id: &str) {
+        let mut q = self.ccg_queue.lock().await;
+        q.retain(|e| e.player.id != session_id);
+    }
+
+    pub async fn ccg_queue_position(&self, session_id: &str) -> u32 {
+        let q = self.ccg_queue.lock().await;
         q.iter()
             .position(|e| e.player.id == session_id)
             .map(|i| (i + 1) as u32)

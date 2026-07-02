@@ -25,6 +25,7 @@ import { CARDS } from "../ranked/cards";
 import { STRATE_CAP } from "./arenaRules/heroCreature";
 import { BALANCE } from "./arenaBalance";
 import { alog } from "./arenaLog";
+import type { Rng } from "../engine/rng";
 
 /** Jet de Caillou — 2 dégâts à une créature adverse. Bloqué par Ancre/Logique. */
 export function applyJetCaillou(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
@@ -206,7 +207,7 @@ export function applySeve(board: BoardState, side: Side, spell: PlayedSpell): Bo
 }
 
 /** Coup d'Œil — pioche 1 + révèle 1 tour la carte la plus chère de la main adverse. */
-export function applyCoupOeil(board: BoardState, side: Side): BoardState {
+export function applyCoupOeil(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
   const hero = side === "a" ? board.a : board.b;
   const opp = side === "a" ? board.b : board.a;
   let priciest: typeof opp.hand[number] | null = null;
@@ -216,7 +217,7 @@ export function applyCoupOeil(board: BoardState, side: Side): BoardState {
     if (c && c.cost > maxCost) { maxCost = c.cost; priciest = id; }
   }
   const reveal = priciest ? [priciest] : [];
-  let b = withSideHero(board, side, drawCards(hero, 1));
+  let b = withSideHero(board, side, drawCards(hero, 1, rng));
   // augurRevealedB = ce que A voit de la main de B (même convention qu'Augur).
   // turns=2 : advanceToNextTurn décrémente aussitôt → reste visible 1 planif (même
   // bug/fix qu'Imposteur, Alex 2026-06-28 ; 1 aurait été effacé direct).
@@ -258,7 +259,7 @@ export function applyToileGluante(board: BoardState, side: Side, spell: PlayedSp
 }
 
 /** Gravité — −1 PV à TOUTES les créatures adverses ; pioche 1 par créature tuée. */
-export function applyGravite(board: BoardState, side: Side): BoardState {
+export function applyGravite(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
   const oppS = oppSide(side);
   let kills = 0;
   const lanes = board.lanes.map((lane) => {
@@ -271,7 +272,7 @@ export function applyGravite(board: BoardState, side: Side): BoardState {
   let b: BoardState = { ...board, lanes };
   if (kills > 0) {
     const hero = side === "a" ? b.a : b.b;
-    b = withSideHero(b, side, drawCards(hero, kills));
+    b = withSideHero(b, side, drawCards(hero, kills, rng));
   }
   alog("spell", `${side} GRAVITÉ → −1 PV créatures adverses, ${kills} tuée(s) → pioche ${kills}`);
   return b;
@@ -318,10 +319,10 @@ export function applyPurge(board: BoardState, side: Side): BoardState {
 }
 
 /** Roue du Destin — effet aléatoire puissant (5 issues). */
-export function applyRoueDestin(board: BoardState, side: Side): BoardState {
+export function applyRoueDestin(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
   const oppS = oppSide(side);
   const hero = side === "a" ? board.a : board.b;
-  const r = Math.floor(Math.random() * 5);
+  const r = Math.floor(rng() * 5);
   switch (r) {
     case 0: {
       const oppHero = oppS === "a" ? board.a : board.b;
@@ -333,14 +334,14 @@ export function applyRoueDestin(board: BoardState, side: Side): BoardState {
       return withSideHero(board, side, healHero(hero, 8));
     case 2:
       alog("spell", `${side} ROUE DU DESTIN → pioche 3`);
-      return withSideHero(board, side, drawCards(hero, 3));
+      return withSideHero(board, side, drawCards(hero, 3, rng));
     case 3: {
       const occupied = ([0, 1, 2] as LaneIndex[]).filter((i) => !!(oppS === "a" ? board.lanes[i].a : board.lanes[i].b));
       if (occupied.length === 0) {
         alog("spell", `${side} ROUE DU DESTIN → wipe sans cible → +4 PV`);
         return withSideHero(board, side, healHero(hero, 4));
       }
-      const lane = occupied[Math.floor(Math.random() * occupied.length)];
+      const lane = occupied[Math.floor(rng() * occupied.length)];
       alog("spell", `${side} ROUE DU DESTIN → détruit la créature adverse L${lane}`);
       return withOppCreatureOnLane(board, side, lane, null);
     }

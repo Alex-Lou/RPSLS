@@ -12,6 +12,7 @@ import {
 import { CARDS } from "../../ranked/cards";
 import type { CardId } from "../../ranked/rankedTypes";
 import type { Move } from "../../engine/game";
+import type { Rng, RngPair } from "../../engine/rng";
 
 /* ───────────────────────── Board init ───────────────────────── */
 
@@ -19,11 +20,11 @@ import type { Move } from "../../engine/game";
  *  the 8 cards equipped in the player's saved deck; passives equipped in
  *  Ranked are IGNORED in Arena — they don't exist as concept here.
  *  `affinity` is the Constellation Pro v2 Voie picked by this player. */
-export function makeHero(deckIds: CardId[], affinity?: Move, cpuPersona?: import("../arenaTypes").CpuPersona): HeroState {
+export function makeHero(deckIds: CardId[], affinity?: Move, cpuPersona?: import("../arenaTypes").CpuPersona, rng: Rng = Math.random): HeroState {
   const cleaned = deckIds.filter(
     (id): id is CardId => Object.prototype.hasOwnProperty.call(CARDS, id),
   );
-  const shuffled = shuffle(cleaned);
+  const shuffled = shuffle(cleaned, rng);
   // Main de départ ANTI-DOUBLON (Alex 2026-06-13) : on tire en évitant les
   // doublons → fini les « 2 Ancres » à l'ouverture / au mulligan.
   let pool = shuffled.slice();
@@ -55,14 +56,14 @@ export function makeHero(deckIds: CardId[], affinity?: Move, cpuPersona?: import
 /** Mulligan T1 (Alex 2026-06-13 économie expert) : remet les cartes choisies
  *  dans le deck, shuffle, repioche autant. Une seule fois par match (géré
  *  côté UI). Les indices invalides sont ignorés. */
-export function mulliganSwap(hero: HeroState, handIndices: number[]): HeroState {
+export function mulliganSwap(hero: HeroState, handIndices: number[], rng: Rng = Math.random): HeroState {
   const idx = [...new Set(handIndices)].filter((i) => i >= 0 && i < hero.hand.length);
   if (idx.length === 0) return hero;
   const kept = hero.hand.filter((_, i) => !idx.includes(i));
   const returned = idx.map((i) => hero.hand[i]);
   // Redraw ANTI-DOUBLON (Alex 2026-06-13) : on évite les doublons de la main
   // gardée, les cartes rejetées (ne pas les re-servir) et les déjà-repiochées.
-  let deck = shuffle([...hero.deck, ...returned]);
+  let deck = shuffle([...hero.deck, ...returned], rng);
   let discard = hero.discard.slice();
   const redrawn: CardId[] = [];
   for (let k = 0; k < idx.length; k++) {
@@ -80,14 +81,14 @@ export function mulliganSwap(hero: HeroState, handIndices: number[]): HeroState 
  *  `i` et tire UNE remplaçante qui prend EXACTEMENT le même emplacement (pas de
  *  décalage → le joueur VOIT clairement la nouvelle carte arriver). La rejetée
  *  est remélangée dans le deck. Taille de main préservée. */
-export function mulliganReplaceInPlace(hero: HeroState, i: number): HeroState {
+export function mulliganReplaceInPlace(hero: HeroState, i: number, rng: Rng = Math.random): HeroState {
   if (i < 0 || i >= hero.hand.length) return hero;
   const rejected = hero.hand[i];
   const handWithout = [...hero.hand.slice(0, i), ...hero.hand.slice(i + 1)];
   // La rejetée retourne au deck (remélangée). On tire en évitant les doublons
   // du RESTE de la main ET la rejetée elle-même (ne pas re-servir ce qu'on vient
   // de jeter). Anti-doublon Alex 2026-06-13.
-  const deck = shuffle([...hero.deck, rejected]);
+  const deck = shuffle([...hero.deck, rejected], rng);
   const res = drawOneAvoidingHand([...handWithout, rejected, ...CAST_ON_DRAW_IDS], deck, hero.discard);
   if (!res) return hero;
   const newHand = [...hero.hand.slice(0, i), res.card, ...hero.hand.slice(i + 1)];
@@ -101,10 +102,14 @@ export function makeInitialBoard(
   affinityA?: Move,
   affinityB?: Move,
   cpuPersonaB?: import("../arenaTypes").CpuPersona,
+  // Paire de PRNG seedés (un par camp) pour un board initial DÉTERMINISTE en
+  // lockstep Pro online. Défaut undefined → chaque makeHero utilise Math.random
+  // (jeu vs-CPU inchangé ; sim de balance via patch global).
+  rng?: RngPair,
 ): BoardState {
   return {
-    a: makeHero(deckA, affinityA),
-    b: makeHero(deckB, affinityB, cpuPersonaB),
+    a: makeHero(deckA, affinityA, undefined, rng?.a),
+    b: makeHero(deckB, affinityB, cpuPersonaB, rng?.b),
     lanes: [makeEmptyLane(), makeEmptyLane(), makeEmptyLane()],
     turn: 1,
     phase: "planning",
@@ -117,10 +122,13 @@ export function makeInitialBoard(
 
 function makeEmptyLane(): LaneState { return { a: null, b: null }; }
 
-function shuffle<T>(input: readonly T[]): T[] {
+// `rng` (défaut Math.random) : PRNG seedé pour un ordre de deck DÉTERMINISTE
+// (lockstep Pro online). Défaut = comportement inchangé (le sim de balance patche
+// Math.random global ; le jeu vs-CPU tire au hasard comme avant).
+function shuffle<T>(input: readonly T[], rng: Rng = Math.random): T[] {
   const out = input.slice();
   for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rng() * (i + 1));
     [out[i], out[j]] = [out[j], out[i]];
   }
   return out;
@@ -178,7 +186,7 @@ export function drawOneAvoidingHand(
  *  RÈGLE ANTI-DOUBLON (Alex 2026-06-13) : on ne pioche jamais une carte DÉJÀ en
  *  main tant qu'elle y est (remplace l'ancien cap par rareté 3/2/1/1, plus
  *  permissif). Évite le flood de doublons / passifs. Cf. drawOneAvoidingHand. */
-export function drawCards(hero: HeroState, n: number): HeroState {
+export function drawCards(hero: HeroState, n: number, rng: Rng = Math.random): HeroState {
   let hand = hero.hand.slice();
   let deck = hero.deck.slice();
   let discard = hero.discard.slice();
@@ -205,7 +213,7 @@ export function drawCards(hero: HeroState, n: number): HeroState {
     // main — elle résout son effet IMMÉDIATEMENT au tirage. Peut piocher plus
     // (extraDraws) → la boucle enchaîne naturellement (toDraw +=).
     if (isCastOnDraw(res.card)) {
-      const fired = resolveCastOnDraw({ ...h, hand, deck, discard }, res.card);
+      const fired = resolveCastOnDraw({ ...h, hand, deck, discard }, res.card, rng);
       if (fired) {
         h = fired.hero;
         hand = fired.hero.hand;       // un effet « défausse » peut modifier la main

@@ -6,6 +6,7 @@
 use std::sync::Arc;
 use std::time::Instant;
 
+use crate::ccg_engine::{start_ccg_match, CcgCommand};
 use crate::hello;
 use crate::lanes_engine::{start_lanes_match, LanesCommand};
 use crate::match_engine::{start_match, MatchCommand};
@@ -79,7 +80,7 @@ pub(crate) async fn handle_client_message(
             if lobby.host.id == session.id {
                 return reply_error(session, "self_lobby", "cannot join your own lobby");
             }
-            if state.in_match.len() + state.in_lanes.len() >= state.max_matches {
+            if state.in_match.len() + state.in_lanes.len() + state.in_ccg.len() >= state.max_matches {
                 return reply_error(session, "server_full", "too many active matches right now — try again in a moment");
             }
             // Legit join — clear any pent-up counter for this IP.
@@ -104,7 +105,7 @@ pub(crate) async fn handle_client_message(
                 return reply_error(session, "bad_best_of", "best_of must be odd 1..=9");
             }
             if let Some(opp) = state.lobbies.join_or_match(session.clone(), best_of).await {
-                if state.in_match.len() + state.in_lanes.len() >= state.max_matches {
+                if state.in_match.len() + state.in_lanes.len() + state.in_ccg.len() >= state.max_matches {
                     return reply_error(session, "server_full", "too many active matches right now — try again in a moment");
                 }
                 let a_id = opp.id.clone();
@@ -135,7 +136,7 @@ pub(crate) async fn handle_client_message(
                 .join_or_match_lanes(session.clone(), win_to)
                 .await
             {
-                if state.in_match.len() + state.in_lanes.len() >= state.max_matches {
+                if state.in_match.len() + state.in_lanes.len() + state.in_ccg.len() >= state.max_matches {
                     return reply_error(session, "server_full", "too many active matches right now — try again in a moment");
                 }
                 let a_id = opp.id.clone();
@@ -157,9 +158,52 @@ pub(crate) async fn handle_client_message(
             }
         }
 
+        ClientMessage::JoinCcgQueue { win_to, variant, ruleset_hash } => {
+            if !validate_win_to(win_to) {
+                return reply_error(session, "bad_win_to", "win_to must be in 1..=5");
+            }
+            // Bornes défensives (relais aveugle : on ne fait pas confiance au client)
+            // — un variant/hash surdimensionné n'a pas à polluer la file.
+            if variant.len() > 32 || ruleset_hash.len() > 64 {
+                return reply_error(session, "bad_ccg_join", "variant/ruleset_hash too long");
+            }
+            if let Some(opp) = state.lobbies.join_or_match_ccg(session.clone(), win_to, variant, ruleset_hash).await {
+                if state.in_match.len() + state.in_lanes.len() + state.in_ccg.len() >= state.max_matches {
+                    return reply_error(session, "server_full", "too many active matches right now — try again in a moment");
+                }
+                let a_id = opp.id.clone();
+                let b_id = session.id.clone();
+                let st = state.clone();
+                let ccg_tx = start_ccg_match(opp.clone(), session.clone(), win_to, Box::new(move || {
+                    st.in_ccg.remove(&a_id);
+                    st.in_ccg.remove(&b_id);
+                }));
+                state.in_ccg.insert(opp.id.clone(), (ccg_tx.clone(), PlayerSlot::A));
+                state.in_ccg.insert(session.id.clone(), (ccg_tx, PlayerSlot::B));
+            } else {
+                let pos = state.lobbies.ccg_queue_position(&session.id).await;
+                session.send(ServerMessage::Queued { position: pos });
+            }
+        }
+
+        ClientMessage::CcgTurn { round_no, intent } => {
+            if let Some(entry) = state.in_ccg.get(&session.id) {
+                let (tx, slot) = entry.value().clone();
+                let _ = tx.send(CcgCommand::Turn { slot, round_no, intent });
+            }
+        }
+
+        ClientMessage::CcgResult { winner } => {
+            if let Some(entry) = state.in_ccg.get(&session.id) {
+                let (tx, _) = entry.value().clone();
+                let _ = tx.send(CcgCommand::Result { winner });
+            }
+        }
+
         ClientMessage::Cancel => {
             state.lobbies.leave_queue(&session.id).await;
             state.lobbies.leave_lanes_queue(&session.id).await;
+            state.lobbies.leave_ccg_queue(&session.id).await;
             state.lobbies.remove_lobby_by_host(&session.id);
         }
 
@@ -183,6 +227,9 @@ pub(crate) async fn handle_client_message(
             }
             if let Some((_, (tx, slot))) = state.in_lanes.remove(&session.id) {
                 let _ = tx.send(LanesCommand::Leave { slot });
+            }
+            if let Some((_, (tx, slot))) = state.in_ccg.remove(&session.id) {
+                let _ = tx.send(CcgCommand::Leave { slot });
             }
         }
 
@@ -218,6 +265,9 @@ pub(crate) async fn handle_client_message(
             } else if let Some(entry) = state.in_lanes.get(&session.id) {
                 let (tx, slot) = entry.value().clone();
                 let _ = tx.send(LanesCommand::RequestRematch { slot });
+            } else if let Some(entry) = state.in_ccg.get(&session.id) {
+                let (tx, slot) = entry.value().clone();
+                let _ = tx.send(CcgCommand::RequestRematch { slot });
             }
         }
 
@@ -228,15 +278,21 @@ pub(crate) async fn handle_client_message(
             } else if let Some(entry) = state.in_lanes.get(&session.id) {
                 let (tx, slot) = entry.value().clone();
                 let _ = tx.send(LanesCommand::RespondRematch { slot, accept });
+            } else if let Some(entry) = state.in_ccg.get(&session.id) {
+                let (tx, slot) = entry.value().clone();
+                let _ = tx.send(CcgCommand::RespondRematch { slot, accept });
             }
         }
 
         ClientMessage::PrepReady => {
-            // Only meaningful during a lanes match's prep phase; the engine
+            // Prep phase (double-confirm + coin) — lanes OR ccg. The engine
             // ignores stray Ready commands once the round loop has started.
             if let Some(entry) = state.in_lanes.get(&session.id) {
                 let (tx, slot) = entry.value().clone();
                 let _ = tx.send(LanesCommand::Ready { slot });
+            } else if let Some(entry) = state.in_ccg.get(&session.id) {
+                let (tx, slot) = entry.value().clone();
+                let _ = tx.send(CcgCommand::Ready { slot });
             }
         }
 

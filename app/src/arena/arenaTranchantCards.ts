@@ -11,6 +11,7 @@ import { damageHero, drawCards, creatureEffectiveAtk } from "./arenaRules";
 import { getMyCreatureOnLane, withSideHero, oppSide } from "./arenaSpellHelpers";
 import { type BoardState, type LaneState, type PlayedSpell, type Side } from "./arenaTypes";
 import { alog } from "./arenaLog";
+import type { Rng } from "../engine/rng";
 
 /** Estafilade (Tranchant) — REACH : mon Ciseau ciblé fend par-dessus le board et
  *  inflige son ATK directement au héros adverse (ignore les bloqueurs/la Provoc).
@@ -33,7 +34,7 @@ export function applyEstafilade(board: BoardState, side: Side, spell: PlayedSpel
 /** Saignée (Tranchant) — CARD-ADVANTAGE aggro : pioche 1 carte, +1 de plus si tu
  *  contrôles ≥2 Ciseaux (un board agressif établi te ravitaille). Comble le trou de
  *  card-disadvantage de l'aggro (la main se vide → essoufflement late). */
-export function applySaignee(board: BoardState, side: Side): BoardState {
+export function applySaignee(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
   const hero = side === "a" ? board.a : board.b;
   let scissors = 0;
   for (const lane of board.lanes) {
@@ -42,7 +43,7 @@ export function applySaignee(board: BoardState, side: Side): BoardState {
   }
   const n = 1 + (scissors >= 2 ? 1 : 0);
   alog("spell", `${side} SAIGNÉE → pioche ${n} (${scissors} Ciseau·x)`);
-  return withSideHero(board, side, drawCards(hero, n));
+  return withSideHero(board, side, drawCards(hero, n, rng));
 }
 
 /** Fureur Émoussée (Tranchant) — PAYOFF Émoussé : tes Ciseaux ÉMOUSSÉS se

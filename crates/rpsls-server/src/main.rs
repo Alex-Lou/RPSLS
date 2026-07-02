@@ -26,6 +26,7 @@ use tower_http::trace::TraceLayer;
 use tracing::{info, warn};
 use uuid::Uuid;
 
+use crate::ccg_engine::CcgCommand;
 use crate::dispatch::handle_client_message;
 use crate::lanes_engine::LanesCommand;
 use crate::lobby::LobbyManager;
@@ -44,6 +45,7 @@ mod hello;
 // incréments (endpoints validés à venir).
 #[allow(dead_code)]
 mod economy;
+mod ccg_engine;
 mod janitors;
 mod lanes_engine;
 mod leaderboard;
@@ -94,6 +96,8 @@ pub(crate) struct AppState {
     pub(crate) in_match: DashMap<String, (mpsc::UnboundedSender<MatchCommand>, PlayerSlot)>,
     /// session_id → (lanes_tx, our_slot) — Constellation Lanes mode (Phase 1+).
     pub(crate) in_lanes: DashMap<String, (mpsc::UnboundedSender<LanesCommand>, PlayerSlot)>,
+    /// session_id → (ccg_tx, our_slot) — Constellation Classée CCG (relais aveugle).
+    pub(crate) in_ccg: DashMap<String, (mpsc::UnboundedSender<CcgCommand>, PlayerSlot)>,
     /// player_id → last SyncState save timestamp — server-side write throttle
     /// (max 1 save per 5s per identity) to protect Upstash quota.
     pub(crate) sync_throttle: DashMap<String, Instant>,
@@ -126,6 +130,7 @@ async fn main() {
         )),
         in_match: DashMap::new(),
         in_lanes: DashMap::new(),
+        in_ccg: DashMap::new(),
         sync_throttle: DashMap::new(),
     });
 
@@ -306,11 +311,15 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, peer_ip: std::ne
     state.lobbies.remove_lobby_by_host(&session_id);
     state.lobbies.leave_queue(&session_id).await;
     state.lobbies.leave_lanes_queue(&session_id).await;
+    state.lobbies.leave_ccg_queue(&session_id).await;
     if let Some((_, (match_tx, slot))) = state.in_match.remove(&session_id) {
         let _ = match_tx.send(MatchCommand::Leave { slot });
     }
     if let Some((_, (lanes_tx, slot))) = state.in_lanes.remove(&session_id) {
         let _ = lanes_tx.send(LanesCommand::Leave { slot });
+    }
+    if let Some((_, (ccg_tx, slot))) = state.in_ccg.remove(&session_id) {
+        let _ = ccg_tx.send(CcgCommand::Leave { slot });
     }
     drop(outgoing);
     info!(%session_id, "socket closed");

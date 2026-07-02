@@ -59,11 +59,19 @@ import {
 import { applyEstafilade, applySaignee, applyFureurEmoussee } from "./arenaTranchantCards";
 import { type BoardState, type PlayedSpell, type Side } from "./arenaTypes";
 import type { CardId } from "../ranked/rankedTypes";
+import type { Rng, RngPair } from "../engine/rng";
 
 export interface ArenaSpellContext {
   board: BoardState;
   side: Side;
   spell: PlayedSpell;
+  // PRNG seedé du CAMP qui lance le sort (lockstep Pro online) : les handlers à
+  // hasard (Larcin, Roue du Destin, Cascade, Reflet-Écho, Imposteur…) tirent via
+  // ce flux → déterministe en online, inchangé hors-ligne (défaut Math.random).
+  rng?: Rng;
+  // Paire complète pour les sorts GLOBAUX (Juge, Genèse) où CHAQUE camp pioche
+  // de SON flux — préserve l'invariant « un flux par camp » (cf. engine/rng.ts).
+  rngPair?: RngPair;
 }
 
 /* ───────────────────────── Priority table ───────────────────────── */
@@ -216,7 +224,7 @@ export function arenaSupported(id: CardId): boolean {
 /* ───────────────────────── Effect dispatch ───────────────────────── */
 
 export function applyArenaSpell(ctx: ArenaSpellContext): BoardState {
-  const { board, side, spell } = ctx;
+  const { board, side, spell, rng, rngPair } = ctx;
   switch (spell.id) {
     // ── Defensive setup ──
     case "aegis":       return applyAegis(board, side, spell);
@@ -229,9 +237,9 @@ export function applyArenaSpell(ctx: ArenaSpellContext): BoardState {
     case "tide":        return applyTide(board, side);
     case "curse":       return applyCurse(board, side, spell);
     // ── Utility / draw ──
-    case "prescience":  return applyPrescience(board, side);
+    case "prescience":  return applyPrescience(board, side, rng);
     case "augur":       return applyAugur(board, side);
-    case "oracle":      return applyOracle(board, side);
+    case "oracle":      return applyOracle(board, side, rng);
     case "mirror":      return applyMirror(board, side, spell);
     // ── Healing ──
     case "gaia":        return applyGaia(board, side);
@@ -243,27 +251,27 @@ export function applyArenaSpell(ctx: ArenaSpellContext): BoardState {
     case "benediction": return applyBenediction(board, side);
     // ── Utility / draw ──
     case "oracle-inverse": return applyOracleInverse(board, side);
-    case "cascade":     return applyCascade(board, side);
-    case "echappee":    return applyEchappee(board, side, spell);
+    case "cascade":     return applyCascade(board, side, rng);
+    case "echappee":    return applyEchappee(board, side, spell, rng);
     case "mascarade":   return applyMascarade(board, side, spell);
     // ── Direct damage / removal ──
-    case "heist":       return applyHeist(board, side);
+    case "heist":       return applyHeist(board, side, rng);
     case "razzia":      return applyRazzia(board, side);
     case "surcharge":    return applySurcharge(board, side, spell);
     case "toxine":       return applyToxine(board, side, spell);
     case "rappel":       return applyRappel(board, side, spell);
     case "double-mot":   return applyDoubleMot(board, side, spell);
-    case "echo":         return applyEcho(board, side);
+    case "echo":         return applyEcho(board, side, rng);
     case "chronomancien": return applyChronomancien(board, side);
     case "sangsue":     return applySangsue(board, side, spell);
     case "supernova":   return applySupernova(board, side, spell);
     case "vortex":      return applyVortex(board, side);
     case "trou-noir":   return applyTrouNoir(board, side, spell);
-    case "marchand-ames": return applyMarchandAmes(board, side);
+    case "marchand-ames": return applyMarchandAmes(board, side, rng);
     case "paradoxe":    return applyParadoxe(board);
     // ── Hand / board wipes ──
-    case "juge":        return applyJuge(board);
-    case "genese":      return applyGenese(board);
+    case "juge":        return applyJuge(board, rngPair);
+    case "genese":      return applyGenese(board, rngPair);
     // ── Nouvelles cartes Pro (2026-06-12) ──
     case "jet-caillou":   return applyJetCaillou(board, side, spell);
     // ── Voie Montagne (2026-06-22) ──
@@ -272,13 +280,13 @@ export function applyArenaSpell(ctx: ArenaSpellContext): BoardState {
     case "gardien-pierre": return applyGardienPierre(board, side, spell);
     case "contrefort":     return applyContrefort(board, side);
     case "barricade":      return applyBarricade(board, side);
-    case "veine-minerale": return applyVeineMinerale(board, side);
+    case "veine-minerale": return applyVeineMinerale(board, side, rng);
     case "grondement":     return applyGrondement(board, side);
     case "veine-gaia":     return applyVeineGaia(board, side);
     // ── Voie Mirage (2026-06-22) ──
     case "mascarade-enchainee": return applyMascaradeEnchainee(board, side, spell);
     case "fuite-masquee":       return applyFuiteMasquee(board, side, spell);
-    case "reflet-echo":         return applyRefletEcho(board, side);
+    case "reflet-echo":         return applyRefletEcho(board, side, rng);
     // ── Voie Mirage — nouvelles cartes (2026-06-28) ──
     case "derobade":         return applyDerobade(board, side, spell);
     case "frappe-spectrale": return applyFrappeSpectrale(board, side, spell);
@@ -291,14 +299,14 @@ export function applyArenaSpell(ctx: ArenaSpellContext): BoardState {
     case "acuite":         return applyAcuite(board, side, spell);
     case "frenesie":       return applyFrenesie(board, side);
     case "estafilade":     return applyEstafilade(board, side, spell);
-    case "saignee":        return applySaignee(board, side);
+    case "saignee":        return applySaignee(board, side, rng);
     case "fureur-emoussee": return applyFureurEmoussee(board, side);
     case "estocade":       return applyEstocade(board, side);
     // ── Voie Forêt (2026-06-23) ──
     case "ramure":         return applyRamure(board, side);
     case "photosynthese":  return applyPhotosynthese(board, side, spell);
     case "ronces":         return applyRonces(board, side, spell);
-    case "greffe":         return applyGreffe(board, side);
+    case "greffe":         return applyGreffe(board, side, rng);
     // ── Voie Cosmos (2026-06-23) ──
     case "dilatation-temporelle": return applyDilatation(board, side);
     case "loi-de-causalite":      return applyLoiCausalite(board, side, spell);
@@ -311,13 +319,13 @@ export function applyArenaSpell(ctx: ArenaSpellContext): BoardState {
     case "intrication-quantique": return applyIntricationQuantique(board, side);
     case "taillade-mortelle":     return applyTailladeMortelle(board, side);
     case "seve":          return applySeve(board, side, spell);
-    case "coup-oeil":     return applyCoupOeil(board, side);
+    case "coup-oeil":     return applyCoupOeil(board, side, rng);
     case "permutation":   return applyPermutation(board, side, spell);
     case "toile-gluante": return applyToileGluante(board, side, spell);
-    case "gravite":       return applyGravite(board, side);
+    case "gravite":       return applyGravite(board, side, rng);
     case "doppelganger":  return applyDoppelganger(board, side);
     case "purge":         return applyPurge(board, side);
-    case "roue-destin":   return applyRoueDestin(board, side);
+    case "roue-destin":   return applyRoueDestin(board, side, rng);
     case "phenix":        return applyPhenix(board, side);
     case "singularite":   return applySingularite(board, side);
     case "reverberation": {
@@ -330,7 +338,7 @@ export function applyArenaSpell(ctx: ArenaSpellContext): BoardState {
         return board;
       }
       alog("spell", `${side} RÉVERBÉRATION → rejoue [${last.id}]`);
-      return applyArenaSpell({ board, side, spell: last });
+      return applyArenaSpell({ board, side, spell: last, rng, rngPair });
     }
     // ── ⚗️ Cartes de fusion (Forge) ──
     case "frappe-parfaite": return applyFrappeParfaite(board, side, spell);
@@ -341,10 +349,10 @@ export function applyArenaSpell(ctx: ArenaSpellContext): BoardState {
     case "source-vitale":   return applySourceVitale(board, side, spell);
     case "bosquet-epineux": return applyBosquetEpineux(board, side, spell);
     case "effacement":      return applyEffacement(board, side, spell);
-    case "omniscience":     return applyOmniscience(board, side);
+    case "omniscience":     return applyOmniscience(board, side, rng);
     case "cocon":           return applyCocon(board, side, spell);
     case "apocalypse":      return applyApocalypse(board, side);
-    case "imposteur":       return applyImposteur(board, side);
+    case "imposteur":       return applyImposteur(board, side, rng);
     // ── Fusions Mirage (2026-06-28) ──
     case "galerie-des-glaces":   return applyGalerieDesGlaces(board, side);
     case "mascarade-souveraine": return applyMascaradeSouveraine(board, side, spell);

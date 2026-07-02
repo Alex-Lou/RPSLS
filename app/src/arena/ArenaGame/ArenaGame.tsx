@@ -58,6 +58,7 @@ import {
   type TurnIntent,
 } from "../arenaTypes";
 import { setMatchExit } from "../../matchExitStore";
+import { makeRngPair, randomSeed, type RngPair } from "../../engine/rng";
 import { buildCpuDeckMirroring, buildPlayerDeck, resolveArenaDeckSource } from "../arenaDecks";
 import { runResolverFlow, type ResolveStep } from "../arenaResolverFlow";
 import type { ProjectileFX } from "../ArenaProjectileFX";
@@ -125,6 +126,13 @@ export function ArenaGame({
   // Persona CPU random au match start (Alex 2026-06-11). Reste constante tout
   // le match pour que le feeling de l'opp soit cohérent.
   const cpuPersona = useRef(CPU_PERSONAS[Math.floor(Math.random() * CPU_PERSONAS.length)]);
+  // Phase 0 lockstep (Pro online, 2026-07) — paire de PRNG seedés, UN PAR CAMP
+  // (a=joueur, b=CPU), consommée par TOUTE la résolution (init deck, sorts à
+  // hasard, pioches). vs-CPU : graine aléatoire par match → même feeling
+  // qu'avant, mais partie REPRODUCTIBLE (replay/debug). Online : la graine
+  // viendra du shared_seed serveur → les 2 clients rejouent la même partie.
+  // Re-tirée au soft-reset rematch (chaque match = sa graine).
+  const rngPair = useRef<RngPair>(makeRngPair(randomSeed()));
 
   // Wipe the log buffer at match start so each match has a clean diagnostic
   // history (Alex flag : "tu pers tout finalement"). Called once at mount.
@@ -141,7 +149,7 @@ export function ArenaGame({
   const cardFr = (id: CardId) => t(CARDS[id]?.nameKey ?? "") || id;
 
   const [board, setBoard] = useState<BoardState>(() =>
-    makeInitialBoard(playerDeck.current, buildCpuDeckMirroring(playerDeck.current, cpuAffinity.current), playerAffinity.current, cpuAffinity.current, cpuPersona.current),
+    makeInitialBoard(playerDeck.current, buildCpuDeckMirroring(playerDeck.current, cpuAffinity.current), playerAffinity.current, cpuAffinity.current, cpuPersona.current, rngPair.current),
   );
 
   // ── MULLIGAN T1 (Alex 2026-06-13 économie expert) ──
@@ -287,13 +295,13 @@ export function ArenaGame({
   // arriver). Décrémente les échanges restants.
   function handleMulliganReject(i: number) {
     if (mulliganSwapsLeft <= 0) return;
-    setBoard((cur) => ({ ...cur, a: mulliganReplaceInPlace(cur.a, i) }));
+    setBoard((cur) => ({ ...cur, a: mulliganReplaceInPlace(cur.a, i, rngPair.current.a) }));
     setMulliganSwapsLeft((n) => Math.max(0, n - 1));
     hapticTap();
   }
   // Fermeture (« C'est parti ! ») : le CPU mulligan UNE fois, puis on ferme.
   function handleMulliganClose() {
-    setBoard((cur) => ({ ...cur, b: mulliganSwap(cur.b, cpuMulliganIndices(cur.b)) }));
+    setBoard((cur) => ({ ...cur, b: mulliganSwap(cur.b, cpuMulliganIndices(cur.b), rngPair.current.b) }));
     setMulliganOpen(false);
   }
 
@@ -563,6 +571,7 @@ export function ArenaGame({
       startBoard,
       playerIntent: safeIntent,
       cpuIntent: safeCpuIntent,
+      rng: rngPair.current,
       setBoard,
       setOppPreview,
       setPlayerPreview,
@@ -593,7 +602,7 @@ export function ArenaGame({
       },
       onAdvanceTurn: () => {
         setResolving(false);
-        setBoard((cur) => advanceToNextTurn(cur));
+        setBoard((cur) => advanceToNextTurn(cur, rngPair.current));
       },
       onMatchEnd: (winnerIsPlayer) => {
         setResolving(false);
@@ -642,7 +651,8 @@ export function ArenaGame({
           matchEndedRef.current = false;
           setMulliganOpen(true);
           setMulliganSwapsLeft(2);
-          setBoard(makeInitialBoard(playerDeck.current, buildCpuDeckMirroring(playerDeck.current, cpuAffinity.current), playerAffinity.current, cpuAffinity.current, cpuPersona.current));
+          rngPair.current = makeRngPair(randomSeed()); // graine FRAÎCHE par match (comme le shared_seed online)
+          setBoard(makeInitialBoard(playerDeck.current, buildCpuDeckMirroring(playerDeck.current, cpuAffinity.current), playerAffinity.current, cpuAffinity.current, cpuPersona.current, rngPair.current));
           setIntent({ spells: [], summons: [] });
           setOppPreview(null);
           setPlayerPreview(null);

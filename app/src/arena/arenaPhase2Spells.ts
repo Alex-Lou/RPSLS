@@ -23,6 +23,7 @@ import { MOVES, type Move } from "../engine/game";
 import { alog } from "./arenaLog";
 import { BALANCE } from "./arenaBalance";
 import type { CardId } from "../ranked/rankedTypes";
+import type { Rng, RngPair } from "../engine/rng";
 
 /** Gaia — heal hero +6 HP. */
 export function applyGaia(board: BoardState, side: Side): BoardState {
@@ -101,7 +102,7 @@ export function applyBarricade(board: BoardState, side: Side): BoardState {
 /** Veine Minérale (Montagne, 2026-06-30) — PIOCHE thématique : pioche 1 carte,
  *  +1 de plus si je contrôle ≥2 Pierres (la pioche récompense le mur établi).
  *  Comble le zéro-pioche du kit Montagne (trouver son closer / ses anti-aggro). */
-export function applyVeineMinerale(board: BoardState, side: Side): BoardState {
+export function applyVeineMinerale(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
   const hero = side === "a" ? board.a : board.b;
   let rocks = 0;
   for (const lane of board.lanes) {
@@ -110,7 +111,7 @@ export function applyVeineMinerale(board: BoardState, side: Side): BoardState {
   }
   const n = 1 + (rocks >= 2 ? 1 : 0);
   alog("spell", `${side} VEINE MINÉRALE → pioche ${n} (${rocks} Pierre(s))`);
-  return withSideHero(board, side, drawCards(hero, n));
+  return withSideHero(board, side, drawCards(hero, n, rng));
 }
 
 /** Greffe (Forêt, 2026-06-30) — PIOCHE thématique : pioche 1 carte, +1 si je
@@ -118,7 +119,7 @@ export function applyVeineMinerale(board: BoardState, side: Side): BoardState {
  *  zéro-pioche du kit Forêt ET ajoute enfin une carte NON-soin (texture/profondeur
  *  de deck) sans renforcer le sustain — parallèle de Veine Minérale (rock) /
  *  Saignée (scissors) : chaque Voie a sa pioche flavor. */
-export function applyGreffe(board: BoardState, side: Side): BoardState {
+export function applyGreffe(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
   const hero = side === "a" ? board.a : board.b;
   let leaves = 0;
   for (const lane of board.lanes) {
@@ -127,7 +128,7 @@ export function applyGreffe(board: BoardState, side: Side): BoardState {
   }
   const n = 1 + (leaves >= 3 ? 1 : 0); // bonus rare (board plein) → surtout un cantrip neutre, pas un robinet d'avantage (anti-ré-inflate Forêt)
   alog("spell", `${side} GREFFE → pioche ${n} (${leaves} Feuille(s))`);
-  return withSideHero(board, side, drawCards(hero, n));
+  return withSideHero(board, side, drawCards(hero, n, rng));
 }
 
 /** Grondement (Montagne, 2026-06-30) — AURA récurrente : pose tremorActive sur le
@@ -213,11 +214,11 @@ export function applyOracleInverse(board: BoardState, side: Side): BoardState {
 }
 
 /** Cascade — draw 3 cards, then discard 1 random from hand (cycle a bad hand). */
-export function applyCascade(board: BoardState, side: Side): BoardState {
+export function applyCascade(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
   const hero = side === "a" ? board.a : board.b;
-  let after = drawCards(hero, 3);
+  let after = drawCards(hero, 3, rng);
   if (after.hand.length > 0) {
-    const idx = Math.floor(Math.random() * after.hand.length);
+    const idx = Math.floor(rng() * after.hand.length);
     const droppedHand = [...after.hand.slice(0, idx), ...after.hand.slice(idx + 1)];
     after = { ...after, hand: droppedHand, discard: [...after.discard, after.hand[idx]] };
   }
@@ -226,11 +227,11 @@ export function applyCascade(board: BoardState, side: Side): BoardState {
 
 /** Reflet-Écho (Mirage) — cycle : pioche 1 carte puis défausse 1 au hasard. Fait
  *  tourner une main bloquée (insaisissable). Calqué sur Cascade (draw 3/disc 1). */
-export function applyRefletEcho(board: BoardState, side: Side): BoardState {
+export function applyRefletEcho(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
   const hero = side === "a" ? board.a : board.b;
-  let after = drawCards(hero, 1);
+  let after = drawCards(hero, 1, rng);
   if (after.hand.length > 0) {
-    const idx = Math.floor(Math.random() * after.hand.length);
+    const idx = Math.floor(rng() * after.hand.length);
     after = { ...after, hand: [...after.hand.slice(0, idx), ...after.hand.slice(idx + 1)], discard: [...after.discard, after.hand[idx]] };
   }
   return withSideHero(board, side, after);
@@ -238,13 +239,13 @@ export function applyRefletEcho(board: BoardState, side: Side): BoardState {
 
 /** Échappée — destroy 1 of my own creatures on the chosen lane, draw 2.
  *  "Cycle" a bad creature into fresh cards. */
-export function applyEchappee(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
+export function applyEchappee(board: BoardState, side: Side, spell: PlayedSpell, rng: Rng = Math.random): BoardState {
   if (spell.kind !== "lane") return board;
   const c = getMyCreatureOnLane(board, side, spell.lane);
   if (!c) return board;
   let after = withMyCreatureOnLane(board, side, spell.lane, null);
   const hero = side === "a" ? after.a : after.b;
-  after = withSideHero(after, side, drawCards(hero, 2));
+  after = withSideHero(after, side, drawCards(hero, 2, rng));
   return after;
 }
 
@@ -301,10 +302,10 @@ export function applyTrouNoir(board: BoardState, side: Side, spell: PlayedSpell)
 }
 
 /** Marchand d'Âmes — pay 2 HP, draw 3 cards. Faustian. */
-export function applyMarchandAmes(board: BoardState, side: Side): BoardState {
+export function applyMarchandAmes(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
   const hero = side === "a" ? board.a : board.b;
   const wounded = { ...hero, hp: Math.max(0, hero.hp - 2) };
-  return withSideHero(board, side, drawCards(wounded, 3));
+  return withSideHero(board, side, drawCards(wounded, 3, rng));
 }
 
 /** Paradoxe Temporel — both heroes take 5 damage. Self-harm board reset. */
@@ -313,21 +314,24 @@ export function applyParadoxe(board: BoardState): BoardState {
 }
 
 /** Le Juge — both sides discard their full hand and draw 4 fresh. */
-export function applyJuge(board: BoardState): BoardState {
-  const reset = (h: BoardState["a"]): BoardState["a"] => {
+// Sorts GLOBAUX (les 2 camps piochent) : chaque camp tire de SON flux (rng.a/rng.b),
+// PAS du flux du lanceur — préserve l'invariant lockstep « un flux par camp » (un
+// aléa ajouté côté A ne décale jamais la pioche de B). Défaut undefined → Math.random.
+export function applyJuge(board: BoardState, rng?: RngPair): BoardState {
+  const reset = (h: BoardState["a"], r?: Rng): BoardState["a"] => {
     const discardAll = { ...h, discard: [...h.discard, ...h.hand], hand: [] as CardId[] };
-    return drawCards(discardAll, 4);
+    return drawCards(discardAll, 4, r);
   };
-  return { ...board, a: reset(board.a), b: reset(board.b) };
+  return { ...board, a: reset(board.a, rng?.a), b: reset(board.b, rng?.b) };
 }
 
 /** Genèse — destroy ALL creatures on the board, both sides draw 3. */
-export function applyGenese(board: BoardState): BoardState {
+export function applyGenese(board: BoardState, rng?: RngPair): BoardState {
   const emptyLanes = board.lanes.map(() => ({ a: null, b: null })) as [LaneState, LaneState, LaneState];
   return {
     ...board,
     lanes: emptyLanes,
-    a: drawCards(board.a, 3),
-    b: drawCards(board.b, 3),
+    a: drawCards(board.a, 3, rng?.a),
+    b: drawCards(board.b, 3, rng?.b),
   };
 }
