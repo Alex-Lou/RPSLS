@@ -112,11 +112,24 @@ pub enum ClientMessage {
     /// Submit this player's turn intent (3 picks + optional card). The payload
     /// is OPAQUE to the server (`intent`) — a blind relay forwards it verbatim
     /// to the opponent, who resolves it locally against the shared seed.
-    CcgTurn { round_no: u32, intent: Value },
+    CcgTurn {
+        round_no: u32,
+        intent: Value,
+        /// Empreinte de l'état vu par ce client (anti-triche Phase 4) — le serveur
+        /// compare les deux clients SANS lire le jeu ; divergence → match droppé.
+        #[serde(default)]
+        state_hash: String,
+    },
 
     /// Declare the CCG match outcome (the client resolves deterministically and
     /// tells the server who won so it can close + broadcast the end).
-    CcgResult { winner: Option<PlayerSlot> },
+    CcgResult {
+        winner: Option<PlayerSlot>,
+        /// Hash du board FINAL — le serveur compare les deux déclarations
+        /// (vainqueur + hash) ; désaccord → match droppé, aucun crédit.
+        #[serde(default)]
+        state_hash: String,
+    },
 }
 
 /* ──────────── Server → Client ──────────── */
@@ -274,7 +287,9 @@ pub enum ServerMessage {
     CcgTurnRelay { from: PlayerSlot, round_no: u32, intent: Value },
 
     /// CCG match has ended (winner declared by a client, or forfeit).
-    CcgMatchEnd { winner: Option<PlayerSlot>, forfeit: bool },
+    /// `desync` = match ANNULÉ par le serveur (hash d'état ou résultats
+    /// divergents → triche/bug) : aucun résultat crédité (anti-triche Phase 4).
+    CcgMatchEnd { winner: Option<PlayerSlot>, forfeit: bool, desync: bool },
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

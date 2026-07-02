@@ -63,6 +63,7 @@ import {
 import { setMatchExit } from "../../matchExitStore";
 import { makeRngPair, randomSeed, type RngPair } from "../../engine/rng";
 import type { ArenaOnlineDriver } from "../arenaOnlineDriver";
+import { hashBoard } from "../arenaNet";
 import { buildCpuDeckMirroring, buildPlayerDeck, resolveArenaDeckSource } from "../arenaDecks";
 import { runResolverFlow, type ResolveStep } from "../arenaResolverFlow";
 import type { ProjectileFX } from "../ArenaProjectileFX";
@@ -530,9 +531,10 @@ export function ArenaGame({
       meDead && oppDead ? "draw" : oppDead ? "win" : "loss";
     if (outcome === "win") hapticMatchWin();
     else if (outcome === "loss") hapticMatchLoss();
-    // Online : déclare l'issue au serveur (les 2 clients calculent le même
-    // résultat en lockstep ; le relais prend la 1re déclaration → clôt + diffuse).
-    online?.reportResult(outcome);
+    // Online : déclare l'issue AU SERVEUR + le hash du board final (anti-triche
+    // Phase 4) — le serveur compare les DEUX déclarations (vainqueur + hash) ;
+    // désaccord = drop, aucun crédit. En lockstep honnête, les deux coïncident.
+    online?.reportResult(outcome, hashBoard(board));
     // VOIE jouée (joueur + adversaire) journalisée dans l'historique (Alex
     // 2026-06-13). me/opp.affinity = la Voie choisie par chaque camp.
     recordArenaMatch(outcome, { playerVoie: me.affinity, oppVoie: opp.affinity });
@@ -604,7 +606,9 @@ export function ArenaGame({
     // déterministe → les deux clients s'apparient sur le même tour.
     if (online) {
       online
-        .exchangeIntent(board.turn, safe)
+        // hashBoard(board) = empreinte de l'état AVANT ce tour (anti-triche
+        // Phase 4) : le serveur compare les hashes des deux clients pour ce tour.
+        .exchangeIntent(board.turn, safe, hashBoard(board))
         .then((oppIntent) => {
           if (matchEndedRef.current) return; // match clos pendant l'attente → on jette
           resolveWith(safe, oppIntent);

@@ -24,7 +24,7 @@ import { MOVES } from "../engine/game";
 import type { CardId } from "../ranked/rankedTypes";
 import { CARDS } from "../ranked/cards";
 import { BALANCE } from "./arenaBalance";
-import { CREATURE_STATS, LANE_COUNT, type LaneIndex, type PlannedSummon, type PlayedSpell, type TurnIntent } from "./arenaTypes";
+import { CREATURE_STATS, LANE_COUNT, type BoardState, type LaneIndex, type PlannedSummon, type PlayedSpell, type TurnIntent } from "./arenaTypes";
 
 /** Version du MOTEUR de résolution Pro. À INCRÉMENTER à chaque changement de
  *  LOGIQUE de résolution non capté par la donnée hashée (BALANCE/cartes/stats) :
@@ -161,4 +161,18 @@ export function arenaRulesetHash(): string {
     creatures: CREATURE_STATS,
   });
   return `${ARENA_ENGINE_VERSION}-${fnv1a(payload)}`;
+}
+
+/* ───────────────────────── Hash d'état (anti-triche Phase 4) ───────────────────────── */
+
+/**
+ * Empreinte déterministe de l'ÉTAT DU BOARD, pour le contrôle d'intégrité
+ * lockstep (Phase 4 anti-triche). En lockstep les deux clients calculent un
+ * board IDENTIQUE à chaque tour → même hash. Chacun envoie ce hash au serveur
+ * (relais aveugle) qui COMPARE les deux sans comprendre le jeu ; toute
+ * divergence (bug OU client qui triche son état local) → le match est DROP,
+ * aucun résultat crédité. `stableStringify` neutralise l'ordre des clés.
+ */
+export function hashBoard(board: BoardState): string {
+  return fnv1a(stableStringify(board));
 }

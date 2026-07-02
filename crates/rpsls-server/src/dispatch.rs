@@ -186,17 +186,17 @@ pub(crate) async fn handle_client_message(
             }
         }
 
-        ClientMessage::CcgTurn { round_no, intent } => {
+        ClientMessage::CcgTurn { round_no, intent, state_hash } => {
             if let Some(entry) = state.in_ccg.get(&session.id) {
                 let (tx, slot) = entry.value().clone();
-                let _ = tx.send(CcgCommand::Turn { slot, round_no, intent });
+                let _ = tx.send(CcgCommand::Turn { slot, round_no, intent, state_hash });
             }
         }
 
-        ClientMessage::CcgResult { winner } => {
+        ClientMessage::CcgResult { winner, state_hash } => {
             if let Some(entry) = state.in_ccg.get(&session.id) {
-                let (tx, _) = entry.value().clone();
-                let _ = tx.send(CcgCommand::Result { winner });
+                let (tx, slot) = entry.value().clone();
+                let _ = tx.send(CcgCommand::Result { slot, winner, state_hash });
             }
         }
 

@@ -28,14 +28,15 @@ export interface ArenaOnlineDriver {
   readonly oppName: string;
   readonly oppDeck: CardId[];
   readonly oppAffinity: Move;
-  /** Envoie MON intent du tour `turn` (≥1) et résout avec celui de l'adversaire.
-   *  Un intent adverse invalide (triche/corruption) est traité comme « il passe »
-   *  (intent vide) — jamais un crash (cf. parseTurnIntent). */
-  exchangeIntent(turn: number, myIntent: TurnIntent): Promise<TurnIntent>;
+  /** Envoie MON intent du tour `turn` (≥1) + le hash de l'état que je vois
+   *  (anti-triche : le serveur compare les hashes des deux clients) et résout
+   *  avec l'intent de l'adversaire. Un intent adverse invalide → « il passe ». */
+  exchangeIntent(turn: number, myIntent: TurnIntent, stateHash: string): Promise<TurnIntent>;
   /** Mulligan relayé : envoie MES indices, résout ceux de l'adversaire. */
   exchangeMulligan(myIndices: number[]): Promise<number[]>;
-  /** Déclare l'issue (perspective locale) → le serveur clôt + diffuse. */
-  reportResult(outcome: "win" | "loss" | "draw"): void;
+  /** Déclare l'issue (perspective locale) + le hash du board final → le serveur
+   *  compare les deux déclarations ; désaccord = drop (aucun crédit). */
+  reportResult(outcome: "win" | "loss" | "draw", stateHash: string): void;
 }
 
 /** Données résolues par l'orchestrateur (post handshake + échange de deck). */
@@ -58,8 +59,8 @@ export function makeArenaOnlineDriver(session: ArenaOnlineSession, setup: ArenaO
     oppName: setup.oppName,
     oppDeck: setup.oppDeck,
     oppAffinity: setup.oppAffinity,
-    async exchangeIntent(turn, myIntent) {
-      const oppWire = await session.exchange(turn + 1, serializeIntent(myIntent));
+    async exchangeIntent(turn, myIntent, stateHash) {
+      const oppWire = await session.exchange(turn + 1, serializeIntent(myIntent), stateHash);
       return parseTurnIntent(oppWire) ?? EMPTY_INTENT;
     },
     async exchangeMulligan(myIndices) {
@@ -69,10 +70,10 @@ export function makeArenaOnlineDriver(session: ArenaOnlineSession, setup: ArenaO
       // ensuite contre la vraie taille de main → jamais d'index hors main).
       return Array.isArray(raw) ? raw.filter((n): n is number => Number.isInteger(n) && n >= 0 && n < 32) : [];
     },
-    reportResult(outcome) {
+    reportResult(outcome, stateHash) {
       const winner: PlayerSlot | null =
         outcome === "win" ? setup.mySide : outcome === "loss" ? oppSide : null;
-      session.declareResult(winner);
+      session.declareResult(winner, stateHash);
     },
   };
 }

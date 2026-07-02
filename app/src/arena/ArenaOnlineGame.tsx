@@ -26,7 +26,7 @@ import { ArenaOnlineSession } from "./arenaOnlineSession";
 import { makeArenaOnlineDriver, type ArenaOnlineDriver } from "./arenaOnlineDriver";
 import { ArenaGame } from "./ArenaGame";
 
-type Phase = "connecting" | "searching" | "setup" | "playing" | "error";
+type Phase = "connecting" | "searching" | "setup" | "playing" | "error" | "desync";
 
 /** Round réservé pour l'échange initial deck+Voie (cf. arenaOnlineDriver). */
 const ROUND_SETUP = 0;
@@ -73,6 +73,11 @@ export function ArenaOnlineGame({ onBack }: { onBack: () => void }) {
       {
         onError: (_code, message) => { if (alive) { setErrMsg(message); setPhase("error"); } },
         onOpponentLeft: () => { /* ArenaGame affiche déjà sa fin/forfait ; le retour hub est manuel */ },
+        onMatchEnd: (_winner, _forfeit, desync) => {
+          // Le serveur a DROP le match (hash d'état ou résultats divergents →
+          // triche/bug détecté) : aucun résultat crédité, on l'annonce (Phase 4).
+          if (alive && desync) setPhase("desync");
+        },
       },
     );
     client.on((msg) => session.handle(msg));
@@ -140,7 +145,13 @@ export function ArenaOnlineGame({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-center">
-      {phase === "error" ? (
+      {phase === "desync" ? (
+        <>
+          <div className="text-lg font-bold text-amber-300">Match annulé</div>
+          <div className="text-sm text-ink-muted max-w-xs">Désynchronisation détectée entre les deux joueurs — aucun résultat n'est crédité.</div>
+          <button onClick={onBack} className="mt-2 px-5 py-2 rounded-xl bg-surface border border-hairline font-semibold">Retour</button>
+        </>
+      ) : phase === "error" ? (
         <>
           <div className="text-lg font-bold text-rose-300">Connexion impossible</div>
           <div className="text-sm text-ink-muted max-w-xs">{errMsg}</div>

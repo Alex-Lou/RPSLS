@@ -28,7 +28,7 @@ export interface ArenaMatchInfo {
 export interface ArenaSessionCallbacks {
   onQueued?: (position: number) => void;
   onReadyState?: (youReady: boolean, oppReady: boolean) => void;
-  onMatchEnd?: (winner: PlayerSlot | null, forfeit: boolean) => void;
+  onMatchEnd?: (winner: PlayerSlot | null, forfeit: boolean, desync: boolean) => void;
   onOpponentLeft?: () => void;
   onRematchOffered?: () => void;
   onRematchDeclined?: () => void;
@@ -90,8 +90,8 @@ export class ArenaOnlineSession {
    * l'adversaire pour le MÊME round. round 0 = mulligan, round ≥ 1 = intent.
    * Le payload est OPAQUE (le relais ne le lit pas) — l'appelant sérialise/parse.
    */
-  exchange(round: number, payload: unknown): Promise<unknown> {
-    this.send({ type: "ccg_turn", round_no: round, intent: payload as never });
+  exchange(round: number, payload: unknown, stateHash = ""): Promise<unknown> {
+    this.send({ type: "ccg_turn", round_no: round, intent: payload, state_hash: stateHash });
     const buffered = this.inbox.get(round);
     if (buffered !== undefined) {
       this.inbox.delete(round);
@@ -100,9 +100,10 @@ export class ArenaOnlineSession {
     return new Promise((resolve) => { this.pending = { round, resolve }; });
   }
 
-  /** Déclare l'issue (résolution locale déterministe) → le serveur clôt + diffuse. */
-  declareResult(winner: PlayerSlot | null): void {
-    this.send({ type: "ccg_result", winner });
+  /** Déclare l'issue (résolution locale déterministe) + le hash du board FINAL →
+   *  le serveur compare les deux déclarations ; désaccord = drop (anti-triche). */
+  declareResult(winner: PlayerSlot | null, stateHash = ""): void {
+    this.send({ type: "ccg_result", winner, state_hash: stateHash });
   }
 
   requestRematch(): void { this.send({ type: "request_rematch" }); }
@@ -139,7 +140,7 @@ export class ArenaOnlineSession {
         break;
       case "ccg_match_end":
         this.ended = true;
-        this.cb.onMatchEnd?.(msg.winner, msg.forfeit);
+        this.cb.onMatchEnd?.(msg.winner, msg.forfeit, msg.desync);
         break;
       case "opponent_left":
         this.cb.onOpponentLeft?.();

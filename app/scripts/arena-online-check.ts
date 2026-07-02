@@ -23,6 +23,7 @@ import { cpuArenaDecision } from "../src/arena/arenaAI";
 import { makeRngPair, type RngPair } from "../src/engine/rng";
 import { ArenaOnlineSession } from "../src/arena/arenaOnlineSession";
 import { makeArenaOnlineDriver } from "../src/arena/arenaOnlineDriver";
+import { hashBoard } from "../src/arena/arenaNet";
 import { TURN_HARD_CAP } from "../src/arena/arenaTypes/constants";
 import type { ClientMessage, ServerMessage } from "../src/online/online";
 import type { Move } from "../src/engine/game";
@@ -107,8 +108,12 @@ async function playOnline(seed: number, voieA: Move, voieB: Move): Promise<{ dif
     // Chaque client génère l'intent de SON camp (sur le board canonique commun).
     const aIntent = scriptedIntent(boardA, "a", turn);
     const bIntent = scriptedIntent(boardB, "b", turn);
-    // Échange via les drivers (serialize→relais→parse), simultané.
-    const [aGotOpp, bGotOpp] = await Promise.all([drvA.exchangeIntent(turn, aIntent), drvB.exchangeIntent(turn, bIntent)]);
+    // Échange via les drivers (serialize→relais→parse) + hash d'état (anti-triche
+    // Phase 4). En lockstep honnête, hashBoard(boardA) == hashBoard(boardB).
+    const [aGotOpp, bGotOpp] = await Promise.all([
+      drvA.exchangeIntent(turn, aIntent, hashBoard(boardA)),
+      drvB.exchangeIntent(turn, bIntent, hashBoard(boardB)),
+    ]);
     // Résolution CANONIQUE de chaque côté : A(mySide=a)→(aIntent,aGotOpp) ;
     // B(mySide=b)→(bGotOpp,bIntent). aGotOpp==bIntent, bGotOpp==aIntent ⇒ mêmes inputs.
     boardA = trap(() => resolveTurn(boardA, aIntent, aGotOpp, drvA.rngPair));
@@ -143,6 +148,18 @@ console.log("── arena-online-check : modèle Pro online end-to-end (2 client
     if (diff) { fail++; console.log(`✗ seed=${SEEDS[i]} ${voieA} vs ${voieB} — DESYNC:\n  ${diff}`); }
     else console.log(`✓ seed=${SEEDS[i]} ${voieA} vs ${voieB} — ${turns} tours, clientA=clientB byte-identiques (via session+driver+relais), 0 fuite`);
   }
+  // Preuve de DÉTECTION anti-triche (Phase 4) : un board FALSIFIÉ produit un hash
+  // DIFFÉRENT → côté serveur, a_hash != b_hash déclenche le drop du match.
+  {
+    const pair = makeRngPair(424242);
+    const board = makeInitialBoard(buildCpuSignatureDeck("rock"), buildCpuSignatureDeck("paper"), "rock", "paper", undefined, pair);
+    const honest = hashBoard(board);
+    const cheated = hashBoard({ ...board, a: { ...board.a, hp: board.a.hp + 10 } }); // triche : +10 PV
+    const ok = honest !== cheated;
+    console.log(`${ok ? "✓" : "✗"} détection triche : board falsifié (+10 PV) → hash DIFFÉRENT → le serveur droppe le match`);
+    if (!ok) fail++;
+  }
+
   console.log(`\n── Pro online end-to-end : ${fail === 0 ? "IDENTIQUE DES 2 CÔTÉS ✅" : `${fail} DESYNC ❌`} ──`);
   if (fail > 0) process.exitCode = 1;
 })();

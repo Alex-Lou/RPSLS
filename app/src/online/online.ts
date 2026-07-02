@@ -152,8 +152,10 @@ export type ClientMessage =
   | { type: "prep_ready" }
   // Constellation Classée (CCG) — relais aveugle (mirror protocol.rs).
   | { type: "join_ccg_queue"; win_to: number; variant: string; ruleset_hash: string }
-  | { type: "ccg_turn"; round_no: number; intent: CcgTurnIntent }
-  | { type: "ccg_result"; winner: PlayerSlot | null };
+  // `intent` = payload OPAQUE (le serveur ne le lit pas) ; `state_hash` = empreinte
+  // de l'état vu par ce client (anti-triche Phase 4, comparée par le serveur).
+  | { type: "ccg_turn"; round_no: number; intent: unknown; state_hash: string }
+  | { type: "ccg_result"; winner: PlayerSlot | null; state_hash: string };
 
 /* Server → Client */
 export type ServerMessage =
@@ -234,8 +236,10 @@ export type ServerMessage =
   | { type: "start_coin_flip"; winner: PlayerSlot }
   // Constellation Classée (CCG) — relais aveugle (mirror protocol.rs).
   | { type: "ccg_match_found"; match_id: string; opponent: OpponentInfo; you_are: PlayerSlot; win_to: number; shared_seed: number }
-  | { type: "ccg_turn_relay"; from: PlayerSlot; round_no: number; intent: CcgTurnIntent }
-  | { type: "ccg_match_end"; winner: PlayerSlot | null; forfeit: boolean };
+  | { type: "ccg_turn_relay"; from: PlayerSlot; round_no: number; intent: unknown }
+  // `desync` = match ANNULÉ par le serveur (hash d'état ou résultats divergents →
+  // triche/bug détecté) : aucun résultat crédité (anti-triche Phase 4).
+  | { type: "ccg_match_end"; winner: PlayerSlot | null; forfeit: boolean; desync: boolean };
 
 /* ──────────── URL helpers ──────────── */
 

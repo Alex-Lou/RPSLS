@@ -33,17 +33,22 @@ const REMATCH_WINDOW: Duration = Duration::from_secs(30);
 /// Commandes envoyées à un match CCG en cours.
 #[derive(Debug)]
 pub enum CcgCommand {
-    /// Intention de tour d'un joueur (3 coups + carte) — payload OPAQUE relayé tel quel.
+    /// Intention de tour d'un joueur (3 coups + carte) — payload OPAQUE relayé tel
+    /// quel. `state_hash` = empreinte de l'état vu par ce client (anti-triche
+    /// Phase 4) : le serveur compare les deux SANS lire le jeu.
     Turn {
         slot: PlayerSlot,
         round_no: u32,
         intent: Value,
+        state_hash: String,
     },
-    /// Fin déclarée par un client (sa résolution déterministe locale → vainqueur).
-    /// Le slot déclarant est indifférent (les deux clients s'accordent sur le
-    /// même vainqueur en lockstep) → on prend la 1re déclaration.
+    /// Fin déclarée par un client (sa résolution déterministe locale → vainqueur +
+    /// hash du board final). Le serveur attend les DEUX déclarations et compare :
+    /// accord → résultat ; désaccord → match droppé (anti-triche Phase 4).
     Result {
+        slot: PlayerSlot,
         winner: Option<PlayerSlot>,
+        state_hash: String,
     },
     Leave {
         slot: PlayerSlot,
@@ -111,14 +116,14 @@ async fn run_ccg_match(
             if let Some(w) = winner {
                 session_for(other_slot(w), &a, &b).send(ServerMessage::OpponentLeft);
             }
-            broadcast_end(&a, &b, winner, true);
+            broadcast_end(&a, &b, winner, true, false);
             break;
         }
 
         // Boucle de relais des tours.
         match ccg_relay(&a, &b, &mut rx).await {
             RelayEnd::Result { winner } => {
-                broadcast_end(&a, &b, winner, false);
+                broadcast_end(&a, &b, winner, false, false);
                 match ccg_rematch(&a, &b, &mut rx).await {
                     Rematch::Restart => continue,
                     Rematch::Done => break,
@@ -128,7 +133,12 @@ async fn run_ccg_match(
                 if let Some(w) = winner {
                     session_for(w, &a, &b).send(ServerMessage::OpponentLeft);
                 }
-                broadcast_end(&a, &b, winner, true);
+                broadcast_end(&a, &b, winner, true, false);
+                break;
+            }
+            RelayEnd::Desync => {
+                // Anti-triche : hash/résultat divergent → match ANNULÉ, aucun crédit.
+                broadcast_end(&a, &b, None, false, true);
                 break;
             }
             RelayEnd::Disconnect => break,
@@ -198,10 +208,13 @@ async fn ccg_prep(
 /* ──────────── Relais des tours ──────────── */
 
 enum RelayEnd {
-    /// Fin propre déclarée par un client (résolution locale).
+    /// Fin propre : les DEUX clients ont déclaré le MÊME vainqueur + hash final.
     Result { winner: Option<PlayerSlot> },
     /// Forfait (leave / timeout d'un côté). `winner` = camp resté.
     Forfeit { winner: Option<PlayerSlot> },
+    /// DÉSYNCHRONISATION (anti-triche Phase 4) : hash d'état divergent en cours
+    /// de partie OU déclarations de résultat incohérentes → match droppé, aucun crédit.
+    Desync,
     /// Les deux côtés partis (canal fermé).
     Disconnect,
 }
@@ -213,8 +226,12 @@ async fn ccg_relay(
 ) -> RelayEnd {
     // Intentions en attente d'appariement (lockstep : un client n'envoie le tour
     // N+1 qu'après avoir résolu N, donc les deux tours en attente sont du même round).
-    let mut a_turn: Option<(u32, Value)> = None;
-    let mut b_turn: Option<(u32, Value)> = None;
+    // On garde aussi le `state_hash` de chaque camp pour le comparer (anti-triche).
+    let mut a_turn: Option<(u32, Value, String)> = None;
+    let mut b_turn: Option<(u32, Value, String)> = None;
+    // Résultats déclarés (winner + hash final) — on attend les DEUX pour comparer.
+    let mut a_res: Option<(Option<PlayerSlot>, String)> = None;
+    let mut b_res: Option<(Option<PlayerSlot>, String)> = None;
 
     loop {
         match timeout(TURN_DEADLINE, rx.recv()).await {
@@ -229,14 +246,20 @@ async fn ccg_relay(
             }
             Ok(None) => return RelayEnd::Disconnect,
             Ok(Some(cmd)) => match cmd {
-                CcgCommand::Turn { slot, round_no, intent } => {
+                CcgCommand::Turn { slot, round_no, intent, state_hash } => {
                     match slot {
-                        PlayerSlot::A => a_turn = Some((round_no, intent)),
-                        PlayerSlot::B => b_turn = Some((round_no, intent)),
+                        PlayerSlot::A => a_turn = Some((round_no, intent, state_hash)),
+                        PlayerSlot::B => b_turn = Some((round_no, intent, state_hash)),
                     }
                     if a_turn.is_some() && b_turn.is_some() {
-                        let (a_round, a_intent) = a_turn.take().unwrap();
-                        let (b_round, b_intent) = b_turn.take().unwrap();
+                        let (a_round, a_intent, a_hash) = a_turn.take().unwrap();
+                        let (b_round, b_intent, b_hash) = b_turn.take().unwrap();
+                        // ANTI-TRICHE : les deux clients doivent voir le MÊME état à
+                        // ce tour (hash égal). Divergence (hashes non vides ≠) =
+                        // desync/triche → match droppé. (Vides = vieux client → skip.)
+                        if !a_hash.is_empty() && !b_hash.is_empty() && a_hash != b_hash {
+                            return RelayEnd::Desync;
+                        }
                         // Chacun reçoit l'intention de l'AUTRE, verbatim.
                         a.send(ServerMessage::CcgTurnRelay {
                             from: PlayerSlot::B,
@@ -250,7 +273,19 @@ async fn ccg_relay(
                         });
                     }
                 }
-                CcgCommand::Result { winner } => return RelayEnd::Result { winner },
+                CcgCommand::Result { slot, winner, state_hash } => {
+                    match slot {
+                        PlayerSlot::A => a_res = Some((winner, state_hash)),
+                        PlayerSlot::B => b_res = Some((winner, state_hash)),
+                    }
+                    // On attend les DEUX déclarations, puis on compare (anti-triche).
+                    if let (Some((aw, ah)), Some((bw, bh))) = (&a_res, &b_res) {
+                        if aw == bw && ah == bh {
+                            return RelayEnd::Result { winner: *aw };
+                        }
+                        return RelayEnd::Desync;
+                    }
+                }
                 CcgCommand::Leave { slot } => {
                     return RelayEnd::Forfeit { winner: Some(other_slot(slot)) };
                 }
@@ -317,12 +352,12 @@ fn broadcast_ready_state(a: &Arc<Session>, b: &Arc<Session>, ready_a: bool, read
     b.send(ServerMessage::PrepReadyState { you_ready: ready_b, opp_ready: ready_a });
 }
 
-fn broadcast_end(a: &Arc<Session>, b: &Arc<Session>, winner: Option<PlayerSlot>, forfeit: bool) {
-    let msg = ServerMessage::CcgMatchEnd { winner, forfeit };
+fn broadcast_end(a: &Arc<Session>, b: &Arc<Session>, winner: Option<PlayerSlot>, forfeit: bool, desync: bool) {
+    let msg = ServerMessage::CcgMatchEnd { winner, forfeit, desync };
     a.send(msg.clone());
     b.send(msg);
     // Pas de leaderboard::record_result — beta sans LP (relais aveugle =
-    // résultat client-authoritative, non fiable pour le classement).
+    // résultat client-authoritative). Sur desync=true, aucun crédit de toute façon.
 }
 
 /// Le camp encore présent d'après (ready_a, ready_b). None si les deux absents.
