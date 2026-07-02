@@ -11,6 +11,7 @@ import {
   type LaneIndex,
   type PlayedSpell,
   type PlannedSummon,
+  type Side,
   type TurnIntent,
 } from "../arenaTypes";
 
@@ -34,7 +35,8 @@ const BINARY_EFFECT_TAGS: Partial<Record<CardId, string[]>> = {
  * sémantiquement à un useState inline (le hook re-tourne à chaque render,
  * capturant le `board` courant). La RÉSOLUTION de combat reste dans ArenaGame.
  */
-export function useArenaIntent(board: BoardState, cardFr: (id: CardId) => string) {
+export function useArenaIntent(board: BoardState, mySide: Side, cardFr: (id: CardId) => string) {
+  const me = board[mySide]; // héros du joueur LOCAL (camp canonique mySide, défaut "a")
   const [intent, setIntent] = useState<TurnIntent>({ spells: [], summons: [] });
 
   function addSpell(spell: PlayedSpell) {
@@ -71,7 +73,7 @@ export function useArenaIntent(board: BoardState, cardFr: (id: CardId) => string
       // de spell.id dans cur.spells et refuser si dépasse le nombre de
       // copies en main.
       const usageCount = cur.spells.filter((s) => s.id === spell.id).length;
-      const handCount = board.a.hand.filter((id) => id === spell.id).length;
+      const handCount = me.hand.filter((id) => id === spell.id).length;
       if (usageCount >= handCount) {
         alog("hand", `🚫 « ${cardFr(spell.id)} » impossible : plus de copie dispo (1 carte = 1 usage ; ${usageCount} déjà planifié(s), ${handCount} en main).`);
         return cur;
@@ -89,7 +91,7 @@ export function useArenaIntent(board: BoardState, cardFr: (id: CardId) => string
       // Finisher = lock 1×/match (cf hero.finisherUsed). Une fois cast il
       // peut être ré-injecté en main (Juge reshuffle, Genèse, etc.) — le
       // garde ici empêche de le rejouer.
-      if (isFinisherCard(spell.id) && board.a.finisherUsed) {
+      if (isFinisherCard(spell.id) && me.finisherUsed) {
         alog("hand", `🚫 « ${cardFr(spell.id)} » impossible : ton Finisher a déjà été lancé ce match (1 seul par partie).`);
         return cur;
       }
@@ -143,7 +145,7 @@ export function useArenaIntent(board: BoardState, cardFr: (id: CardId) => string
    *  l'UI bloquait au coût plein et le Finisher Spock ne servait à rien. */
   function intentCost(i: TurnIntent): number {
     let total = i.summons.length * 1; // 1m per summon
-    for (const s of i.spells) total += arenaSpellCost(board.a, s.id);
+    for (const s of i.spells) total += arenaSpellCost(me, s.id);
     return total;
   }
 

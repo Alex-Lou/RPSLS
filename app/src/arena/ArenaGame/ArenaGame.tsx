@@ -36,6 +36,8 @@ import { ArenaMatchSplash } from "../ArenaMatchSplash";
 import { AnimatePresence, motion, useAnimationControls } from "motion/react";
 import { ArenaImpactFX } from "../ArenaImpactFX";
 import { ArenaTraceCue, type TraceCue } from "../ArenaTraceCue";
+import { ArenaTurnRecap } from "../ArenaTurnRecap";
+import { buildTurnRecap, type TurnRecap } from "../arenaRecap";
 import { hasDominantSpell } from "../arenaFinishers";
 import { engineGauge } from "../arenaEngines";
 import { ArenaCastOnDrawFX, useCastOnDrawQueue } from "../ArenaCastOnDrawFX";
@@ -55,10 +57,12 @@ import {
   type ArenaTargeting,
   type BoardState,
   type LaneIndex,
+  type Side,
   type TurnIntent,
 } from "../arenaTypes";
 import { setMatchExit } from "../../matchExitStore";
 import { makeRngPair, randomSeed, type RngPair } from "../../engine/rng";
+import type { ArenaOnlineDriver } from "../arenaOnlineDriver";
 import { buildCpuDeckMirroring, buildPlayerDeck, resolveArenaDeckSource } from "../arenaDecks";
 import { runResolverFlow, type ResolveStep } from "../arenaResolverFlow";
 import type { ProjectileFX } from "../ArenaProjectileFX";
@@ -77,7 +81,7 @@ import { startMatchFps, stopMatchFps } from "../../graphics/fpsSampler";
 const MATCH_FOUND_SPLASH_MS = 2_600;
 
 export function ArenaGame({
-  onQuit, onRematch, oppName, oppAvatar,
+  onQuit, onRematch, oppName, oppAvatar, online,
 }: {
   onQuit: () => void;
   /** Called when the player taps "Rejouer" on the match-end screen.
@@ -88,6 +92,10 @@ export function ArenaGame({
    *  en match : nom réel + portrait hero_*.png, plus de « CPU » + 🤖. */
   oppName?: string;
   oppAvatar?: string;
+  /** Pro ONLINE (absent = vs-CPU local). Fournit le camp assigné, la graine
+   *  partagée, le deck/Voie réels de l'adversaire, et l'échange lockstep des
+   *  intents/mulligan + la déclaration d'issue. Cf. arenaOnlineDriver. */
+  online?: ArenaOnlineDriver;
 }) {
   const player = useStore((s) => s.player);
   const difficulty = player.difficulty ?? "normal";
@@ -132,7 +140,9 @@ export function ArenaGame({
   // qu'avant, mais partie REPRODUCTIBLE (replay/debug). Online : la graine
   // viendra du shared_seed serveur → les 2 clients rejouent la même partie.
   // Re-tirée au soft-reset rematch (chaque match = sa graine).
-  const rngPair = useRef<RngPair>(makeRngPair(randomSeed()));
+  // Online : graine PARTAGÉE du serveur (les 2 clients rejouent la même partie).
+  // Local : graine aléatoire par match (feeling inchangé, partie reproductible).
+  const rngPair = useRef<RngPair>(online?.rngPair ?? makeRngPair(randomSeed()));
 
   // Wipe the log buffer at match start so each match has a clean diagnostic
   // history (Alex flag : "tu pers tout finalement"). Called once at mount.
@@ -148,15 +158,39 @@ export function ArenaGame({
   // l'id si la clé i18n manque.
   const cardFr = (id: CardId) => t(CARDS[id]?.nameKey ?? "") || id;
 
-  const [board, setBoard] = useState<BoardState>(() =>
-    makeInitialBoard(playerDeck.current, buildCpuDeckMirroring(playerDeck.current, cpuAffinity.current), playerAffinity.current, cpuAffinity.current, cpuPersona.current, rngPair.current),
-  );
+  // Camp CANONIQUE du joueur local. Local vs-CPU : "a" (l'adversaire CPU = "b").
+  // Online : `online.mySide` (le serveur assigne A/B). Le board reste CANONIQUE
+  // (a=A, b=B) — `mySide` ne pilote QUE la PERSPECTIVE (rendu/intent/télémétrie/
+  // victoire), jamais l'état résolu : les deux clients calculent le MÊME board
+  // (le résolveur départage a-avant-b).
+  const mySide: Side = online?.mySide ?? "a";
+  const oppSide: Side = mySide === "a" ? "b" : "a";
+
+  const [board, setBoard] = useState<BoardState>(() => {
+    // Deck/Voie de l'ADVERSAIRE : online = les VRAIS (échangés au handshake) ;
+    // local = deck CPU miroir + Voie aléatoire. On place MON deck sur mySide et
+    // celui de l'adversaire sur oppSide → board CANONIQUE identique des 2 côtés.
+    const myDeck = playerDeck.current;
+    const myAff = playerAffinity.current;
+    const oppDeckResolved = online?.oppDeck ?? buildCpuDeckMirroring(myDeck, cpuAffinity.current);
+    const oppAff = online?.oppAffinity ?? cpuAffinity.current;
+    const deckA = mySide === "a" ? myDeck : oppDeckResolved;
+    const deckB = mySide === "a" ? oppDeckResolved : myDeck;
+    const affA = mySide === "a" ? myAff : oppAff;
+    const affB = mySide === "a" ? oppAff : myAff;
+    // Persona = tempérament de l'IA (cosmétique) — inutile en online (adversaire humain).
+    const personaB = online ? undefined : cpuPersona.current;
+    return makeInitialBoard(deckA, deckB, affA, affB, personaB, rngPair.current);
+  });
 
   // ── MULLIGAN T1 (Alex 2026-06-13 économie expert) ──
   // Une fois par match : remplace jusqu'à 2 cartes de la main de départ.
   // Le CPU mulligan EN MÊME TEMPS (heuristique : il rend ses cartes chères
   // surnuméraires) pour l'équité. "Garder tout" laisse aussi le CPU décider.
-  const [mulliganOpen, setMulliganOpen] = useState(true);
+  // Online v1 : PAS de mulligan (le mulligan par-tap ne se relaie pas à
+  // l'identique ; les mains de départ sont déjà déterministes et identiques des
+  // deux côtés). À câbler en relayé plus tard. Local : mulligan T1 normal.
+  const [mulliganOpen, setMulliganOpen] = useState(!online);
   // Échanges restants (départ 2). Modèle IMMÉDIAT : chaque rejet remplace EN
   // PLACE (cf. ArenaMulligan) → plus de sélection multi-index.
   const [mulliganSwapsLeft, setMulliganSwapsLeft] = useState(2);
@@ -176,7 +210,7 @@ export function ArenaGame({
   // ── INTENT (sorts/invocations planifiés) — état + builders extraits dans
   // useArenaIntent (sémantiquement identique à un useState inline). ──
   const { intent, setIntent, addSpell, removeSpell, addSummon, removeSummon, intentCost } =
-    useArenaIntent(board, cardFr);
+    useArenaIntent(board, mySide, cardFr);
 
   const [matchSplash, setMatchSplash] = useState(true);
   const [resolving, setResolving] = useState(false);
@@ -225,14 +259,23 @@ export function ArenaGame({
   // MONTE. Rend le mécanisme visible : tu vois la cause→effet (« counter de Voie
   // gagné → arête tracée »). One-shot, purgé par timer nettoyé (leak-free).
   const [traceCue, setTraceCue] = useState<TraceCue | null>(null);
-  const engineValA = engineGauge(board.a)?.value ?? 0;
+  // Recap de fin de tour (phrases + micro-stats en bas du pad, Pro vs-CPU + online,
+  // Alex 2026-07). Posé au settle, effacé au lock suivant + par un timer nettoyé.
+  const [turnRecap, setTurnRecap] = useState<TurnRecap | null>(null);
+  const recapKey = useRef(0);
+  useEffect(() => {
+    if (!turnRecap) return;
+    const id = window.setTimeout(() => setTurnRecap(null), 2800);
+    return () => window.clearTimeout(id);
+  }, [turnRecap?.key]);
+  const engineValA = engineGauge(board[mySide])?.value ?? 0;
   const prevEngineA = useRef(engineValA);
   useEffect(() => {
     if (engineValA > prevEngineA.current && engineValA >= 1) {
-      setTraceCue({ count: engineValA, affinity: board.a.affinity, key: Date.now() });
+      setTraceCue({ count: engineValA, affinity: board[mySide].affinity, key: Date.now() });
     }
     prevEngineA.current = engineValA;
-  }, [engineValA, board.a.affinity]);
+  }, [engineValA, board[mySide].affinity]);
   useEffect(() => {
     if (!traceCue) return;
     const idCue = window.setTimeout(() => setTraceCue(null), 1800);
@@ -290,18 +333,23 @@ export function ArenaGame({
   const { forgeFlash, forgeRecover, handleForgeTap, handleForgeDeposit } = useArenaForge({
     board, setBoard, setIntent, targeting, setTargeting, resolving, cardFr,
   });
+  // Online v1 : FORGE désactivée — le dépôt est une mutation de board HORS intent
+  // (setBoard direct) → elle ne passe pas par le lockstep et desyncrait les deux
+  // clients. À relayer plus tard. Local : handlers normaux.
+  const forgeTap = online ? () => {} : handleForgeTap;
+  const forgeDeposit = online ? (_id: CardId) => {} : handleForgeDeposit;
 
   // Rejet IMMÉDIAT d'une carte → remplacée EN PLACE (le joueur voit la nouvelle
   // arriver). Décrémente les échanges restants.
   function handleMulliganReject(i: number) {
     if (mulliganSwapsLeft <= 0) return;
-    setBoard((cur) => ({ ...cur, a: mulliganReplaceInPlace(cur.a, i, rngPair.current.a) }));
+    setBoard((cur) => ({ ...cur, [mySide]: mulliganReplaceInPlace(cur[mySide], i, rngPair.current[mySide]) }));
     setMulliganSwapsLeft((n) => Math.max(0, n - 1));
     hapticTap();
   }
   // Fermeture (« C'est parti ! ») : le CPU mulligan UNE fois, puis on ferme.
   function handleMulliganClose() {
-    setBoard((cur) => ({ ...cur, b: mulliganSwap(cur.b, cpuMulliganIndices(cur.b), rngPair.current.b) }));
+    setBoard((cur) => ({ ...cur, [oppSide]: mulliganSwap(cur[oppSide], cpuMulliganIndices(cur[oppSide]), rngPair.current[oppSide]) }));
     setMulliganOpen(false);
   }
 
@@ -357,7 +405,7 @@ export function ArenaGame({
     if (matchEndedRef.current) { onQuit(); return; }
     matchEndedRef.current = true;
     hapticMatchLoss();
-    recordArenaMatch("loss", { playerVoie: board.a.affinity, oppVoie: board.b.affinity, forfeit: true });
+    recordArenaMatch("loss", { playerVoie: board[mySide].affinity, oppVoie: board[oppSide].affinity, forfeit: true });
     onQuit();
   }
 
@@ -458,8 +506,8 @@ export function ArenaGame({
   // que la dép soit [board.turn] seul (1 point/tour, pas à chaque frame de combat).
   useEffect(() => {
     if (board.phase === "match-end" || board.phase === "sudden-death") return;
-    trajRef.current.self.push(Math.max(0, board.a.hp));
-    trajRef.current.opp.push(Math.max(0, board.b.hp));
+    trajRef.current.self.push(Math.max(0, board[mySide].hp));
+    trajRef.current.opp.push(Math.max(0, board[oppSide].hp));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [board.turn]);
 
@@ -472,26 +520,33 @@ export function ArenaGame({
     if (board.phase !== "match-end") return;
     if (matchEndedRef.current) return;
     matchEndedRef.current = true;
-    const aDead = board.a.hp <= 0;
-    const bDead = board.b.hp <= 0;
+    // Perspective du joueur LOCAL (camp mySide). En vs-CPU, mySide="a" → me=a,
+    // opp=b (inchangé) ; en online camp B, me=b → victoire/défaite correctes.
+    const me = board[mySide];
+    const opp = board[oppSide];
+    const meDead = me.hp <= 0;
+    const oppDead = opp.hp <= 0;
     const outcome: "win" | "loss" | "draw" =
-      aDead && bDead ? "draw" : bDead ? "win" : "loss";
+      meDead && oppDead ? "draw" : oppDead ? "win" : "loss";
     if (outcome === "win") hapticMatchWin();
     else if (outcome === "loss") hapticMatchLoss();
+    // Online : déclare l'issue au serveur (les 2 clients calculent le même
+    // résultat en lockstep ; le relais prend la 1re déclaration → clôt + diffuse).
+    online?.reportResult(outcome);
     // VOIE jouée (joueur + adversaire) journalisée dans l'historique (Alex
-    // 2026-06-13). board.a/b.affinity = la Voie choisie par chaque camp.
-    recordArenaMatch(outcome, { playerVoie: board.a.affinity, oppVoie: board.b.affinity });
+    // 2026-06-13). me/opp.affinity = la Voie choisie par chaque camp.
+    recordArenaMatch(outcome, { playerVoie: me.affinity, oppVoie: opp.affinity });
     // Télémétrie Watcher (Arena Pro vs CPU) — fail-soft, inerte si non configuré.
-    if (board.a.affinity) {
+    if (me.affinity) {
       // Filet : fige le dernier tour si le settle ne l'a pas déjà fait (no-op
       // sinon — pending est purgé après chaque end). Puis lit le déroulé v:2.
       try {
         turnRec.end({
-          hpSelf: Math.max(0, board.a.hp),
-          hpOpp: Math.max(0, board.b.hp),
-          engine: engineGauge(board.a)?.value ?? 0,
-          engineOpp: engineGauge(board.b)?.value ?? 0,
-          finisherUnlocked: !!board.a.finisherUnlocked,
+          hpSelf: Math.max(0, me.hp),
+          hpOpp: Math.max(0, opp.hp),
+          engine: engineGauge(me)?.value ?? 0,
+          engineOpp: engineGauge(opp)?.value ?? 0,
+          finisherUnlocked: !!me.finisherUnlocked,
         });
       } catch { /* télémétrie fail-soft */ }
       const turnLog = turnRec.log();
@@ -500,30 +555,31 @@ export function ArenaGame({
         id: watcherUuid(),
         ts: Date.now(),
         mode: "pro",
-        playerVoie: board.a.affinity,
-        oppVoie: board.b.affinity ?? null,
+        playerVoie: me.affinity,
+        oppVoie: opp.affinity ?? null,
         oppKind: "cpu",
         result: outcome,
         turns: board.turn,
-        finalHpSelf: Math.max(0, board.a.hp),
-        finalHpOpp: Math.max(0, board.b.hp),
-        finisherFired: !!board.a.finisherUnlocked,
-        oppFinisherFired: !!board.b.finisherUnlocked,
-        hpTrajectorySelf: [...trajRef.current.self, Math.max(0, board.a.hp)],
-        hpTrajectoryOpp: [...trajRef.current.opp, Math.max(0, board.b.hp)],
+        finalHpSelf: Math.max(0, me.hp),
+        finalHpOpp: Math.max(0, opp.hp),
+        finisherFired: !!me.finisherUnlocked,
+        oppFinisherFired: !!opp.finisherUnlocked,
+        hpTrajectorySelf: [...trajRef.current.self, Math.max(0, me.hp)],
+        hpTrajectoryOpp: [...trajRef.current.opp, Math.max(0, opp.hp)],
         endReason: endReasonRef.current,
         appVersion: watcherAppVersion,
         turnLog: turnLog.length ? turnLog : undefined,
         fps: stopMatchFps() ?? undefined, // profil FPS de la partie (rAF) — null si trop court
       });
     }
-  }, [board.phase, board.a.hp, board.b.hp, recordArenaMatch]);
+  }, [board.phase, board[mySide].hp, board[oppSide].hp, recordArenaMatch]);
 
   /* ──────────── Lock & resolve ──────────── */
 
   function handleLockTurn() {
     if (resolving) return;
     if (board.phase !== "planning") return;
+    setTurnRecap(null); // le recap du tour précédent disparaît dès qu'on relance
     // Tu peux TOUJOURS finir ton tour (Alex 2026-06-17 « grave erreur » : le Lock
     // se bloquait SILENCIEUSEMENT quand l'intent devenait inabordable — ex. après
     // retrait d'une carte qui DONNAIT du mana, Sablier/Offre). On ne bloque plus :
@@ -532,7 +588,7 @@ export function ArenaGame({
     // (le moteur débite le mana sans clamp, cf. resolver.ts).
     let safe = intent;
     while (
-      intentCost(safe) > board.a.mana + intentManaGrant(safe) &&
+      intentCost(safe) > board[mySide].mana + intentManaGrant(safe) &&
       (safe.spells.length > 0 || safe.summons.length > 0)
     ) {
       safe = safe.spells.length > 0
@@ -542,9 +598,31 @@ export function ArenaGame({
     hapticLock();
     setResolving(true);
 
-    const cpuIntent = cpuArenaDecision(board, "b", difficulty);
-    // Pré-calcul PUR extrait dans arenaResolvePrep (troncature/dépense/exil/startBoard ; flux de résolution = ici).
-    const { startBoard, safeIntent, safeCpuIntent, spentA, spentB } = prepareResolveStart(board, safe, cpuIntent);
+    // Intent de l'ADVERSAIRE. Local vs-CPU : l'IA joue oppSide (SYNC). Online :
+    // on envoie MON intent et on attend celui de l'adversaire (lockstep, ASYNC),
+    // puis on résout des DEUX côtés à l'identique. `board.turn` = round partagé
+    // déterministe → les deux clients s'apparient sur le même tour.
+    if (online) {
+      online
+        .exchangeIntent(board.turn, safe)
+        .then((oppIntent) => {
+          if (matchEndedRef.current) return; // match clos pendant l'attente → on jette
+          resolveWith(safe, oppIntent);
+        })
+        .catch(() => { /* déconnexion/fin : gérée par les callbacks de session */ });
+    } else {
+      resolveWith(safe, cpuArenaDecision(board, oppSide, difficulty));
+    }
+  }
+
+  /** Résout un tour depuis MON intent + celui de l'ADVERSAIRE (déjà connus).
+   *  Jonction UNIQUE vs-CPU / online : seul le PRODUCTEUR de l'intent adverse
+   *  diffère (IA locale sync OU réseau async) ; résolution + anims identiques.
+   *  prepareResolveStart(...,mySide) remet les intents en ordre CANONIQUE → les
+   *  deux clients calculent le même board. */
+  function resolveWith(myIntent: TurnIntent, oppIntent: TurnIntent) {
+    // Pré-calcul PUR (troncature/dépense/exil/startBoard) — cf. arenaResolvePrep.
+    const { startBoard, safeIntent, safeCpuIntent, spentA, spentB } = prepareResolveStart(board, myIntent, oppIntent, mySide);
 
     // Télémétrie Watcher (Tier A) — démarre le tour avec l'état AVANT résolution +
     // les coups réellement engagés (safeIntent/safeCpuIntent post-trim) + le ledger
@@ -552,18 +630,18 @@ export function ArenaGame({
     try {
       turnRec.begin({
         turn: board.turn,
-        manaMax: board.a.maxMana,
-        manaSpent: Math.min(board.a.maxMana, Math.max(0, intentCost(safe) - intentManaGrant(safe))),
-        handStart: board.a.hand.length,
-        deckLeft: board.a.deck.length,
-        plays: buildTurnPlays(safeIntent, board.a.affinity),
-        playsOpp: buildTurnPlays(safeCpuIntent, board.b.affinity),
+        manaMax: board[mySide].maxMana,
+        manaSpent: Math.min(board[mySide].maxMana, Math.max(0, intentCost(myIntent) - intentManaGrant(myIntent))),
+        handStart: board[mySide].hand.length,
+        deckLeft: board[mySide].deck.length,
+        plays: buildTurnPlays(safeIntent, board[mySide].affinity),
+        playsOpp: buildTurnPlays(safeCpuIntent, board[oppSide].affinity),
         cards: buildCardLedger(spentA, cardFr),
         cardsOpp: buildCardLedger(spentB, cardFr),
-        hpSelf: Math.max(0, board.a.hp),
-        hpOpp: Math.max(0, board.b.hp),
-        engine: engineGauge(board.a)?.value ?? 0,
-        engineOpp: engineGauge(board.b)?.value ?? 0,
+        hpSelf: Math.max(0, board[mySide].hp),
+        hpOpp: Math.max(0, board[oppSide].hp),
+        engine: engineGauge(board[mySide])?.value ?? 0,
+        engineOpp: engineGauge(board[oppSide])?.value ?? 0,
       });
     } catch { /* télémétrie fail-soft */ }
 
@@ -572,6 +650,8 @@ export function ArenaGame({
       playerIntent: safeIntent,
       cpuIntent: safeCpuIntent,
       rng: rngPair.current,
+      mySide,
+      noSuddenDeath: !!online, // online : mort subite non déterministe → NUL propre
       setBoard,
       setOppPreview,
       setPlayerPreview,
@@ -592,13 +672,17 @@ export function ArenaGame({
         // en match-end). Fail-soft, observationnel.
         try {
           turnRec.end({
-            hpSelf: Math.max(0, finalBoard.a.hp),
-            hpOpp: Math.max(0, finalBoard.b.hp),
-            engine: engineGauge(finalBoard.a)?.value ?? 0,
-            engineOpp: engineGauge(finalBoard.b)?.value ?? 0,
-            finisherUnlocked: !!finalBoard.a.finisherUnlocked,
+            hpSelf: Math.max(0, finalBoard[mySide].hp),
+            hpOpp: Math.max(0, finalBoard[oppSide].hp),
+            engine: engineGauge(finalBoard[mySide])?.value ?? 0,
+            engineOpp: engineGauge(finalBoard[oppSide])?.value ?? 0,
+            finisherUnlocked: !!finalBoard[mySide].finisherUnlocked,
           });
         } catch { /* télémétrie fail-soft */ }
+        // Recap de fin de tour (phrases + micro-stats) — delta board AVANT (`board`,
+        // pré-résolution) → APRÈS (finalBoard), du point de vue local. null au coup
+        // fatal (l'écran de fin prend le relais). Affiché en bas du pad.
+        setTurnRecap(buildTurnRecap(board, finalBoard, mySide, ++recapKey.current));
       },
       onAdvanceTurn: () => {
         setResolving(false);
@@ -673,6 +757,8 @@ export function ArenaGame({
        *  ébranlement Pierre… + tremblement de cette racine (Alex 2026-06-13). */}
       <ArenaImpactFX fx={impactFX} />
       <ArenaTraceCue cue={traceCue} />
+      {/* Recap de fin de tour (phrases + micro-stats) — bas du pad, Pro vs-CPU + online. */}
+      <ArenaTurnRecap recap={turnRecap} />
       {/* ⚡ Cartes « à la pioche » (Cast When Drawn) — éclair + carte + effet,
        *  jouées une par une (Alex 2026-06-13). One-shot, démonte via onDone. */}
       <AnimatePresence>
@@ -712,7 +798,7 @@ export function ArenaGame({
           <ArenaBoard
             fillHeight={slotH}
             board={board}
-            playerSide="a"
+            playerSide={mySide}
             intent={intent}
             oppPreview={oppPreview}
             playerPreview={playerPreview}
@@ -733,7 +819,7 @@ export function ArenaGame({
             onRemoveSummon={removeSummon}
             forgeYou={board.forgeA ?? null}
             forgeOpp={board.forgeB ?? null}
-            onForgeTap={handleForgeTap}
+            onForgeTap={forgeTap}
             forgeFlashKey={forgeFlash}
             forgeRecoverKey={forgeRecover}
             forgeHighlight={
@@ -758,8 +844,8 @@ export function ArenaGame({
         onAddSummon={addSummon}
         onRemoveSummon={removeSummon}
         onLock={handleLockTurn}
-        onForgeTap={handleForgeTap}
-        onForgeDeposit={handleForgeDeposit}
+        onForgeTap={forgeTap}
+        onForgeDeposit={forgeDeposit}
         incomingAttackKey={heroHit?.side === "you" ? heroHit.key : null}
         playerName={player.nickname || "Toi"}
         playerAvatar={player.avatar}
@@ -767,9 +853,9 @@ export function ArenaGame({
       {/* ── MULLIGAN T1 — modale extraite (ArenaMulligan) : empilage des
        *  doublons + remplacement IMMÉDIAT en place (Alex 2026-06-13). ── */}
       <AnimatePresence>
-        {mulliganOpen && board.turn === 1 && board.a.hand.length > 0 && !resolving && (
+        {mulliganOpen && board.turn === 1 && board[mySide].hand.length > 0 && !resolving && (
           <ArenaMulligan
-            hand={board.a.hand}
+            hand={board[mySide].hand}
             swapsLeft={mulliganSwapsLeft}
             onRejectOne={handleMulliganReject}
             onClose={handleMulliganClose}

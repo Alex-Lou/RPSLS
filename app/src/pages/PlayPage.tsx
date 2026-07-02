@@ -15,6 +15,7 @@ import { MatchPrepScreen, type Arena } from "../ranked/MatchPrepScreen";
 import { ArenaPadProvider } from "../ranked/arena";
 import { ArenaPage } from "../arena/ArenaPage";
 import { ArenaLobby } from "../arena/ArenaLobby";
+import { ArenaOnlineGame } from "../arena/ArenaOnlineGame";
 import { useArenaOverride } from "../ranked/arenaOverride";
 import { oppPersona } from "../ranked/personaSeed";
 import { applyTheme } from "../theme/theme";
@@ -43,7 +44,8 @@ type View =
   | { kind: "classe_match"; oppName: string; oppAvatar: string }
   // Constellation Pro — solo lobby (deck + rules + entry points) then match.
   | { kind: "arena_lobby" }
-  | { kind: "arena_pro" };
+  | { kind: "arena_pro" }
+  | { kind: "arena_online" };
 
 export function PlayPage({
   onNavigate, homeNonce,
@@ -152,10 +154,22 @@ export function PlayPage({
           <ArenaLobby
             key="arena-lobby"
             onTraining={() => setView({ kind: "arena_pro" })}
+            onGoOnline={() => setView({ kind: "arena_online" })}
             onManageDeck={() => setView({ kind: "ranked_deck", from: "arena" })}
             onGoShop={() => setView({ kind: "ranked_lobby" })}
             onBack={() => setView({ kind: "select" })}
           />
+        )}
+        {view.kind === "arena_online" && (
+          <motion.div
+            key="arena_online"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            className="flex flex-col flex-1 min-h-0"
+          >
+            <ArenaOnlineGame onBack={() => setView({ kind: "arena_lobby" })} />
+          </motion.div>
         )}
         {view.kind === "arena_pro" && (
           <motion.div

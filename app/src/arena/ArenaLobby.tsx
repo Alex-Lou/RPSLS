@@ -87,12 +87,15 @@ const VOIE_FICHE: Record<Move, { but: string; plus: string; moins: string; perso
 
 export function ArenaLobby({
   onTraining,
+  onGoOnline,
   onManageDeck,
   onGoShop,
   onBack,
 }: {
   /** Launch a Training match vs CPU (goes to ArenaPrepScreen → ArenaGame). */
   onTraining: () => void;
+  /** Match rapide EN LIGNE vs joueur réel (Pro 1v1 lockstep). */
+  onGoOnline?: () => void;
   /** Open the deck manager (filtered by arenaSupported). */
   onManageDeck: () => void;
   /** Jump to the boutique (eclats / packs / craft). */
@@ -191,12 +194,13 @@ export function ArenaLobby({
       secondary={
         <div className="grid grid-cols-3 gap-2">
           <button
-            disabled
-            className="bg-surface rounded-2xl px-2 py-2 flex flex-col items-center gap-0.5 opacity-55 cursor-not-allowed border border-hairline"
+            onClick={onGoOnline}
+            disabled={!onGoOnline}
+            className="bg-surface rounded-2xl px-2 py-2 flex flex-col items-center gap-0.5 border border-hairline hover:bg-hairline transition disabled:opacity-55 disabled:cursor-not-allowed"
           >
             <img src={PRO_ICON("pro-match-rapide")} alt="" draggable={false} className="w-7 h-7 object-contain" />
-            <span className="font-bold text-[10px]">Match rapide</span>
-            <span className="text-[8px] uppercase tracking-wider text-ink-faint">Bientôt</span>
+            <span className="font-bold text-[10px] text-ink">Match rapide</span>
+            <span className="text-[8px] uppercase tracking-wider" style={{ color: "var(--theme-secondary)" }}>En ligne</span>
           </button>
           <button
             disabled

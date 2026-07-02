@@ -3,7 +3,7 @@ import type { CardId } from "../../ranked/rankedTypes";
 import { alog } from "../arenaLog";
 import { truncateIntentByCaps } from "../arenaRules";
 import { removeSpentCardsDetailed } from "../arenaDecks";
-import type { BoardState, TurnIntent } from "../arenaTypes";
+import type { BoardState, Side, TurnIntent } from "../arenaTypes";
 
 /**
  * prepareResolveStart — pré-calcul PUR exécuté avant runResolverFlow.
@@ -26,17 +26,24 @@ import type { BoardState, TurnIntent } from "../arenaTypes";
  * consommé == appliqué, invariant garanti. (cpuIntent est déjà tronqué
  * par l'IA ; re-tronquer est idempotent.)
  */
-export function prepareResolveStart(board: BoardState, intent: TurnIntent, cpuIntent: TurnIntent): {
+// `intent`/`cpuIntent` sont en PERSPECTIVE (moi / adversaire). `mySide` (défaut
+// "a") replace chaque intent sur le BON camp canonique : mon intent retire mes
+// cartes de board[mySide], l'adversaire de board[oppSide]. Défaut "a" → moi=a,
+// opp=b = comportement inchangé ; en online camp B, moi=b. Le startBoard reste
+// CANONIQUE (les deux clients calculent le même). `spentA`/`spentB` = dépensé
+// par MOI / l'ADVERSAIRE (perspective, pour la télémétrie locale).
+export function prepareResolveStart(board: BoardState, intent: TurnIntent, cpuIntent: TurnIntent, mySide: Side = "a"): {
   startBoard: BoardState;
   safeIntent: TurnIntent;
   safeCpuIntent: TurnIntent;
   spentA: CardId[]; // vraies cartes dépensées ce tour (télémétrie Watcher, observationnel)
   spentB: CardId[];
 } {
+  const oppSide: Side = mySide === "a" ? "b" : "a";
   const safeIntent = truncateIntentByCaps(intent);
   const safeCpuIntent = truncateIntentByCaps(cpuIntent);
-  const aSpent = removeSpentCardsDetailed(board.a.hand, safeIntent);
-  const bSpent = removeSpentCardsDetailed(board.b.hand, safeCpuIntent);
+  const aSpent = removeSpentCardsDetailed(board[mySide].hand, safeIntent);
+  const bSpent = removeSpentCardsDetailed(board[oppSide].hand, safeCpuIntent);
   // ÉCONOMIE expert (Alex 2026-06-13) : les LÉGENDAIRES jouées sont EXILÉES
   // (jamais reshufflées → 1 usage/partie, elles redeviennent des MOMENTS).
   // Idem les cartes de FUSION (Alex 2026-06-16) : forgées en partie, jouées
@@ -56,8 +63,8 @@ export function prepareResolveStart(board: BoardState, intent: TurnIntent, cpuIn
   if (bSplit.toExile.length > 0) alog("hand", `b EXIL [${bSplit.toExile.join(",")}] (légendaire/fusion, 1 usage par partie)`);
   const startBoard: BoardState = {
     ...board,
-    a: { ...board.a, hand: aSpent.hand, discard: [...board.a.discard, ...aSplit.toDiscard], exiled: [...board.a.exiled, ...aSplit.toExile] },
-    b: { ...board.b, hand: bSpent.hand, discard: [...board.b.discard, ...bSplit.toDiscard], exiled: [...board.b.exiled, ...bSplit.toExile] },
+    [mySide]: { ...board[mySide], hand: aSpent.hand, discard: [...board[mySide].discard, ...aSplit.toDiscard], exiled: [...board[mySide].exiled, ...aSplit.toExile] },
+    [oppSide]: { ...board[oppSide], hand: bSpent.hand, discard: [...board[oppSide].discard, ...bSplit.toDiscard], exiled: [...board[oppSide].exiled, ...bSplit.toExile] },
   };
   return { startBoard, safeIntent, safeCpuIntent, spentA: aSpent.spent, spentB: bSpent.spent };
 }

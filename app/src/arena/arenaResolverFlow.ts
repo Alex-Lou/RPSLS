@@ -72,6 +72,18 @@ export interface ResolverFlowArgs {
    *  DÉTERMINISTE (lockstep Pro online / replay). Optionnel : absent →
    *  Math.random (comportement historique). */
   rng?: RngPair;
+  /** Camp CANONIQUE du joueur local (défaut "a"). `playerIntent`/`cpuIntent`
+   *  restent en PERSPECTIVE (moi / adversaire) ; ce champ sert UNIQUEMENT à
+   *  replacer les deux intents dans l'ordre canonique a/b au moment de résoudre,
+   *  pour que les DEUX clients (moi camp "a" OU "b") calculent le MÊME board
+   *  (le résolveur départage a-avant-b → l'ordre canonique doit être partagé).
+   *  Défaut "a" → intentA=moi, intentB=adversaire = comportement vs-CPU inchangé. */
+  mySide?: Side;
+  /** Pro online : la MORT SUBITE (ArenaSuddenDeath) tire au `Math.random` NON
+   *  seedé → elle desyncrait les deux clients. En online on la NEUTRALISE : une
+   *  égalité parfaite (double KO ou hard-cap à PV égaux) devient un NUL propre
+   *  (match-end, les deux à 0). Défaut false → comportement vs-CPU inchangé. */
+  noSuddenDeath?: boolean;
   setBoard: (b: BoardState) => void;
   setOppPreview: (i: TurnIntent | null) => void;
   setPlayerPreview: (i: TurnIntent | null) => void;
@@ -153,7 +165,7 @@ const VICTORY_REVEAL_MS = 1_600;
  *  observable side-effect. */
 export function runResolverFlow(args: ResolverFlowArgs): () => void {
   const {
-    startBoard, playerIntent, cpuIntent, rng,
+    startBoard, playerIntent, cpuIntent, rng, mySide = "a", noSuddenDeath = false,
     setBoard, setOppPreview, setPlayerPreview, setResolveStep,
     setCombatLane, setCombatChargers, setHeroHit, setTauntBlock, setAntiTaunt, setRiposteFX, setSpellFX, setImpactFX, setProjectileFX,
     onSettle, onAdvanceTurn, onMatchEnd, onLaneResolved,
@@ -170,6 +182,12 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
   // Le « moment » Légendaire/Finisher est géré PAR CARTE dans la file de
   // spell-spotlight (Step 1) — plus besoin d'un flag global de tour.
 
+  // Ordre CANONIQUE (a/b) des deux intents pour la résolution — partagé par les
+  // deux clients quel que soit le camp local. Les APERÇUS restent en perspective
+  // (moi=playerIntent, adversaire=cpuIntent). Défaut mySide="a" → intentA=moi.
+  const intentA = mySide === "a" ? playerIntent : cpuIntent;
+  const intentB = mySide === "a" ? cpuIntent : playerIntent;
+
   // ─── Step 0: REVEAL ───
   setOppPreview(cpuIntent);
   setPlayerPreview(playerIntent);
@@ -183,13 +201,13 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
     // fraîches AVANT de résoudre les sorts → Éboulement & co agissent sur les
     // voisines tout juste invoquées (fini « le sort frappe le ghost, la créature se
     // forme après »). postSummonBoard = état lu par les projectiles (cibles réelles).
-    b = applySummons(b, playerIntent, "a");
-    b = applySummons(b, cpuIntent, "b");
+    b = applySummons(b, intentA, "a");
+    b = applySummons(b, intentB, "b");
     const postSummonBoard = b;
     setBoard(b);
     setOppPreview(null);
     setPlayerPreview(null);
-    b = applyAllSpells(b, playerIntent, cpuIntent, rng);
+    b = applyAllSpells(b, intentA, intentB, rng);
     setResolveStep("spells");
     // COMMIT du board (mort/dégâts/héros) — emballé pour pouvoir être DIFFÉRÉ à
     // l'impact du caillou (cf. plus bas). Flash de strip sur le héros qui ENCAISSE
@@ -498,11 +516,15 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
             // (Mort subite RPSLS) au lieu de match-end direct. ArenaGame
             // détecte cette phase et affiche le component ArenaSuddenDeath.
             alog("turn", `MATCH END — ÉGALITÉ (a.hp=${b.a.hp}, b.hp=${b.b.hp}) → 🌟 BUT D'OR / Mort subite RPSLS`);
-            b = { ...b, phase: "sudden-death" };
-            setBoard(b);
-            // Pas de onMatchEnd ici — le sudden-death component va le triggerer
-            // après résolution. Délai 1.6s pour laisser respirer la transition.
-            return;
+            if (!noSuddenDeath) {
+              b = { ...b, phase: "sudden-death" };
+              setBoard(b);
+              // Pas de onMatchEnd ici — le sudden-death component va le triggerer
+              // après résolution. Délai 1.6s pour laisser respirer la transition.
+              return;
+            }
+            // Online : pas de mort subite (non déterministe) → on tombe en
+            // match-end NUL ci-dessous (les deux héros sont déjà à ≤0).
           }
           if (b.a.hp <= 0 || b.b.hp <= 0) {
             b = { ...b, phase: "match-end" };
@@ -514,15 +536,20 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
             // BUT D'OR, même chemin que l'égalité parfaite.
             if (b.a.hp === b.b.hp) {
               alog("turn", `HARD CAP T${b.turn} — HP égaux (${b.a.hp}) → 🌟 BUT D'OR / Mort subite RPSLS`);
-              b = { ...b, phase: "sudden-death" };
-              setBoard(b);
-              return;
+              if (!noSuddenDeath) {
+                b = { ...b, phase: "sudden-death" };
+                setBoard(b);
+                return;
+              }
+              // Online : NUL forcé (les deux à 0 → match-end draw), pas de mort subite.
+              b = { ...b, a: { ...b.a, hp: 0 }, b: { ...b.b, hp: 0 }, phase: "match-end" };
+            } else {
+              const aLoses = b.a.hp < b.b.hp;
+              alog("turn", `HARD CAP T${b.turn} — ${aLoses ? "a" : "b"} perd (HP ${b.a.hp} vs ${b.b.hp})`);
+              b = aLoses
+                ? { ...b, a: { ...b.a, hp: 0 }, phase: "match-end" }
+                : { ...b, b: { ...b.b, hp: 0 }, phase: "match-end" };
             }
-            const aLoses = b.a.hp < b.b.hp;
-            alog("turn", `HARD CAP T${b.turn} — ${aLoses ? "a" : "b"} perd (HP ${b.a.hp} vs ${b.b.hp})`);
-            b = aLoses
-              ? { ...b, a: { ...b.a, hp: 0 }, phase: "match-end" }
-              : { ...b, b: { ...b.b, hp: 0 }, phase: "match-end" };
           }
           const aDead = b.a.hp <= 0;
           const bDead = b.b.hp <= 0;
@@ -538,7 +565,9 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
             window.setTimeout(() => {
               if (aborted) return;
               setBoard(b); // phase match-end → ArenaMatchEnd s'affiche enfin
-              const playerWon = bDead && !aDead;
+              // Perspective : mon camp gagne si l'ADVERSAIRE (oppSide) est mort et
+              // pas moi. mySide="a" → bDead&&!aDead (inchangé) ; camp B → l'inverse.
+              const playerWon = mySide === "a" ? (bDead && !aDead) : (aDead && !bDead);
               onMatchEnd(playerWon);
             }, VICTORY_REVEAL_MS);
           } else {
