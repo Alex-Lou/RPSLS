@@ -1,10 +1,13 @@
 import { starterDeck, shuffle, STARTING_HAND, CARDS, isPassiveCard } from "../cards";
 import type { CardId, RankedBattleState } from "../rankedTypes";
+import type { Rng } from "../../engine/rng";
 
 /** Helpers PURS extraits VERBATIM de RankedGame (lignes 94-140). Zéro
  *  dépendance React — déplacement mécanique pour alléger l'orchestrateur. */
 
-export function makeBattle(savedDeck?: string[]): RankedBattleState {
+// `rng` (défaut Math.random) : PRNG seedé pour un ordre de deck DÉTERMINISTE
+// (lockstep CCG online). Défaut = comportement inchangé.
+export function makeBattle(savedDeck?: string[], rng: Rng = Math.random): RankedBattleState {
   const cleaned = (savedDeck ?? []).filter(
     (id): id is CardId => Object.prototype.hasOwnProperty.call(CARDS, id),
   );
@@ -14,7 +17,7 @@ export function makeBattle(savedDeck?: string[]): RankedBattleState {
   const passives = source.filter(isPassiveCard);
   const drawSource = source.filter((id) => !isPassiveCard(id));
   return {
-    deck: shuffle(drawSource),
+    deck: shuffle(drawSource, rng),
     hand: [],
     discard: [],
     usedOneShotCards: [],

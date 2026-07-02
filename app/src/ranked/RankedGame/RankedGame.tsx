@@ -19,6 +19,7 @@ import {
   type RoundOutcome,
 } from "../../engine/lanesEngine";
 import { detectPlayerCombo, shuffleLaneIdentities } from "../../engine/lanesCombos";
+import { makeRng, randomSeed, rngInt, type Rng } from "../../engine/rng";
 import { eclatsReward } from "../../engine/economy";
 import {
   hapticLock, hapticMatchStart, hapticMatchWin, hapticMatchLoss,
@@ -78,11 +79,18 @@ export function RankedGame({
   const savedDeck = useStore((s) => s.player.rankedDeck);
   const awardCardMasteryXp = useStore((s) => s.awardCardMasteryXp);
 
+  // PRNG SEEDÉ du match (Phase 0 lockstep) : seed aléatoire au boot pour le
+  // vs-CPU (comportement inchangé, mais résolution REPRODUCTIBLE) ; plus tard le
+  // seed viendra du serveur pour synchroniser les 2 joueurs. TOUTE la résolution
+  // (deck / pioche / défausse / lane-perm / aléa de cartes) consomme CE rng dans
+  // un ordre déterministe. Le CPU AI, lui, garde Math.random (input, mort en PvP).
+  const [rng] = useState<Rng>(() => makeRng(randomSeed()));
+
   // Shuffle the lane arrangement once per match — synchronously during this
   // (parent) render so the board children read the SAME arrangement on first
   // paint. The ref guards against re-shuffling on re-renders / StrictMode.
   const laneShuffled = useRef(false);
-  if (!laneShuffled.current) { shuffleLaneIdentities(); laneShuffled.current = true; }
+  if (!laneShuffled.current) { shuffleLaneIdentities(rng); laneShuffled.current = true; }
 
   const matchInfo: RankedMatchInfo = {
     matchId: "ranked-local",
@@ -115,7 +123,7 @@ export function RankedGame({
    *  per round" tension by decoupling the reveal from the counter slot. */
   const pharePendingRef = useRef(false);
   const [mana, setMana] = useState(1);
-  const [battle, setBattle] = useState<RankedBattleState>(() => makeBattle(savedDeck));
+  const [battle, setBattle] = useState<RankedBattleState>(() => makeBattle(savedDeck, rng));
   const [lastResult, setLastResult] = useState<RankedRoundResultData | null>(null);
   const [end, setEnd] = useState<RankedEndData | null>(null);
   /** Riposte sub-phase: when set, the player played Riposte on a lane and
@@ -222,7 +230,7 @@ export function RankedGame({
         const fullSource = [...b.deck, ...b.hand, ...b.discard, ...b.usedOneShotCards];
         return {
           ...b,
-          deck: shuffle(fullSource),
+          deck: shuffle(fullSource, rng),
           hand: [],
           discard: [],
           usedOneShotCards: [],
@@ -266,7 +274,7 @@ export function RankedGame({
     // Bump the cap for this draw cycle so the compensation / Pillage cards are
     // honored even if the player also hit the normal cap this round.
     const drawCap = HAND_CAP + (compensationDraw ? 1 : 0) + pillageDraw;
-    const drawn = drawN(battle.deck, battle.hand, battle.discard, drawCount, drawCap);
+    const drawn = drawN(battle.deck, battle.hand, battle.discard, drawCount, drawCap, rng);
 
     // CPU decision now, stored in ref so Augur can read without races.
     // Mascarade (Bluff): a poisoned read makes the hard AI plan from an empty
@@ -327,7 +335,7 @@ export function RankedGame({
     // Prophétie (passive): a free Augur every round — reveal one random
     // opponent pick. Otherwise clear last round's reveal.
     if (battle.passives.includes("prophetie")) {
-      const lane = Math.floor(Math.random() * LANE_COUNT) as LaneTarget;
+      const lane = rngInt(rng, LANE_COUNT) as LaneTarget;
       setAugurRevealed({ lane, move: cpuDecision.plays[lane].mv });
     } else {
       setAugurRevealed(null);
@@ -382,7 +390,7 @@ export function RankedGame({
       // theme by trading "saved seconds" for resource velocity.
       setBonusManaNext(bonusManaNextRoundRef.current + 1);
       setBattle((b) => {
-        const dr = drawN(b.deck, b.hand, b.discard, 1, b.hand.length + 1);
+        const dr = drawN(b.deck, b.hand, b.discard, 1, b.hand.length + 1, rng);
         return { ...b, deck: dr.deck, hand: dr.hand, discard: dr.discard };
       });
     }
@@ -405,7 +413,7 @@ export function RankedGame({
       const picked: CardId[] = [];
       const work = pool.slice();
       for (let i = 0; i < 3 && work.length > 0; i++) {
-        const idx = Math.floor(Math.random() * work.length);
+        const idx = rngInt(rng, work.length);
         picked.push(work[idx]);
         work.splice(idx, 1);
       }
@@ -488,12 +496,12 @@ export function RankedGame({
         let discardAfter = b.discard.slice();
         let usedAfter = b.usedOneShotCards.slice();
         if (handAfter.length > 0) {
-          const dr = discardRandom(handAfter, discardAfter, usedAfter);
+          const dr = discardRandom(handAfter, discardAfter, usedAfter, rng);
           handAfter = dr.hand;
           discardAfter = dr.discard;
           usedAfter = dr.usedOneShotCards;
         }
-        const draw = drawN(b.deck, handAfter, discardAfter, 3, HAND_CAP + 3);
+        const draw = drawN(b.deck, handAfter, discardAfter, 3, HAND_CAP + 3, rng);
         return {
           ...b,
           deck: draw.deck,
@@ -857,7 +865,7 @@ export function RankedGame({
       // a blind sacrifice ("I might lose this lane") into a tempo trade
       // ("I burn the lane for a card NOW + a fatter mana pool next round").
       if (myCard?.id === "echappee") {
-        const dr = drawN(b.deck, handAfter, discardAfter, 1, handAfter.length + 1);
+        const dr = drawN(b.deck, handAfter, discardAfter, 1, handAfter.length + 1, rng);
         handAfter = dr.hand;
         discardAfter = dr.discard;
         // Reassign the deck reference for the rest of this update block.
@@ -866,24 +874,24 @@ export function RankedGame({
       // Player Heist landed → steal a random card from the CPU's notional hand.
       if (myHeistSuccess) {
         const stolen = STEALABLE_FROM_CPU[
-          Math.floor(Math.random() * STEALABLE_FROM_CPU.length)
+          rngInt(rng, STEALABLE_FROM_CPU.length)
         ];
         handAfter = [...handAfter, stolen];
       }
       // CPU Heist landed → yank a random card out of our hand.
       if (oppHeistSuccess && handAfter.length > 0) {
-        const idx = Math.floor(Math.random() * handAfter.length);
+        const idx = rngInt(rng, handAfter.length);
         handAfter = [...handAfter.slice(0, idx), ...handAfter.slice(idx + 1)];
       }
       // Lose round → discard 1 random card from hand
       if (finalWinner === "b" && handAfter.length > 0) {
-        const dr = discardRandom(handAfter, discardAfter, usedOneShotAfter);
+        const dr = discardRandom(handAfter, discardAfter, usedOneShotAfter, rng);
         handAfter = dr.hand;
         discardAfter = dr.discard;
         usedOneShotAfter = dr.usedOneShotCards;
         // Gambit backfire: a lost Gambit round burns an EXTRA card.
         if (gambitActive && handAfter.length > 0) {
-          const dr2 = discardRandom(handAfter, discardAfter, usedOneShotAfter);
+          const dr2 = discardRandom(handAfter, discardAfter, usedOneShotAfter, rng);
           handAfter = dr2.hand;
           discardAfter = dr2.discard;
           usedOneShotAfter = dr2.usedOneShotCards;
@@ -893,7 +901,7 @@ export function RankedGame({
       // Resolved here (after the loss-discard) so it's a guaranteed net +1 card.
       let deckAfter = b.deck;
       if (myCard?.id === "prescience") {
-        const dr = drawN(deckAfter, handAfter, discardAfter, 1, handAfter.length + 1);
+        const dr = drawN(deckAfter, handAfter, discardAfter, 1, handAfter.length + 1, rng);
         deckAfter = dr.deck;
         handAfter = dr.hand;
         discardAfter = dr.discard;
@@ -1025,7 +1033,7 @@ export function RankedGame({
     setSuddenDeathData(null);
     setAugurCooldown(0);
     setMana(1);
-    const fresh = makeBattle(savedDeck);
+    const fresh = makeBattle(savedDeck, rng);
     setBattle(fresh);
     setGaiaCharged(fresh.passives.includes("gaia"));
     cpuDecisionRef.current = null;

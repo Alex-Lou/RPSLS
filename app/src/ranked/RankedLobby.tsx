@@ -28,7 +28,7 @@ const HIW_ICONS = {
   cartes:   "/IconesMenu CommentCaMarche/Cartes icone.png",
 };
 
-export function RankedLobby({ onViewBracket, onManageDeck, onBack, onGoShop }: { onViewBracket: () => void; onManageDeck: () => void; onBack?: () => void; onGoShop?: () => void }) {
+export function RankedLobby({ onQuickMatch, onViewBracket, onManageDeck, onBack, onGoShop }: { onQuickMatch: () => void; onViewBracket: () => void; onManageDeck: () => void; onBack?: () => void; onGoShop?: () => void }) {
   const t = useT();
   const player = useStore((s) => s.player);
   const { tier, progress: lpProgress } = rankProgress(player.rankLp);
@@ -48,27 +48,39 @@ export function RankedLobby({ onViewBracket, onManageDeck, onBack, onGoShop }: {
       titleGradient="from-amber-300 to-violet-300"
       onBack={onBack}
       cta={
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={onViewBracket}
-          className="w-full rounded-2xl px-5 py-3 flex items-center justify-between font-black text-white shadow-2xl bg-themed-br"
-          style={{
-            boxShadow: "0 12px 32px -6px color-mix(in oklab, var(--theme-primary) 55%, transparent), 0 0 24px color-mix(in oklab, var(--theme-secondary) 35%, transparent)",
-            fontFamily: "var(--font-headline)",
-            letterSpacing: "0.04em",
-          }}
-        >
-          <div className="flex items-center gap-2.5">
+        // DEUX entrées (Alex 2026-07 « pas forcément que du tournoi ») : Match
+        // rapide = 1 duel Constellation Classée direct vs CPU · Tournoi = le
+        // bracket 8 CPU. Mêmes gabarits themed, différenciés par l'icône/label.
+        <div className="grid grid-cols-2 gap-2">
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={onQuickMatch}
+            className="rounded-2xl px-3 py-3 flex flex-col items-center justify-center gap-0.5 text-center font-black text-white shadow-2xl bg-themed-br"
+            style={{
+              boxShadow: "0 12px 32px -6px color-mix(in oklab, var(--theme-primary) 55%, transparent), 0 0 24px color-mix(in oklab, var(--theme-secondary) 35%, transparent)",
+              fontFamily: "var(--font-headline)",
+              letterSpacing: "0.03em",
+            }}
+          >
+            <span className="text-2xl">🎮</span>
+            <span className="text-sm sm:text-base leading-tight">MATCH RAPIDE</span>
+            <span className="text-[10px] font-medium opacity-85 normal-case tracking-normal">Duel direct vs CPU</span>
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={onViewBracket}
+            className="rounded-2xl px-3 py-3 flex flex-col items-center justify-center gap-0.5 text-center font-black text-white shadow-2xl bg-themed-br"
+            style={{
+              boxShadow: "0 12px 32px -6px color-mix(in oklab, var(--theme-secondary) 55%, transparent), 0 0 24px color-mix(in oklab, var(--theme-primary) 35%, transparent)",
+              fontFamily: "var(--font-headline)",
+              letterSpacing: "0.03em",
+            }}
+          >
             <span className="text-2xl">🏆</span>
-            <div className="text-left">
-              <div className="text-sm sm:text-base">VOIR LE TOURNOI</div>
-              <div className="text-[10px] font-medium opacity-85 normal-case tracking-normal">
-                8 adversaires CPU · prochain dans {countdown}
-              </div>
-            </div>
-          </div>
-          <span className="text-xl">›</span>
-        </motion.button>
+            <span className="text-sm sm:text-base leading-tight">TOURNOI</span>
+            <span className="text-[10px] font-medium opacity-85 normal-case tracking-normal">8 CPU · dans {countdown}</span>
+          </motion.button>
+        </div>
       }
       secondary={
         // Rangée secondaire — MÊME pattern que le Pro ([Match rapide][Tournoi]

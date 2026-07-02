@@ -4,6 +4,7 @@
  */
 
 import type { CardId, CardRarity, RankedCard } from "./rankedTypes";
+import type { Rng } from "../engine/rng";
 
 export const CARDS: Record<CardId, RankedCard> = {
   /* ⚪ COMMONS — 1 mana */
@@ -979,10 +980,13 @@ export const DEFAULT_ARENA_DECK: CardId[] = [
   "aegis", "precision", "surge", "augur", "anchor", "second-wind", "heist", "supernova", "seve", "jet-caillou",
 ];
 
-export function shuffle<T>(input: readonly T[]): T[] {
+// `rng` (défaut Math.random) : passe un PRNG seedé pour une résolution
+// DÉTERMINISTE (lockstep CCG online). Tous les appelants existants (non-CCG)
+// gardent Math.random via le défaut → zéro changement de comportement.
+export function shuffle<T>(input: readonly T[], rng: Rng = Math.random): T[] {
   const out = input.slice();
   for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rng() * (i + 1));
     [out[i], out[j]] = [out[j], out[i]];
   }
   return out;
@@ -990,7 +994,7 @@ export function shuffle<T>(input: readonly T[]): T[] {
 
 export function drawN(
   deck: CardId[], hand: CardId[], discard: CardId[],
-  n: number, capHand: number = HAND_CAP,
+  n: number, capHand: number = HAND_CAP, rng: Rng = Math.random,
 ): { deck: CardId[]; hand: CardId[]; discard: CardId[]; drawn: CardId[] } {
   let workingDeck = deck.slice();
   let workingDiscard = discard.slice();
@@ -1001,7 +1005,7 @@ export function drawN(
   for (let i = 0; i < toDraw; i++) {
     if (workingDeck.length === 0) {
       if (workingDiscard.length === 0) break;
-      workingDeck = shuffle(workingDiscard);
+      workingDeck = shuffle(workingDiscard, rng);
       workingDiscard = [];
     }
     const card = workingDeck.shift()!;
@@ -1013,10 +1017,10 @@ export function drawN(
 
 /** Discard a random card from hand. Epics/legendaries go to usedOneShotCards instead. */
 export function discardRandom(
-  hand: CardId[], discard: CardId[], usedOneShotCards: CardId[],
+  hand: CardId[], discard: CardId[], usedOneShotCards: CardId[], rng: Rng = Math.random,
 ): { hand: CardId[]; discard: CardId[]; usedOneShotCards: CardId[] } {
   if (hand.length === 0) return { hand, discard, usedOneShotCards };
-  const idx = Math.floor(Math.random() * hand.length);
+  const idx = Math.floor(rng() * hand.length);
   const card = hand[idx];
   const rarity = CARDS[card].rarity;
   const isOneShot = rarity === "epic" || rarity === "legendary";

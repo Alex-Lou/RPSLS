@@ -9,10 +9,14 @@ import { FloatingMatchBackButton, hapticTick, useAndroidBackPrompt } from "../..
 /* ─────────── Classé — classic 1v1 hub (quick match + tournament) ─────────── */
 
 export function ClasseLobby({
-  onBack, onQuickMatch, onViewBracket,
+  onBack, onQuickMatch, onQuickMatchOnline, onViewBracket,
 }: {
   onBack: () => void;
+  /** Match rapide LOCAL vs CPU (le duel classé actuel). */
   onQuickMatch: () => void;
+  /** Match rapide EN LIGNE vs joueur réel (file Render + fallback CPU) — compte
+   *  dans classeLp (client) ET rankLp (serveur). */
+  onQuickMatchOnline: () => void;
   onViewBracket: () => void;
 }) {
   useAndroidBackPrompt(onBack);
@@ -77,25 +81,41 @@ export function ClasseLobby({
         </div>
       </div>
 
-      <motion.button
-        whileTap={{ scale: 0.98 }}
-        onClick={() => { hapticTick(); onQuickMatch(); }}
-        className="rounded-2xl p-4 text-left transition hover:brightness-110"
-        style={{
-          background: "linear-gradient(135deg, color-mix(in oklab, var(--theme-primary) 55%, rgba(10,12,20,0.85)), color-mix(in oklab, var(--theme-secondary) 40%, rgba(10,12,20,0.85)))",
-          border: "1px solid color-mix(in oklab, var(--theme-primary) 60%, transparent)",
-          boxShadow: "0 4px 16px -4px color-mix(in oklab, var(--theme-primary) 40%, transparent)",
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <img src="/Icones Tournoi/ConstRankedRapide.png" alt="" className="w-12 h-12 object-contain shrink-0 drop-shadow-[0_2px_8px_rgba(0,0,0,0.55)]" draggable={false} />
-          <div className="min-w-0">
-            <div className="font-bold text-base">Match rapide</div>
-            <div className="text-[11px] text-zinc-300/80">Un duel classé immédiat (Best of 5) · PR en jeu.</div>
-          </div>
-          <span className="ml-auto text-xl" style={{ color: "var(--theme-secondary)" }}>→</span>
-        </div>
-      </motion.button>
+      {/* Match rapide — DEUX entrées côte à côte (Alex 2026-07) : vs CPU (local,
+          immédiat) · vs joueur réel (file en ligne Render + fallback CPU 10s). Les
+          deux alimentent le classement Classé (classeLp) ; le vs-réel alimente en
+          plus le rang global rankLp côté serveur (« compter dans les deux »). */}
+      <div className="grid grid-cols-2 gap-2.5">
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => { hapticTick(); onQuickMatch(); }}
+          className="rounded-2xl p-3 flex flex-col items-center gap-1 text-center transition hover:brightness-110"
+          style={{
+            background: "linear-gradient(135deg, color-mix(in oklab, var(--theme-primary) 55%, rgba(10,12,20,0.85)), color-mix(in oklab, var(--theme-secondary) 38%, rgba(10,12,20,0.85)))",
+            border: "1px solid color-mix(in oklab, var(--theme-primary) 60%, transparent)",
+            boxShadow: "0 4px 16px -4px color-mix(in oklab, var(--theme-primary) 40%, transparent)",
+          }}
+        >
+          <img src="/Icones Tournoi/ConstRankedRapide.png" alt="" className="w-11 h-11 object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.55)]" draggable={false} />
+          <div className="font-bold text-sm leading-tight">🤖 vs CPU</div>
+          <div className="text-[10px] text-zinc-300/80 leading-tight">Duel immédiat · Best of 5</div>
+        </motion.button>
+
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => { hapticTick(); onQuickMatchOnline(); }}
+          className="rounded-2xl p-3 flex flex-col items-center gap-1 text-center transition hover:brightness-110"
+          style={{
+            background: "linear-gradient(135deg, color-mix(in oklab, var(--theme-secondary) 55%, rgba(10,12,20,0.85)), color-mix(in oklab, var(--theme-primary) 38%, rgba(10,12,20,0.85)))",
+            border: "1px solid color-mix(in oklab, var(--theme-secondary) 60%, transparent)",
+            boxShadow: "0 4px 16px -4px color-mix(in oklab, var(--theme-secondary) 40%, transparent)",
+          }}
+        >
+          <img src="/Icones Tournoi/ConstRankedRapide.png" alt="" className="w-11 h-11 object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.55)]" draggable={false} />
+          <div className="font-bold text-sm leading-tight">🌐 vs Joueur réel</div>
+          <div className="text-[10px] text-zinc-300/80 leading-tight">En ligne · vrai adversaire</div>
+        </motion.button>
+      </div>
 
       <motion.button
         whileTap={{ scale: 0.98 }}

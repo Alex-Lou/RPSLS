@@ -23,6 +23,11 @@ export interface AppState {
 
   updateProfile: (patch: Partial<Pick<Player, "nickname" | "avatar" | "themeId" | "padId" | "difficulty" | "hapticEnabled" | "hapticIntensity" | "backgroundId" | "crashReports" | "fontScale" | "customBgUrl" | "customPadUrl" | "customBgs" | "customPads" | "padChosen" | "premiumIntensity" | "graphicsQuality" | "graphicsMeasured">>) => void;
   recordMatch: (m: MatchRecord) => void;
+  /** Crédite UNIQUEMENT le ladder Classé local (classeLp + classeStats) — utilisé
+   *  pour un « match rapide vs joueur réel » lancé depuis le hub Classé : le match
+   *  online alimente déjà le rankLp serveur, on ajoute ici le classeLp côté client
+   *  (« compter dans les deux », Alex 2026-07). Forfait = pénalité dédiée, hors W/L. */
+  recordClasseOutcome: (outcome: "win" | "loss" | "draw", forfeit: boolean) => void;
   /** Grant a flat XP bonus (e.g. tournament placement reward). */
   grantXp: (amount: number) => void;
   /** Register a competitive forfeit. Bumps the rolling abandon counter and

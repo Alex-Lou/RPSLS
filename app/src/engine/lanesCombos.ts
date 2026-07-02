@@ -10,6 +10,7 @@
  */
 
 import type { Move } from "./game";
+import type { Rng } from "./rng";
 
 export type ComboTier = "epic" | "rare" | "common" | "neutral";
 
@@ -253,11 +254,15 @@ let LANE_PERM: [number, number, number] = [0, 1, 2];
 
 /** Shuffle the lane arrangement for a fresh match. Call once when a lanes /
  *  ranked match starts — synchronously, before the board renders, so the
- *  display and the scoring read the SAME arrangement on the first paint. */
-export function shuffleLaneIdentities(): void {
+ *  display and the scoring read the SAME arrangement on the first paint.
+ *  `rng` (défaut Math.random) : passe un PRNG seedé pour une permutation
+ *  DÉTERMINISTE (lockstep CCG online) — la lane favorisée pèse dans le SCORING
+ *  (laneFavoursMove → computeRoundBonuses), donc elle doit être identique sur
+ *  les deux clients. Seedée = même arrangement des deux côtés. */
+export function shuffleLaneIdentities(rng: Rng = Math.random): void {
   const a: number[] = [0, 1, 2];
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rng() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
   }
   LANE_PERM = a as [number, number, number];

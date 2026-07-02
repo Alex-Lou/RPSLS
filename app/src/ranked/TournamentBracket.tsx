@@ -114,6 +114,14 @@ const CPU_POOL: Omit<BracketPlayer, "id">[] = [
   { name: "Wraith", avatar: CPU_HERO("hero_zen"), level: 8 },
 ];
 
+/** Un adversaire CPU aléatoire (nom + avatar hero) pour un DUEL DIRECT hors
+ *  tournoi (Match rapide Constellation Classée — Alex 2026-07). Puise dans le
+ *  même roster que le bracket → cohérence visuelle. */
+export function pickCpuOpponent(): { name: string; avatar: string } {
+  const p = CPU_POOL[Math.floor(Math.random() * CPU_POOL.length)];
+  return { name: p.name, avatar: p.avatar };
+}
+
 function emptyMatch(): MatchSlot {
   return { p1: null, p2: null, winner: null, status: "pending" };
 }

@@ -357,7 +357,7 @@ function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void
             transition={{ delay: 0.05 * i }}
             whileHover={{ y: -4, scale: 1.04 }}
             whileTap={{ scale: 0.86 }}
-            className="relative h-[46px] sm:h-[52px] rounded-xl flex flex-col items-center justify-center gap-0.5 py-1 text-white transition"
+            className="relative h-[56px] sm:h-[62px] rounded-xl flex flex-col items-center justify-center gap-1 py-1 px-0.5 text-white transition"
             // Dark glass surface so the white-silhouette PNG glyph reads
             // unambiguously on every theme. The per-move identity comes
             // from the rim + glow, which now blend ~45% toward the active
@@ -370,8 +370,10 @@ function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void
             }}
           >
             <PickShock show={shockMove === mv} />
-            <MoveGlyph move={mv} className="w-[35px] h-[35px] sm:w-[39px] sm:h-[39px]" />
-            <span className="text-[11px] sm:text-xs uppercase tracking-wider font-bold leading-none" style={{ color: moveRim(pal.hex) }}>{mv}</span>
+            {/* Symboles PLUS GRANDS + label resserré (tracking-tight) qui rentre
+                sans être coupé, même « SCISSORS » (Alex 2026-07). */}
+            <MoveGlyph move={mv} className="w-[40px] h-[40px] sm:w-[44px] sm:h-[44px]" />
+            <span className="w-full text-center text-[10px] sm:text-[11px] uppercase tracking-tight font-bold leading-none" style={{ color: moveRim(pal.hex) }}>{mv}</span>
           </motion.button>
         );
       })}

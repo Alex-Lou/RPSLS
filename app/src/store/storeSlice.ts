@@ -92,6 +92,24 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
       };
     }),
 
+  // Ladder Classé SEUL (classeLp + classeStats), sans toucher rankLp/xp/history —
+  // le match online correspondant est déjà enregistré (mode "online", rankLp
+  // serveur). Miroir exact de la branche `m.mode === "ranked"` de recordMatch.
+  recordClasseOutcome: (outcome, forfeit) =>
+    set((s) => {
+      const p = structuredClone(s.player);
+      const dLp = forfeit ? CLASSE_LP.forfeit : classeLpDelta(outcome);
+      p.classeLp = Math.max(0, (p.classeLp ?? 1000) + dLp);
+      if (!forfeit) {
+        const cs = p.classeStats ?? { wins: 0, losses: 0, draws: 0 };
+        if (outcome === "win") cs.wins++;
+        else if (outcome === "loss") cs.losses++;
+        else cs.draws++;
+        p.classeStats = cs;
+      }
+      return { player: p };
+    }),
+
   grantXp: (amount) =>
     set((s) => ({ player: { ...s.player, xp: Math.max(0, s.player.xp + Math.round(amount)) } })),
 
