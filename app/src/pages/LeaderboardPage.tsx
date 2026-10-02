@@ -1,5 +1,5 @@
 /**
- * LeaderboardPage — global ranking (top 100 by LP) read live from Upstash.
+ * LeaderboardPage — global ranking (top 100 by LP) read live from the game server.
  *
  * Read-only: the board is written server-side after real online-ranked
  * matches. Shows a clear "coming soon" state when not configured, an empty
@@ -22,7 +22,9 @@ import {
 export function LeaderboardPage() {
   const t = useT();
   const player = useStore((s) => s.player);
-  const enabled = leaderboardEnabled();
+  // The ladder is global: always read it from the cloud server.
+  const cloudUrl = useStore((s) => s.serverConfig.cloudUrl);
+  const enabled = leaderboardEnabled(cloudUrl);
 
   const [entries, setEntries] = useState<LeaderboardEntry[] | null>(null);
   const [mine, setMine] = useState<{ rank: number; lp: number } | null>(null);
@@ -33,14 +35,14 @@ export function LeaderboardPage() {
     let alive = true;
     setError(false);
     setEntries(null);
-    fetchTop(100)
+    fetchTop(cloudUrl)
       .then((e) => alive && setEntries(e))
       .catch(() => { if (alive) { setError(true); setEntries([]); } });
-    fetchMyRank(player.id)
+    fetchMyRank(cloudUrl, player.id)
       .then((m) => alive && setMine(m))
       .catch(() => {});
     return () => { alive = false; };
-  }, [enabled, player.id]);
+  }, [enabled, cloudUrl, player.id]);
 
   return (
     <motion.div
