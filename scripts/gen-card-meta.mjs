@@ -22,18 +22,26 @@ const OUT = join(ROOT, "crates", "rpsls-server", "cards_meta.json");
 
 const src = readFileSync(SRC, "utf8");
 
-// Chaque def de carte commence par :  id: "X", cost: N, rarity: "Y"[, kind: "Z"]
-const re = /id:\s*"([^"]+)",\s*cost:\s*(\d+),\s*rarity:\s*"(common|rare|epic|legendary)"(?:\s*,\s*kind:\s*"(active|passive|fusion)")?/g;
+// Chaque def de carte commence par :  id: "X", cost: N, rarity: "Y". Le `kind`
+// peut venir APRÈS d'autres champs (`voie: "lizard", kind: "fusion"`) : on le
+// cherche donc dans tout le BLOC de la carte (jusqu'à la fermeture `},` de son
+// objet, sans déborder sur un commentaire qui suit), sinon une fusion passerait
+// pour une carte active collectionnable.
+const re = /id:\s*"([^"]+)",\s*cost:\s*(\d+),\s*rarity:\s*"(common|rare|epic|legendary)"/g;
+const heads = [...src.matchAll(re)];
 
 const cards = [];
 const seen = new Set();
-let m;
-while ((m = re.exec(src)) !== null) {
-  const [, id, cost, rarity, kind] = m;
-  if (seen.has(id)) continue; // garde-fou anti-doublon
+heads.forEach((m, i) => {
+  const [, id, cost, rarity] = m;
+  if (seen.has(id)) return; // garde-fou anti-doublon
   seen.add(id);
-  cards.push({ id, cost: Number(cost), rarity, kind: kind ?? "active" });
-}
+  const next = i + 1 < heads.length ? heads[i + 1].index : src.length;
+  const close = src.indexOf("},", m.index);
+  const block = src.slice(m.index, close === -1 ? next : Math.min(close, next));
+  const kind = block.match(/\bkind:\s*"(active|passive|fusion)"/)?.[1] ?? "active";
+  cards.push({ id, cost: Number(cost), rarity, kind });
+});
 
 cards.sort((a, b) => a.id.localeCompare(b.id));
 writeFileSync(OUT, JSON.stringify(cards, null, 2) + "\n");

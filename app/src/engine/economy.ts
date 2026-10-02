@@ -29,6 +29,15 @@ export const ECLATS_PER_WIN: Record<RecordMode, number> = {
 /** Consolation for any finished loss, so a bad run still nudges progress. */
 export const ECLATS_PER_LOSS = 2;
 
+/** Éclats d'un match Constellation Pro (Arena) : plus long et plus exigeant,
+ *  il paie un peu plus que Constellation Classé. Lu aussi par le serveur. */
+export const ARENA_ECLATS = { win: 20, draw: 10, loss: 5 } as const;
+
+/** Plafond QUOTIDIEN (jour UTC) d'éclats gagnés contre le CPU. Appliqué par le
+ *  serveur : un match vs CPU n'est pas vérifiable, le plafond borne la triche
+ *  sans gêner un joueur normal. */
+export const CPU_ECLATS_DAILY_CAP = 300;
+
 /** Cost of one pack. Tuned so a ~3-match win streak in ranked earns it. */
 export const PACK_COST = 50;
 

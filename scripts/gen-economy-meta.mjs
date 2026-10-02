@@ -20,6 +20,8 @@ const ECO = readFileSync(join(ROOT, "app", "src", "engine", "economy.ts"), "utf8
 const RANK = readFileSync(join(ROOT, "app", "src", "engine", "rank.ts"), "utf8");
 const THEMES = readFileSync(join(ROOT, "app", "src", "theme", "themes.ts"), "utf8");
 const TYPES = readFileSync(join(ROOT, "app", "src", "types.ts"), "utf8");
+const CATALOG = readFileSync(join(ROOT, "app", "src", "pages", "ProfilePage", "premiumCatalog.tsx"), "utf8");
+const UNLOCKS = readFileSync(join(ROOT, "app", "src", "store", "rankedUnlocks.ts"), "utf8");
 const OUT = join(ROOT, "crates", "rpsls-server", "economy_meta.json");
 
 const fail = (msg) => { throw new Error(`gen-economy-meta: ${msg}`); };
@@ -96,6 +98,30 @@ const seasonRewards = rankTiers.map((t) => {
   return { minLp: t.floor, eclats: a.eclats, dust: a.dust };
 });
 
+// Prix des sets premium (✦) — PREMIUM_SETS de premiumCatalog.tsx. Chaque set
+// connu du serveur DOIT avoir un prix, sinon il ne pourrait pas être acheté.
+const premiumSetCosts = {};
+for (const m of CATALOG.matchAll(/id:\s*"([a-z0-9-]+)",[\s\S]*?cost:\s*(\d+)/g)) {
+  premiumSetCosts[m[1]] = Number(m[2]);
+}
+for (const id of premiumSetIds) {
+  if (!(id in premiumSetCosts)) fail(`set premium "${id}" sans prix dans premiumCatalog.tsx`);
+}
+
+// Cartes de déblocage (rankedUnlocks.ts) : le serveur ne peut pas vérifier la
+// condition (victoires vs CPU), mais il borne la réclamation à CETTE liste.
+const unlockCards = [...new Set([
+  ...[...UNLOCKS.matchAll(/set\.add\("([a-z0-9-]+)"\)/g)].map((m) => m[1]),
+  ...[...UNLOCKS.matchAll(/for \(const c of \[([^\]]*)\]\)/g)]
+    .flatMap((m) => [...m[1].matchAll(/"([a-z0-9-]+)"/g)].map((x) => x[1])),
+])].sort();
+if (!unlockCards.length) fail("aucune carte de déblocage trouvée dans rankedUnlocks.ts");
+
+// SEASON_DURATION_MS = produit d'entiers (ex. 30 * 24 * 3600 * 1000).
+const seasonExpr = ECO.match(/export const SEASON_DURATION_MS\s*=\s*([\d\s*]+);/);
+if (!seasonExpr) fail("SEASON_DURATION_MS introuvable");
+const seasonDurationMs = seasonExpr[1].split("*").reduce((acc, n) => acc * Number(n.trim()), 1);
+
 const meta = {
   packCost: scalar("PACK_COST"),
   packSize: scalar("PACK_SIZE"),
@@ -108,6 +134,11 @@ const meta = {
   premiumSetIds,
   codexTiers,
   seasonRewards,
+  premiumSetCosts,
+  arenaEclats: numMap(objectBody(ECO, "ARENA_ECLATS")),
+  cpuEclatsDailyCap: scalar("CPU_ECLATS_DAILY_CAP"),
+  unlockCards,
+  seasonDurationMs,
 };
 writeFileSync(OUT, JSON.stringify(meta, null, 2) + "\n");
 console.log(`gen-economy-meta : ${codexTiers.length} paliers codex, ${seasonRewards.length} paliers saison → ${OUT}`);

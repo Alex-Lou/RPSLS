@@ -51,6 +51,13 @@ pub fn is_collectible(id: &str) -> bool {
     card_meta().get(id).map(|c| c.kind != "fusion").unwrap_or(false)
 }
 
+/// True si la carte peut sortir d'un pack : collectionnable ET pas un Finisher
+/// Pro (injectés à 3 étoiles en match, jamais deckables). Miroir de
+/// `PACKABLE_IDS` côté client (engine/economy.ts).
+pub fn is_packable(id: &str) -> bool {
+    is_collectible(id) && !id.starts_with("finisher-")
+}
+
 /// Tous les ids collectionnables (pour valider une collection / tirer un pack).
 pub fn collectible_ids() -> Vec<&'static str> {
     card_meta()
@@ -107,6 +114,11 @@ struct EconomyMeta {
     premium_set_ids: Vec<String>,
     codex_tiers: Vec<CodexTier>,
     season_rewards: Vec<SeasonReward>,
+    premium_set_costs: HashMap<String, u64>,
+    arena_eclats: HashMap<String, u64>,
+    cpu_eclats_daily_cap: u64,
+    unlock_cards: Vec<String>,
+    season_duration_ms: u64,
 }
 
 const ECONOMY_META_JSON: &str = include_str!("../economy_meta.json");
@@ -196,6 +208,34 @@ pub fn is_premium_set(id: &str) -> bool {
     economy_meta().premium_set_ids.iter().any(|s| s == id)
 }
 
+/// Prix en ✦ d'un set premium, ou None si le set est inconnu.
+pub fn premium_set_cost(id: &str) -> Option<u64> {
+    if !is_premium_set(id) {
+        return None;
+    }
+    economy_meta().premium_set_costs.get(id).copied()
+}
+
+/// Éclats d'un match Constellation Pro (Arena) : "win" | "draw" | "loss".
+pub fn arena_eclats(outcome: &str) -> u64 {
+    economy_meta().arena_eclats.get(outcome).copied().unwrap_or(0)
+}
+
+/// Plafond quotidien (jour UTC) d'éclats gagnés contre le CPU.
+pub fn cpu_eclats_daily_cap() -> u64 {
+    economy_meta().cpu_eclats_daily_cap
+}
+
+/// True si la carte fait partie des déblocages de progression (rankedUnlocks.ts).
+pub fn is_unlock_card(id: &str) -> bool {
+    economy_meta().unlock_cards.iter().any(|c| c == id)
+}
+
+/// Durée d'une saison (ms) — SEASON_DURATION_MS côté client.
+pub fn season_duration_ms() -> u64 {
+    economy_meta().season_duration_ms
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -204,8 +244,15 @@ mod tests {
     fn meta_loads_and_is_consistent() {
         let m = card_meta();
         // 87 cartes définies, 8 de fusion → 79 collectionnables.
-        assert_eq!(m.len(), 87, "cards_meta.json doit contenir 87 cartes");
-        assert_eq!(collectible_ids().len(), 79, "79 cartes collectionnables");
+        assert_eq!(m.len(), 131, "cards_meta.json doit contenir 131 cartes");
+        assert_eq!(collectible_ids().len(), 115, "115 cartes collectionnables");
+        // Fusions déclarées APRÈS `voie:` (bug du générateur corrigé) : non collectionnables.
+        assert!(!is_collectible("apotheose-spectrale"));
+        assert!(!is_collectible("imposteur"));
+        // Finishers : collectionnables (codex) mais jamais tirés en pack.
+        assert!(is_collectible("finisher-lame"));
+        assert!(!is_packable("finisher-lame"));
+        assert!(is_packable("aegis"));
         // Quelques sanity-checks de barème.
         assert_eq!(rarity_of("supernova"), Some("legendary"));
         assert_eq!(craft_cost("supernova"), Some(500));
@@ -249,5 +296,13 @@ mod tests {
         assert!(is_premium_set("eclipse"));
         assert!(is_premium_set("quartz"));
         assert!(!is_premium_set("forged-set-xyz"));
+        assert_eq!(premium_set_cost("quartz"), Some(800));
+        assert_eq!(premium_set_cost("void"), Some(900));
+        assert_eq!(premium_set_cost("forged-set-xyz"), None);
+        assert_eq!((arena_eclats("win"), arena_eclats("draw"), arena_eclats("loss")), (20, 10, 5));
+        assert_eq!(cpu_eclats_daily_cap(), 300);
+        assert!(is_unlock_card("supernova"));
+        assert!(!is_unlock_card("aegis"));
+        assert_eq!(season_duration_ms(), 30 * 24 * 3600 * 1000);
     }
 }

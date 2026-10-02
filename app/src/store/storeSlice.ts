@@ -7,6 +7,7 @@ import { clearAnchor } from "../online/playerAnchor";
 import { abandonPenaltyLp, activeAbandonCount, nextAbandon } from "../match/forfeit";
 import { nextStreak, streakBonusXp } from "../match/streak";
 import {
+  ARENA_ECLATS,
   PACK_COST,
   SEASON_DURATION_MS,
   codexTier,
@@ -185,7 +186,7 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
     // scale for casual modes. Constellation Pro is higher-effort (longer
     // matches, deeper strategy) so it pays slightly above Constellation
     // Ranked: win 20, draw 10, loss 5.
-    const reward = outcome === "win" ? 20 : outcome === "draw" ? 10 : 5;
+    const reward = ARENA_ECLATS[outcome];
     // HISTORIQUE (Alex 2026-06-13 « voies jouées dans l'historique ») : on
     // journalise AUSSI le match vs-CPU (avant : SEULS les compteurs
     // arenaStats, aucune entrée dans `history` → log vide + voie perdue). La

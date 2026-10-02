@@ -116,5 +116,52 @@
       "eclats": 700,
       "dust": 200
     }
-  ]
+  ],
+  "premiumSetCosts": {
+    "quartz": 800,
+    "eclipse": 800,
+    "phantom": 800,
+    "emberforge": 800,
+    "tempus": 800,
+    "storm": 800,
+    "coral": 800,
+    "rust": 800,
+    "void": 900,
+    "prism": 800,
+    "ink": 900,
+    "bloom": 800
+  },
+  "arenaEclats": {
+    "win": 20,
+    "draw": 10,
+    "loss": 5
+  },
+  "cpuEclatsDailyCap": 300,
+  "unlockCards": [
+    "bouffee-air",
+    "cafeine",
+    "chronomancien",
+    "coup-de-bol",
+    "curse",
+    "double-mot",
+    "echo",
+    "eclair-genie",
+    "gambit",
+    "heist",
+    "mirror",
+    "oracle",
+    "patate-chaude",
+    "pile-ou-face",
+    "rappel",
+    "razzia",
+    "riposte",
+    "supernova",
+    "surcharge",
+    "sursaut",
+    "toxine",
+    "trefle-chance",
+    "tuile",
+    "vortex"
+  ],
+  "seasonDurationMs": 2592000000
 }
