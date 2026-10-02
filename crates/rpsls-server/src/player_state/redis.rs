@@ -40,24 +40,31 @@ async fn pipeline_send(cmds: &[Vec<String>]) -> Option<reqwest::Result<reqwest::
     Some(http().post(&endpoint).bearer_auth(token).json(cmds).send().await)
 }
 
-/// Load player state from Redis. Returns None if not found or on error.
-/// This is awaited on Hello so the player gets their state immediately.
-pub async fn load(player_id: &str) -> Option<PlayerProgress> {
-    let (url, token) = config()?;
+/// Load player state from Redis. This is awaited on Hello so the player gets
+/// their state immediately.
+///   `Ok(Some(_))` — row found;
+///   `Ok(None)`    — no row (new player), or Redis not configured;
+///   `Err(())`     — transport/HTTP error or an unreadable row.
+/// Callers MUST NOT save (or authenticate the session) after `Err`: doing so
+/// would overwrite the real progression with an empty state.
+pub async fn load(player_id: &str) -> Result<Option<PlayerProgress>, ()> {
+    let Some((url, token)) = config() else { return Ok(None) };
     if player_id.trim().is_empty() {
-        return None;
+        return Ok(None);
     }
     let key = format!("{KEY_PREFIX}{player_id}");
     let endpoint = format!("{url}/get/{key}");
 
     match http().get(&endpoint).bearer_auth(token).send().await {
         Ok(resp) if resp.status().is_success() => {
-            let body: serde_json::Value = resp.json().await.ok()?;
-            let result = body.get("result")?;
+            let body: serde_json::Value = resp.json().await.map_err(|e| {
+                warn!(player_id, error = %e, "player state load: bad JSON");
+            })?;
+            let result = body.get("result").ok_or(())?;
             if result.is_null() {
-                return None;
+                return Ok(None);
             }
-            let json_str = result.as_str()?;
+            let json_str = result.as_str().ok_or(())?;
             match serde_json::from_str::<PlayerProgress>(json_str) {
                 Ok(mut state) => {
                     // Defense-in-depth: a poisoned row (left over from before
@@ -67,22 +74,24 @@ pub async fn load(player_id: &str) -> Option<PlayerProgress> {
                     // u64::MAX would permanently corrupt the local player state.
                     state.sanitize();
                     debug!(player_id, "player state loaded from Redis");
-                    Some(state)
+                    Ok(Some(state))
                 }
                 Err(e) => {
+                    // Unreadable row = error, NOT "absent": treating it as a new
+                    // player would let the next save overwrite it.
                     warn!(player_id, error = %e, "failed to deserialize player state");
-                    None
+                    Err(())
                 }
             }
         }
         Ok(resp) => {
             let status = resp.status();
             warn!(player_id, %status, "player state load rejected");
-            None
+            Err(())
         }
         Err(e) => {
             warn!(player_id, error = %e, "player state load failed");
-            None
+            Err(())
         }
     }
 }
@@ -299,4 +308,36 @@ pub fn save(player_id: String, mut state: PlayerProgress) {
             Err(e) => warn!(error = %e, "player state save failed"),
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::{extract::Path, http::StatusCode, routing::get, Json, Router};
+
+    /// H4 : `load` distingue « absent » (Ok(None)) d'une erreur (Err) — une ligne
+    /// illisible ou un Upstash en erreur ne doit JAMAIS passer pour un nouveau
+    /// joueur, sinon la sauvegarde suivante écrase la vraie progression.
+    #[tokio::test]
+    async fn load_distinguishes_absent_from_error() {
+        async fn fake_get(Path(key): Path<String>) -> Result<Json<serde_json::Value>, StatusCode> {
+            match key.as_str() {
+                "player:absent" => Ok(Json(serde_json::json!({ "result": null }))),
+                "player:corrupt" => Ok(Json(serde_json::json!({ "result": "{not json" }))),
+                _ => Err(StatusCode::INTERNAL_SERVER_ERROR),
+            }
+        }
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, Router::new().route("/get/:key", get(fake_get))).await.unwrap();
+        });
+        // Seul test du binaire qui lit cette config (OnceLock) : pas de course.
+        std::env::set_var("UPSTASH_REDIS_REST_URL", format!("http://{addr}"));
+        std::env::set_var("UPSTASH_REDIS_REST_TOKEN", "test-token");
+
+        assert_eq!(load("absent").await.map(|p| p.is_none()), Ok(true));
+        assert!(load("corrupt").await.is_err());
+        assert!(load("upstash-down").await.is_err());
+    }
 }

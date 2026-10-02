@@ -257,8 +257,14 @@ pub fn handle_google_login(
             }
         };
 
+        // Load BEFORE adopting the identity: on a Redis error the session must
+        // stay unauthenticated, and nothing is saved over the real row.
+        let Ok(loaded) = player_state::load(&pid).await else {
+            session_clone.send(ServerMessage::AuthError { code: "server_error".into() });
+            return;
+        };
+        let mut progress = loaded.unwrap_or_default();
         session_clone.set_player_id(pid.clone());
-        let mut progress = player_state::load(&pid).await.unwrap_or_default();
         // Bonus exactly once per identity. A returning Google user's pid is
         // already `welcomed`, so this is a no-op for them — farm-proof.
         if let Ok(true) = account::try_mark_welcomed(&pid).await {

@@ -56,3 +56,7 @@ argon2 = "0.5"
 # Real RS256 signature check against Google's JWKS (fetched + cached) plus
 # aud / iss / exp validation. Pure Rust — keeps the Docker/rustls build clean.
 jsonwebtoken = "9"
+
+[dev-dependencies]
+# Horloge virtuelle (`start_paused`) pour tester les échéances des matchs sans attendre.
+tokio = { version = "1.40", features = ["full", "test-util"] }

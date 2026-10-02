@@ -94,6 +94,16 @@ pub(crate) fn handle_hello(
                 player_state::load_claim_token(&pid),
                 player_state::load(&pid),
             );
+            // Progression unreadable (Redis error) → stay UNAUTHENTICATED: an
+            // authenticated session would SyncState over the real row.
+            let Ok(progress) = progress else {
+                warn!(player_id = %pid, "player state load error — Hello deferred");
+                session_clone.send(ServerMessage::Error {
+                    code: "auth_transient".into(),
+                    message: "transient auth backend error".into(),
+                });
+                return;
+            };
 
             match stored_token {
                 Some(ref st) if client_token == *st => {

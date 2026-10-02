@@ -67,7 +67,14 @@ pub fn handle_signup(
         // One count per attempt that reaches the work, regardless of outcome.
         attempts.record_failed(sk);
 
-        let hash = match hash_password(&password) {
+        // Read the progression FIRST: on a Redis error nothing is created yet,
+        // and we never save an empty state over the real one.
+        let Ok(loaded) = player_state::load(&pid).await else {
+            session_clone.send(ServerMessage::AuthError { code: "server_error".into() });
+            return;
+        };
+
+        let hash = match hash_password_async(password).await {
             Ok(h) => h,
             Err(()) => {
                 session_clone.send(ServerMessage::AuthError { code: "server_error".into() });
@@ -107,7 +114,7 @@ pub fn handle_signup(
                     session_clone.send(ServerMessage::AuthError { code: "email_taken".into() });
                 }
                 Ok(true) => {
-                    let mut progress = player_state::load(&pid).await.unwrap_or_default();
+                    let mut progress = loaded.unwrap_or_default();
                     // Welcome bonus EXACTLY once per real mailbox: gate on the
                     // canonical e-mail (`+tag` / Gmail dots folded). A fresh
                     // install (new pid) or a `+tag` variant of the same mailbox
@@ -161,22 +168,23 @@ pub fn handle_login(
     tokio::spawn(async move {
         let acct = load_account(&email_norm).await;
         // Always spend a verify (real or dummy) so timing is ~constant whether or
-        // not the e-mail exists — closes the enumeration oracle.
-        let ok = match &acct {
-            Some(a) => verify_password(&a.password_hash, &password),
-            None => {
-                verify_dummy(&password);
-                false
-            }
-        };
+        // not the e-mail exists — closes the enumeration oracle. Runs off the
+        // async workers, under the global Argon2 cap.
+        let ok = verify_login(acct.as_ref().map(|a| a.password_hash.clone()), password).await;
         match acct {
             Some(a) if ok => {
                 attempts.record_success(lk);
                 email_attempts.record_success(ek);
                 let pid = a.player_id;
+                // Load BEFORE adopting the identity: on a Redis error the session
+                // must stay unauthenticated (no SyncState over the real row).
+                let Ok(loaded) = player_state::load(&pid).await else {
+                    session_clone.send(ServerMessage::AuthError { code: "server_error".into() });
+                    return;
+                };
+                let progress = loaded.unwrap_or_default();
                 // Adopt the account's stable identity (cross-device login).
                 session_clone.set_player_id(pid.clone());
-                let progress = player_state::load(&pid).await.unwrap_or_default();
                 // A fresh device holds no claim token yet — load it (or mint one)
                 // so subsequent TOFU Hellos still authenticate.
                 let claim_token = match player_state::load_claim_token(&pid).await {
