@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use rpsls_core::{Match, MatchStatus, Move};
 use tokio::sync::mpsc;
-use tokio::time::timeout;
+use tokio::time::{timeout, timeout_at, Instant};
 use uuid::Uuid;
 
 use crate::protocol::{OpponentInfo, PlayerSlot, ServerMessage};
@@ -235,9 +235,12 @@ async fn collect_round_moves(
     let mut a_move: Option<Move> = None;
     let mut b_move: Option<Move> = None;
 
+    // ABSOLUTE deadline for the round: a message (e.g. Chat spam) must not
+    // re-arm it, or the idle side could stall the match forever and win by
+    // the opponent leaving.
+    let deadline = Instant::now() + PICK_DEADLINE + Duration::from_secs(2);
     while a_move.is_none() || b_move.is_none() {
-        let timeout_dur = PICK_DEADLINE + Duration::from_secs(2);
-        let next = timeout(timeout_dur, rx.recv()).await;
+        let next = timeout_at(deadline, rx.recv()).await;
         match next {
             Err(_) => {
                 // Both players idle past the deadline. Treat as forfeit by

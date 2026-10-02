@@ -18,7 +18,7 @@ use std::time::Duration;
 use rand::Rng;
 use serde_json::Value;
 use tokio::sync::mpsc;
-use tokio::time::{timeout, Instant};
+use tokio::time::{timeout, timeout_at, Instant};
 use uuid::Uuid;
 
 use crate::protocol::{OpponentInfo, PlayerSlot, ServerMessage};
@@ -233,8 +233,13 @@ async fn ccg_relay(
     let mut a_res: Option<(Option<PlayerSlot>, String)> = None;
     let mut b_res: Option<(Option<PlayerSlot>, String)> = None;
 
+    // ABSOLUTE deadline, re-armed only on real progress: a side's FIRST lock of
+    // the turn or FIRST result declaration (the other side then gets a full
+    // TURN_DEADLINE, as before) and a relayed pair. Re-sends and any other message no longer re-arm it, so the
+    // stalled side can't keep the match alive forever.
+    let mut deadline = Instant::now() + TURN_DEADLINE;
     loop {
-        match timeout(TURN_DEADLINE, rx.recv()).await {
+        match timeout_at(deadline, rx.recv()).await {
             Err(_) => {
                 // Un côté a calé → il forfait ; les deux calés → nul.
                 let winner = match (a_turn.is_some(), b_turn.is_some()) {
@@ -247,6 +252,13 @@ async fn ccg_relay(
             Ok(None) => return RelayEnd::Disconnect,
             Ok(Some(cmd)) => match cmd {
                 CcgCommand::Turn { slot, round_no, intent, state_hash } => {
+                    let first_lock = match slot {
+                        PlayerSlot::A => a_turn.is_none(),
+                        PlayerSlot::B => b_turn.is_none(),
+                    };
+                    if first_lock {
+                        deadline = Instant::now() + TURN_DEADLINE;
+                    }
                     match slot {
                         PlayerSlot::A => a_turn = Some((round_no, intent, state_hash)),
                         PlayerSlot::B => b_turn = Some((round_no, intent, state_hash)),
@@ -271,9 +283,18 @@ async fn ccg_relay(
                             round_no: a_round,
                             intent: a_intent,
                         });
+                        deadline = Instant::now() + TURN_DEADLINE;
                     }
                 }
                 CcgCommand::Result { slot, winner, state_hash } => {
+                    // First declaration of this side = progress (same rule as Turn).
+                    let first_decl = match slot {
+                        PlayerSlot::A => a_res.is_none(),
+                        PlayerSlot::B => b_res.is_none(),
+                    };
+                    if first_decl {
+                        deadline = Instant::now() + TURN_DEADLINE;
+                    }
                     match slot {
                         PlayerSlot::A => a_res = Some((winner, state_hash)),
                         PlayerSlot::B => b_res = Some((winner, state_hash)),
@@ -380,5 +401,62 @@ fn other_slot(s: PlayerSlot) -> PlayerSlot {
     match s {
         PlayerSlot::A => PlayerSlot::B,
         PlayerSlot::B => PlayerSlot::A,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn session(id: &str) -> Arc<Session> {
+        let (tx, _rx) = mpsc::unbounded_channel();
+        Arc::new(Session::new(id.into(), id.into(), tx, std::net::IpAddr::from([127, 0, 0, 1])))
+    }
+
+    fn turn(slot: PlayerSlot) -> CcgCommand {
+        CcgCommand::Turn { slot, round_no: 1, intent: Value::Null, state_hash: String::new() }
+    }
+
+    /// H3 : renvoyer son tour en boucle ne relance plus l'horloge — le camp muet
+    /// perd au bout de TURN_DEADLINE après le PREMIER verrouillage adverse.
+    #[tokio::test(start_paused = true)]
+    async fn resending_a_turn_does_not_extend_the_deadline() {
+        let (a, b) = (session("a"), session("b"));
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let spam = tokio::spawn(async move {
+            while tx.send(turn(PlayerSlot::A)).is_ok() {
+                tokio::time::sleep(Duration::from_secs(5)).await;
+            }
+        });
+        let start = Instant::now();
+        // Garde-fou : une régression ferait boucler à l'infini → échec, pas blocage.
+        let end = timeout(Duration::from_secs(600), ccg_relay(&a, &b, &mut rx))
+            .await
+            .expect("le relais doit se terminer");
+        spam.abort();
+        assert!(matches!(end, RelayEnd::Forfeit { winner: Some(PlayerSlot::A) }));
+        assert_eq!(start.elapsed(), TURN_DEADLINE);
+    }
+
+    /// Comportement légitime conservé : un premier verrouillage tardif redonne
+    /// un TURN_DEADLINE complet à l'adversaire.
+    #[tokio::test(start_paused = true)]
+    async fn first_lock_gives_the_opponent_a_full_window() {
+        let (a, b) = (session("a"), session("b"));
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let late_lock = TURN_DEADLINE - Duration::from_secs(10);
+        let driver = tokio::spawn(async move {
+            tokio::time::sleep(late_lock).await;
+            let _ = tx.send(turn(PlayerSlot::A));
+            tokio::time::sleep(TURN_DEADLINE * 2).await; // garde le canal ouvert
+        });
+        let start = Instant::now();
+        // Garde-fou : une régression ferait boucler à l'infini → échec, pas blocage.
+        let end = timeout(Duration::from_secs(600), ccg_relay(&a, &b, &mut rx))
+            .await
+            .expect("le relais doit se terminer");
+        driver.abort();
+        assert!(matches!(end, RelayEnd::Forfeit { winner: Some(PlayerSlot::A) }));
+        assert_eq!(start.elapsed(), late_lock + TURN_DEADLINE);
     }
 }

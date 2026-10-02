@@ -6,7 +6,7 @@ use rand::Rng;
 use rpsls_core::constellation::{LanePlay, LaneResult, LaneWinner, RoundOutcome};
 use rpsls_core::{Move, Outcome};
 use tokio::sync::mpsc;
-use tokio::time::timeout;
+use tokio::time::{timeout, timeout_at, Instant};
 use crate::protocol::{PlayerSlot, ServerMessage};
 use crate::session::Session;
 use super::{
@@ -181,9 +181,11 @@ pub(super) async fn collect_lanes_round(
     let mut a_plays: Option<Vec<LanePlay>> = None;
     let mut b_plays: Option<Vec<LanePlay>> = None;
 
+    // ABSOLUTE deadline for the round: a stray message (Ready, Rematch, a
+    // malformed Play) must not re-arm it and let the idle side stall the match.
+    let deadline = Instant::now() + PICK_DEADLINE + Duration::from_secs(2);
     while a_plays.is_none() || b_plays.is_none() {
-        let timeout_dur = PICK_DEADLINE + Duration::from_secs(2);
-        let next = timeout(timeout_dur, rx.recv()).await;
+        let next = timeout_at(deadline, rx.recv()).await;
         match next {
             Err(_) => {
                 // Deadline expired. Whichever side is silent loses *this round*
@@ -287,5 +289,30 @@ pub(super) fn build_timeout_outcome(
         a_points,
         b_points,
         round_winner,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// H3 : des messages parasites (ici `Ready` toutes les secondes) ne doivent
+    /// plus prolonger le round — sinon le camp inactif bloque le match à l'infini.
+    #[tokio::test(start_paused = true)]
+    async fn stray_messages_do_not_extend_the_round() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let spam = tokio::spawn(async move {
+            while tx.send(LanesCommand::Ready { slot: PlayerSlot::A }).is_ok() {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            }
+        });
+        let start = Instant::now();
+        // Garde-fou : une régression ferait boucler à l'infini → échec, pas blocage.
+        let (_, _, end) = tokio::time::timeout(Duration::from_secs(600), collect_lanes_round(&mut rx, 3))
+            .await
+            .expect("le round doit se terminer");
+        spam.abort();
+        assert!(matches!(end, RoundEnd::Timeout(PlayerSlot::A)));
+        assert_eq!(start.elapsed(), PICK_DEADLINE + Duration::from_secs(2));
     }
 }
