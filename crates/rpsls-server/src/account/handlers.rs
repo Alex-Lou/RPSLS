@@ -74,7 +74,7 @@ pub fn handle_signup(
             return;
         };
 
-        let hash = match hash_password(&password) {
+        let hash = match hash_password_async(password).await {
             Ok(h) => h,
             Err(()) => {
                 session_clone.send(ServerMessage::AuthError { code: "server_error".into() });
@@ -168,14 +168,9 @@ pub fn handle_login(
     tokio::spawn(async move {
         let acct = load_account(&email_norm).await;
         // Always spend a verify (real or dummy) so timing is ~constant whether or
-        // not the e-mail exists — closes the enumeration oracle.
-        let ok = match &acct {
-            Some(a) => verify_password(&a.password_hash, &password),
-            None => {
-                verify_dummy(&password);
-                false
-            }
-        };
+        // not the e-mail exists — closes the enumeration oracle. Runs off the
+        // async workers, under the global Argon2 cap.
+        let ok = verify_login(acct.as_ref().map(|a| a.password_hash.clone()), password).await;
         match acct {
             Some(a) if ok => {
                 attempts.record_success(lk);
