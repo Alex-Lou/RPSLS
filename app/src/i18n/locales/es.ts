@@ -736,7 +736,7 @@ const es: Record<string, string> = {
   "ranked.cards.conduit.desc": "Pasiva: tus combos (triple / trinidad) pagan +1 extra.",
   "ranked.cards.conduit.targetHint": "Pasiva — siempre activa.",
   "ranked.cards.trinite.name": "Trinidad perfecta",
-  "ranked.cards.trinite.desc": "Si tus tres elecciones son todas distintas, ganas la ronda directamente.",
+  "ranked.cards.trinite.desc": "Si tus tres elecciones son todas distintas y no pierdes ninguna línea, ganas la ronda directamente.",
   "ranked.cards.trinite.targetHint": "Efecto inmediato.",
   "ranked.compass.none": "Rival: ninguna carta con objetivo",
   "ranked.compass.lane": "Carta del rival → Lane {n}",

@@ -122,7 +122,7 @@ const nl: Record<string, string> = {
   "ranked.cards.prophetie.targetHint": "Passief — altijd actief.",
   "ranked.cards.conduit.name": "Geleider", "ranked.cards.conduit.desc": "Passief: je combo's (triple / triniteit) betalen +1 extra.",
   "ranked.cards.conduit.targetHint": "Passief — altijd actief.",
-  "ranked.cards.trinite.name": "Perfecte Triniteit", "ranked.cards.trinite.desc": "Als je drie keuzes allemaal verschillend zijn, win je de ronde onmiddellijk.",
+  "ranked.cards.trinite.name": "Perfecte Triniteit", "ranked.cards.trinite.desc": "Als je drie keuzes allemaal verschillend zijn en je geen lane verliest, win je de ronde onmiddellijk.",
   "ranked.cards.trinite.targetHint": "Onmiddellijk effect.",
   "ranked.compass.none": "Tegenstander: geen gerichte kaart",
   "ranked.compass.lane": "Tegenstanderkaart → Baan {n}",

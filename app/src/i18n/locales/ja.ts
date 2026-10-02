@@ -36,7 +36,7 @@ const ja: Record<string, string> = {
   "ranked.cards.trou-noir.name":"特異点","ranked.cards.trou-noir.desc":"このラウンドの相手カードを無効化。","ranked.cards.trou-noir.targetHint":"即時効果。",
   "ranked.cards.prophetie.name":"予言","ranked.cards.prophetie.desc":"パッシブ: 毎ラウンド開始時に相手の手を1つランダム公開。","ranked.cards.prophetie.targetHint":"パッシブ — 常時発動。",
   "ranked.cards.conduit.name":"導管","ranked.cards.conduit.desc":"パッシブ: コンボ(トリプル/三位一体)が+1追加。","ranked.cards.conduit.targetHint":"パッシブ — 常時発動。",
-  "ranked.cards.trinite.name":"完全三位一体","ranked.cards.trinite.desc":"3つの手が全て異なる場合、即座にラウンド勝利。","ranked.cards.trinite.targetHint":"即時効果。",
+  "ranked.cards.trinite.name":"完全三位一体","ranked.cards.trinite.desc":"3つの手が全て異なり、どのレーンも負けなければ、即座にラウンド勝利。","ranked.cards.trinite.targetHint":"即時効果。",
   "ranked.compass.none":"相手: 対象カードなし","ranked.compass.lane":"相手カード → レーン{n}",
   "premium.label":"プレミアム","premium.setKindLabel":"プレミアムコスメ","premium.priceLabel":"価格","premium.youHave":"✦ {n} 所持","premium.buy":"セット解除","premium.notEnough":"✦ スター不足","premium.alreadyOwned":"✓ 所有済み","premium.devGrant":"+1000 ✦ (テスト)","premium.close":"閉じる","premium.unlocked":"解除！",
   "crash.title":"問題発生","crash.body":"アプリに予期せぬエラー。進行状況は安全です。下をタップして再試行。","crash.details":"詳細","crash.retry":"再試行",

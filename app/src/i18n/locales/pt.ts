@@ -164,7 +164,7 @@ const pt: Record<string, string> = {
   "ranked.cards.conduit.desc": "Passiva: seus combos (triplo / trindade) pagam +1 extra.",
   "ranked.cards.conduit.targetHint": "Passiva — sempre ativa.",
   "ranked.cards.trinite.name": "Trindade Perfeita",
-  "ranked.cards.trinite.desc": "Se seus três movimentos forem todos diferentes, você vence a rodada na hora.",
+  "ranked.cards.trinite.desc": "Se seus três movimentos forem todos diferentes e você não perder nenhuma lane, vence a rodada na hora.",
   "ranked.cards.trinite.targetHint": "Efeito imediato.",
   "ranked.compass.none": "Oponente: nenhuma carta mirada",
   "ranked.compass.lane": "Carta do oponente → Lane {n}",

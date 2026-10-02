@@ -35,7 +35,7 @@ const pl: Record<string, string> = {
   "ranked.cards.trou-noir.name":"Osobliwość","ranked.cards.trou-noir.desc":"Unieważnia kartę przeciwnika w tej rundzie.","ranked.cards.trou-noir.targetHint":"Efekt natychmiastowy.",
   "ranked.cards.prophetie.name":"Proroctwo","ranked.cards.prophetie.desc":"Pasywna: ujawnij jeden losowy ruch przeciwnika na początku każdej rundy.","ranked.cards.prophetie.targetHint":"Pasywna — zawsze aktywna.",
   "ranked.cards.conduit.name":"Przewód","ranked.cards.conduit.desc":"Pasywna: twoje combo (potrójne / trójca) dają +1 dodatkowo.","ranked.cards.conduit.targetHint":"Pasywna — zawsze aktywna.",
-  "ranked.cards.trinite.name":"Idealna Trójca","ranked.cards.trinite.desc":"Jeśli twoje trzy wybory są różne, wygrywasz rundę natychmiast.","ranked.cards.trinite.targetHint":"Efekt natychmiastowy.",
+  "ranked.cards.trinite.name":"Idealna Trójca","ranked.cards.trinite.desc":"Jeśli twoje trzy wybory są różne i nie przegrasz żadnej linii, wygrywasz rundę natychmiast.","ranked.cards.trinite.targetHint":"Efekt natychmiastowy.",
   "ranked.compass.none":"Przeciwnik: brak wycelowanej karty","ranked.compass.lane":"Karta przeciwnika → Linia {n}",
   "premium.label":"PREMIUM","premium.setKindLabel":"Zestaw kosmetyczny premium","premium.priceLabel":"Cena","premium.youHave":"Masz ✦ {n}","premium.buy":"Odblokuj zestaw","premium.notEnough":"Za mało ✦ Gwiazd","premium.alreadyOwned":"✓ Posiadane — zastosuj z Profilu","premium.devGrant":"+1000 ✦ (tylko test)","premium.close":"Zamknij","premium.unlocked":"Odblokowano!",
   "crash.title":"Coś się zepsuło","crash.body":"Aplikacja napotkała nieoczekiwany błąd. Twoje postępy są bezpieczne. Dotknij poniżej, aby spróbować ponownie.","crash.details":"Szczegóły","crash.retry":"Spróbuj ponownie",
