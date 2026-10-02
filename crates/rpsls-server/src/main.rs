@@ -46,6 +46,9 @@ mod hello;
 // incréments (endpoints validés à venir).
 #[allow(dead_code)]
 mod economy;
+mod wallet;
+#[cfg(test)]
+mod test_upstash;
 mod ccg_engine;
 mod janitors;
 mod lanes_engine;

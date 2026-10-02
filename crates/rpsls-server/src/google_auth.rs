@@ -270,7 +270,9 @@ pub fn handle_google_login(
         if let Ok(true) = account::try_mark_welcomed(&pid).await {
             account::apply_welcome_bonus(&mut progress);
             player_state::save(pid.clone(), progress.clone());
+            crate::wallet::handlers::grant_welcome(&pid).await;
         }
+        crate::wallet::handlers::overlay_best_effort(&pid, &mut progress).await;
         let claim_token = match player_state::load_claim_token(&pid).await {
             Some(t) => Some(t),
             None => player_state::try_create_claim_token(&pid).await.ok().flatten(),

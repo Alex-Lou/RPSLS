@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::player_state::PlayerProgress;
+use crate::wallet::{PackResult, Wallet};
 
 /* ──────────── Client → Server ──────────── */
 
@@ -130,6 +131,22 @@ pub enum ClientMessage {
         #[serde(default)]
         state_hash: String,
     },
+
+    /* ──────────── Économie serveur-autoritaire (§9-B, module `wallet`) ──────────── */
+    /// L'app gère l'éco serveur : crée le portefeuille au premier appel (reprise
+    /// de la ligne player), puis le renvoie. À envoyer après Hello / Login.
+    WalletInit,
+    /// Ouvre un pack : le serveur tire les cartes et débite.
+    OpenPack,
+    CraftCard { card_id: String },
+    BuyPremiumSet { set_id: String },
+    ClaimCodex { threshold: u32 },
+    /// Gain d'un match vs CPU (barème serveur, plafond quotidien).
+    ClaimCpuReward { mode: String, outcome: String },
+    /// Cartes de déblocage de progression (liste bornée côté serveur).
+    ClaimUnlocks { card_ids: Vec<String> },
+    /// Fin de saison (horloge serveur).
+    ClaimSeason,
 }
 
 /* ──────────── Server → Client ──────────── */
@@ -290,6 +307,29 @@ pub enum ServerMessage {
     /// `desync` = match ANNULÉ par le serveur (hash d'état ou résultats
     /// divergents → triche/bug) : aucun résultat crédité (anti-triche Phase 4).
     CcgMatchEnd { winner: Option<PlayerSlot>, forfeit: bool, desync: bool },
+
+    /// Portefeuille à jour après une opération réussie (`op` = nom de
+    /// l'opération, ou "match_reward" pour un gain de match en ligne). Les champs
+    /// optionnels décrivent ce que l'opération a produit.
+    WalletUpdate {
+        op: String,
+        wallet: Wallet,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pack: Option<PackResult>,
+        /// Éclats crédités (récompense CPU, saison, match en ligne).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        eclats: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        dust: Option<u64>,
+        /// Cartes ajoutées (craft, déblocages).
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        cards: Vec<String>,
+    },
+
+    /// Opération refusée : rien n'a changé. `code` stable (insufficient_funds,
+    /// already_owned, unknown_item, not_eligible, already_claimed,
+    /// wallet_not_initialized, auth_needed, server_error).
+    WalletError { op: String, code: String },
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

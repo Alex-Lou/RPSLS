@@ -124,9 +124,11 @@ pub fn handle_signup(
                     let canonical = canonical_email(&record.email);
                     if let Ok(true) = try_mark_welcomed_email(&canonical).await {
                         apply_welcome_bonus(&mut progress);
+                        crate::wallet::handlers::grant_welcome(&pid).await;
                     }
                     let _ = try_mark_welcomed(&pid).await;
                     player_state::save(pid.clone(), progress.clone());
+                    crate::wallet::handlers::overlay_best_effort(&pid, &mut progress).await;
                     let claim_token = player_state::load_claim_token(&pid).await;
                     session_clone.send(ServerMessage::AuthOk {
                         player_id: pid,
@@ -182,7 +184,8 @@ pub fn handle_login(
                     session_clone.send(ServerMessage::AuthError { code: "server_error".into() });
                     return;
                 };
-                let progress = loaded.unwrap_or_default();
+                let mut progress = loaded.unwrap_or_default();
+                crate::wallet::handlers::overlay_best_effort(&pid, &mut progress).await;
                 // Adopt the account's stable identity (cross-device login).
                 session_clone.set_player_id(pid.clone());
                 // A fresh device holds no claim token yet — load it (or mint one)
