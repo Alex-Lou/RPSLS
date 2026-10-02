@@ -880,8 +880,9 @@ export function ArenaGame({
       <HeroHitFlash heroHit={heroHit} />
       {/* Debug log overlay — floating 🐛 button + bottom-sheet panel
        *  that shows live arena events. Replaces adb logcat (which
-       *  dropped lines under load) with an in-app live feed. */}
-      <ArenaDebugOverlay />
+       *  dropped lines under load) with an in-app live feed. Dev / debug
+       *  device builds only. */}
+      {__DEV_TOOLS__ && <ArenaDebugOverlay />}
     </motion.div>
   );
 }

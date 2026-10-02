@@ -21,11 +21,10 @@ import { PremiumBadge } from "./PremiumBadge";
 import { useT } from "../i18n";
 import { hapticMatchStart, hapticMatchWin, hapticTap } from "../haptic";
 
-// Le bouton de test « +1000 ✦ » est masqué UNIQUEMENT dans une vraie RELEASE
-// PUBLIQUE — build avec `VITE_PUBLIC_RELEASE=1`. Il reste dispo en `pnpm dev` ET
-// dans les builds debug device (pour tester les achats premium sur l'appareil).
+// Le bouton de test « +1000 ✦ » n'existe qu'en `pnpm dev` et dans les builds
+// debug device (`__DEV_TOOLS__`, fail-closed) : absent de toute release.
 // Alex 2026-06-20 : « virer le test dev en PUBLIC », mais le garder en debug.
-const __DEV_PREMIUM__ = import.meta.env.VITE_PUBLIC_RELEASE !== "1";
+const __DEV_PREMIUM__ = __DEV_TOOLS__;
 
 export interface PremiumSet {
   id: string;

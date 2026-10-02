@@ -14,7 +14,8 @@
  * so the panel stays readable across a long match.
  */
 
-const ARENA_LOG_ENABLED = true;
+// Builds dev / debug device uniquement : en release, ni buffer ni console.log.
+const ARENA_LOG_ENABLED = __DEV_TOOLS__;
 const MAX_BUFFER = 250;
 
 export interface ArenaLogEntry {
