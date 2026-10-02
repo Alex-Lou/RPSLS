@@ -22,7 +22,9 @@ export function AtoutBar({
           const a = ATOUTS_BY_ID[id];
           const isUsed = used.includes(id);
           const manual = a.kind === "manual";
-          const active = manual && !isUsed && canUse;
+          // Lecture et Va-banque ne se cumulent pas sur la même manche.
+          const blocked = (id === "lecture" && vabanqueArmed) || (id === "vabanque" && !!lectureMove);
+          const active = manual && !isUsed && canUse && !blocked;
           const onClick = id === "lecture" ? onUseLecture : id === "vabanque" ? onUseVabanque : undefined;
           return (
             <button
