@@ -193,9 +193,11 @@ const PRIORITY_TABLE: Partial<Record<CardId, number>> = {
   frenesie:         216, // buff board-wide ATK
   estocade:         218, // fusion : buff board + perforation + dé-émoussage
   saignee:          112, // pioche (tôt, ravitaille l'aggro)
+  greffe:           113, // pioche (tôt, voisin saignee)
   estafilade:       409, // reach : dmg direct héros (tard, avec les dégâts)
   // ── Voie Forêt (2026-06-23) ──
   ronces:           127, // setup défensif (riposte + bouclier)
+  "bosquet-epineux": 128, // fusion ronces+photosynthese : setup défensif (voisin ronces)
   photosynthese:    149, // soin créature + ATK perm (avant les buffs)
   ramure:           227, // bouclier board-wide (après les buffs)
   // ── Voie Cosmos (2026-06-23) ──

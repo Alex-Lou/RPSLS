@@ -15,7 +15,9 @@
  */
 
 // Builds dev / debug device uniquement : en release, ni buffer ni console.log.
-const ARENA_LOG_ENABLED = __DEV_TOOLS__;
+// `typeof` : hors Vite (scripts `npx tsx app/scripts/*-check.ts`), le define
+// n'existe pas → logs coupés au lieu d'un ReferenceError.
+const ARENA_LOG_ENABLED = typeof __DEV_TOOLS__ !== "undefined" && __DEV_TOOLS__;
 const MAX_BUFFER = 250;
 
 export interface ArenaLogEntry {
