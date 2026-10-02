@@ -359,6 +359,7 @@ fn broadcast_lanes_end(
     };
     a.send(msg.clone());
     b.send(msg);
+    crate::wallet::handlers::credit_match_end(a, b, winner, forfeit, "constellation");
 
     // Record the decisive result on the global ladder (winner +LP, loser -LP).
     if let Some(slot) = winner {

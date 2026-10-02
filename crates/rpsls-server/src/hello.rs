@@ -109,8 +109,9 @@ pub(crate) fn handle_hello(
                 Some(ref st) if client_token == *st => {
                     // Token matches — authenticate the session. (Le pseudo est
                     // déjà adopté en synchrone avant ce spawn, cf. plus haut.)
+                    let mut state = progress.unwrap_or_default();
+                    crate::wallet::handlers::overlay_best_effort(&pid, &mut state).await;
                     session_clone.set_player_id(pid);
-                    let state = progress.unwrap_or_default();
                     session_clone.send(ServerMessage::StateLoaded {
                         state,
                         claim_token: Some(st.clone()),
@@ -135,8 +136,9 @@ pub(crate) fn handle_hello(
                     // and ask the client to retry with its existing token.
                     match player_state::try_create_claim_token(&pid).await {
                         Ok(Some(new_token)) => {
+                            let mut state = progress.unwrap_or_default();
+                            crate::wallet::handlers::overlay_best_effort(&pid, &mut state).await;
                             session_clone.set_player_id(pid);
-                            let state = progress.unwrap_or_default();
                             session_clone.send(ServerMessage::StateLoaded {
                                 state,
                                 claim_token: Some(new_token),

@@ -1,5 +1,11 @@
 [
   {
+    "id": "acuite",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
     "id": "aegis",
     "cost": 1,
     "rarity": "common",
@@ -24,6 +30,12 @@
     "kind": "fusion"
   },
   {
+    "id": "apotheose-spectrale",
+    "cost": 4,
+    "rarity": "legendary",
+    "kind": "fusion"
+  },
+  {
     "id": "augur",
     "cost": 2,
     "rarity": "rare",
@@ -36,8 +48,14 @@
     "kind": "fusion"
   },
   {
-    "id": "bastion",
+    "id": "barricade",
     "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "bastion",
+    "cost": 2,
     "rarity": "rare",
     "kind": "fusion"
   },
@@ -46,6 +64,12 @@
     "cost": 3,
     "rarity": "epic",
     "kind": "active"
+  },
+  {
+    "id": "bosquet-epineux",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "fusion"
   },
   {
     "id": "bouffee-air",
@@ -84,10 +108,22 @@
     "kind": "active"
   },
   {
+    "id": "cataclysme",
+    "cost": 4,
+    "rarity": "legendary",
+    "kind": "fusion"
+  },
+  {
     "id": "chronomancien",
     "cost": 2,
     "rarity": "epic",
     "kind": "active"
+  },
+  {
+    "id": "citadelle",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "fusion"
   },
   {
     "id": "cocon",
@@ -102,9 +138,33 @@
     "kind": "passive"
   },
   {
+    "id": "contrefort",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "convergence-cosmique",
+    "cost": 4,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "coup-dans-lombre",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
     "id": "coup-de-bol",
     "cost": 1,
     "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "coup-de-taille",
+    "cost": 2,
+    "rarity": "rare",
     "kind": "active"
   },
   {
@@ -126,6 +186,18 @@
     "kind": "active"
   },
   {
+    "id": "derobade",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "dilatation-temporelle",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
     "id": "doppelganger",
     "cost": 3,
     "rarity": "epic",
@@ -134,6 +206,24 @@
   {
     "id": "double-mot",
     "cost": 3,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "drain-vital",
+    "cost": 3,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "eboulement",
+    "cost": 2,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "eboulis-final",
+    "cost": 4,
     "rarity": "epic",
     "kind": "active"
   },
@@ -162,9 +252,45 @@
     "kind": "active"
   },
   {
+    "id": "eclipse",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "ecrasement",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "effacement",
+    "cost": 4,
+    "rarity": "epic",
+    "kind": "fusion"
+  },
+  {
+    "id": "estafilade",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "estocade",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "fusion"
+  },
+  {
     "id": "fardeau",
     "cost": 2,
     "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "faux-semblant",
+    "cost": 3,
+    "rarity": "epic",
     "kind": "active"
   },
   {
@@ -204,15 +330,51 @@
     "kind": "fusion"
   },
   {
+    "id": "frappe-spectrale",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "frenesie",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "fuite-masquee",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "fureur-emoussee",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
     "id": "gaia",
     "cost": 3,
     "rarity": "epic",
     "kind": "passive"
   },
   {
+    "id": "galerie-des-glaces",
+    "cost": 2,
+    "rarity": "epic",
+    "kind": "fusion"
+  },
+  {
     "id": "gambit",
     "cost": 2,
     "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "gardien-pierre",
+    "cost": 3,
+    "rarity": "rare",
     "kind": "active"
   },
   {
@@ -228,6 +390,18 @@
     "kind": "active"
   },
   {
+    "id": "greffe",
+    "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "grondement",
+    "cost": 3,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
     "id": "heist",
     "cost": 3,
     "rarity": "epic",
@@ -240,6 +414,12 @@
     "kind": "fusion"
   },
   {
+    "id": "intrication-quantique",
+    "cost": 3,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
     "id": "jet-caillou",
     "cost": 1,
     "rarity": "common",
@@ -249,6 +429,12 @@
     "id": "juge",
     "cost": 4,
     "rarity": "legendary",
+    "kind": "active"
+  },
+  {
+    "id": "loi-de-causalite",
+    "cost": 2,
+    "rarity": "rare",
     "kind": "active"
   },
   {
@@ -264,6 +450,18 @@
     "kind": "active"
   },
   {
+    "id": "mascarade-enchainee",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "mascarade-souveraine",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "fusion"
+  },
+  {
     "id": "metamorphose",
     "cost": 3,
     "rarity": "epic",
@@ -273,6 +471,12 @@
     "id": "mirror",
     "cost": 2,
     "rarity": "rare",
+    "kind": "active"
+  },
+  {
+    "id": "nuee-spectrale",
+    "cost": 4,
+    "rarity": "legendary",
     "kind": "active"
   },
   {
@@ -324,6 +528,12 @@
     "kind": "active"
   },
   {
+    "id": "photosynthese",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
     "id": "pile-ou-face",
     "cost": 1,
     "rarity": "rare",
@@ -360,6 +570,12 @@
     "kind": "active"
   },
   {
+    "id": "ramure",
+    "cost": 3,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
     "id": "rappel",
     "cost": 3,
     "rarity": "epic",
@@ -369,6 +585,12 @@
     "id": "razzia",
     "cost": 2,
     "rarity": "legendary",
+    "kind": "active"
+  },
+  {
+    "id": "reflet-echo",
+    "cost": 1,
+    "rarity": "common",
     "kind": "active"
   },
   {
@@ -396,6 +618,12 @@
     "kind": "active"
   },
   {
+    "id": "ronces",
+    "cost": 2,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
     "id": "roue-destin",
     "cost": 4,
     "rarity": "legendary",
@@ -405,6 +633,12 @@
     "id": "sablier",
     "cost": 1,
     "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "saignee",
+    "cost": 2,
+    "rarity": "rare",
     "kind": "active"
   },
   {
@@ -432,6 +666,12 @@
     "kind": "active"
   },
   {
+    "id": "sillage-spectral",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
+  },
+  {
     "id": "singularite",
     "cost": 4,
     "rarity": "legendary",
@@ -442,6 +682,12 @@
     "cost": 1,
     "rarity": "rare",
     "kind": "fusion"
+  },
+  {
+    "id": "strate-vive",
+    "cost": 2,
+    "rarity": "rare",
+    "kind": "active"
   },
   {
     "id": "supernova",
@@ -465,6 +711,12 @@
     "id": "sursaut",
     "cost": 1,
     "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "taillade-mortelle",
+    "cost": 4,
+    "rarity": "legendary",
     "kind": "active"
   },
   {
@@ -512,6 +764,18 @@
   {
     "id": "tuile",
     "cost": 1,
+    "rarity": "common",
+    "kind": "active"
+  },
+  {
+    "id": "veine-gaia",
+    "cost": 3,
+    "rarity": "epic",
+    "kind": "active"
+  },
+  {
+    "id": "veine-minerale",
+    "cost": 2,
     "rarity": "common",
     "kind": "active"
   },

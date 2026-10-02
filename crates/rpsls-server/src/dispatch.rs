@@ -13,6 +13,7 @@ use crate::match_engine::{start_match, MatchCommand};
 use crate::player_state;
 use crate::protocol::{ClientMessage, PlayerSlot, ServerMessage};
 use crate::session::Session;
+use crate::wallet::handlers::{self as wallet, WalletOp};
 use crate::{account, google_auth, AppState};
 
 pub(crate) async fn handle_client_message(
@@ -312,6 +313,17 @@ pub(crate) async fn handle_client_message(
         }
 
         ClientMessage::Ping => session.send(ServerMessage::Pong),
+
+        ClientMessage::WalletInit => wallet::handle(session, WalletOp::Init),
+        ClientMessage::OpenPack => wallet::handle(session, WalletOp::OpenPack),
+        ClientMessage::CraftCard { card_id } => wallet::handle(session, WalletOp::Craft(card_id)),
+        ClientMessage::BuyPremiumSet { set_id } => wallet::handle(session, WalletOp::BuyPremiumSet(set_id)),
+        ClientMessage::ClaimCodex { threshold } => wallet::handle(session, WalletOp::ClaimCodex(threshold)),
+        ClientMessage::ClaimCpuReward { mode, outcome } => {
+            wallet::handle(session, WalletOp::ClaimCpuReward { mode, outcome })
+        }
+        ClientMessage::ClaimUnlocks { card_ids } => wallet::handle(session, WalletOp::ClaimUnlocks(card_ids)),
+        ClientMessage::ClaimSeason => wallet::handle(session, WalletOp::ClaimSeason),
     }
 }
 

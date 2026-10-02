@@ -377,6 +377,10 @@ fn broadcast_end(a: &Arc<Session>, b: &Arc<Session>, winner: Option<PlayerSlot>,
     let msg = ServerMessage::CcgMatchEnd { winner, forfeit, desync };
     a.send(msg.clone());
     b.send(msg);
+    // Éclats Arena crédités par le serveur, JAMAIS sur un match annulé (desync).
+    if !desync {
+        crate::wallet::handlers::credit_match_end(a, b, winner, forfeit, "arena");
+    }
     // Pas de leaderboard::record_result — beta sans LP (relais aveugle =
     // résultat client-authoritative). Sur desync=true, aucun crédit de toute façon.
 }

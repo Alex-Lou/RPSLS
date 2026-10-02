@@ -203,6 +203,46 @@ pub(crate) async fn get_raw(key: &str) -> Option<String> {
     result.as_str().map(|s| s.to_string())
 }
 
+/// Like `get_raw`, but distinguishes a MISSING key (`Ok(None)`) from a backend
+/// error (`Err(())`). Callers that would CREATE data on "missing" (e.g. the
+/// wallet migration) must use this one: an Upstash outage must never pass for
+/// "new player" and overwrite real data (same lesson as `load`, H4).
+pub(crate) async fn get_opt(key: &str) -> Result<Option<String>, ()> {
+    let cmds: Vec<Vec<String>> = vec![vec!["GET".into(), key.to_string()]];
+    let resp = match pipeline_send(&cmds).await {
+        Some(Ok(resp)) if resp.status().is_success() => resp,
+        _ => return Err(()),
+    };
+    let body: serde_json::Value = resp.json().await.map_err(|_| ())?;
+    let result = body.as_array().and_then(|a| a.first()).and_then(|e| e.get("result")).ok_or(())?;
+    if result.is_null() {
+        return Ok(None);
+    }
+    result.as_str().map(|s| Some(s.to_string())).ok_or(())
+}
+
+/// Awaited `SET key val`. `Err(())` on any backend failure — for writes whose
+/// caller must know the outcome before replying (wallet operations).
+pub(crate) async fn set_checked(key: &str, val: &str) -> Result<(), ()> {
+    let cmds: Vec<Vec<String>> = vec![vec!["SET".into(), key.to_string(), val.to_string()]];
+    match pipeline_send(&cmds).await {
+        Some(Ok(resp)) if resp.status().is_success() => {
+            let body: serde_json::Value = resp.json().await.map_err(|_| ())?;
+            let ok = body.as_array().and_then(|a| a.first()).and_then(|e| e.get("result")).and_then(|r| r.as_str());
+            if ok == Some("OK") { Ok(()) } else { Err(()) }
+        }
+        Some(Ok(resp)) => {
+            warn!(status = %resp.status(), "set_checked rejected");
+            Err(())
+        }
+        Some(Err(e)) => {
+            warn!(error = %e, "set_checked failed");
+            Err(())
+        }
+        None => Err(()),
+    }
+}
+
 /// Atomic `SET key val NX` via the pipeline POST form. Returns:
 ///   `Ok(true)`  — the key was created (it did not exist)
 ///   `Ok(false)` — the key already existed (NX rejected the write)
@@ -313,29 +353,14 @@ pub fn save(player_id: String, mut state: PlayerProgress) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::{extract::Path, http::StatusCode, routing::get, Json, Router};
 
     /// H4 : `load` distingue « absent » (Ok(None)) d'une erreur (Err) — une ligne
     /// illisible ou un Upstash en erreur ne doit JAMAIS passer pour un nouveau
     /// joueur, sinon la sauvegarde suivante écrase la vraie progression.
     #[tokio::test]
     async fn load_distinguishes_absent_from_error() {
-        async fn fake_get(Path(key): Path<String>) -> Result<Json<serde_json::Value>, StatusCode> {
-            match key.as_str() {
-                "player:absent" => Ok(Json(serde_json::json!({ "result": null }))),
-                "player:corrupt" => Ok(Json(serde_json::json!({ "result": "{not json" }))),
-                _ => Err(StatusCode::INTERNAL_SERVER_ERROR),
-            }
-        }
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        tokio::spawn(async move {
-            axum::serve(listener, Router::new().route("/get/:key", get(fake_get))).await.unwrap();
-        });
-        // Seul test du binaire qui lit cette config (OnceLock) : pas de course.
-        std::env::set_var("UPSTASH_REDIS_REST_URL", format!("http://{addr}"));
-        std::env::set_var("UPSTASH_REDIS_REST_TOKEN", "test-token");
-
+        // Faux Upstash partagé par tout le binaire (config lue une seule fois).
+        crate::test_upstash::ensure();
         assert_eq!(load("absent").await.map(|p| p.is_none()), Ok(true));
         assert!(load("corrupt").await.is_err());
         assert!(load("upstash-down").await.is_err());
