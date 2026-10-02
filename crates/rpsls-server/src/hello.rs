@@ -161,7 +161,7 @@ pub(crate) fn handle_hello(
 /// which closes the Redis-key path-traversal vector (a `player_id` like
 /// `"../../leaderboard"` would otherwise become a Redis key fragment that
 /// some misconfigured REST proxy could mis-route).
-fn validate_player_id(raw: &str) -> Option<String> {
+pub(crate) fn validate_player_id(raw: &str) -> Option<String> {
     let clean: String = raw
         .chars()
         .filter(|c| c.is_ascii_alphanumeric() || *c == '-')
