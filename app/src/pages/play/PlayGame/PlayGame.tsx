@@ -107,14 +107,15 @@ export function Game({
   }, [phase.kind, isHotseat, mood, difficulty, match.history]);
 
   const useLecture = () => {
-    if (usedAtouts.includes("lecture") || isHotseat) return;
+    // Pas sur la même manche que Va-banque (2 points garantis sinon).
+    if (usedAtouts.includes("lecture") || isHotseat || vabanqueArmed) return;
     if (!cpuNextRef.current) cpuNextRef.current = aiMove(mood, difficulty, match.history.map((r) => r.move_a));
     hapticTick();
     setLectureMove(cpuNextRef.current);
     setUsedAtouts((u) => [...u, "lecture"]);
   };
   const useVabanque = () => {
-    if (usedAtouts.includes("vabanque")) return;
+    if (usedAtouts.includes("vabanque") || lectureMove) return; // cf. useLecture
     hapticTick();
     setVabanqueArmed(true);
     setUsedAtouts((u) => [...u, "vabanque"]);

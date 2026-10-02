@@ -36,7 +36,7 @@ const zh: Record<string, string> = {
   "ranked.cards.trou-noir.name":"奇点","ranked.cards.trou-noir.desc":"取消对手本回合的卡牌效果。","ranked.cards.trou-noir.targetHint":"即时效果。",
   "ranked.cards.prophetie.name":"预言","ranked.cards.prophetie.desc":"被动: 每回合开始时随机揭示对手一个选择。","ranked.cards.prophetie.targetHint":"被动 — 始终激活。",
   "ranked.cards.conduit.name":"导管","ranked.cards.conduit.desc":"被动: 你的连击(三重/三位一体)额外+1。","ranked.cards.conduit.targetHint":"被动 — 始终激活。",
-  "ranked.cards.trinite.name":"完美三位一体","ranked.cards.trinite.desc":"若你的三个选择各不相同，立即赢得回合。","ranked.cards.trinite.targetHint":"即时效果。",
+  "ranked.cards.trinite.name":"完美三位一体","ranked.cards.trinite.desc":"若你的三个选择各不相同且没有输掉任何一路，立即赢得回合。","ranked.cards.trinite.targetHint":"即时效果。",
   "ranked.compass.none":"对手: 无目标卡牌","ranked.compass.lane":"对手卡牌 → 线路{n}",
   "premium.label":"高级","premium.setKindLabel":"高级外观套装","premium.priceLabel":"价格","premium.youHave":"你拥有 ✦ {n}","premium.buy":"解锁套装","premium.notEnough":"✦ 星星不足","premium.alreadyOwned":"✓ 已拥有","premium.devGrant":"+1000 ✦ (仅测试)","premium.close":"关闭","premium.unlocked":"已解锁！",
   "crash.title":"出了点问题","crash.body":"应用遇到意外错误。你的进度是安全的。点击下方重试。","crash.details":"详情","crash.retry":"重试",

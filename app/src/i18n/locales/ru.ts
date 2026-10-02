@@ -174,7 +174,7 @@ const ru: Record<string, string> = {
   "ranked.cards.conduit.desc": "Пассивно: ваши комбо (тройка / триединство) приносят +1 дополнительно.",
   "ranked.cards.conduit.targetHint": "Пассивно — действует всегда.",
   "ranked.cards.trinite.name": "Идеальное триединство",
-  "ranked.cards.trinite.desc": "Если все три ваших хода разные, вы сразу выигрываете раунд.",
+  "ranked.cards.trinite.desc": "Если все три ваших хода разные и вы не проиграли ни одной линии, вы сразу выигрываете раунд.",
   "ranked.cards.trinite.targetHint": "Немедленный эффект.",
   "ranked.compass.none": "Противник: нет нацеленной карты",
   "ranked.compass.lane": "Карта противника → Линия {n}",

@@ -10,6 +10,7 @@
 
 import type { CardId, CardRarity } from "../ranked/rankedTypes";
 import { CARDS, ALL_CARD_IDS, RARITY_ORDER } from "../ranked/cards";
+import { isFinisherCard } from "../arena/arenaFinishers";
 import { RANK_TIERS, type RankTier } from "./rank";
 import type { Outcome, RecordMode } from "../types";
 
@@ -74,6 +75,10 @@ export function eclatsReward(mode: RecordMode, outcome: Outcome): number {
   return 0;
 }
 
+/** Cartes tirables en pack. Les Finishers Pro sont exclus : injectés à 3⭐ en
+ *  match, jamais deckables (cf. arenaDecks.isDeckable) → une carte morte. */
+const PACKABLE_IDS: CardId[] = ALL_CARD_IDS.filter((id) => !isFinisherCard(id));
+
 function rollOneCard(): CardId {
   const total = (Object.values(PACK_WEIGHTS) as number[]).reduce((a, b) => a + b, 0);
   let r = Math.random() * total;
@@ -82,9 +87,9 @@ function rollOneCard(): CardId {
     r -= PACK_WEIGHTS[rarity];
     if (r <= 0) { pickedRarity = rarity; break; }
   }
-  const pool = ALL_CARD_IDS.filter((id) => CARDS[id].rarity === pickedRarity);
+  const pool = PACKABLE_IDS.filter((id) => CARDS[id].rarity === pickedRarity);
   if (pool.length === 0) {
-    const commons = ALL_CARD_IDS.filter((id) => CARDS[id].rarity === "common");
+    const commons = PACKABLE_IDS.filter((id) => CARDS[id].rarity === "common");
     return commons[Math.floor(Math.random() * commons.length)];
   }
   return pool[Math.floor(Math.random() * pool.length)];

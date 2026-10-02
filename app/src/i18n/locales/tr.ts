@@ -164,7 +164,7 @@ const tr: Record<string, string> = {
   "ranked.cards.conduit.desc": "Pasif: comboların (üçlü / üçleme) +1 fazladan öder.",
   "ranked.cards.conduit.targetHint": "Pasif — her zaman aktif.",
   "ranked.cards.trinite.name": "Perfect Trinity",
-  "ranked.cards.trinite.desc": "Üç seçimin de farklıysa, raundu doğrudan kazanırsın.",
+  "ranked.cards.trinite.desc": "Üç seçimin de farklıysa ve hiçbir hattı kaybetmezsen, raundu doğrudan kazanırsın.",
   "ranked.cards.trinite.targetHint": "Anında etki.",
   "ranked.compass.none": "Rakip: hedefli kart yok",
   "ranked.compass.lane": "Rakip kartı → Raund {n}",

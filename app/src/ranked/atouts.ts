@@ -19,8 +19,8 @@ export interface AtoutDef {
 }
 
 export const ATOUTS: AtoutDef[] = [
-  { id: "lecture",  glyph: "🔮", label: "Lecture",   desc: "Révèle le coup probable de l'adversaire.", kind: "manual" },
-  { id: "vabanque", glyph: "⚡", label: "Va-banque", desc: "La manche en cours vaut 2 points.",       kind: "manual" },
+  { id: "lecture",  glyph: "🔮", label: "Lecture",   desc: "Révèle le coup de l'adversaire (pas avec Va-banque).", kind: "manual" },
+  { id: "vabanque", glyph: "⚡", label: "Va-banque", desc: "La manche en cours vaut 2 points (pas avec Lecture).", kind: "manual" },
   { id: "garde",    glyph: "🛡️", label: "Garde",     desc: "Annule ta 1ʳᵉ manche perdue (→ nul).",     kind: "auto" },
   { id: "contre",   glyph: "🔁", label: "Contre",    desc: "Rejoue ta 1ʳᵉ manche perdue (nouveau tirage adverse).", kind: "auto" },
 ];

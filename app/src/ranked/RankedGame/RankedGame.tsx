@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import type { AiMood, Move } from "../../engine/game";
+import { localResolve, type AiMood, type Move } from "../../engine/game";
 import { useStore } from "../../store/store";
 import {
   resolveLanesRound,
@@ -45,7 +45,7 @@ import type {
   RankedBattleState,
 } from "../rankedTypes";
 import { makeBattle, pickSacrifice, nextRarityUp, removeFirst } from "./rankedGameHelpers";
-import { COUNTER_MOVE, BASE_CPU_HAND_POOL, STEALABLE_FROM_CPU } from "./rankedGameData";
+import { BASE_CPU_HAND_POOL, STEALABLE_FROM_CPU } from "./rankedGameData";
 import { RiposteOverlay } from "./RiposteOverlay";
 import { SuddenDeathOverlay } from "./SuddenDeathOverlay";
 import { usePickPhase } from "./usePickPhase";
@@ -639,20 +639,17 @@ export function RankedGame({
       // (No mutation needed — the post-resolve wipe is enough.)
     }
 
-    // Le Choix de Schrödinger: simulate a second move per lane (the move that
-    // would have beaten the opp's pick on that lane), pick whichever gives
-    // you the better outcome lane-by-lane. Falls back to your real pick if
-    // the simulated cover is the same.
+    // Le Choix de Schrödinger (superposition) : sur chaque lane que tu
+    // PERDRAIS, ton coup reste « ni gagné ni perdu » → il prend le coup adverse
+    // (nul, même mécanique que Mirror). Tu ne peux perdre aucune lane ce round,
+    // mais les victoires restent à aller chercher. (Avant : contre canonique
+    // sur chaque lane = 3-0 garanti, Alex 2026-10.)
     if (!timedOut && cardPlayed?.id === "schrodinger") {
       for (let i = 0; i < playerPlays.length; i++) {
-        const yourMv = playerPlays[i].mv;
         const oppMv = cpuPlays[i].mv;
-        // Find a move that BEATS the opp's move (the second superposed move).
-        const cover = COUNTER_MOVE[oppMv];
-        if (cover !== yourMv && cover) {
-          // Take the cover — it's strictly better than a tie or loss.
-          playerPlays[i] = { mv: cover, mana: 0 };
-          displayPlayerPicks[i] = cover;
+        if (localResolve(playerPlays[i].mv, oppMv).outcome.kind === "b_wins") {
+          playerPlays[i] = { mv: oppMv, mana: 0 };
+          displayPlayerPicks[i] = oppMv;
         }
       }
     }
@@ -739,10 +736,13 @@ export function RankedGame({
     } else if (!timedOut && echoActiveRef.current) {
       setEchoActive(false); // consume the watch even on win/draw
     }
-    // Trinité parfaite (Perfect Trinity): if your three picks are ALL different
-    // (a true trinity), you win the round outright. Otherwise the card is wasted.
+    // Trinité parfaite (Perfect Trinity): your three picks ALL different AND no
+    // lane lost (draws allowed) → you win the round outright. Otherwise the
+    // round resolves normally. (Avant : 3 coups différents suffisaient = trivial,
+    // Alex 2026-10.)
     const trinityActive = !timedOut && myCard?.id === "trinite";
-    const trinityHit = trinityActive && new Set(playerPicks).size === 3;
+    const trinityHit = trinityActive && new Set(playerPicks).size === 3
+      && fx.outcome.lanes.every((l) => l.winner !== "b");
     if (trinityHit) finalWinner = "a";
     // Gambit (high-roll): a won Gambit round counts DOUBLE toward the match
     // (extra round-win) and doubles the shown points; a lost Gambit round
