@@ -13,130 +13,23 @@ import {
   applyAllSpells,
   applySummons,
   creditManaGrants,
-  creatureEffectiveAtk,
   decideMatchEnd,
   endOfTurnCleanup,
   resolveLaneCombatAt,
 } from "./arenaRules";
-import { CREATURE_STATS, moveCountersMove, type BoardState, type LaneIndex, type Side, type TurnIntent } from "./arenaTypes";
-import type { Move } from "../engine/game";
-import type { RngPair } from "../engine/rng";
-import type { CardId } from "../ranked/rankedTypes";
+import type { LaneIndex, Side, TurnIntent } from "./arenaTypes";
 import { alog } from "./arenaLog";
 import { isDominantSpell } from "./arenaFinishers";
 import { spellPriority } from "./arenaCardEffects";
 import { SPELLS_WITH_SIGNATURE } from "./ArenaSpellFX";
 import type { ProjectileFX } from "./ArenaProjectileFX";
-import type { LaneOutcome, LaneResult } from "./arenaTelemetry";
 import { BALANCE } from "./arenaBalance";
+import type { ResolverFlowArgs } from "./arenaResolverFlowTypes";
+import { logBoardSnapshot, analyzeLaneCombat, findAntiTauntBypass, emitLaneTelemetry } from "./arenaResolverFlowHelpers";
 
-/** Snapshot helper — log compact d'une lane avec flags. Réutilise le même
- *  format que advanceToNextTurn pour cohérence à travers le pipeline. */
-function logBoardSnapshot(b: BoardState, tag: string): void {
-  alog("state", `--- ${tag} --- a.hp=${b.a.hp} b.hp=${b.b.hp}`);
-  const fmt = (c: BoardState["lanes"][number]["a"]): string => {
-    if (!c) return "∅";
-    const stats = CREATURE_STATS[c.move];
-    const atk = creatureEffectiveAtk(c);
-    const flags: string[] = [];
-    if (c.divineShield) flags.push("🛡");
-    if (c.dodgeCharges > 0) flags.push(c.dodgeCharges > 1 ? `✨${c.dodgeCharges}` : "✨");
-    if (c.taunt && c.provocationCharges > 0) flags.push(`P${c.provocationCharges}`);
-    if (c.summonedThisTurn && (c.move === "rock" || c.move === "lizard")) flags.push("L");
-    if (c.move === "paper" && c.wiltedSteps > 0) flags.push(`F${c.wiltedSteps}`);
-    if (c.combatBlunted) flags.push("É");
-    return `${c.move}(${c.hp}/${stats.hp},⚔${atk}${flags.length ? "," + flags.join("") : ""})`;
-  };
-  for (let i = 0; i < 3; i++) {
-    alog("state", `${tag} L${i} a:${fmt(b.lanes[i].a)} b:${fmt(b.lanes[i].b)}`);
-  }
-  // Alex feedback : "ajouter les cartes de chacun dans les logs" → mains
-  // visibles côté joueur ET côté CPU pour analyse CCG post-mortem.
-  // Format compact : main=[id1,id2,...] deck=N discard=M mana=X/Y.
-  alog("hand", `${tag} a hand=[${b.a.hand.join(",")}] deck=${b.a.deck.length} discard=${b.a.discard.length} mana=${b.a.mana}/${b.a.maxMana}`);
-  alog("hand", `${tag} b hand=[${b.b.hand.join(",")}] deck=${b.b.deck.length} discard=${b.b.discard.length} mana=${b.b.mana}/${b.b.maxMana}`);
-}
-
-/** Resolver step labels — kept in sync with ArenaBoard's banner switch. */
-export type ResolveStep =
-  | "reveal-opp"   // showing CPU intent before any effect
-  | "spells"       // both sides' spells just fired
-  | "summons"      // new creatures just landed
-  | "combat"       // lane combat just resolved
-  | "settle";      // post-combat, before next turn
-
-export interface ResolverFlowArgs {
-  /** Board AFTER hand-cleanup (spells removed from hand) but BEFORE spell effects fire. */
-  startBoard: BoardState;
-  playerIntent: TurnIntent;
-  cpuIntent: TurnIntent;
-  /** Paire de PRNG seedés (un par camp, cf. engine/rng.ts) — résolution
-   *  DÉTERMINISTE (lockstep Pro online / replay). Optionnel : absent →
-   *  Math.random (comportement historique). */
-  rng?: RngPair;
-  /** Camp CANONIQUE du joueur local (défaut "a"). `playerIntent`/`cpuIntent`
-   *  restent en PERSPECTIVE (moi / adversaire) ; ce champ sert UNIQUEMENT à
-   *  replacer les deux intents dans l'ordre canonique a/b au moment de résoudre,
-   *  pour que les DEUX clients (moi camp "a" OU "b") calculent le MÊME board
-   *  (le résolveur départage a-avant-b → l'ordre canonique doit être partagé).
-   *  Défaut "a" → intentA=moi, intentB=adversaire = comportement vs-CPU inchangé. */
-  mySide?: Side;
-  /** Pro online : la MORT SUBITE (ArenaSuddenDeath) tire au `Math.random` NON
-   *  seedé → elle desyncrait les deux clients. En online on la NEUTRALISE : une
-   *  égalité parfaite (double KO ou hard-cap à PV égaux) devient un NUL propre
-   *  (match-end, les deux à 0). Défaut false → comportement vs-CPU inchangé. */
-  noSuddenDeath?: boolean;
-  /** Facteur appliqué aux SEULES pauses de lecture (révélation, invocations,
-   *  fin de tour, victoire) — réglage « combat rapide ». 1 = rythme posé.
-   *  Les durées d'animation (sorts, charges de lane) ne sont jamais réduites. */
-  holdScale?: number;
-  setBoard: (b: BoardState) => void;
-  setOppPreview: (i: TurnIntent | null) => void;
-  setPlayerPreview: (i: TurnIntent | null) => void;
-  setResolveStep: (s: ResolveStep | null) => void;
-  setCombatLane: (l: LaneIndex | null) => void;
-  /** Camps qui CHARGENT sur la lane en combat (anti-mush, Alex 2026-06-17) :
-   *  seul l'attaquant fonce ; le défenseur garde sa réaction au dégât.
-   *  Optionnel (tests/headless). */
-  setCombatChargers?: (sides: ("a" | "b")[]) => void;
-  setHeroHit: (h: { side: "you" | "opp"; lane: LaneIndex; key: number } | null) => void;
-  /** Set when an undefended-lane attack is DEFLECTED by a taunt creature.
-   *  `defenderSide` owns the taunt. `rockLane` is the lane of the Pierre
-   *  that ate the deflection — used by the UI to pull a dotted line from
-   *  the attacker's lane to the Pierre + decrement its charge badge. */
-  setTauntBlock: (b: { defenderSide: "a" | "b"; rockLane: LaneIndex; key: number } | null) => void;
-  /** Anti-taunt bypass — set when an attack reaches a hero despite a charged
-   *  Pierre, because the attacker carries Étouffe (Paper) / Logique (Spock)
-   *  which cancel Provocation. `bypassedSide` owns the bypassed Pierre. */
-  setAntiTaunt: (b: { bypassedSide: "a" | "b"; rockLane: LaneIndex; cause: "paper" | "spock"; key: number } | null) => void;
-  /** Riposte d'esquive (Mirage) — set quand un Lézard va esquiver un counter et
-   *  contre-attaquer : pop un chip sur la lane de l'ATTAQUANT (« meurt sans raison »
-   *  → enfin expliqué, Alex 2026-06-28). Optionnel (tests/headless). */
-  setRiposteFX?: (b: { attackerSide: "a" | "b"; lane: LaneIndex; key: number } | null) => void;
-  /** Signature FX plein-board (Genèse, Supernova…) — déclenché au step SPELLS
-   *  avec les ids de TOUS les sorts joués ce tour. ArenaSpellFX ne joue que
-   *  ceux qui ont une signature ; le reste s'appuie sur les réactions
-   *  par-créature (ArenaLaneSlot). Optionnel (tests/headless). */
-  setSpellFX?: (fx: { ids: CardId[]; key: number } | null) => void;
-  /** IMPACT FX plein-écran (Alex 2026-06-13) — déclenché sur un coup PUISSANT
-   *  ou FATAL au héros, typé par le MOVE de l'attaquant (Ciseaux → entaille,
-   *  Pierre → ébranlement…). Cf. ArenaImpactFX. */
-  setImpactFX?: (fx: { move: Move; power: "strong" | "fatal"; key: number } | null) => void;
-  /** Projectiles « cailloux » lane→lane — Jet de Caillou (1) + Éboulement AOE (N).
-   *  Liste de tirs posée d'un coup (Alex 2026-06-24/25). Optionnel (tests/headless). */
-  setProjectileFX?: (shots: ProjectileFX[]) => void;
-  /** Called BEFORE the resolver advances to the next turn — clears the
-   *  player's pending intent and stops the "resolving" lock. */
-  onSettle: (finalBoard: BoardState) => void;
-  /** Called AFTER the resolver's settle pause — advances board to next turn. */
-  onAdvanceTurn: () => void;
-  /** Match-end haptics — fired once if either hero hit 0 HP. */
-  onMatchEnd?: (winnerIsPlayer: boolean) => void;
-  /** Télémétrie Watcher (observationnel, fail-soft) — appelé 1× par lane APRÈS
-   *  résolution du combat, avec l'issue DÉJÀ calculée par le résolveur (aucune
-   *  logique de combat dupliquée). Optionnel (tests/headless). ZÉRO effet gameplay. */
-  onLaneResolved?: (outcome: LaneOutcome) => void;
-}
+// Types (ResolveStep, ResolverFlowArgs) → arenaResolverFlowTypes ; helpers purs
+// (snapshot, analyse de lane, télémétrie) → arenaResolverFlowHelpers.
+export type { ResolveStep, ResolverFlowArgs } from "./arenaResolverFlowTypes";
 
 /** Pacing constants — RALENTIES (Alex 2026-06-23 « tout va vite, je m'y perds »).
  *  Chaque beat doit LANDER avant le suivant. Un tour ≈ 10-11s : on privilégie la
@@ -317,92 +210,14 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
         setResolveStep("combat");
         const runLane = (laneIdx: 0 | 1 | 2) => {
           if (aborted) return;
-          const lane = b.lanes[laneIdx];
-          const aHitsB = !!lane.a && !lane.b;
-          const bHitsA = !!lane.b && !lane.a;
-          // RPSLS counter follow-through (2026-06-09): if both creatures
-          // are present and one counters the other, the loser dies AND the
-          // winner pursues its ATK onto the opp hero (unless dodge or a
-          // charged Pierre deflects). Treat that as a hero hit for the
-          // anim layer too.
-          const bothPresent = !!lane.a && !!lane.b;
-          const counterAB = bothPresent && moveCountersMove(lane.a!.move, lane.b!.move);
-          const counterBA = bothPresent && moveCountersMove(lane.b!.move, lane.a!.move);
-          // Sync avec arenaCombat : la poursuite n'a PAS lieu si le perdant est
-          // sauvé par Esquive OU par Aegis (sauf attaquant Tranchant/LAME qui
-          // percent le bouclier ; LAME perce aussi l'Esquive). Sans ces termes
-          // l'anim flashait le héros alors que l'engine ne frappait pas.
-          const aLame = !!lane.a && b.a.lameActive && lane.a.move === "scissors";
-          const bLame = !!lane.b && b.b.lameActive && lane.b.move === "scissors";
-          const aFollowsThroughOnB = bothPresent && counterAB && !counterBA
-            && (lane.b!.dodgeCharges === 0 || aLame)
-            && (!lane.b!.divineShield || lane.a!.pierces || aLame);
-          const bFollowsThroughOnA = bothPresent && counterBA && !counterAB
-            && (lane.a!.dodgeCharges === 0 || bLame)
-            && (!lane.a!.divineShield || lane.b!.pierces || bLame);
-          // TAUNT DEFLECTION DETECTION — keep in sync with rules.findDeflector:
-          //   first ALIVE+CHARGED Pierre on defender's side, EXCEPT if
-          //   attacker has Paper/Spock anti-taunt active. Returns the
-          //   Pierre's lane so the chip can point a dotted line at it.
-          const isAntiTaunt = (c: { move: string } | null | undefined): boolean =>
-            !!c && (c.move === "paper" || c.move === "spock");
-          const findDeflectorLane = (defenderSide: "a" | "b"): LaneIndex | null => {
-            const attackerSide: "a" | "b" = defenderSide === "a" ? "b" : "a";
-            // LAME Finisher : l'attaquant Ciseau LAME perce la Provoc — pas de
-            // chip "détourné" (sync avec le skip deflect d'arenaCombat).
-            const attackerLame = attackerSide === "a" ? aLame : bLame;
-            if (attackerLame) return null;
-            const attackerHasAntiTaunt = b.lanes.some((l) =>
-              isAntiTaunt(attackerSide === "a" ? l.a : l.b),
-            );
-            if (attackerHasAntiTaunt) return null;
-            for (let i = 0; i < 3; i++) {
-              const c = defenderSide === "a" ? b.lanes[i].a : b.lanes[i].b;
-              if (c && c.taunt && c.provocationCharges > 0) return i as LaneIndex;
-            }
-            return null;
-          };
-          // ANTI-TAUNT BYPASS — when an attack reaches the hero AND the
-          // defender HAS a charged Pierre but the attacker carries Étouffe
-          // (Paper) / Logique (Spock), the Provocation is cancelled. Surface
-          // WHICH passive bypassed the rock so the player understands why it
-          // didn't defend (keep the move check in sync with isAntiTaunt above).
-          const findAntiTauntBypass = (defenderSide: "a" | "b"): { rockLane: LaneIndex; cause: "paper" | "spock" } | null => {
-            const attackerSide: "a" | "b" = defenderSide === "a" ? "b" : "a";
-            let cause: "paper" | "spock" | null = null;
-            for (let i = 0; i < 3; i++) {
-              const c = attackerSide === "a" ? b.lanes[i].a : b.lanes[i].b;
-              if (c && (c.move === "paper" || c.move === "spock")) { cause = c.move; break; }
-            }
-            if (!cause) return null;
-            for (let i = 0; i < 3; i++) {
-              const c = defenderSide === "a" ? b.lanes[i].a : b.lanes[i].b;
-              if (c && c.taunt && c.provocationCharges > 0) return { rockLane: i as LaneIndex, cause };
-            }
-            return null;
-          };
-          // a hits b's hero when either undefended attack or RPSLS follow-through.
-          // Splash damage (Alex 2026-06-11) : la poursuite après counter-kill
-          // est réduite à max(0, ATK − HP cible). Si splash = 0 → le hero ne
-          // prend RIEN, pas d'anim flash sur sa HP bar (sinon induit en erreur).
-          const atkA = lane.a ? creatureEffectiveAtk(lane.a) : 0;
-          const atkB = lane.b ? creatureEffectiveAtk(lane.b) : 0;
-          const splashAtoB = aFollowsThroughOnB && lane.b ? Math.max(0, atkA - lane.b.hp) : 0;
-          const splashBtoA = bFollowsThroughOnA && lane.a ? Math.max(0, atkB - lane.a.hp) : 0;
-          const aReachesHeroB = aHitsB || aFollowsThroughOnB;
-          const bReachesHeroA = bHitsA || bFollowsThroughOnA;
-          // damage RÉEL qui va toucher le hero (filtre les follow-through à 0)
-          const aHitsHeroBForReal = (aHitsB && atkA > 0) || splashAtoB > 0;
-          const bHitsHeroAForReal = (bHitsA && atkB > 0) || splashBtoA > 0;
-          const bDeflectorLane = aReachesHeroB ? findDeflectorLane("b") : null;
-          const aDeflectorLane = bReachesHeroA ? findDeflectorLane("a") : null;
-          // Anti-mush (Alex 2026-06-17) : seul l'ATTAQUANT charge — le défenseur
-          // garde sa réaction hitShake au moment du dégât → séquence lisible
-          // « fonce → encaisse ». Vainqueur du counter, ou créature seule ; trade
-          // sans counter (même symbole / pas de relation) = les 2 (vrai clash).
-          const chargers: ("a" | "b")[] = bothPresent
-            ? (counterAB && !counterBA ? ["a"] : counterBA && !counterAB ? ["b"] : ["a", "b"])
-            : lane.a ? ["a"] : lane.b ? ["b"] : [];
+          // Analyse visuelle de la lane (poursuite RPSLS, splash, Provoc,
+          // chargeurs anti-mush) → arenaResolverFlowHelpers.analyzeLaneCombat.
+          const an = analyzeLaneCombat(b, laneIdx);
+          const {
+            lane, bothPresent, counterAB, counterBA, aLame, bLame, atkA, atkB,
+            splashAtoB, splashBtoA, aHitsHeroBForReal, bHitsHeroAForReal,
+            bDeflectorLane, aDeflectorLane, chargers,
+          } = an;
           setCombatChargers?.(chargers);
           setCombatLane(laneIdx);
           // Mid-charge: flash the targeted hero BEFORE damage is committed,
@@ -413,7 +228,7 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
               setTauntBlock({ defenderSide: "b", rockLane: bDeflectorLane, key: Date.now() });
             } else if (aHitsHeroBForReal) {
               // Anti-taunt bypass chip seulement si dmg réellement infligé.
-              const bypass = findAntiTauntBypass("b");
+              const bypass = findAntiTauntBypass(b, "b");
               if (bypass) setAntiTaunt({ bypassedSide: "b", rockLane: bypass.rockLane, cause: bypass.cause, key: Date.now() });
               setHeroHit({ side: "opp", lane: laneIdx, key: Date.now() });
               // IMPACT FX plein-écran RÉSERVÉ au coup FATAL (Audit anim Build A).
@@ -427,7 +242,7 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
             if (aDeflectorLane !== null) {
               setTauntBlock({ defenderSide: "a", rockLane: aDeflectorLane, key: Date.now() + 1 });
             } else if (bHitsHeroAForReal) {
-              const bypass = findAntiTauntBypass("a");
+              const bypass = findAntiTauntBypass(b, "a");
               if (bypass) setAntiTaunt({ bypassedSide: "a", rockLane: bypass.rockLane, cause: bypass.cause, key: Date.now() + 1 });
               setHeroHit({ side: "you", lane: laneIdx, key: Date.now() + 1 });
               const dmgA = splashBtoA > 0 ? splashBtoA : atkB;
@@ -470,33 +285,7 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
             // Télémétrie Watcher (Tier B) — issue de la lane, à partir des valeurs
             // DÉJÀ calculées ci-dessus + le diff de board (prevB → b). Fail-soft,
             // observationnel : ne touche jamais au gameplay.
-            if (onLaneResolved) {
-              try {
-                const selfMove = lane.a?.move ?? null;
-                const oppMove = lane.b?.move ?? null;
-                const result: LaneResult =
-                  lane.a && lane.b
-                    ? counterAB ? "counterWinSelf" : counterBA ? "counterWinOpp" : "mirror"
-                    : lane.a ? "emptySelf" : lane.b ? "emptyOpp" : "none";
-                onLaneResolved({
-                  lane: laneIdx,
-                  selfMove,
-                  oppMove,
-                  result,
-                  killSelf: !!prevB.lanes[laneIdx].a && !b.lanes[laneIdx].a,
-                  killOpp: !!prevB.lanes[laneIdx].b && !b.lanes[laneIdx].b,
-                  saved:
-                    (counterAB && !counterBA && !!prevB.lanes[laneIdx].b && !!b.lanes[laneIdx].b) ||
-                    (counterBA && !counterAB && !!prevB.lanes[laneIdx].a && !!b.lanes[laneIdx].a),
-                  splashToOpp: bDeflectorLane === null ? splashAtoB : 0,
-                  splashToSelf: aDeflectorLane === null ? splashBtoA : 0,
-                  directToOpp: aHitsB && bDeflectorLane === null ? atkA : 0,
-                  directToSelf: bHitsA && aDeflectorLane === null ? atkB : 0,
-                });
-              } catch {
-                /* télémétrie fail-soft — jamais bloquer la résolution */
-              }
-            }
+            emitLaneTelemetry(onLaneResolved, laneIdx, an, prevB, b);
             // Alex feedback 2026-06-09 "résolution complète des 3 lanes" : NE
             // PLUS early-exit sur match-end interim. On résout les 3 lanes
             // pour permettre l'égalité (a≤0 ET b≤0). Verdict final calculé

@@ -1,4 +1,5 @@
 import type { CardId, CardRarity } from "../rankedTypes";
+import type { Move } from "../../engine/game";
 
 // Taille du deck PAR MODE (Alex 2026-06-13) : Classé = 6, Pro = 8. Decks
 // SÉPARÉS dans le store (rankedDeck / arenaDeck) → éditer l'un n'écrase pas
@@ -81,4 +82,14 @@ export const UNLOCK_HINTS: Partial<Record<CardId, string>> = {
   schrodinger: "deck.unlock.rarePackOrForge",
   juge: "deck.unlock.rarePackOrForge",
   genese: "deck.unlock.rarePackOrForge",
+};
+
+
+/** Filtre de collection par Voie en Arène (Alex 2026-06-22 « un filtre pour
+ *  chaque voie ») : "myvoie" = ta Voie active + neutres ; un Move = cette Voie ;
+ *  "neutral" = cartes neutres ; "all" = tout. */
+export type VoieFilter = "myvoie" | "neutral" | "all" | Move;
+/** Symboles RPSLS des chips de Voie (décoratifs). */
+export const VOIE_CHIP_ICON: Record<Move, string> = {
+  rock: "⛰", paper: "🌿", scissors: "⚔", lizard: "🦎", spock: "🖖",
 };
