@@ -44,7 +44,7 @@ export function PremiumIntensitySlider({ setId, label, accent }: {
         </span>
       </div>
       <p className="text-[11px] text-ink-faint mb-3 leading-snug">
-        Règle la densité des effets signature : pluie, pétales, étincelles, motes…
+        {t("profile.premiumFx.hint")}
       </p>
       <div className="relative h-9 flex items-center">
         {/* Track */}
@@ -94,9 +94,9 @@ export function PremiumIntensitySlider({ setId, label, accent }: {
         />
       </div>
       <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-ink-faint mt-1.5">
-        <span>Discret</span>
-        <span>Standard</span>
-        <span>Intense</span>
+        <span>{t("profile.premiumFx.low")}</span>
+        <span>{t("profile.premiumFx.mid")}</span>
+        <span>{t("profile.premiumFx.high")}</span>
       </div>
     </section>
   );

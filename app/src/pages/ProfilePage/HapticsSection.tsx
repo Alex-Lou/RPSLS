@@ -1,74 +1,55 @@
 import { useStore } from "../../store/store";
 import { useT } from "../../i18n";
 import { hapticTap, hapticMatchStart } from "../../haptic";
+import { SectionCard } from "./SectionCard";
+import { ChoiceGrid, ToggleRow } from "./Toggle";
 
+/** Réglages › Vibrations : interrupteur + intensité + bouton de test.
+ *  Champs inchangés (`hapticEnabled`, `hapticIntensity`, défauts true / med). */
 export function HapticsSection() {
-  const player = useStore((s) => s.player);
+  const enabled = useStore((s) => s.player.hapticEnabled ?? true);
+  const intensity = useStore((s) => s.player.hapticIntensity ?? "med");
   const updateProfile = useStore((s) => s.updateProfile);
   const t = useT();
 
   return (
-    <section className="bg-surface border border-hairline rounded-3xl p-4 sm:p-5">
-      <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-muted mb-1">
-        {t("profile.haptic.title")}
-      </h2>
-      <p className="text-xs text-ink-faint mb-3">
-        {t("profile.haptic.subtitle")}
-      </p>
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <span className="text-sm text-ink-muted">{t("profile.haptic.enable")}</span>
-        <button
-          onClick={() => updateProfile({ hapticEnabled: !(player.hapticEnabled ?? true) })}
-          className={
-            "w-12 h-7 rounded-full transition relative " +
-            ((player.hapticEnabled ?? true)
-              ? "bg-emerald-500/70"
-              : "bg-zinc-700")
-          }
-        >
-          <span
-            className={
-              "absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-all " +
-              ((player.hapticEnabled ?? true) ? "left-[22px]" : "left-0.5")
-            }
-          />
-        </button>
-      </div>
-      <div className={"grid grid-cols-3 gap-2 " + ((player.hapticEnabled ?? true) ? "" : "opacity-40 pointer-events-none")}>
-        {(["low", "med", "high"] as const).map((lvl) => {
-          const active = (player.hapticIntensity ?? "med") === lvl;
-          return (
-            <button
-              key={lvl}
-              onClick={() => {
-                updateProfile({ hapticIntensity: lvl });
-                // Give a sample buzz at the new level so the player
-                // can actually feel the difference between pills.
-                setTimeout(() => hapticTap(), 60);
-              }}
-              className={
-                "rounded-xl py-2 text-xs font-semibold border transition " +
-                (active
-                  ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
-                  : "border-hairline bg-hairline text-ink-muted hover:bg-hairline")
-              }
-            >
-              {t(`profile.haptic.${lvl}`)}
-            </button>
-          );
-        })}
+    <SectionCard title={t("profile.haptic.title")} subtitle={t("profile.haptic.subtitle")}>
+      <ToggleRow
+        icon="📳"
+        title={t("profile.haptic.enable")}
+        checked={enabled}
+        onChange={(v) => updateProfile({ hapticEnabled: v })}
+      />
+      <div className="mt-3">
+        <span className="block text-[11px] text-ink-faint mb-1.5">{t("profile.haptic.intensity")}</span>
+        <ChoiceGrid
+          disabled={!enabled}
+          options={(["low", "med", "high"] as const).map((lvl) => ({
+            key: lvl,
+            value: lvl,
+            label: <span className="text-xs font-semibold">{t(`profile.haptic.${lvl}`)}</span>,
+          }))}
+          value={intensity}
+          onPick={(lvl) => {
+            updateProfile({ hapticIntensity: lvl });
+            // Petite vibration au nouveau niveau pour sentir la différence.
+            setTimeout(() => hapticTap(), 60);
+          }}
+        />
       </div>
       <button
+        type="button"
         onClick={() => hapticMatchStart()}
+        disabled={!enabled}
         className={
-          "mt-3 w-full py-2 rounded-xl text-xs font-semibold border transition " +
-          ((player.hapticEnabled ?? true)
-            ? "border-violet-400/40 bg-violet-500/15 text-violet-200 hover:bg-violet-500/25"
-            : "opacity-40 pointer-events-none border-hairline bg-hairline text-ink-faint")
+          "mt-3 w-full py-2.5 rounded-xl text-xs font-semibold border transition " +
+          (enabled
+            ? "border-white/20 bg-white/5 text-ink hover:bg-white/10"
+            : "opacity-40 border-hairline bg-hairline text-ink-faint")
         }
       >
         {t("profile.haptic.test")}
       </button>
-    </section>
+    </SectionCard>
   );
 }
