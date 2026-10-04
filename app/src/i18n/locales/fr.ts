@@ -5,7 +5,13 @@ import arena_flow_fr from "./arena/flow.fr";
 import arena_fx_fr from "./arena/fx.fr";
 import shell_nav_fr from "./shell/nav.fr";
 import matchEnd_fr from "./matchEnd.fr";
+import app_pages_fr from "./app/pages.fr";
+import app_play_fr from "./app/play.fr";
+import app_ranked_fr from "./app/ranked.fr";
 const fr: Record<string, string> = {
+  ...app_pages_fr,
+  ...app_play_fr,
+  ...app_ranked_fr,
   // ── Arena (fragments par zone, cf. locales/arena/) ──
   ...arena_screens_fr,
   ...arena_board_fr,
