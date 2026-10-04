@@ -41,6 +41,7 @@ import { ArenaCenterBand } from "./ArenaCenterBand";
 import { ArenaFuseReveal } from "./ArenaFuseReveal";
 import { ArenaOppCardInspect } from "./ArenaOppCardInspect";
 import { LaneRow } from "./LaneRow";
+import { useGfxAllows } from "../../graphics/graphicsQuality";
 
 export interface ArenaBoardProps {
   board: BoardState;
@@ -187,6 +188,8 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
   const playerRowStickers = stickersForSide(playerSide);
   const oppRowStickers = stickersForSide(oppSide);
   const padId = useArenaPad(useStore((s) => s.player.padId));
+  // Fond de plateau animé seulement en qualité Haute (chauffe en longue partie).
+  const padAnim = useGfxAllows("padAnim");
   // Le player strip (avatar/nickname) est rendu dans ArenaPlanPhase désormais
   // (Alex 2026-06-11). ArenaBoard ne rend plus que l'opp strip + le pad.
   const opp = board[oppSide];
@@ -260,7 +263,7 @@ export function ArenaBoard({ board, playerSide, intent, oppPreview, playerPrevie
       >
       {/* Backdrop — same pad system as Ranked, so themes carry over. */}
       <div className="absolute inset-0 pointer-events-none">
-        <BattlePad padId={padId} className="w-full h-full" compact paused={resolveStep !== null} />
+        <BattlePad padId={padId} className="w-full h-full" compact frozen={!padAnim} paused={resolveStep !== null} />
       </div>
       {/* Radial vignette for legibility. */}
       <div

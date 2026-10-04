@@ -1,14 +1,29 @@
-import type { PersistOptions } from "zustand/middleware";
+import { createJSONStorage, type PersistOptions } from "zustand/middleware";
 import type { MatchRecord, Player } from "../types";
 import type { Locale } from "../i18n";
 import { sanitisePersisted } from "./storeMigrationGuard";
 import type { AppState, ServerConfig } from "./storeTypes";
 import { detectLocale, defaultServerConfig, DEFAULT_CLOUD_URL } from "./storeDefaults";
 import { HISTORY_STORAGE_KEY } from "./historySideChannel";
+import { playerForMainBlob, readSideImages } from "./imageSideChannel";
 
 export const persistOptions: PersistOptions<AppState> = {
   name: "rpsls-app-state",
   version: 22,
+  // Écriture protégée : un quota localStorage plein faisait REMONTER l'exception
+  // jusqu'à l'appelant du set() (ex. recordMatch en fin de partie → écran de fin
+  // jamais affiché). On perd la sauvegarde locale de cet instant, pas la partie.
+  storage: createJSONStorage(() => ({
+    getItem: (k) => localStorage.getItem(k),
+    setItem: (k, v) => {
+      try {
+        localStorage.setItem(k, v);
+      } catch (e) {
+        console.warn("[persist] sauvegarde locale impossible", e);
+      }
+    },
+    removeItem: (k) => localStorage.removeItem(k),
+  })),
   migrate: (persisted: unknown, version: number): AppState => {
     const state = persisted as {
       player?: Partial<Player> & { customVariants?: unknown };
@@ -145,7 +160,8 @@ export const persistOptions: PersistOptions<AppState> = {
   // history then rides a debounced side-channel writer (below) so it
   // still survives a reinstall, just no longer hot-path.
   partialize: (state) => ({
-    player: state.player,
+    // Images perso rangées à part (cf. imageSideChannel) : plus réécrites à chaque set().
+    player: playerForMainBlob(state.player),
     onboarded: state.onboarded,
     locale: state.locale,
     serverConfig: state.serverConfig,
@@ -171,5 +187,26 @@ export const persistOptions: PersistOptions<AppState> = {
   // `merge` runs on each boot, so the guard always fires. (migrate keeps its
   // own call for the upgrade path; sanitisePersisted is idempotent.)
   merge: (persisted, current) =>
-    ({ ...(current as object), ...(sanitisePersisted(persisted) as object) }) as AppState,
+    ({ ...(current as object), ...(sanitisePersisted(withSideImages(persisted, current)) as object) }) as AppState,
 };
+
+/** Remet les images perso (clé dédiée, la plus récente) dans le joueur persisté
+ *  AVANT la validation, pour qu'elles passent par les mêmes gardes. Les champs
+ *  absents des deux côtés reprennent la valeur par défaut (le merge est
+ *  superficiel : sans ça `player.avatar` resterait undefined). */
+function withSideImages(persisted: unknown, current: AppState): unknown {
+  const p = persisted as { player?: Partial<Player> } | null;
+  if (!p?.player) return persisted;
+  const d = current.player;
+  const side = readSideImages() ?? {};
+  return {
+    ...p,
+    player: {
+      avatar: d.avatar,
+      customBgs: d.customBgs,
+      customPads: d.customPads,
+      ...p.player,
+      ...side,
+    },
+  };
+}

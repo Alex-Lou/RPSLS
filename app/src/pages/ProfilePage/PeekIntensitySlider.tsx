@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { useStore } from "../../store/store";
+import { useIntensityValue } from "./useIntensityValue";
 
 /**
  * PeekIntensitySlider — VERTICAL slider mounted inside the full-screen
@@ -21,14 +21,8 @@ export function PeekIntensitySlider({ setId, accent }: {
   setId: string;
   accent: { from: string; to: string } | null;
 }) {
-  const intensity = useStore((s) => s.player.premiumIntensity?.[setId] ?? 1.0);
-  const updateProfile = useStore((s) => s.updateProfile);
+  const [intensity, setValue] = useIntensityValue(setId);
   const MIN = 0.1, MAX = 2.0;
-  const setValue = (v: number) => {
-    const clamped = Math.max(MIN, Math.min(MAX, v));
-    const current = useStore.getState().player.premiumIntensity ?? {};
-    updateProfile({ premiumIntensity: { ...current, [setId]: clamped } });
-  };
   const fillPct = ((intensity - MIN) / (MAX - MIN)) * 100;
   const accentGrad = accent
     ? `linear-gradient(0deg, ${accent.from}, ${accent.to})`
