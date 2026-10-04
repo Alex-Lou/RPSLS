@@ -48,17 +48,28 @@ export function EmptySlot({
         aria-label={clickableLabel}
       >
         <motion.div
-          animate={{ scale: [1, 1.04, 1], boxShadow: [
-            "0 0 0 0 rgba(252,211,77,0)",
-            "0 0 14px 2px rgba(252,211,77,0.55)",
-            "0 0 0 0 rgba(252,211,77,0)",
-          ] }}
+          animate={{ scale: [1, 1.04, 1] }}
           transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-          className="aspect-[5/4] w-full rounded-xl border-2 border-amber-300/80 bg-amber-500/20 flex items-center justify-center relative overflow-hidden"
+          className="aspect-[5/4] w-full relative"
         >
-          <span className="text-[10px] uppercase tracking-[0.2em] text-amber-100 font-black text-center px-1">
-            {clickableLabel}
-          </span>
+          {/* PERF : lueur en box-shadow STATIQUE dont seule l'opacité pulse
+           *  (composité GPU) — avant, l'ombre animée était re-rastérisée à
+           *  chaque image sur chaque case ciblable. */}
+          <motion.div
+            aria-hidden
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 1, 0] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute inset-0 rounded-xl pointer-events-none"
+            style={{ boxShadow: "0 0 14px 2px rgba(252,211,77,0.55)" }}
+          />
+          <div
+            className="absolute inset-0 rounded-xl border-2 border-amber-300/80 bg-amber-500/20 flex items-center justify-center overflow-hidden"
+          >
+            <span className="text-[10px] uppercase tracking-[0.2em] text-amber-100 font-black text-center px-1">
+              {clickableLabel}
+            </span>
+          </div>
         </motion.div>
       </button>
     );

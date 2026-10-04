@@ -15,7 +15,7 @@
  * arenaRules pure functions, so the resolver is unit-testable.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { type MutableRefObject, useEffect, useRef, useState } from "react";
 import {
   hapticLock, hapticMatchStart, hapticMatchWin, hapticMatchLoss,
   hapticTap, hapticWin, hapticLoss,
@@ -77,6 +77,17 @@ import { recordWatcherMatch, watcherUuid, watcherAppVersion, watcherEnabled, cre
 import { startMatchFps, stopMatchFps } from "../../graphics/fpsSampler";
 import { useMatchSurface } from "../../fx/menuFx";
 
+/** useRef dont la valeur initiale n'est calculée QU'AU PREMIER rendu. Avec
+ *  `useRef(expr)`, `expr` est réévaluée à chaque rendu puis jetée : ArenaGame
+ *  se re-rend des dizaines de fois par tour (deck reconstruit, graines
+ *  retirées… pour rien). */
+const UNSET = Symbol("unset");
+function useLazyRef<T>(init: () => T): MutableRefObject<T> {
+  const r = useRef<T | typeof UNSET>(UNSET);
+  if (r.current === UNSET) r.current = init();
+  return r as MutableRefObject<T>;
+}
+
 // Alex feedback 2026-06-09 point #7 : décompte+GO trop rapide. Bumpé de
 // 1800 → 2600ms pour laisser le "GO!" durer un peu et faire monter le
 // suspense (anim splash interne dure ~1.35s + 0.45s = ~1.8s, on garde
@@ -109,7 +120,7 @@ export function ArenaGame({
   // hand never contains a no-op card. Falls back to a curated default if
   // the saved deck has too few supported cards. Saved deck is `string[]` in
   // the store; we re-narrow to CardId by filtering against the registry.
-  const playerDeck = useRef<CardId[]>(buildPlayerDeck(
+  const playerDeck = useLazyRef<CardId[]>(() => buildPlayerDeck(
     // Source résolue PAR VOIE (Alex 2026-06-22) : deck CUSTOM édité de la Voie >
     // deck SIGNATURE curé > deck arène libre (fallback rankedDeck, migration douce).
     resolveArenaDeckSource(
@@ -127,17 +138,17 @@ export function ArenaGame({
   // 3 pierres). Re-tiré à chaque remount (rematch via ArenaPage) ; le
   // soft-reset local réutilise la valeur, déjà ≠ joueur.
   const playerAffinity = useRef(player.arenaAffinity);
-  const cpuAffinity = useRef<Move>(
-    (() => {
+  const cpuAffinity = useLazyRef<Move>(
+    () => {
       const pool = (["rock", "paper", "scissors", "lizard", "spock"] as const).filter(
         (m) => m !== player.arenaAffinity,
       );
       return pool[Math.floor(Math.random() * pool.length)];
-    })(),
+    },
   );
   // Persona CPU random au match start (Alex 2026-06-11). Reste constante tout
   // le match pour que le feeling de l'opp soit cohérent.
-  const cpuPersona = useRef(CPU_PERSONAS[Math.floor(Math.random() * CPU_PERSONAS.length)]);
+  const cpuPersona = useLazyRef(() => CPU_PERSONAS[Math.floor(Math.random() * CPU_PERSONAS.length)]);
   // Phase 0 lockstep (Pro online, 2026-07) — paire de PRNG seedés, UN PAR CAMP
   // (a=joueur, b=CPU), consommée par TOUTE la résolution (init deck, sorts à
   // hasard, pioches). vs-CPU : graine aléatoire par match → même feeling
@@ -146,7 +157,7 @@ export function ArenaGame({
   // Re-tirée au soft-reset rematch (chaque match = sa graine).
   // Online : graine PARTAGÉE du serveur (les 2 clients rejouent la même partie).
   // Local : graine aléatoire par match (feeling inchangé, partie reproductible).
-  const rngPair = useRef<RngPair>(online?.rngPair ?? makeRngPair(randomSeed()));
+  const rngPair = useLazyRef<RngPair>(() => online?.rngPair ?? makeRngPair(randomSeed()));
 
   // Wipe the log buffer at match start so each match has a clean diagnostic
   // history (Alex flag : "tu pers tout finalement"). Called once at mount.

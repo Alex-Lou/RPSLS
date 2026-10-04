@@ -216,7 +216,7 @@ function CardThumb({
         </div>
       )}
       {/* Name at bottom */}
-      <div className="absolute bottom-0 left-0 right-0 bg-black/70 backdrop-blur-sm py-0.5 z-10">
+      <div className="absolute bottom-0 left-0 right-0 bg-black/80 py-0.5 z-10">
         <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-center text-white/90 truncate px-0.5">
           {t(card.nameKey)}
         </div>

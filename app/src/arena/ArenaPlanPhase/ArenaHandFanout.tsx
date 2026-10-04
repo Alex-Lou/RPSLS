@@ -169,7 +169,7 @@ export function ArenaHandFanout({
               >
                 <CardImage id={id} glyphSize="text-xl" />
 
-                <div className="absolute top-0.5 left-0.5 z-10 inline-flex items-center justify-center gap-0.5 px-1 py-0.5 rounded-full bg-black/65 backdrop-blur-sm">
+                <div className="absolute top-0.5 left-0.5 z-10 inline-flex items-center justify-center gap-0.5 px-1 py-0.5 rounded-full bg-black/75">
                   {Array.from({ length: card.cost }, (_, k) => (
                     <span key={k} className="w-1 h-1 rounded-full bg-sky-300" />
                   ))}
