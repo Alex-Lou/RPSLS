@@ -245,3 +245,15 @@ async fn hello_forces_wallet_only_for_existing_rows() {
     super::handlers::ensure_and_overlay(fresh, &mut empty, false).await;
     assert!(store::get(fresh).await.unwrap().is_none());
 }
+
+#[test]
+fn forfeit_loser_earns_nothing_in_every_mode() {
+    use super::handlers::match_reward;
+    for mode in ["online", "constellation", "arena"] {
+        assert_eq!(match_reward(mode, "loss", true), 0, "{mode}");
+        assert_eq!(match_reward(mode, "win", true), match_reward(mode, "win", false), "{mode}");
+    }
+    // Défaite « normale » en Arena : toujours payée (comme recordArenaMatch).
+    assert_eq!(match_reward("arena", "loss", false), economy::arena_eclats("loss"));
+    assert!(match_reward("arena", "loss", false) > 0);
+}
