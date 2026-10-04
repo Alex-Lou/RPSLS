@@ -11,10 +11,12 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use axum::http::HeaderValue;
+use axum::extract::ConnectInfo;
+use axum::http::{HeaderMap, HeaderValue, Request};
 use dashmap::DashMap;
+use std::net::SocketAddr;
 use tower_governor::{
-    governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor, GovernorLayer,
+    governor::GovernorConfigBuilder, key_extractor::KeyExtractor, GovernorError, GovernorLayer,
 };
 use tower_http::cors::{AllowOrigin, CorsLayer};
 
@@ -81,22 +83,61 @@ pub fn cors_layer() -> CorsLayer {
 // Per-IP HTTP rate limit (governor)
 // ──────────────────────────────────────────────────────────────────────────
 
+/// Vraie IP du client derrière Render. Mesuré en prod (diag 2026-10-04) :
+/// - le pair TCP est TOUJOURS le proxy de Render (127.0.0.1) → inutilisable ;
+/// - `X-Forwarded-For` garde ce que le client a envoyé EN TÊTE
+///   (`1.2.3.4,<vraie>`) → falsifiable, jamais utilisé ;
+/// - `CF-Connecting-IP` est posé par Cloudflare (un client qui l'envoie lui-même
+///   est rejeté par Cloudflare, erreur 1000) ; `True-Client-IP` est écrasé par
+///   Cloudflare avec la même valeur → secours.
+///
+/// Les en-têtes ne sont crus que si le pair est une adresse locale/privée (= on
+/// est derrière le proxy). Un pair public (exposition directe) fait foi.
+pub fn client_ip(peer: IpAddr, headers: &HeaderMap) -> IpAddr {
+    let behind_proxy = match peer {
+        IpAddr::V4(v4) => v4.is_loopback() || v4.is_private(),
+        IpAddr::V6(v6) => v6.is_loopback(),
+    };
+    if !behind_proxy {
+        return peer;
+    }
+    ["cf-connecting-ip", "true-client-ip"]
+        .iter()
+        .find_map(|h| headers.get(*h)?.to_str().ok()?.trim().parse::<IpAddr>().ok())
+        .unwrap_or(peer)
+}
+
+/// Clé du rate limit HTTP = [`client_ip`] (remplace `SmartIpKeyExtractor`, qui
+/// lisait la tête falsifiable de `X-Forwarded-For`).
+#[derive(Debug, Clone, Copy)]
+pub struct ClientIpKeyExtractor;
+
+impl KeyExtractor for ClientIpKeyExtractor {
+    type Key = IpAddr;
+
+    fn extract<T>(&self, req: &Request<T>) -> Result<Self::Key, GovernorError> {
+        let peer = req
+            .extensions()
+            .get::<ConnectInfo<SocketAddr>>()
+            .map(|ConnectInfo(addr)| addr.ip())
+            .ok_or(GovernorError::UnableToExtractKey)?;
+        Ok(client_ip(peer, req.headers()))
+    }
+}
+
 /// Build the global per-IP rate limit layer.
 ///
-/// Sustained rate: 20 req/sec. Burst: 30 (so a fresh app start that opens a
-/// /health check + a /ws upgrade in quick succession passes through). Past
-/// that, the offender gets a 429 — and the layer keeps the bucket open
-/// for ~60 s of cooldown before the next allowed request.
-///
-/// Behind the Render reverse proxy the client IP arrives in
-/// `X-Forwarded-For` / `Forwarded`. [`SmartIpKeyExtractor`] reads both
-/// before falling back to the TCP peer (which would be the proxy IP).
-pub fn governor_layer() -> GovernorLayer<SmartIpKeyExtractor, governor::middleware::NoOpMiddleware> {
+/// Sustained rate: 20 req/sec (one token every 50 ms — NB: `per_second(n)`
+/// means « one token every n seconds » in tower_governor, the previous
+/// `per_second(20)` allowed 1 req / 20 s). Burst: 30 (so a fresh app start that
+/// opens a /health check + a /ws upgrade in quick succession passes through).
+/// Past that, the offender gets a 429.
+pub fn governor_layer() -> GovernorLayer<ClientIpKeyExtractor, governor::middleware::NoOpMiddleware> {
     let config = Arc::new(
         GovernorConfigBuilder::default()
-            .per_second(20)
+            .per_millisecond(50)
             .burst_size(30)
-            .key_extractor(SmartIpKeyExtractor)
+            .key_extractor(ClientIpKeyExtractor)
             .finish()
             .expect("static governor config must build"),
     );
@@ -285,6 +326,56 @@ fn prune_old(entry: &mut VecDeque<Instant>, now: Instant, window: Duration) {
 mod tests {
     use super::*;
     use std::net::Ipv4Addr;
+
+    fn headers(pairs: &[(&'static str, &str)]) -> HeaderMap {
+        let mut h = HeaderMap::new();
+        for (k, v) in pairs {
+            h.insert(*k, v.parse().unwrap());
+        }
+        h
+    }
+
+    const PROXY: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
+
+    /// Rejoue la requête falsifiée mesurée en prod (diag 2026-10-04) : le client
+    /// met 1.2.3.4 en tête de X-Forwarded-For, Cloudflare pose la vraie IP.
+    #[test]
+    fn client_ip_ignores_spoofed_forwarded_for() {
+        let h = headers(&[
+            ("x-forwarded-for", "1.2.3.4,83.59.139.63"),
+            ("true-client-ip", "83.59.139.63"),
+            ("cf-connecting-ip", "83.59.139.63"),
+        ]);
+        assert_eq!(client_ip(PROXY, &h), "83.59.139.63".parse::<IpAddr>().unwrap());
+    }
+
+    #[test]
+    fn client_ip_fallbacks() {
+        // Pas de CF-Connecting-IP → True-Client-IP.
+        let h = headers(&[("true-client-ip", "83.59.139.63")]);
+        assert_eq!(client_ip(PROXY, &h), "83.59.139.63".parse::<IpAddr>().unwrap());
+        // En-tête illisible → pair TCP (jamais de panique, jamais X-Forwarded-For).
+        let h = headers(&[("cf-connecting-ip", "not-an-ip"), ("x-forwarded-for", "1.2.3.4")]);
+        assert_eq!(client_ip(PROXY, &h), PROXY);
+        // Pair PUBLIC (pas derrière le proxy) : les en-têtes ne sont pas crus.
+        let public: IpAddr = "203.0.113.9".parse().unwrap();
+        let h = headers(&[("cf-connecting-ip", "1.2.3.4")]);
+        assert_eq!(client_ip(public, &h), public);
+    }
+
+    #[test]
+    fn rate_limit_key_is_the_client_ip() {
+        let mut req = Request::builder()
+            .header("x-forwarded-for", "1.2.3.4,83.59.139.63")
+            .header("cf-connecting-ip", "83.59.139.63")
+            .body(())
+            .unwrap();
+        req.extensions_mut().insert(ConnectInfo(SocketAddr::from(([127, 0, 0, 1], 4000))));
+        assert_eq!(
+            ClientIpKeyExtractor.extract(&req).unwrap(),
+            "83.59.139.63".parse::<IpAddr>().unwrap()
+        );
+    }
 
     #[test]
     fn msg_rate_limit_allows_up_to_max_then_blocks() {

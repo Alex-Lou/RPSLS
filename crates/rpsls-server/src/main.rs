@@ -216,9 +216,8 @@ async fn main() {
     );
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    // ConnectInfo is required by tower_governor's SmartIpKeyExtractor to
-    // grab the peer SocketAddr when no X-Forwarded-For header is present
-    // (i.e. during local dev without a reverse proxy).
+    // ConnectInfo is required by `security::client_ip` / ClientIpKeyExtractor
+    // (the peer address decides whether proxy headers are trusted).
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
@@ -231,43 +230,21 @@ async fn health() -> &'static str {
     "ok"
 }
 
-/// TEMPORAIRE — diagnostic : quel en-tête porte la vraie IP client derrière
-/// Render ? On logue les candidats pour les premières connexions après boot
-/// (borné : ce sont des données perso), puis on retire ce bloc une fois
-/// l'extraction d'IP corrigée.
-const IP_DIAG_MAX: usize = 50;
-
-fn log_ip_diag(peer: &SocketAddr, headers: &HeaderMap) {
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    static SEEN: AtomicUsize = AtomicUsize::new(0);
-    if SEEN.fetch_add(1, Ordering::Relaxed) >= IP_DIAG_MAX {
-        return;
-    }
-    let h = |name: &str| headers.get(name).and_then(|v| v.to_str().ok()).unwrap_or("-").to_string();
-    info!(
-        peer = %peer.ip(),
-        x_forwarded_for = %h("x-forwarded-for"),
-        true_client_ip = %h("true-client-ip"),
-        cf_connecting_ip = %h("cf-connecting-ip"),
-        x_real_ip = %h("x-real-ip"),
-        forwarded = %h("forwarded"),
-        "ip-diag"
-    );
-}
-
 async fn ws_handler(
     ws: WebSocketUpgrade,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
-    log_ip_diag(&peer, &headers);
+    // Vraie IP client (le pair TCP est le proxy de Render) : clé des limites
+    // par IP (lobby, signup, login…).
+    let client_ip = crate::security::client_ip(peer.ip(), &headers);
     // Cap frame + message size so a malicious client can't OOM the server
     // by streaming a 60 MB JSON blob. 64 KiB is well above any legit
     // payload (lobby code, move enum, deck of 6 ids).
     ws.max_frame_size(64 * 1024)
         .max_message_size(64 * 1024)
-        .on_upgrade(move |sock| handle_socket(sock, state, peer.ip()))
+        .on_upgrade(move |sock| handle_socket(sock, state, client_ip))
 }
 
 async fn handle_socket(socket: WebSocket, state: Arc<AppState>, peer_ip: std::net::IpAddr) {
