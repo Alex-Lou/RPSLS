@@ -46,6 +46,7 @@ export function SeasonRolloverModal({ fromSeason, reward, lpBefore, lpAfter, onC
             <div className="mt-1 flex flex-col gap-0.5 text-sm font-black tabular-nums">
               <span className="text-cyan-200">+{reward.eclats} 💎</span>
               {reward.dust > 0 && <span className="text-violet-200">+{reward.dust} ✨</span>}
+              {(reward.stars ?? 0) > 0 && <span className="text-amber-200">+{reward.stars} ✦</span>}
             </div>
           </div>
           <div className="rounded-xl p-3 bg-amber-500/10 border border-amber-400/30">

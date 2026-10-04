@@ -105,16 +105,25 @@ export interface ArenaBalance {
  *  Montagne 51→52% (sain, pas de sur-buff). RESTE : vs Forêt 28-29% (paper>rock +
  *  Forêt encore OP 62.7% — non corrigeable par knobs Montagne → carte anti-heal
  *  « Écrasement » OU passe Forêt dédiée) ; vs Cosmos 38%. Parité contenu (cartes/
- *  fusions/anims) Montagne à faire (Barricade validée, reste à détailler). */
+ *  fusions/anims) Montagne à faire (Barricade validée, reste à détailler).
+ *
+ *  PASSE CHIFFRÉE 2026-10 (Alex « Réglages chiffrés d'abord » — chiffres seuls,
+ *  aucune règle). Mesurée moteur+IA corrigés (finishers, decks signature, Lab via
+ *  prepareResolveStart) + plafond 20/départage, hard-vs-hard, 25 appariements,
+ *  13 000 parties sur 3 graines. Avant : Montagne 56 | Forêt 57 | Tranchant 40 |
+ *  Mirage 63 | Cosmos 34 (spread ~29 pp). Après : 49 | 52 | 50 | 53 | 46 (~7 pp).
+ *   - Cosmos : convergenceDmgCap 3→5, intricationCap 3→4 (vs Forêt 9%→~16%).
+ *   - Mirage : dodgeCumulativeCap 4→3, dodgeGrowAtkCap 3→2, coupDansLombreCap 3→2.
+ *   - Tranchant : trancheAtkPerStack 2→4 (jauge = vrai payoff offensif).
+ *   - Montagne : strateAtk 2→1. Forêt : sangsueCap 3→2. */
 export const DEFAULT_BALANCE: ArenaBalance = {
-  engine: { cap: 3, risePerCounterWin: 1, voieAtkBonus: 1, trancheAtkPerStack: 2 },
-  montagne: { strateAtk: 2, strateHp: 1, forteresseAtk: 2, voieProvocationCharges: 3, eboulisPerRock: 2, eboulisCap: 10, grondementCap: 3 },
-  foret: { seveHealActive: 1, seveHealVerger: 1, drainAmount: 2, secondWindHeal: 1, photosyntheseHeal: 2, sangsueCap: 3 },
+  engine: { cap: 3, risePerCounterWin: 1, voieAtkBonus: 1, trancheAtkPerStack: 4 },
+  montagne: { strateAtk: 1, strateHp: 1, forteresseAtk: 2, voieProvocationCharges: 3, eboulisPerRock: 2, eboulisCap: 10, grondementCap: 3 },
+  foret: { seveHealActive: 1, seveHealVerger: 1, drainAmount: 2, secondWindHeal: 1, photosyntheseHeal: 2, sangsueCap: 2 },
   tranchant: { voieScissorsHp: 1, acuiteAtkCap: 2 },
-  mirage: { dodgeCapOnSummon: 3, dodgeSpellCap: 3, coupDansLombreCap: 3, voieLizardDodge: 1, dodgeGrowAtk: 1, dodgeGrowAtkCap: 3, dodgeRiposte: 0.5, dodgeCumulativeCap: 4 },
-  cosmos: { chipCap: 0, convergenceDmgCap: 3, intricationCap: 3, calculDiscount: 1, tempoDiscount: 1 },
+  mirage: { dodgeCapOnSummon: 3, dodgeSpellCap: 3, coupDansLombreCap: 2, voieLizardDodge: 1, dodgeGrowAtk: 1, dodgeGrowAtkCap: 2, dodgeRiposte: 0.5, dodgeCumulativeCap: 3 },
+  cosmos: { chipCap: 0, convergenceDmgCap: 5, intricationCap: 4, calculDiscount: 1, tempoDiscount: 1 },
 };
-
 function clone(b: ArenaBalance): ArenaBalance {
   return {
     engine: { ...b.engine },

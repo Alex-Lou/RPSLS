@@ -7,7 +7,8 @@ import { BALANCE } from "../arenaBalance";
 // primitives feuilles (creatureEffectiveAtk/damageCreature/damageHero), sans
 // back-dépendance sur ce resolver. resolveCombat + resolveLaneCombatAt sont
 // re-exportés par le barrel (index.ts) pour préserver le contract des callsites.
-import { resolveCombat } from "../arenaCombat";
+import { resolveLaneCombatAt } from "../arenaCombat";
+import { decideMatchEnd } from "./matchEnd";
 import {
   applyArenaSpell,
   spellPriority,
@@ -52,8 +53,12 @@ export function resolveTurn(
   // lockstep Pro online (Alex 2026-07). Défaut undefined → les effets à hasard
   // gardent Math.random (jeu vs-CPU inchangé ; sim de balance via patch global).
   rng?: RngPair,
+  // Online : pas de mort subite (non déterministe) → égalité totale = NUL.
+  opts: { noSuddenDeath?: boolean } = {},
 ): BoardState {
   let b = board;
+  // PV de DÉBUT de tour — critère (a) du départage (cf. decideMatchEnd).
+  const startHp = { a: board.a.hp, b: board.b.hp };
 
   // ─── 0. Mana « tempo » (Sablier, Offre, Dilatation, Chronomancien) crédité
   //     D'AVANCE — même budget que la planification (intentManaGrant). Miroité
@@ -69,18 +74,17 @@ export function resolveTurn(
   // ─── 2. Spell phase ─── (intercale les deux camps par priorité)
   b = applyAllSpells(b, intentA, intentB, rng);
 
-  // ─── 3. Combat phase ───
-  b = resolveCombat(b);
+  // ─── 3. Combat phase ─── les 3 lanes TOUJOURS résolues (aligné sur le flux
+  //     live : plus de court-circuit au premier coup létal → le double KO existe
+  //     aussi en pur, et lockstep/sims voient le même verdict que l'app).
+  for (let i = 0; i < b.lanes.length; i++) b = resolveLaneCombatAt(b, i as LaneIndex);
 
   // ─── 4. End-of-turn reset (buffs drop, but persistent dmg stays) ───
   b = endOfTurnCleanup(b, rng);
 
-  // ─── 5. HP check ───
-  if (b.a.hp <= 0 || b.b.hp <= 0) {
-    return { ...b, phase: "match-end" };
-  }
-
-  return b;
+  // ─── 5. Verdict ─── KO / double KO / plafond → départage (source unique
+  //     partagée avec runResolverFlow).
+  return decideMatchEnd(startHp, b, opts);
 }
 
 /** Caps de sorts partagés engine/UI/IA : max MAX_SPELLS_PER_TURN sorts

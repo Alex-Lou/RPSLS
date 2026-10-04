@@ -217,7 +217,7 @@ export function LocalLanesGame({
           roundWinsYou: battle.roundWinsA,
           roundWinsOpp: battle.roundWinsB,
           forfeit: false,
-          eclatsGained: eclatsReward("constellation", outcomeKind),
+          eclatsGained: eclatsReward("constellation", outcomeKind, winTo),
         });
       }, ROUND_PAUSE_MS);
     } else {

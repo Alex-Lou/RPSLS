@@ -42,10 +42,12 @@ export const FORGE_RECOVER_COST = 1;
 // UI/engine/IA) est conservée — re-serrer ici suffit si un abus émerge.
 export const MAX_SPELLS_PER_TURN = 99;
 export const UTILITY_SPELLS_PER_TURN = 99;
-/** Soft cap on turns — if neither hero is dead by then, the lower-HP loses
- *  (sudden-death fail-safe so an over-defensive match still ends).
+/** Soft cap on turns — if neither hero is dead by then, the lower-HP loses ;
+ *  PV égaux → départage (cf. arenaRules/matchEnd.decideMatchEnd).
  *  30→15 (Alex 2026-06-17, rethink Phase 0/1) : borne le late-game qui
  *  s'éternisait en RPSLS pur (decks secs dès T6-8). Filet réversible ; la vraie
  *  horloge léthale = la fatigue douce (Phase 1, deck sec → dégâts croissants).
  *  Cf. ARENA-RETHINK.md. */
-export const TURN_HARD_CAP = 15;
+/*  15→20 (Alex 2026-10, « Plafond 20 + départage ») : laisse le late-game
+ *  conclure par KO plutôt qu'au plafond. */
+export const TURN_HARD_CAP = 20;
