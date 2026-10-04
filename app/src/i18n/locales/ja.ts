@@ -38,7 +38,7 @@ const ja: Record<string, string> = {
   "ranked.cards.conduit.name":"導管","ranked.cards.conduit.desc":"パッシブ: コンボ(トリプル/三位一体)が+1追加。","ranked.cards.conduit.targetHint":"パッシブ — 常時発動。",
   "ranked.cards.trinite.name":"完全三位一体","ranked.cards.trinite.desc":"3つの手が全て異なり、どのレーンも負けなければ、即座にラウンド勝利。","ranked.cards.trinite.targetHint":"即時効果。",
   "ranked.compass.none":"相手: 対象カードなし","ranked.compass.lane":"相手カード → レーン{n}",
-  "premium.label":"プレミアム","premium.setKindLabel":"プレミアムコスメ","premium.priceLabel":"価格","premium.youHave":"✦ {n} 所持","premium.buy":"セット解除","premium.notEnough":"✦ スター不足","premium.alreadyOwned":"✓ 所有済み","premium.devGrant":"+1000 ✦ (テスト)","premium.close":"閉じる","premium.unlocked":"解除！",
+  "premium.label":"プレミアム","premium.setKindLabel":"プレミアムコスメ","premium.priceLabel":"価格","premium.youHave":"✦ {n} 所持","premium.buy":"セット解除","premium.notEnough":"✦ スター不足","premium.alreadyOwned":"✓ 所有済み","premium.close":"閉じる","premium.unlocked":"解除！",
   "crash.title":"問題発生","crash.body":"アプリに予期せぬエラー。進行状況は安全です。下をタップして再試行。","crash.details":"詳細","crash.retry":"再試行",
   "premium.quartz.name":"クォーツ","premium.quartz.tagline":"プリズム光を屈折させる結晶片 — 柔らかな氷河世界。",
   "ranked.bonus.combo":"コンボ","ranked.bonus.favoured":"有利","ranked.bonus.surge":"サージ","ranked.bonus.tide":"潮流","ranked.bonus.aegisSaved":"イージスがレーンを救出",

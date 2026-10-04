@@ -24,6 +24,16 @@ export interface RngPair {
   b: Rng;
 }
 
+/** Le SEUL repli non seedé du moteur Arena : appliqué aux POINTS D'ENTRÉE
+ *  publics (makeInitialBoard, resolveTurn, advanceToNextTurn…) quand aucune
+ *  paire n'est fournie (vs-CPU, sims). Les fonctions internes EXIGENT un Rng :
+ *  un oubli de threading devient une erreur de compilation, plus une désync
+ *  silencieuse en ligne. `Math.random` est relu à CHAQUE tirage (pas capturé) :
+ *  les sims qui le remplacent et le piège de determinism-check restent actifs. */
+export function randomPair(): RngPair {
+  return { a: () => Math.random(), b: () => Math.random() };
+}
+
 /** Deux PRNG indépendants dérivés d'UNE graine de match — un par camp. Le camp
  *  B décale la graine d'une constante (nombre d'or 32-bit) pour un flux distinct
  *  mais reproductible. Les deux clients construisent la MÊME paire depuis le

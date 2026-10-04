@@ -149,32 +149,55 @@ pub async fn scan_player_keys(cursor: &str, count: u32) -> Option<(String, Vec<S
     Some((next, keys))
 }
 
-/// Delete a player's state and their claim token in one round-trip. Used by
-/// the 6-month inactive-user janitor.
+/// Delete everything a GUEST player owns (state, claim token, wallet, activity
+/// stamp) in one round-trip. Used by the 6-month inactive-user janitor, which
+/// never calls it for an account-linked player.
 pub async fn delete_player(player_id: &str) -> bool {
-    let player_key = format!("{KEY_PREFIX}{player_id}");
-    let claim_key = format!("{CLAIM_PREFIX}{player_id}");
-    let cmds: Vec<Vec<String>> = vec![
-        vec!["DEL".into(), player_key],
-        vec!["DEL".into(), claim_key],
-    ];
+    let cmds: Vec<Vec<String>> = [KEY_PREFIX, CLAIM_PREFIX, "wallet:", SEEN_PREFIX]
+        .iter()
+        .map(|p| vec!["DEL".into(), format!("{p}{player_id}")])
+        .collect();
     matches!(pipeline_send(&cmds).await, Some(Ok(resp)) if resp.status().is_success())
 }
 
-/// Read `updated_at` (epoch millis) from a player_key. Returns None when
-/// the row is missing / malformed — caller treats that as "skip, don't delete"
-/// so a transient parse failure can never erase live data.
-pub async fn read_updated_at(player_key: &str) -> Option<u64> {
-    let (url, token) = config()?;
-    let endpoint = format!("{url}/get/{player_key}");
-    let resp = http().get(&endpoint).bearer_auth(token).send().await.ok()?;
-    if !resp.status().is_success() {
-        return None;
+/// Dernière activité authentifiée (epoch ms), posée par le SERVEUR. Remplace
+/// l'ancien `updatedAt` de la ligne player, écrit par le client (un client
+/// pouvait y mettre n'importe quoi → compte supprimé par le janitor).
+const SEEN_PREFIX: &str = "seen:";
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// Note l'activité d'un joueur maintenant (fire-and-forget, une écriture par
+/// authentification de session).
+pub fn touch_seen(player_id: &str) {
+    if player_id.is_empty() || !enabled() {
+        return;
     }
-    let body: serde_json::Value = resp.json().await.ok()?;
-    let raw = body.get("result")?.as_str()?;
-    let val: serde_json::Value = serde_json::from_str(raw).ok()?;
-    val.get("updatedAt").and_then(|v| v.as_u64())
+    let key = format!("{SEEN_PREFIX}{player_id}");
+    tokio::spawn(async move {
+        if set_checked(&key, &now_ms().to_string()).await.is_err() {
+            warn!(key = %key, "seen stamp NOT written");
+        }
+    });
+}
+
+/// Dernière activité connue : `Ok(None)` si jamais vue (joueur antérieur à ce
+/// marquage), `Err` sur erreur backend (l'appelant ne supprime alors rien).
+pub async fn read_seen(player_id: &str) -> Result<Option<u64>, ()> {
+    match get_opt(&format!("{SEEN_PREFIX}{player_id}")).await? {
+        None => Ok(None),
+        Some(s) => s.parse().map(Some).map_err(|_| ()),
+    }
+}
+
+/// Pose `seen:{pid}` à `ms` (janitor : premier passage sur un joueur ancien).
+pub async fn set_seen(player_id: &str, ms: u64) -> Result<(), ()> {
+    set_checked(&format!("{SEEN_PREFIX}{player_id}"), &ms.to_string()).await
 }
 
 /// Extract the `{player_id}` suffix from a Redis key of form `player:{id}`.
@@ -364,5 +387,16 @@ mod tests {
         assert_eq!(load("absent").await.map(|p| p.is_none()), Ok(true));
         assert!(load("corrupt").await.is_err());
         assert!(load("upstash-down").await.is_err());
+    }
+
+    /// L'activité est horodatée par le SERVEUR (janitor des inactifs).
+    #[tokio::test]
+    async fn seen_stamp_roundtrip() {
+        crate::test_upstash::ensure();
+        assert_eq!(read_seen("never-seen").await, Ok(None));
+        touch_seen("just-seen");
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        let ts = read_seen("just-seen").await.unwrap().expect("seen stamp written");
+        assert!(ts.abs_diff(now_ms()) < 60_000);
     }
 }

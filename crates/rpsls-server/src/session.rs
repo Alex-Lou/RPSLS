@@ -22,10 +22,10 @@ pub struct Session {
     /// Set to true when this session is in an active match. Used by the
     /// lobby/queue to avoid double-matching.
     pub in_match: AtomicBool,
-    /// Peer IP — used by the lobby brute-force tracker so a single
+    /// Client IP — used by the lobby brute-force tracker so a single
     /// attacker can't dodge the cap by reconnecting (which would yield a
-    /// fresh session_id). Behind the Render proxy this resolves via the
-    /// X-Forwarded-For header upstream.
+    /// fresh session_id). Behind Render this is `security::client_ip`
+    /// (CF-Connecting-IP), never the proxy's address.
     pub peer_ip: IpAddr,
 }
 
@@ -57,7 +57,11 @@ impl Session {
         self.player_id.lock().unwrap().clone()
     }
 
+    /// Pose l'identité AUTHENTIFIÉE de la session (Hello, login, Google) et
+    /// note l'activité côté serveur (`seen:{pid}`, lue par le janitor des
+    /// comptes inactifs — jamais une date fournie par le client).
     pub fn set_player_id(&self, id: String) {
+        crate::player_state::touch_seen(&id);
         *self.player_id.lock().unwrap() = id;
     }
 

@@ -12,7 +12,7 @@ import {
 import { CARDS } from "../../ranked/cards";
 import type { CardId } from "../../ranked/rankedTypes";
 import type { Move } from "../../engine/game";
-import type { Rng, RngPair } from "../../engine/rng";
+import { randomPair, type Rng, type RngPair } from "../../engine/rng";
 
 /* ───────────────────────── Board init ───────────────────────── */
 
@@ -20,7 +20,12 @@ import type { Rng, RngPair } from "../../engine/rng";
  *  the 8 cards equipped in the player's saved deck; passives equipped in
  *  Ranked are IGNORED in Arena — they don't exist as concept here.
  *  `affinity` is the Constellation Pro v2 Voie picked by this player. */
-export function makeHero(deckIds: CardId[], affinity?: Move, cpuPersona?: import("../arenaTypes").CpuPersona, rng: Rng = Math.random): HeroState {
+export function makeHero(
+  deckIds: CardId[],
+  affinity: Move | undefined,
+  cpuPersona: import("../arenaTypes").CpuPersona | undefined,
+  rng: Rng,
+): HeroState {
   const cleaned = deckIds.filter(
     (id): id is CardId => Object.prototype.hasOwnProperty.call(CARDS, id),
   );
@@ -56,7 +61,7 @@ export function makeHero(deckIds: CardId[], affinity?: Move, cpuPersona?: import
 /** Mulligan T1 (Alex 2026-06-13 économie expert) : remet les cartes choisies
  *  dans le deck, shuffle, repioche autant. Une seule fois par match (géré
  *  côté UI). Les indices invalides sont ignorés. */
-export function mulliganSwap(hero: HeroState, handIndices: number[], rng: Rng = Math.random): HeroState {
+export function mulliganSwap(hero: HeroState, handIndices: number[], rng: Rng): HeroState {
   const idx = [...new Set(handIndices)].filter((i) => i >= 0 && i < hero.hand.length);
   if (idx.length === 0) return hero;
   const kept = hero.hand.filter((_, i) => !idx.includes(i));
@@ -81,7 +86,7 @@ export function mulliganSwap(hero: HeroState, handIndices: number[], rng: Rng = 
  *  `i` et tire UNE remplaçante qui prend EXACTEMENT le même emplacement (pas de
  *  décalage → le joueur VOIT clairement la nouvelle carte arriver). La rejetée
  *  est remélangée dans le deck. Taille de main préservée. */
-export function mulliganReplaceInPlace(hero: HeroState, i: number, rng: Rng = Math.random): HeroState {
+export function mulliganReplaceInPlace(hero: HeroState, i: number, rng: Rng): HeroState {
   if (i < 0 || i >= hero.hand.length) return hero;
   const rejected = hero.hand[i];
   const handWithout = [...hero.hand.slice(0, i), ...hero.hand.slice(i + 1)];
@@ -107,9 +112,10 @@ export function makeInitialBoard(
   // (jeu vs-CPU inchangé ; sim de balance via patch global).
   rng?: RngPair,
 ): BoardState {
+  const r = rng ?? randomPair();
   return {
-    a: makeHero(deckA, affinityA, undefined, rng?.a),
-    b: makeHero(deckB, affinityB, cpuPersonaB, rng?.b),
+    a: makeHero(deckA, affinityA, undefined, r.a),
+    b: makeHero(deckB, affinityB, cpuPersonaB, r.b),
     lanes: [makeEmptyLane(), makeEmptyLane(), makeEmptyLane()],
     turn: 1,
     phase: "planning",
@@ -125,7 +131,7 @@ function makeEmptyLane(): LaneState { return { a: null, b: null }; }
 // `rng` (défaut Math.random) : PRNG seedé pour un ordre de deck DÉTERMINISTE
 // (lockstep Pro online). Défaut = comportement inchangé (le sim de balance patche
 // Math.random global ; le jeu vs-CPU tire au hasard comme avant).
-function shuffle<T>(input: readonly T[], rng: Rng = Math.random): T[] {
+function shuffle<T>(input: readonly T[], rng: Rng): T[] {
   const out = input.slice();
   for (let i = out.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
@@ -186,7 +192,7 @@ export function drawOneAvoidingHand(
  *  RÈGLE ANTI-DOUBLON (Alex 2026-06-13) : on ne pioche jamais une carte DÉJÀ en
  *  main tant qu'elle y est (remplace l'ancien cap par rareté 3/2/1/1, plus
  *  permissif). Évite le flood de doublons / passifs. Cf. drawOneAvoidingHand. */
-export function drawCards(hero: HeroState, n: number, rng: Rng = Math.random): HeroState {
+export function drawCards(hero: HeroState, n: number, rng: Rng): HeroState {
   let hand = hero.hand.slice();
   let deck = hero.deck.slice();
   let discard = hero.discard.slice();

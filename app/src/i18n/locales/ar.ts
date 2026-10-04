@@ -38,7 +38,7 @@ const ar: Record<string, string> = {
   "ranked.cards.conduit.name":"قناة","ranked.cards.conduit.desc":"سلبي: كومبوهاتك (ثلاثية/تثليث) تدفع +1 إضافي.","ranked.cards.conduit.targetHint":"سلبي — نشط دائماً.",
   "ranked.cards.trinite.name":"تثليث كامل","ranked.cards.trinite.desc":"إذا كانت اختياراتك الثلاثة مختلفة ولم تخسر أي مسار، تفوز بالجولة فوراً.","ranked.cards.trinite.targetHint":"تأثير فوري.",
   "ranked.compass.none":"الخصم: لا بطاقة مستهدفة","ranked.compass.lane":"بطاقة الخصم → المسار {n}",
-  "premium.label":"مميز","premium.setKindLabel":"طقم تجميلي مميز","premium.priceLabel":"السعر","premium.youHave":"لديك ✦ {n}","premium.buy":"افتح الطقم","premium.notEnough":"✦ نجوم غير كافية","premium.alreadyOwned":"✓ مملوك مسبقاً","premium.devGrant":"+1000 ✦ (اختبار فقط)","premium.close":"إغلاق","premium.unlocked":"تم الفتح!",
+  "premium.label":"مميز","premium.setKindLabel":"طقم تجميلي مميز","premium.priceLabel":"السعر","premium.youHave":"لديك ✦ {n}","premium.buy":"افتح الطقم","premium.notEnough":"✦ نجوم غير كافية","premium.alreadyOwned":"✓ مملوك مسبقاً","premium.close":"إغلاق","premium.unlocked":"تم الفتح!",
   "crash.title":"حدث خطأ ما","crash.body":"واجه التطبيق خطأ غير متوقع. تقدمك آمن. انقر أدناه للمحاولة مرة أخرى.","crash.details":"تفاصيل","crash.retry":"حاول مرة أخرى",
   "premium.quartz.name":"كوارتز","premium.quartz.tagline":"شظايا بلورية تكسر الضوء المنشوري — عالم جليدي ناعم.",
   "ranked.bonus.combo":"كومبو","ranked.bonus.favoured":"مفضل","ranked.bonus.surge":"اندفاع","ranked.bonus.tide":"مد","ranked.bonus.aegisSaved":"إيجيس أنقذ مساراً",

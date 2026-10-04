@@ -74,7 +74,7 @@ export function isCastOnDraw(id: CardId): boolean {
  *  défaussé (0 si main vide). Deterministe seulement par le RNG du moteur
  *  (même shuffle que arenaRules) — acceptable côté app (pas un workflow). */
 function discardRandom(
-  hand: CardId[], discard: CardId[], n: number, rng: Rng = Math.random,
+  hand: CardId[], discard: CardId[], n: number, rng: Rng,
 ): { hand: CardId[]; discard: CardId[]; count: number } {
   const h = hand.slice();
   const d = discard.slice();
@@ -92,7 +92,7 @@ function discardRandom(
  *  (pour l'anim ⚡) et le nombre de pioches BONUS à effectuer côté drawCards.
  *  Retourne null si `id` n'est pas une carte à la pioche. PURE. */
 export function resolveCastOnDraw(
-  hero: HeroState, id: CardId, rng: Rng = Math.random,
+  hero: HeroState, id: CardId, rng: Rng,
 ): { hero: HeroState; event: CastOnDrawEvent; extraDraws: number } | null {
   const spec = CAST_ON_DRAW[id];
   if (!spec) return null;

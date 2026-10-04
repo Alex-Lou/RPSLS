@@ -38,7 +38,7 @@ const hi: Record<string, string> = {
   "ranked.cards.conduit.name":"वाहक","ranked.cards.conduit.desc":"निष्क्रिय: आपके कॉम्बो (ट्रिपल/त्रित्व) +1 अतिरिक्त भुगतान करें।","ranked.cards.conduit.targetHint":"निष्क्रिय — हमेशा सक्रिय।",
   "ranked.cards.trinite.name":"पूर्ण त्रित्व","ranked.cards.trinite.desc":"यदि आपकी तीनों चालें भिन्न हों और आप कोई लेन न हारें, तो तुरंत राउंड जीतें।","ranked.cards.trinite.targetHint":"तत्काल प्रभाव।",
   "ranked.compass.none":"विरोधी: कोई लक्षित कार्ड नहीं","ranked.compass.lane":"विरोधी कार्ड → लेन {n}",
-  "premium.label":"प्रीमियम","premium.setKindLabel":"प्रीमियम कॉस्मेटिक सेट","premium.priceLabel":"मूल्य","premium.youHave":"आपके पास ✦ {n}","premium.buy":"सेट अनलॉक करें","premium.notEnough":"✦ स्टार अपर्याप्त","premium.alreadyOwned":"✓ पहले से स्वामित्व","premium.devGrant":"+1000 ✦ (केवल परीक्षण)","premium.close":"बंद करें","premium.unlocked":"अनलॉक!",
+  "premium.label":"प्रीमियम","premium.setKindLabel":"प्रीमियम कॉस्मेटिक सेट","premium.priceLabel":"मूल्य","premium.youHave":"आपके पास ✦ {n}","premium.buy":"सेट अनलॉक करें","premium.notEnough":"✦ स्टार अपर्याप्त","premium.alreadyOwned":"✓ पहले से स्वामित्व","premium.close":"बंद करें","premium.unlocked":"अनलॉक!",
   "crash.title":"कुछ टूट गया","crash.body":"ऐप में अप्रत्याशित त्रुटि आई। आपकी प्रगति सुरक्षित है। पुनः प्रयास के लिए नीचे टैप करें।","crash.details":"विवरण","crash.retry":"पुनः प्रयास",
   "premium.quartz.name":"क्वार्ट्ज़","premium.quartz.tagline":"प्रिज़्मीय प्रकाश को अपवर्तित करते क्रिस्टलीय टुकड़े — एक कोमल, हिमानी दुनिया।",
   "ranked.bonus.combo":"कॉम्बो","ranked.bonus.favoured":"अनुकूल","ranked.bonus.surge":"सर्ज","ranked.bonus.tide":"ज्वार","ranked.bonus.aegisSaved":"एजिस ने एक लेन बचाई",

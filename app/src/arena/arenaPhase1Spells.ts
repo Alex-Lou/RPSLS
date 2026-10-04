@@ -114,7 +114,7 @@ export function applyCurse(board: BoardState, side: Side, spell: PlayedSpell): B
 }
 
 /** Prescience — draw 2 cards. */
-export function applyPrescience(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
+export function applyPrescience(board: BoardState, side: Side, rng: Rng): BoardState {
   const hero = side === "a" ? board.a : board.b;
   return withSideHero(board, side, drawCards(hero, 2, rng));
 }
@@ -128,7 +128,7 @@ export function applyAugur(board: BoardState, side: Side): BoardState {
 }
 
 /** Oracle — draw 3 cards. */
-export function applyOracle(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
+export function applyOracle(board: BoardState, side: Side, rng: Rng): BoardState {
   const hero = side === "a" ? board.a : board.b;
   return withSideHero(board, side, drawCards(hero, 3, rng));
 }
@@ -166,7 +166,7 @@ export function applyMirror(board: BoardState, side: Side, spell: PlayedSpell): 
  *  3 dégâts au héros opp — un Larcin n'est jamais vain.
  *
  *  Cohérent avec l'anim Larcin (carte qui s'arrache de l'opp, vole vers moi). */
-export function applyHeist(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
+export function applyHeist(board: BoardState, side: Side, rng: Rng): BoardState {
   const oppS = oppSide(side);
   const oppHero = oppS === "a" ? board.a : board.b;
   if (oppHero.hand.length === 0) {
@@ -255,7 +255,7 @@ export function applyDoubleMot(board: BoardState, side: Side, spell: PlayedSpell
 }
 
 /** Echo — duplique une carte AU HASARD de ta main (résonance). */
-export function applyEcho(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
+export function applyEcho(board: BoardState, side: Side, rng: Rng): BoardState {
   const me = side === "a" ? board.a : board.b;
   if (me.hand.length === 0) return board;
   const idx = Math.floor(rng() * me.hand.length);

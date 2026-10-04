@@ -16,6 +16,7 @@
  */
 
 import { arenaSupported } from "./arenaCardEffects";
+import { alog } from "./arenaLog";
 import { isCastOnDraw } from "./arenaCastOnDraw";
 import { cpuCanPlay } from "./arenaAI";
 import { isFinisherCard } from "./arenaFinishers";
@@ -349,8 +350,8 @@ export function removeSpentCardsDetailed(hand: CardId[], intent: TurnIntent): { 
     }
   }
   if (consumed.length > 0) {
-    // eslint-disable-next-line no-console
-    console.log(`[arena:hand] consumed cards=[${consumed.join(",")}] hand was=${hand.length} now=${out.length}`);
+    // Via alog : coupé en release (cf. arenaLog, DEV_TOOLS), comme les autres logs arena.
+    alog("hand", `consumed cards=[${consumed.join(",")}] hand was=${hand.length} now=${out.length}`);
   }
   return { hand: out, spent };
 }

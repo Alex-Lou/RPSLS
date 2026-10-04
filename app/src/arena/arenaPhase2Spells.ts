@@ -102,7 +102,7 @@ export function applyBarricade(board: BoardState, side: Side): BoardState {
 /** Veine Minérale (Montagne, 2026-06-30) — PIOCHE thématique : pioche 1 carte,
  *  +1 de plus si je contrôle ≥2 Pierres (la pioche récompense le mur établi).
  *  Comble le zéro-pioche du kit Montagne (trouver son closer / ses anti-aggro). */
-export function applyVeineMinerale(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
+export function applyVeineMinerale(board: BoardState, side: Side, rng: Rng): BoardState {
   const hero = side === "a" ? board.a : board.b;
   let rocks = 0;
   for (const lane of board.lanes) {
@@ -119,7 +119,7 @@ export function applyVeineMinerale(board: BoardState, side: Side, rng: Rng = Mat
  *  zéro-pioche du kit Forêt ET ajoute enfin une carte NON-soin (texture/profondeur
  *  de deck) sans renforcer le sustain — parallèle de Veine Minérale (rock) /
  *  Saignée (scissors) : chaque Voie a sa pioche flavor. */
-export function applyGreffe(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
+export function applyGreffe(board: BoardState, side: Side, rng: Rng): BoardState {
   const hero = side === "a" ? board.a : board.b;
   let leaves = 0;
   for (const lane of board.lanes) {
@@ -214,7 +214,7 @@ export function applyOracleInverse(board: BoardState, side: Side): BoardState {
 }
 
 /** Cascade — draw 3 cards, then discard 1 random from hand (cycle a bad hand). */
-export function applyCascade(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
+export function applyCascade(board: BoardState, side: Side, rng: Rng): BoardState {
   const hero = side === "a" ? board.a : board.b;
   let after = drawCards(hero, 3, rng);
   if (after.hand.length > 0) {
@@ -227,7 +227,7 @@ export function applyCascade(board: BoardState, side: Side, rng: Rng = Math.rand
 
 /** Reflet-Écho (Mirage) — cycle : pioche 1 carte puis défausse 1 au hasard. Fait
  *  tourner une main bloquée (insaisissable). Calqué sur Cascade (draw 3/disc 1). */
-export function applyRefletEcho(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
+export function applyRefletEcho(board: BoardState, side: Side, rng: Rng): BoardState {
   const hero = side === "a" ? board.a : board.b;
   let after = drawCards(hero, 1, rng);
   if (after.hand.length > 0) {
@@ -239,7 +239,7 @@ export function applyRefletEcho(board: BoardState, side: Side, rng: Rng = Math.r
 
 /** Échappée — destroy 1 of my own creatures on the chosen lane, draw 2.
  *  "Cycle" a bad creature into fresh cards. */
-export function applyEchappee(board: BoardState, side: Side, spell: PlayedSpell, rng: Rng = Math.random): BoardState {
+export function applyEchappee(board: BoardState, side: Side, spell: PlayedSpell, rng: Rng): BoardState {
   if (spell.kind !== "lane") return board;
   const c = getMyCreatureOnLane(board, side, spell.lane);
   if (!c) return board;
@@ -302,7 +302,7 @@ export function applyTrouNoir(board: BoardState, side: Side, spell: PlayedSpell)
 }
 
 /** Marchand d'Âmes — pay 2 HP, draw 3 cards. Faustian. */
-export function applyMarchandAmes(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
+export function applyMarchandAmes(board: BoardState, side: Side, rng: Rng): BoardState {
   const hero = side === "a" ? board.a : board.b;
   const wounded = { ...hero, hp: Math.max(0, hero.hp - 2) };
   return withSideHero(board, side, drawCards(wounded, 3, rng));
@@ -316,22 +316,22 @@ export function applyParadoxe(board: BoardState): BoardState {
 /** Le Juge — both sides discard their full hand and draw 4 fresh. */
 // Sorts GLOBAUX (les 2 camps piochent) : chaque camp tire de SON flux (rng.a/rng.b),
 // PAS du flux du lanceur — préserve l'invariant lockstep « un flux par camp » (un
-// aléa ajouté côté A ne décale jamais la pioche de B). Défaut undefined → Math.random.
-export function applyJuge(board: BoardState, rng?: RngPair): BoardState {
-  const reset = (h: BoardState["a"], r?: Rng): BoardState["a"] => {
+// aléa ajouté côté A ne décale jamais la pioche de B).
+export function applyJuge(board: BoardState, rng: RngPair): BoardState {
+  const reset = (h: BoardState["a"], r: Rng): BoardState["a"] => {
     const discardAll = { ...h, discard: [...h.discard, ...h.hand], hand: [] as CardId[] };
     return drawCards(discardAll, 4, r);
   };
-  return { ...board, a: reset(board.a, rng?.a), b: reset(board.b, rng?.b) };
+  return { ...board, a: reset(board.a, rng.a), b: reset(board.b, rng.b) };
 }
 
 /** Genèse — destroy ALL creatures on the board, both sides draw 3. */
-export function applyGenese(board: BoardState, rng?: RngPair): BoardState {
+export function applyGenese(board: BoardState, rng: RngPair): BoardState {
   const emptyLanes = board.lanes.map(() => ({ a: null, b: null })) as [LaneState, LaneState, LaneState];
   return {
     ...board,
     lanes: emptyLanes,
-    a: drawCards(board.a, 3, rng?.a),
-    b: drawCards(board.b, 3, rng?.b),
+    a: drawCards(board.a, 3, rng.a),
+    b: drawCards(board.b, 3, rng.b),
   };
 }

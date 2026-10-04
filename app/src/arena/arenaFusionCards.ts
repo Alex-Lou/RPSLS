@@ -250,7 +250,7 @@ export function applyEffacement(board: BoardState, side: Side, spell: PlayedSpel
 }
 
 /** Omniscience — pioche 3 + la main adverse ENTIÈRE révélée 2 tours. */
-export function applyOmniscience(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
+export function applyOmniscience(board: BoardState, side: Side, rng: Rng): BoardState {
   const hero = side === "a" ? board.a : board.b;
   let b = withSideHero(board, side, drawCards(hero, 3, rng));
   const opp = side === "a" ? b.b : b.a;
@@ -286,7 +286,7 @@ export function applyApocalypse(board: BoardState, side: Side): BoardState {
 
 /** Imposteur — vole 1 carte au hasard de la main adverse (dans TA main,
  *  cap+1 comme Larcin) ET révèle sa main 1 tour. Main vide : 3 dmg héros. */
-export function applyImposteur(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
+export function applyImposteur(board: BoardState, side: Side, rng: Rng): BoardState {
   const oppS = oppSide(side);
   const oppHero = oppS === "a" ? board.a : board.b;
   let b = board;

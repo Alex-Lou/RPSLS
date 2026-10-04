@@ -207,7 +207,7 @@ export function applySeve(board: BoardState, side: Side, spell: PlayedSpell): Bo
 }
 
 /** Coup d'Œil — pioche 1 + révèle 1 tour la carte la plus chère de la main adverse. */
-export function applyCoupOeil(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
+export function applyCoupOeil(board: BoardState, side: Side, rng: Rng): BoardState {
   const hero = side === "a" ? board.a : board.b;
   const opp = side === "a" ? board.b : board.a;
   let priciest: typeof opp.hand[number] | null = null;
@@ -259,7 +259,7 @@ export function applyToileGluante(board: BoardState, side: Side, spell: PlayedSp
 }
 
 /** Gravité — −1 PV à TOUTES les créatures adverses ; pioche 1 par créature tuée. */
-export function applyGravite(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
+export function applyGravite(board: BoardState, side: Side, rng: Rng): BoardState {
   const oppS = oppSide(side);
   let kills = 0;
   const lanes = board.lanes.map((lane) => {
@@ -319,7 +319,7 @@ export function applyPurge(board: BoardState, side: Side): BoardState {
 }
 
 /** Roue du Destin — effet aléatoire puissant (5 issues). */
-export function applyRoueDestin(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
+export function applyRoueDestin(board: BoardState, side: Side, rng: Rng): BoardState {
   const oppS = oppSide(side);
   const hero = side === "a" ? board.a : board.b;
   const r = Math.floor(rng() * 5);

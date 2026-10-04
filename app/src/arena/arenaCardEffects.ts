@@ -65,13 +65,14 @@ export interface ArenaSpellContext {
   board: BoardState;
   side: Side;
   spell: PlayedSpell;
-  // PRNG seedé du CAMP qui lance le sort (lockstep Pro online) : les handlers à
+  // PRNG du CAMP qui lance le sort (lockstep Pro online) : les handlers à
   // hasard (Larcin, Roue du Destin, Cascade, Reflet-Écho, Imposteur…) tirent via
-  // ce flux → déterministe en online, inchangé hors-ligne (défaut Math.random).
-  rng?: Rng;
+  // ce flux. OBLIGATOIRE : le repli Math.random vit aux points d'entrée
+  // (resolver, cf. engine/rng.ts randomPair), jamais dans un handler.
+  rng: Rng;
   // Paire complète pour les sorts GLOBAUX (Juge, Genèse) où CHAQUE camp pioche
   // de SON flux — préserve l'invariant « un flux par camp » (cf. engine/rng.ts).
-  rngPair?: RngPair;
+  rngPair: RngPair;
 }
 
 /* ───────────────────────── Priority table ───────────────────────── */

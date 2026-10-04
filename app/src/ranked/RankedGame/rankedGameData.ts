@@ -1,19 +1,8 @@
-import type { Move } from "../../engine/game";
 import type { CardId } from "../rankedTypes";
 
 /** Tables de domaine extraites VERBATIM de RankedGame. Les constantes de
  *  CADENCE (*_MS, MAX_MANA, LANE_COUNT) restent dans l'orchestrateur (elles
  *  cadencent la boucle de match). */
-
-/** Canonical RPSLS counters — used by Le Choix de Schrödinger to compute
- *  the "superposed" second move for each lane. */
-export const COUNTER_MOVE: Record<Move, Move> = {
-  rock: "paper",
-  paper: "scissors",
-  scissors: "rock",
-  lizard: "rock",
-  spock: "lizard",
-};
 
 /** CPU's notional hand pool — the cards the AI may consider each round. The
  *  CPU doesn't track a real deck/hand, but we filter one-shots out across the

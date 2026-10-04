@@ -703,7 +703,6 @@ const fr: Record<string, string> = {
   "wallet.err.generic": "Le serveur a refusé l'opération. Réessaie plus tard.",
   "premium.notEnough": "Pas assez d'✦ Étoiles",
   "premium.alreadyOwned": "✓ Acquis — applique depuis Profil",
-  "premium.devGrant": "+1000 ✦ (test uniquement)",
   "premium.close": "Fermer",
   "premium.unlocked": "Débloqué !",
   "crash.title": "Une erreur est survenue",
