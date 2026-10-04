@@ -34,7 +34,7 @@ import type {
   Creature,
 } from "./arenaTypes";
 import { arenaSupported, spellPriority } from "./arenaCardEffects";
-import { truncateIntentByCaps } from "./arenaRules";
+import { truncateIntentByCaps, creatureEffectiveAtk } from "./arenaRules";
 import { arenaSpellCost } from "./arenaSpellHelpers";
 import { affinityEdges } from "./arenaTrace";
 import { engineGauge } from "./arenaEngines";
@@ -110,6 +110,19 @@ const CPU_PLAYABLE = new Set<CardId>([
   // ── Dégâts signature par Voie (2026-06-23) ──
   "eboulis-final", "drain-vital", "coup-dans-lombre",
   "intrication-quantique", "taillade-mortelle",
+  // ── Audit IA 2026-10 : cartes signature dont le case existait mais absentes
+  //    d'ici → filtrées du deck CPU (Mirage amputé de 6 cartes, Cosmos de
+  //    Chronomancien, Tranchant de Surcharge/Double Mot). ──
+  "derobade", "frappe-spectrale", "eclipse", "sillage-spectral", "faux-semblant", "nuee-spectrale",
+  "chronomancien", "surcharge", "double-mot",
+  // ── Finishers (injectés à 3⭐) — avant, le CPU ne les castait JAMAIS. ──
+  "finisher-forteresse", "finisher-verger", "finisher-lame", "finisher-metamorphose", "finisher-calcul",
+]);
+
+/** Sorts de buff allié que Spock DÉTACHÉ ignore (isDetached → fizzle dans
+ *  arenaPhase1Spells) : ne jamais les viser sur un Spock à soi. */
+const DETACHED_FIZZLE = new Set<CardId>([
+  "aegis", "anchor", "riposte", "precision", "surge", "surcharge", "double-mot",
 ]);
 export function cpuCanPlay(id: CardId): boolean {
   return CPU_PLAYABLE.has(id);
@@ -138,10 +151,12 @@ export function cpuArenaDecision(
 
   // Easy CPU: skip ~40% of optional plays so the player has breathing room.
   // Persona module via spellSkipMult.
-  const baseSkip = difficulty === "easy" ? 0.4 : difficulty === "hard" ? 0 : 0.1;
+  // Courbe de difficulté (audit 2026-10) : normal ≈ hard avant (0.1) → 0.25.
+  const baseSkip = difficulty === "easy" ? 0.4 : difficulty === "hard" ? 0 : 0.25;
   const skipChance = Math.min(0.6, baseSkip * bias.spellSkipMult);
 
   /* ─── 1. Defensive emergencies — save a creature about to die ─── */
+  const savedLanes = new Set<LaneIndex>();
   if (difficulty !== "easy") {
     for (let i = 0; i < 3; i++) {
       const lane = i as LaneIndex;
@@ -165,8 +180,9 @@ export function cpuArenaDecision(
       if (!wouldDie) continue;
       // Try Aegis first — divine shield absorbs ALL the incoming dmg.
       // Lock 1×/match levé : "1 copie en main = 1 cast" via consume gère seul.
-      if (mana >= costOf("aegis") && playableHand.includes("aegis")) {
+      if (mana >= costOf("aegis") && playableHand.includes("aegis") && mine.move !== "spock") {
         intent.spells.push({ id: "aegis", kind: "lane", lane });
+        savedLanes.add(lane);
         consume(playableHand, "aegis");
         mana -= costOf("aegis");
         continue;
@@ -204,7 +220,9 @@ export function cpuArenaDecision(
     const oppC = sideCreature(board, oppSide, lane);
     if (myC && !oppC) {
       if (tauntBlocksMe) continue; // attack deflected, contributes nothing
-      lethalDmg += CREATURE_STATS[myC.move].atk + myC.atkBuff;
+      // ATK EFFECTIVE (Lente, Fanaison, Émoussé, Strates, Toile…) — même source
+      // que le combat, sinon l'IA croyait au létal sur une Pierre fraîche.
+      lethalDmg += creatureEffectiveAtk(myC);
     }
   }
   const couldLethal = lethalDmg + (playableHand.includes("supernova") && mana >= costOf("supernova") ? 6 : 0)
@@ -249,9 +267,10 @@ export function cpuArenaDecision(
 
   // Summon skip chance — much lower than the spell skip so the CPU
   // RELIABLY develops board, instead of standing still on its mana.
-  // Easy keeps a bit of randomness (30%), normal/hard always summon if
+  // Easy keeps a bit of randomness (15%), normal/hard always summon if
   // there's an open lane and mana for it.
-  const summonSkip = difficulty === "easy" ? 0.3 : 0;
+  // Audit 2026-10 : easy 0.3 → 0.15 (falaise : ~11% vs hard).
+  const summonSkip = difficulty === "easy" ? 0.15 : 0;
   // HARD CAP: max 2 summons per turn. Without this, the CPU stacks all 3
   // lanes every turn → player has zero undefended path to reach opp hero
   // (Alex's "opp ne perd jamais de vie" symptom). Leaving one lane open
@@ -265,6 +284,22 @@ export function cpuArenaDecision(
   const MAX_SUMMONS_PER_TURN = 3;
   const lanesAvailableForSummon = MAX_SUMMONS_PER_TURN;
   let summonsThisTurn = 0;
+  // HARD — counter-replace (audit 2026-10) : si une créature adverse VISIBLE
+  // counter la mienne sur une lane (et que rien ne la sauve : bouclier, esquive,
+  // Aegis posé ci-dessus), on ré-invoque le counter par-dessus (remplacement).
+  if (difficulty === "hard") {
+    for (const lane of laneOrder) {
+      if (mana < 1 || summonsThisTurn >= lanesAvailableForSummon) break;
+      const mine = sideCreature(board, side, lane);
+      const opp = sideCreature(board, oppSide, lane);
+      if (!mine || !opp || savedLanes.has(lane)) continue;
+      if (!moveCountersMove(opp.move, mine.move) || moveCountersMove(mine.move, opp.move)) continue;
+      if (mine.divineShield || mine.dodgeCharges > 0) continue;
+      intent.summons.push({ lane, move: bestCounter(opp.move, hero.affinity) });
+      mana -= 1;
+      summonsThisTurn += 1;
+    }
+  }
   for (const lane of laneOrder) {
     if (mana < 1) break;
     if (summonsThisTurn >= lanesAvailableForSummon) break;
@@ -291,11 +326,19 @@ export function cpuArenaDecision(
 
   /* ─── 4. Spend remaining mana — biggest spells first ─── */
   // Sort remaining hand by cost desc; play whatever fits.
-  const queue = playableHand.slice().sort((a, b) => costOf(b) - costOf(a));
+  // Chronomancien d'abord : son +3 mana (priorité 165, résolu avant les autres
+  // sorts) finance la suite du plan, comme Sablier.
+  const queue = playableHand.slice().sort((a, b) =>
+    (a === "chronomancien" ? -1 : 0) - (b === "chronomancien" ? -1 : 0) || costOf(b) - costOf(a));
+  // Gain Chronomancien en borne BASSE (mana réel au moment où il résout ≤ mana
+  // du héros − son coût) → jamais de sort planifié non payable à la résolution.
+  const chronoGain = Math.max(0, Math.min(3, MANA_CAP - (hero.mana - costOf("chronomancien"))));
   for (const id of queue) {
     const cost = costOf(id);
     if (cost > mana) continue;
     if (Math.random() < skipChance) continue;
+    // Chronomancien seulement s'il débloque un sort de la main sinon inabordable.
+    if (id === "chronomancien" && !queue.some((o) => o !== id && costOf(o) > mana - cost && costOf(o) <= mana - cost + chronoGain)) continue;
     const spell = buildSpellTarget(id, board, side);
     if (!spell) continue;
     intent.spells.push(spell);
@@ -303,6 +346,8 @@ export function cpuArenaDecision(
     // Sablier rend +2 mana à la résolution (priorité 160 : il fire AVANT les
     // sorts plus chers) — le budget de plan peut donc compter le gain.
     if (id === "sablier") mana += 2;
+    // Chronomancien : +3 mana à la résolution (clampé MANA_CAP).
+    if (id === "chronomancien") mana += chronoGain;
   }
 
   // Final priority sort — caller (resolver) will re-sort, but doing it here
@@ -372,15 +417,7 @@ function pickBestMove(
   // Face à une créature opp qui MATCH la Voie joueur → priorité blocage
   // (le CPU "lit" ton plan et le contre).
   if (oppAffinity && opp.move === oppAffinity && Math.random() < bias.blockPlayerVoieChance) {
-    let best: Move | null = null;
-    for (const mv of MOVES) {
-      if (!moveCountersMove(mv, opp.move)) continue;
-      if (best === null) { best = mv; continue; }
-      const s = CREATURE_STATS[mv];
-      const bs = CREATURE_STATS[best];
-      if (s.atk * 10 + s.hp > bs.atk * 10 + bs.hp) best = mv;
-    }
-    if (best) return best;
+    return bestCounter(opp.move, myAffinity);
   }
   // Variance vs counter parfait (Round 9) — 30% bag random pour pas que le
   // joueur sente "CPU triche". Builder persona varie plus (1.3× skip implique
@@ -389,24 +426,28 @@ function pickBestMove(
     const bag: Move[] = ["rock", "rock", "rock", "spock", "spock", "scissors", "scissors", "lizard", "paper"];
     return draw(bag);
   }
-  for (const mv of MOVES) {
-    if (moveCountersMove(mv, opp.move)) {
-      // Among counters, pick the one with the best ATK/HP for this trade.
-      let best: Move = mv;
-      for (const candidate of MOVES) {
-        if (!moveCountersMove(candidate, opp.move)) continue;
-        const s = CREATURE_STATS[candidate];
-        const bs = CREATURE_STATS[best];
-        if (s.atk * 10 + s.hp > bs.atk * 10 + bs.hp) best = candidate;
-      }
-      return best;
-    }
-  }
+  if (MOVES.some((mv) => moveCountersMove(mv, opp.move))) return bestCounter(opp.move, myAffinity);
   // Fallback when the move can't be RPSLS-countered (impossible in practice
   // for the 5-symbol table, but guards against future extensions). Random
   // from the bag instead of hardcoded Scissors.
   const fallbackBag: Move[] = ["rock", "paper", "scissors", "lizard", "spock"];
   return draw(fallbackBag);
+}
+
+/** Meilleur counter RPSLS de `oppMove`. Si MA Voie fait partie des counters, on
+ *  la préfère (audit 2026-10 : le tri ATK/HP choisissait toujours Ciseaux vs
+ *  Feuille, Feuille vs Spock, jamais Lézard → la Voie n'était pas jouée et le
+ *  moteur de Voie ne montait pas). Sinon : meilleur ATK/HP pour l'échange. */
+function bestCounter(oppMove: Move, myAffinity: Move | undefined): Move {
+  const counters = MOVES.filter((mv) => moveCountersMove(mv, oppMove));
+  if (myAffinity && counters.includes(myAffinity)) return myAffinity;
+  let best = counters[0];
+  for (const mv of counters) {
+    const s = CREATURE_STATS[mv];
+    const bs = CREATURE_STATS[best];
+    if (s.atk * 10 + s.hp > bs.atk * 10 + bs.hp) best = mv;
+  }
+  return best;
 }
 
 /** Build a PlayedSpell with a sensible target chosen for the CPU. Returns null
@@ -742,6 +783,38 @@ function buildSpellTarget(
       const hasSpock = ([0, 1, 2] as LaneIndex[]).some((l) => sideCreature(board, side, l)?.move === "spock");
       return hasSpock ? { id, kind: "hero" } : null;
     }
+    // ── Cosmos / Tranchant — audit 2026-10 (cartes signature jamais castées) ──
+    case "chronomancien": return { id, kind: "self" };
+    case "surcharge":
+    case "double-mot": {
+      // Buff ATK (Spock Détaché ignoré) : mon meilleur Ciseau, sinon ma meilleure créature.
+      let bestLane: LaneIndex | null = null;
+      let best = -1;
+      for (let i = 0; i < 3; i++) {
+        const c = sideCreature(board, side, i as LaneIndex);
+        if (!c || c.move === "spock" || c.cannotAttack) continue;
+        const s = (c.move === "scissors" ? 100 : 0) + creatureEffectiveAtk(c) * 2 + c.hp;
+        if (s > best) { best = s; bestLane = i as LaneIndex; }
+      }
+      return bestLane === null ? null : { id, kind: "lane", lane: bestLane };
+    }
+    // ── Finishers (Lot D) — joués en "global" comme côté joueur (CARD_TARGET_KIND
+    //    par défaut). 1×/match : on ne tente pas si déjà utilisé. ──
+    case "finisher-forteresse":
+    case "finisher-lame":
+    case "finisher-metamorphose": {
+      const me = side === "a" ? board.a : board.b;
+      if (me.finisherUsed) return null;
+      // Effet sur MES créatures du symbole : ≥1 requis sinon gâché.
+      const need: Move = id === "finisher-forteresse" ? "rock" : id === "finisher-lame" ? "scissors" : "lizard";
+      const has = ([0, 1, 2] as LaneIndex[]).some((l) => sideCreature(board, side, l)?.move === need);
+      return has ? { id, kind: "global" } : null;
+    }
+    case "finisher-verger":
+    case "finisher-calcul": {
+      const me = side === "a" ? board.a : board.b;
+      return me.finisherUsed ? null : { id, kind: "global" };
+    }
     default:          return null;
   }
 }
@@ -755,7 +828,9 @@ function targetMyBestCreature(
     const lane = i as LaneIndex;
     const c = sideCreature(board, side, lane);
     if (!c) continue;
-    const score = CREATURE_STATS[c.move].atk + c.hp;
+    // Spock Détaché ignore ces buffs alliés → le sort fizzlerait.
+    if (c.move === "spock" && DETACHED_FIZZLE.has(id)) continue;
+    const score = creatureEffectiveAtk(c) + c.hp;
     if (score > bestScore) { bestScore = score; bestLane = lane; }
   }
   if (bestLane === null) return null;
