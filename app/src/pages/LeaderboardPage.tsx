@@ -87,7 +87,7 @@ export function LeaderboardPage() {
           </div>
           <div className="text-right shrink-0">
             <div className="text-lg font-black text-themed tabular-nums">{(mine?.lp ?? player.rankLp)}</div>
-            <div className="text-[10px] uppercase tracking-wider text-ink-faint">LP</div>
+            <div className="text-[10px] uppercase tracking-wider text-ink-faint">{t("sidebar.lp")}</div>
           </div>
         </div>
       )}
@@ -115,6 +115,7 @@ export function LeaderboardPage() {
 }
 
 function Row({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
+  const t = useT();
   const tier = rankFromLp(entry.lp);
   const medal = entry.rank === 1 ? "🥇" : entry.rank === 2 ? "🥈" : entry.rank === 3 ? "🥉" : null;
   return (
@@ -137,7 +138,7 @@ function Row({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
       </div>
       <div className="text-right shrink-0">
         <span className="text-sm font-black text-ink tabular-nums">{entry.lp}</span>
-        <span className="text-[10px] text-ink-faint ml-1">LP</span>
+        <span className="text-[10px] text-ink-faint ml-1">{t("sidebar.lp")}</span>
       </div>
     </li>
   );

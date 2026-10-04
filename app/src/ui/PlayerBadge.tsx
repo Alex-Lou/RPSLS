@@ -125,7 +125,7 @@ export function PlayerBadge({
                   initial={{ scale: 0.6, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   className="shrink-0 whitespace-nowrap text-[9px] font-black px-1.5 py-0.5 rounded-full bg-orange-500/25 text-orange-300 border border-orange-400/40"
-                  title="Série de victoires"
+                  title={t("ui.winStreak")}
                 >
                   🔥 {player.winStreak}
                   {(player.winStreak ?? 0) >= 5 ? " x2" : (player.winStreak ?? 0) >= 3 ? " x1.5" : ""}

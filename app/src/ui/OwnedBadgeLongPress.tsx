@@ -23,6 +23,7 @@ import { PremiumBadge } from "./PremiumBadge";
 import { useStore } from "../store/store";
 import { hapticAlert, hapticMatchWin, hapticTap } from "../haptic";
 import { DEV_TOOLS } from "../devTools";
+import { useT } from "../i18n";
 
 const HOLD_MS = 3000;
 const HALFWAY_MS = 1500;
@@ -35,6 +36,7 @@ export function OwnedBadgeLongPress({
   setId: string;
   className?: string;
 }) {
+  const t = useT();
   const revoke = useStore((s) => s.revokePremiumSet);
   const [progress, setProgress] = useState(0);
   const [pressing, setPressing] = useState(false);
@@ -123,7 +125,7 @@ export function OwnedBadgeLongPress({
       className={"absolute z-20 " + className}
       style={{ touchAction: "none" }}
     >
-      <PremiumBadge variant="ribbon" label="✓ OWNED" />
+      <PremiumBadge variant="ribbon" label={t("ui.owned")} />
 
       {/* Progress ring: circular SVG that fills as the hold accumulates.
           strokeDashoffset drives the 0 → 100 % sweep with a 50 ms linear

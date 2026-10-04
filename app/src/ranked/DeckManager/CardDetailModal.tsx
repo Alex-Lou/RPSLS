@@ -64,13 +64,13 @@ export function CardDetailModal({
                 className="mt-2 w-full py-2.5 rounded-2xl bg-themed shadow-lg font-black text-white text-sm transition active:scale-[0.97]"
                 style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.08em" }}
               >
-                {inDeck ? "✕ Retirer du deck" : deckFull ? "🔁 Remplacer une carte…" : "✓ Mettre dans mon deck"}
+                {inDeck ? t("deck.detail.remove") : deckFull ? t("deck.detail.replace") : t("deck.detail.add")}
               </button>
             )}
             <button
               onClick={onClose}
               className="absolute -top-3 -right-3 w-9 h-9 rounded-full bg-zinc-900 border-2 border-hairline text-white text-lg font-bold flex items-center justify-center shadow-2xl hover:bg-zinc-800 transition"
-              aria-label="Fermer"
+              aria-label={t("ranked.close")}
             >
               ✕
             </button>

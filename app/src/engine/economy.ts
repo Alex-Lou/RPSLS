@@ -240,7 +240,8 @@ const SEASON_REWARD_AMOUNTS: Record<RankTier["id"], { eclats: number; dust: numb
 
 export const SEASON_REWARDS: SeasonReward[] = RANK_TIERS.map((t) => ({
   minLp: t.floor,
-  tier: t.label,
+  // Getter : libellé traduit relu à l'affichage (pas figé au chargement).
+  get tier() { return t.label; },
   ...SEASON_REWARD_AMOUNTS[t.id],
 }));
 

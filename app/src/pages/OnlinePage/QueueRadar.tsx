@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "motion/react";
 import { useState, useEffect } from "react";
 import { useGfxAllows } from "../../graphics/graphicsQuality";
+import { useT } from "../../i18n";
 
 export function QueueRadar({
   position,
@@ -23,6 +24,7 @@ export function QueueRadar({
    *  to cancel and re-queue from scratch. */
   onExtend?: () => void;
 }) {
+  const t = useT();
   const [now, setNow] = useState(Date.now());
   // Palier perf : en 'low' on coupe les décorations animées lourdes (anneaux de
   // pulsation infinis, particules en orbite, blobs de gradient en rotation) et
@@ -187,12 +189,12 @@ export function QueueRadar({
             letterSpacing: "0.02em",
           }}
         >
-          À la recherche d'un adversaire
+          {t("online.queue.searching")}
         </motion.div>
         <div className="text-xs text-zinc-400 mt-2 flex items-center justify-center gap-2">
-          <span>{position > 0 ? `Position #${position}` : "Scan du réseau…"}</span>
+          <span>{position > 0 ? t("online.queue.position", { n: position }) : t("online.queue.scanning")}</span>
           <span className="text-zinc-600">·</span>
-          <span>Bo {bestOf}</span>
+          <span>{t("history.bo", { n: bestOf })}</span>
           <span className="text-zinc-600">·</span>
           <span className="tabular-nums">{elapsedSec}s</span>
         </div>
@@ -202,8 +204,8 @@ export function QueueRadar({
             seeing the time, not by guessing it. */}
         <div className="mt-4 px-1">
           <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-1">
-            <span>Vrai adversaire</span>
-            <span className="text-amber-300 tabular-nums">🤖 IA dans {botRemainingSec}s</span>
+            <span>{t("online.queue.realOpp")}</span>
+            <span className="text-amber-300 tabular-nums">{t("online.queue.cpuIn", { n: botRemainingSec })}</span>
           </div>
           <div className="h-2 rounded-full bg-zinc-800 overflow-hidden ring-1 ring-white/5">
             <motion.div
@@ -232,7 +234,7 @@ export function QueueRadar({
               onClick={onExtend}
               className="mt-3 px-4 py-1.5 rounded-full text-[11px] font-bold bg-white/10 border border-white/20 text-white hover:bg-white/15 transition"
             >
-              ⏳ Attendre encore un humain
+              {t("online.queue.extend")}
             </motion.button>
           )}
         </AnimatePresence>
@@ -241,7 +243,7 @@ export function QueueRadar({
         onClick={onCancel}
         className="mt-2 px-5 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-200 text-sm transition"
       >
-        Cancel
+        {t("online.cancel")}
       </button>
     </motion.div>
   );

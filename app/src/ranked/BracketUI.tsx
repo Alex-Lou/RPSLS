@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useRef } from "react";
+import { useT } from "../i18n";
 import { motion } from "motion/react";
 import {
   type TournamentState,
@@ -106,13 +107,14 @@ export function BracketTree({ tournament }: { tournament: TournamentState }) {
 }
 
 function ChampionCol({ champion }: { champion: BracketPlayer | null }) {
+  const t = useT();
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-3 shrink-0">
       <div
         className="text-[10px] uppercase tracking-[0.2em] font-extrabold"
         style={{ color: "color-mix(in oklab, var(--theme-secondary) 80%, white)" }}
       >
-        Champion
+        {t("bracket.champion")}
       </div>
       {champion ? (
         <PlayerChip player={champion} size="lg" />
@@ -231,6 +233,7 @@ function GhostChip({ player, lost, compact }: { player: BracketPlayer; lost: boo
 function PlayerChip({ player, size, dimmed = false, won = false, compact = false }: {
   player: BracketPlayer; size: "sm" | "lg"; dimmed?: boolean; won?: boolean; compact?: boolean;
 }) {
+  const t = useT();
   const isPhoto = /^(data:|\/|https?:)/.test(player.avatar);
   const lg = size === "lg";
   const w = compact ? "w-[5.25rem]" : "w-28 sm:w-32";
@@ -270,7 +273,7 @@ function PlayerChip({ player, size, dimmed = false, won = false, compact = false
       {!lg && (
         <>
           <span className="truncate flex-1 text-[11px] font-semibold">{player.name}</span>
-          {player.isYou && <span className="shrink-0 text-[8px] uppercase tracking-wide text-emerald-200/90 font-bold">toi</span>}
+          {player.isYou && <span className="shrink-0 text-[8px] uppercase tracking-wide text-emerald-200/90 font-bold">{t("ranked.tag.you")}</span>}
         </>
       )}
     </motion.div>

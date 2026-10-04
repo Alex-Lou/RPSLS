@@ -30,7 +30,7 @@ const nav_en: Record<string, string> = {
   "lobby.classe.vsHuman": "🌐 vs Real player",
   "lobby.classe.vsHumanSub": "Online · real opponent",
   "lobby.classe.tournamentSub": "Climb a bracket of opponents up to the podium.",
-  "lobby.ranked.tagline": "3 lanes · Best of 5 · Mana & cards · LP & rewards",
+  "lobby.ranked.tagline": "3 lanes · Best of 5 · Mana & cards · RP & rewards",
   "lobby.deck.title": "My Deck",
   "lobby.prep.title": "Duel setup",
   "lobby.rank.toNext": "{n} {unit} to {tier}",

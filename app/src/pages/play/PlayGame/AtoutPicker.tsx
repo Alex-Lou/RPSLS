@@ -1,6 +1,7 @@
 import { motion } from "motion/react";
 import { ATOUTS, MAX_ATOUTS, type AtoutId } from "../../../ranked/atouts";
 import { FloatingMatchBackButton, hapticTick } from "../../../match/sharedMatchUI";
+import { useT } from "../../../i18n";
 
 export function AtoutPicker({
   chosen, onToggle, onConfirm, onBack,
@@ -10,6 +11,7 @@ export function AtoutPicker({
   onConfirm: () => void;
   onBack: () => void;
 }) {
+  const t = useT();
   const ready = chosen.length === MAX_ATOUTS;
   const remaining = MAX_ATOUTS - chosen.length;
   return (
@@ -20,12 +22,12 @@ export function AtoutPicker({
       transition={{ duration: 0.3 }}
       className="flex flex-col gap-4 flex-1 py-2 px-1 max-w-lg mx-auto w-full overflow-y-auto"
     >
-      <FloatingMatchBackButton onClick={onBack} label="Retour" />
+      <FloatingMatchBackButton onClick={onBack} label={t("nav.back")} />
       <div className="text-center mt-8">
         <h1 className="text-2xl sm:text-3xl font-extrabold text-themed leading-tight" style={{ fontFamily: "var(--font-headline)" }}>
-          Choisis tes Atouts
+          {t("atout.picker.title")}
         </h1>
-        <p className="text-[11px] text-ink-muted mt-1">2 atouts · chacun utilisable une fois dans le match</p>
+        <p className="text-[11px] text-ink-muted mt-1">{t("atout.picker.sub", { n: MAX_ATOUTS })}</p>
       </div>
       <div className="flex flex-col gap-2">
         {ATOUTS.map((a) => {
@@ -50,12 +52,12 @@ export function AtoutPicker({
               <span className="text-2xl shrink-0">{a.glyph}</span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="font-bold text-sm">{a.label}</span>
+                  <span className="font-bold text-sm">{t(`atout.${a.id}.name`)}</span>
                   <span className="text-[9px] uppercase tracking-wider px-1 rounded-full bg-hairline text-ink-muted">
-                    {a.kind === "manual" ? "manuel" : "auto"}
+                    {t(a.kind === "manual" ? "atout.kind.manual" : "atout.kind.auto")}
                   </span>
                 </div>
-                <div className="text-[11px] text-ink-muted leading-snug">{a.desc}</div>
+                <div className="text-[11px] text-ink-muted leading-snug">{t(`atout.${a.id}.desc`)}</div>
               </div>
               <span className={"shrink-0 w-5 h-5 rounded-full border flex items-center justify-center text-xs " +
                 (on ? "bg-emerald-400 border-emerald-400 text-zinc-900" : "border-white/30 text-transparent")}>✓</span>
@@ -70,7 +72,7 @@ export function AtoutPicker({
         className="mt-1 w-full px-7 py-3.5 rounded-2xl font-bold text-white bg-themed shadow-lg shadow-themed transition hover:scale-[1.01] disabled:opacity-40 disabled:pointer-events-none"
         style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
       >
-        {ready ? "Commencer →" : `Choisis encore ${remaining} atout${remaining > 1 ? "s" : ""}`}
+        {ready ? t("atout.picker.start") : t(remaining > 1 ? "atout.picker.remainingPlural" : "atout.picker.remaining", { n: remaining })}
       </motion.button>
     </motion.div>
   );

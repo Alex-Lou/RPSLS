@@ -59,7 +59,7 @@ export function HelpModal({ target, onClose }: { target: number; onClose: () => 
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col gap-1">
                     <div className="text-base font-black uppercase tracking-wider text-zinc-50">
-                      {t(`online.reveal.${id}`)}
+                      {t(`element.${id}`)}
                     </div>
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm leading-tight">
                       <span className="text-emerald-300 font-semibold">

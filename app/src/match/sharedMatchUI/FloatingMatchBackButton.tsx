@@ -2,6 +2,7 @@ import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import type { MatchBackHandle } from "./androidBack";
+import { useT } from "../../i18n";
 
 /**
  * Floating back/quit button that docks at the top-left of the screen, right
@@ -34,6 +35,7 @@ export const FloatingMatchBackButton = forwardRef<
     hidden?: boolean;
   }
 >(function FloatingMatchBackButtonImpl({ onClick, label, confirm, hidden = false }, ref) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   // Confirmation déjà donnée : la modale reste cliquable pendant son anim de
   // sortie → un double tap appelait onClick deux fois (double forfait).
@@ -104,7 +106,7 @@ export const FloatingMatchBackButton = forwardRef<
                   onClick={() => setOpen(false)}
                   className="flex-1 py-2.5 rounded-2xl bg-hairline hover:bg-hairline border border-hairline font-semibold text-sm text-ink transition active:scale-[0.97]"
                 >
-                  {confirm.cancelLabel ?? "Annuler"}
+                  {confirm.cancelLabel ?? t("lab.btn.cancel")}
                 </button>
                 <button
                   onClick={() => {
@@ -120,7 +122,7 @@ export const FloatingMatchBackButton = forwardRef<
                       : "bg-themed shadow-themed")
                   }
                 >
-                  {confirm.confirmLabel ?? "Quitter"}
+                  {confirm.confirmLabel ?? t("match.quit")}
                 </button>
               </div>
             </motion.div>

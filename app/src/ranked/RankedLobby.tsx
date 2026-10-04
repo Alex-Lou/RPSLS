@@ -55,8 +55,8 @@ export function RankedLobby({ onQuickMatch, onViewBracket, onManageDeck, onBack 
             }}
           >
             <span className="text-2xl">🎮</span>
-            <span className="text-sm sm:text-base leading-tight">MATCH RAPIDE</span>
-            <span className="text-[10px] font-medium opacity-85 normal-case tracking-normal">Duel direct vs CPU</span>
+            <span className="text-sm sm:text-base leading-tight">{t("ranked.lobby.quickMatch")}</span>
+            <span className="text-[10px] font-medium opacity-85 normal-case tracking-normal">{t("ranked.lobby.quickMatchSub")}</span>
           </motion.button>
           <motion.button
             whileTap={{ scale: 0.97 }}
@@ -69,8 +69,8 @@ export function RankedLobby({ onQuickMatch, onViewBracket, onManageDeck, onBack 
             }}
           >
             <span className="text-2xl">🏆</span>
-            <span className="text-sm sm:text-base leading-tight">TOURNOI</span>
-            <span className="text-[10px] font-medium opacity-85 normal-case tracking-normal">8 CPU · dans {countdown}</span>
+            <span className="text-sm sm:text-base leading-tight">{t("ranked.lobby.tournament")}</span>
+            <span className="text-[10px] font-medium opacity-85 normal-case tracking-normal">{t("ranked.lobby.tournamentSub", { time: countdown })}</span>
           </motion.button>
         </div>
       }
@@ -84,14 +84,14 @@ export function RankedLobby({ onQuickMatch, onViewBracket, onManageDeck, onBack 
             className="bg-surface rounded-2xl px-2 py-2.5 flex items-center justify-center gap-1.5 border border-hairline hover:bg-hairline transition"
           >
             <img src={HIW_ICONS.how} alt="" className="w-6 h-6 object-contain" draggable={false} />
-            <span className="font-bold text-[12px] text-ink">Comment ça marche</span>
+            <span className="font-bold text-[12px] text-ink">{t("ranked.lobby.howItWorks")}</span>
           </button>
           <button
             onClick={() => setCardsOpen(true)}
             className="bg-surface rounded-2xl px-2 py-2.5 flex items-center justify-center gap-1.5 border border-hairline hover:bg-hairline transition"
           >
             <span className="text-base leading-none">🎴</span>
-            <span className="font-bold text-[12px] text-ink">Toutes les cartes</span>
+            <span className="font-bold text-[12px] text-ink">{t("ranked.lobby.allCards")}</span>
           </button>
         </div>
       }
@@ -101,19 +101,19 @@ export function RankedLobby({ onQuickMatch, onViewBracket, onManageDeck, onBack 
       <div className="flex flex-col gap-2.5">
         <LobbyRankCard
           lp={player.rankLp}
-          unit="LP"
+          unit={t("ranked.lp.unit")}
           wins={player.stats.wins}
           losses={player.stats.losses}
           draws={player.stats.draws}
           info={
             <InfoBubble
               size="sm"
-              title="LP — League Points"
+              title={t("ranked.lp.infoTitle")}
               body={
                 <>
-                  Points de rang. Gagnés en gagnant des matchs Classés / Constellation Classés, perdus en perdant.
-                  Paliers : <b>Bronze</b> (0+), <b>Silver</b> (1100+), <b>Gold</b> (1300+), <b>Platinum</b> (1500+), <b>Diamond</b> (1750+).
-                  Chaque palier débloque une carte ou un cosmétique.
+                  {t("ranked.lp.infoBody")}{" "}
+                  {t("ranked.lp.infoTiers")} <b>{t("match.tier.bronze")}</b> (0+), <b>{t("match.tier.silver")}</b> (1100+), <b>{t("match.tier.gold")}</b> (1300+), <b>{t("match.tier.platinum")}</b> (1500+), <b>{t("match.tier.diamond")}</b> (1750+).
+                  {" "}{t("ranked.lp.infoUnlock")}
                 </>
               }
             />
@@ -130,8 +130,8 @@ export function RankedLobby({ onQuickMatch, onViewBracket, onManageDeck, onBack 
           <div className="flex items-center gap-2.5">
             <img src="/MenuIcons/DeckGestionIcone.png" alt="" className="w-8 h-8 object-contain drop-shadow-[0_1px_4px_rgba(0,0,0,0.5)]" draggable={false} />
             <div className="text-left">
-              <div className="font-bold text-[15px] text-ink">Gérer mon Deck</div>
-              <div className="text-[11px] text-ink-faint">Compose tes 6 cartes</div>
+              <div className="font-bold text-[15px] text-ink">{t("ranked.lobby.manageDeck")}</div>
+              <div className="text-[11px] text-ink-faint">{t("ranked.lobby.manageDeckSub")}</div>
             </div>
           </div>
           <span style={{ color: "var(--theme-secondary)" }}>›</span>
@@ -141,16 +141,16 @@ export function RankedLobby({ onQuickMatch, onViewBracket, onManageDeck, onBack 
       {/* ── MODALES (overlays) — fini le scroll-wall : Règles + Cartes ── */}
       <AnimatePresence>
         {rulesOpen && (
-          <ModalOverlay title="Comment ça marche" onClose={() => setRulesOpen(false)}>
+          <ModalOverlay title={t("ranked.lobby.howItWorks")} onClose={() => setRulesOpen(false)}>
             <div className="flex flex-col gap-2.5 text-[12.5px] text-ink-muted leading-relaxed">
-              <RuleBlock emoji="🎯" iconSrc={HIW_ICONS.principe} title="Le principe"
-                text="Pose 3 coups sur 3 lanes (FORCE / SAGESSE / RUSE). Révélation. Le plus de lanes gagnées = round gagné. Premier à 3 rounds." />
-              <RuleBlock emoji="💜" iconSrc={HIW_ICONS.mana} title="Mana"
-                text="1 mana au round 1, +1 par round (max 4). Sert à jouer des cartes." />
-              <RuleBlock emoji="🃏" iconSrc={HIW_ICONS.cartes} title="Cartes"
-                text="Main de 3 cartes. Tu pioches si tu GAGNES un round. Tu perds 1 carte si tu PERDS. 0 ou 1 carte par round." />
-              <RuleBlock emoji="✨" title="Bonus"
-                text="Lane favorisée = +1 pt. Combo (3× même coup) = +1. Sweep (3-0) = +2." />
+              <RuleBlock emoji="🎯" iconSrc={HIW_ICONS.principe} title={t("ranked.rules.principle.title")}
+                text={t("ranked.rules.principle.text")} />
+              <RuleBlock emoji="💜" iconSrc={HIW_ICONS.mana} title={t("ranked.mana")}
+                text={t("ranked.rules.mana.text")} />
+              <RuleBlock emoji="🃏" iconSrc={HIW_ICONS.cartes} title={t("ranked.rules.cards.title")}
+                text={t("ranked.rules.cards.text")} />
+              <RuleBlock emoji="✨" title={t("ranked.rules.bonus.title")}
+                text={t("ranked.rules.bonus.text")} />
             </div>
             <CardOverviewTable />
           </ModalOverlay>
@@ -158,7 +158,7 @@ export function RankedLobby({ onQuickMatch, onViewBracket, onManageDeck, onBack 
       </AnimatePresence>
       <AnimatePresence>
         {cardsOpen && (
-          <ModalOverlay title="Toutes les cartes" onClose={() => setCardsOpen(false)}>
+          <ModalOverlay title={t("ranked.lobby.allCards")} onClose={() => setCardsOpen(false)}>
             <div className="flex flex-col gap-2">
               {ALL_CARD_IDS.map((id) => {
                 const card = CARDS[id];
@@ -174,11 +174,11 @@ export function RankedLobby({ onQuickMatch, onViewBracket, onManageDeck, onBack 
                         <span className="font-bold text-sm">{t(card.nameKey)}</span>
                         <span className={"inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide " + RARITY_COLOR[card.rarity]}>
                           <span className={"w-2 h-2 rounded-full " + RARITY_DOT[card.rarity]} />
-                          {RARITY_LABEL_FR[card.rarity]}
+                          {t(RARITY_LABEL_KEY[card.rarity])}
                         </span>
-                        <span className="text-[9px] text-ink-faint bg-black/25 px-1.5 py-0.5 rounded-full font-semibold">{card.cost} mana</span>
+                        <span className="text-[9px] text-ink-faint bg-black/25 px-1.5 py-0.5 rounded-full font-semibold">{t("ranked.manaCost", { n: card.cost })}</span>
                         <span className={"text-[9px] font-bold px-1.5 py-0.5 rounded-full " + (oneShot ? "bg-rose-500/15 text-rose-300" : "bg-emerald-500/15 text-emerald-300")}>
-                          {usage.label}
+                          {t(usage.label)}
                         </span>
                       </div>
                       <p className="text-[11px] text-ink-muted mt-1 leading-snug">{t(card.descKey)}</p>
@@ -200,6 +200,7 @@ export function RankedLobby({ onQuickMatch, onViewBracket, onManageDeck, onBack 
  *  corps scrollable, en-tête + croix. Remplace les listes inline qui
  *  faisaient du lobby un mur de scroll (Alex 2026-06-13). */
 function ModalOverlay({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const t = useT();
   return createPortal(
     <motion.div
       initial={{ opacity: 0 }}
@@ -221,7 +222,7 @@ function ModalOverlay({ title, onClose, children }: { title: string; onClose: ()
           <h2 className="text-sm font-black uppercase tracking-wider text-themed">{title}</h2>
           <button
             onClick={onClose}
-            aria-label="Fermer"
+            aria-label={t("ranked.close")}
             className="w-8 h-8 rounded-full bg-hairline text-ink-muted hover:text-white text-base flex items-center justify-center transition"
           >✕</button>
         </div>
@@ -252,17 +253,17 @@ function useCountdown(intervalMinutes: number) {
 }
 
 const USAGE_LABEL: Record<string, { label: string; color: string }> = {
-  common: { label: "Permanent", color: "text-emerald-400" },
-  rare: { label: "Permanent", color: "text-emerald-400" },
-  epic: { label: "Usage unique", color: "text-rose-400" },
-  legendary: { label: "Usage unique", color: "text-rose-400" },
+  common: { label: "ranked.usage.permanent", color: "text-emerald-400" },
+  rare: { label: "ranked.usage.permanent", color: "text-emerald-400" },
+  epic: { label: "ranked.usage.oneShot", color: "text-rose-400" },
+  legendary: { label: "ranked.usage.oneShot", color: "text-rose-400" },
 };
 
-const RARITY_LABEL_FR: Record<string, string> = {
-  common: "Commune",
-  rare: "Rare",
-  epic: "Épique",
-  legendary: "Légendaire",
+const RARITY_LABEL_KEY: Record<string, string> = {
+  common: "ranked.rarity.common",
+  rare: "ranked.rarity.rare",
+  epic: "ranked.rarity.epic",
+  legendary: "ranked.rarity.legendary",
 };
 
 const RARITY_DOT: Record<string, string> = {
@@ -278,6 +279,7 @@ const RARITY_DOT: Record<string, string> = {
  *  descriptions + glyphs lives in "Toutes les cartes" just below — no
  *  duplication. Bigger, readable type since there are only 4 rows. */
 function CardOverviewTable() {
+  const t = useT();
   const tiers = RARITY_ORDER.map((rarity) => ({
     rarity,
     count: ALL_CARD_IDS.filter((id) => CARDS[id].rarity === rarity).length,
@@ -300,10 +302,10 @@ function CardOverviewTable() {
                 color: "color-mix(in oklab, var(--theme-primary) 82%, white)",
               }}
             >
-              <th className="text-left py-2.5 pl-3 pr-1 font-bold">Rareté</th>
-              <th className="text-center py-2.5 px-1 font-bold">Cartes</th>
-              <th className="text-center py-2.5 px-1 font-bold">Forge</th>
-              <th className="text-right py-2.5 px-1 pr-3 font-bold">Usage</th>
+              <th className="text-left py-2.5 pl-3 pr-1 font-bold">{t("ranked.overview.rarity")}</th>
+              <th className="text-center py-2.5 px-1 font-bold">{t("ranked.rules.cards.title")}</th>
+              <th className="text-center py-2.5 px-1 font-bold">{t("ranked.overview.forge")}</th>
+              <th className="text-right py-2.5 px-1 pr-3 font-bold">{t("ranked.overview.usage")}</th>
             </tr>
           </thead>
           <tbody>
@@ -312,13 +314,13 @@ function CardOverviewTable() {
                 <td className="py-2.5 pl-3 pr-1 border-t border-white/[0.06]">
                   <span className="flex items-center gap-2">
                     <span className={"w-2.5 h-2.5 rounded-full shrink-0 " + RARITY_DOT[rarity]} />
-                    <span className={"font-bold " + RARITY_COLOR[rarity]}>{RARITY_LABEL_FR[rarity]}</span>
+                    <span className={"font-bold " + RARITY_COLOR[rarity]}>{t(RARITY_LABEL_KEY[rarity])}</span>
                   </span>
                 </td>
                 <td className="text-center py-2.5 px-1 border-t border-white/[0.06] text-ink font-bold tabular-nums">{count}</td>
                 <td className="text-center py-2.5 px-1 border-t border-white/[0.06] text-ink-muted whitespace-nowrap font-semibold">{forge} ✨</td>
                 <td className="text-right py-2.5 px-1 pr-3 border-t border-white/[0.06]">
-                  <span className={"font-bold whitespace-nowrap " + usage.color}>{usage.label}</span>
+                  <span className={"font-bold whitespace-nowrap " + usage.color}>{t(usage.label)}</span>
                 </td>
               </tr>
             ))}
@@ -326,9 +328,9 @@ function CardOverviewTable() {
         </table>
       </div>
       <p className="text-[11px] sm:text-xs text-ink-faint mt-2 leading-relaxed">
-        <span className="text-emerald-400 font-semibold">Permanent</span> : la carte revient dans ta pioche, rejouable toute la partie.{" "}
-        <span className="text-rose-400 font-semibold">Usage unique</span> : consommée définitivement après l'avoir jouée.{" "}
-        <span className="text-ink-muted">Forge</span> = coût en ✨ pour la fabriquer.
+        <span className="text-emerald-400 font-semibold">{t("ranked.usage.permanent")}</span>{t("ranked.overview.permanentHelp")}{" "}
+        <span className="text-rose-400 font-semibold">{t("ranked.usage.oneShot")}</span>{t("ranked.overview.oneShotHelp")}{" "}
+        <span className="text-ink-muted">{t("ranked.overview.forge")}</span>{t("ranked.overview.forgeHelp")}
       </p>
     </div>
   );

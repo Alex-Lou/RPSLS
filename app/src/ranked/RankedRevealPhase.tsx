@@ -25,14 +25,9 @@ import { useT } from "../i18n";
 
 /** Localised lane name for inline hints — reads the live per-match lane
  *  permutation so the hint matches the shuffled board, not a fixed order. */
-const laneFr = (i: number) => laneIdentityAt(i).titleFr;
-const MOVE_FR: Record<Move, string> = {
-  rock: "Pierre",
-  paper: "Feuille",
-  scissors: "Ciseaux",
-  lizard: "Lézard",
-  spock: "Spock",
-};
+type TFn = (k: string, vars?: Record<string, string | number>) => string;
+const LANE_IDENTITY_KEYS = ["lanes.identity.force", "lanes.identity.wisdom", "lanes.identity.cunning"];
+const laneName = (t: TFn, i: number) => t(`${LANE_IDENTITY_KEYS[laneIdentityAt(i).index]}.title`);
 
 export interface RankedRevealPhaseProps {
   youName: string;
@@ -202,6 +197,7 @@ export function RankedRevealPhase({
  *  one short FR phrase per scored bonus on each side, so players learn the
  *  rules by reading instead of guessing. */
 function favouredHints(
+  t: TFn,
   side: "a" | "b",
   picks: [Move, Move, Move],
   laneResults: LaneResult[],
@@ -212,15 +208,16 @@ function favouredHints(
     if (laneResults[i].winner !== side) continue;
     const mv = picks[i];
     if (laneFavoursMove(i, mv)) {
-      hints.push(`${MOVE_FR[mv]} sur ${laneFr(i)}`);
+      hints.push(t("ranked.hint.favoured", { move: t(`element.${mv}`), lane: laneName(t, i) }));
     } else if (precisionLane === i) {
-      hints.push(`🎯 Précision sur ${laneFr(i)}`);
+      hints.push(t("ranked.hint.precision", { lane: laneName(t, i) }));
     }
   }
   return hints;
 }
 
 function surgeHint(
+  t: TFn,
   side: "a" | "b",
   myCard: PlayedCard | null,
   oppCard: PlayedCard | null,
@@ -230,10 +227,11 @@ function surgeHint(
   if (card?.id !== "surge") return null;
   const lane = (card as { lane: LaneTarget }).lane;
   if (laneResults[lane]?.winner !== side) return null;
-  return `⚡ Surge gagnant sur ${laneFr(lane)}`;
+  return t("ranked.hint.surge", { lane: laneName(t, lane) });
 }
 
 function tideHint(
+  t: TFn,
   side: "a" | "b",
   myCard: PlayedCard | null,
   oppCard: PlayedCard | null,
@@ -243,7 +241,7 @@ function tideHint(
   if (card?.id !== "tide") return null;
   const wins = laneResults.filter((l) => l.winner === side).length;
   if (wins < 2) return null;
-  return `🌊 Marée — +1 par lane gagnée (${wins})`;
+  return t("ranked.hint.tide", { n: wins });
 }
 
 function BonusBreakdown({
@@ -268,12 +266,12 @@ function BonusBreakdown({
   const aPrecisionLane = myCard?.id === "precision" ? (myCard as { lane: LaneTarget }).lane : null;
   const bPrecisionLane = oppCard?.id === "precision" ? (oppCard as { lane: LaneTarget }).lane : null;
 
-  const youFavHints = favouredHints("a", yourPicks, laneResults, aPrecisionLane);
-  const oppFavHints = favouredHints("b", oppPicks, laneResults, bPrecisionLane);
-  const youSurgeHint = surgeHint("a", myCard, oppCard, laneResults);
-  const oppSurgeHint = surgeHint("b", myCard, oppCard, laneResults);
-  const youTideHint = tideHint("a", myCard, oppCard, laneResults);
-  const oppTideHint = tideHint("b", myCard, oppCard, laneResults);
+  const youFavHints = favouredHints(t, "a", yourPicks, laneResults, aPrecisionLane);
+  const oppFavHints = favouredHints(t, "b", oppPicks, laneResults, bPrecisionLane);
+  const youSurgeHint = surgeHint(t, "a", myCard, oppCard, laneResults);
+  const oppSurgeHint = surgeHint(t, "b", myCard, oppCard, laneResults);
+  const youTideHint = tideHint(t, "a", myCard, oppCard, laneResults);
+  const oppTideHint = tideHint(t, "b", myCard, oppCard, laneResults);
 
   return (
     <motion.div
@@ -388,7 +386,7 @@ function CardLine({
         (isYou ? "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/30"
               : "bg-rose-500/15 text-rose-300 ring-1 ring-rose-400/30")
       }>
-        {isYou ? "Toi" : "Adv."}
+        {isYou ? t("ranked.tag.you") : t("prep.oppShort")}
       </span>
       <span className="text-sm shrink-0 self-center">🃏</span>
       <span className="text-xs leading-snug line-clamp-2 min-w-0">
@@ -412,9 +410,9 @@ function ComboBanner({
   const rare = combo.tier === "rare";
   const name = t(`combo.${combo.id}.name`);
   const tag = t(`combo.${combo.id}.tag`);
-  const chip = attribution === "you" ? "Toi"
-             : attribution === "opp" ? "Adv."
-             : attribution === "both" ? "Toi & Adv."
+  const chip = attribution === "you" ? t("ranked.tag.you")
+             : attribution === "opp" ? t("prep.oppShort")
+             : attribution === "both" ? t("ranked.tag.both")
              : null;
   const chipCls = attribution === "you"
     ? "bg-emerald-500/15 text-emerald-300 ring-emerald-400/30"

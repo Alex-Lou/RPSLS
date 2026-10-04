@@ -17,7 +17,7 @@ export function ScoreHeader({
       oppScore={oppWins}
       youTag={t("lanes.you")}
       oppTag={t("lanes.opponent")}
-      caption={t("lanes.scoreCaption", { round, target })}
+      caption={t(target > 1 ? "lanes.scoreCaption" : "lanes.scoreCaptionOne", { round, target })}
     />
   );
 }

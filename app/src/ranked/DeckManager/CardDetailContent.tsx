@@ -3,6 +3,7 @@ import { CARDS, isPassiveCard, RARITY_COLOR } from "../cards";
 import { CardImage } from "../CardImage";
 import { masteryLevel, MASTERY_MAX_LEVEL } from "../../engine/economy";
 import type { CardId } from "../rankedTypes";
+import { RARITY_KEY } from "./deckManagerConstants";
 
 export function CardDetailContent({
   id, masteryXp, owned, inDeck, t,
@@ -11,7 +12,7 @@ export function CardDetailContent({
   masteryXp: number;
   owned: boolean;
   inDeck: boolean;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   const card = CARDS[id];
   const mastery = masteryLevel(masteryXp);
@@ -44,12 +45,12 @@ export function CardDetailContent({
             {t(card.nameKey)}
           </span>
           <span className={"text-[10px] font-bold uppercase tracking-wider " + RARITY_COLOR[card.rarity]}>
-            {passive ? "Passive" : card.rarity}
+            {passive ? t("ranked.passive") : t(RARITY_KEY[card.rarity])}
           </span>
         </div>
         {/* Mana cost as a pip cluster — same visual language as the hand. */}
         <div className="flex items-center gap-1">
-          <span className="text-[9px] uppercase tracking-wider text-ink-muted font-bold">Coût</span>
+          <span className="text-[9px] uppercase tracking-wider text-ink-muted font-bold">{t("deck.detail.cost")}</span>
           <div className="flex items-center gap-0.5">
             {Array.from({ length: card.cost }, (_, k) => (
               <span key={k} className="w-1.5 h-1.5 rounded-full bg-sky-300 shadow-[0_0_4px_rgba(125,211,252,0.7)]" />
@@ -68,22 +69,22 @@ export function CardDetailContent({
         <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
           {!owned && (
             <span className="text-[9px] font-bold uppercase tracking-wider rounded-full px-1.5 py-0.5 bg-zinc-600/40 text-ink-muted border border-hairline">
-              🔒 Verrouillée
+              🔒 {t("deck.detail.locked")}
             </span>
           )}
           {owned && inDeck && (
             <span className="text-[9px] font-bold uppercase tracking-wider rounded-full px-1.5 py-0.5 bg-emerald-500/20 text-emerald-200 border border-emerald-400/40">
-              ✓ Dans le deck
+              ✓ {t("deck.detail.inDeck")}
             </span>
           )}
           {owned && !inDeck && (
             <span className="text-[9px] font-bold uppercase tracking-wider rounded-full px-1.5 py-0.5 bg-white/5 text-ink-muted border border-hairline">
-              Possédée
+              {t("deck.detail.owned")}
             </span>
           )}
           {owned && mastery > 1 && (
             <span className="text-[9px] font-bold uppercase tracking-wider rounded-full px-1.5 py-0.5 bg-amber-500/20 text-amber-200 border border-amber-400/40">
-              {mastery >= MASTERY_MAX_LEVEL ? "⭐" : "✦"} Maîtrise {mastery}/{MASTERY_MAX_LEVEL}
+              {mastery >= MASTERY_MAX_LEVEL ? "⭐" : "✦"} {t("deck.detail.mastery", { n: mastery, max: MASTERY_MAX_LEVEL })}
             </span>
           )}
         </div>

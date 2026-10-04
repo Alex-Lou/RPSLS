@@ -29,7 +29,7 @@ import { useNoMenuFx } from "../../fx/menuFx";
 import { CurrencyBadges } from "../CurrencyBadges";
 import { hapticTap } from "../../haptic";
 import { useTopBar } from "../../nav/topBarStore";
-import { SLOTS_BY_MODE, RARITY_FR, RARITY_DOT, RARITY_RING } from "./deckManagerConstants";
+import { SLOTS_BY_MODE, RARITY_TAB_KEY, RARITY_DOT, RARITY_RING } from "./deckManagerConstants";
 import { DeckSlot } from "./DeckSlot";
 import { CardDetailModal } from "./CardDetailModal";
 import { RarityTab, FilterChip } from "./collectionFilters";
@@ -129,7 +129,7 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
     const existingIdx = deck.indexOf(selected);
     if (existingIdx >= 0) {
       const next = [...deck]; next[existingIdx] = null; setDeck(next);
-      setDeckMsg({ text: `« ${name} » retirée du deck`, tone: "info", key: Date.now() });
+      setDeckMsg({ text: t("deck.msg.removed", { name }), tone: "info", key: Date.now() });
       setModalOpen(false); setSelected(null);
       return;
     }
@@ -140,7 +140,7 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
       const legCount = deck.filter((c) => c !== null && CARDS[c]?.rarity === "legendary").length;
       if (legCount >= ARENA_LEGENDARY_CAP) {
         setModalOpen(false);
-        setDeckMsg({ text: `Max ${ARENA_LEGENDARY_CAP} légendaires en Arena (équité) — retires-en une d'abord`, tone: "warn", key: Date.now() });
+        setDeckMsg({ text: t("deck.msg.legendaryCap", { n: ARENA_LEGENDARY_CAP }), tone: "warn", key: Date.now() });
         return;
       }
     }
@@ -151,11 +151,11 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
       // slots pulsent déjà via `highlight={!!selected}`). Le tap suivant sur
       // un slot fait le swap (handleSlotTap). Alex 2026-06-13.
       setModalOpen(false);
-      setDeckMsg({ text: `Deck plein (${TOTAL}/${TOTAL}) — tape la carte à remplacer ↑`, tone: "warn", key: Date.now() });
+      setDeckMsg({ text: t("deck.msg.full", { n: TOTAL }), tone: "warn", key: Date.now() });
       return; // `selected` reste set
     }
     const next = [...deck]; next[freeIdx] = selected; setDeck(next);
-    setDeckMsg({ text: `« ${name} » ajoutée (emplacement ${freeIdx + 1})`, tone: "good", key: Date.now() });
+    setDeckMsg({ text: t("deck.msg.added", { name, slot: freeIdx + 1 }), tone: "good", key: Date.now() });
     setModalOpen(false); setSelected(null);
   }
 
@@ -180,14 +180,14 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
     // sinon on pouvait dépasser le cap en remplaçant un slot.
     if (mode === "arena" && CARDS[selected].rarity === "legendary"
         && next.filter((c) => c !== null && CARDS[c]?.rarity === "legendary").length > ARENA_LEGENDARY_CAP) {
-      setDeckMsg({ text: `Max ${ARENA_LEGENDARY_CAP} légendaires en Arena (équité) — retires-en une d'abord`, tone: "warn", key: Date.now() });
+      setDeckMsg({ text: t("deck.msg.legendaryCap", { n: ARENA_LEGENDARY_CAP }), tone: "warn", key: Date.now() });
       return; // swap annulé, selected reste set
     }
     setDeck(next);
     setDeckMsg({
       text: slotCard
-        ? `« ${t(CARDS[selected].nameKey)} » remplace l'emplacement ${slotIdx + 1}`
-        : `« ${t(CARDS[selected].nameKey)} » placée (emplacement ${slotIdx + 1})`,
+        ? t("deck.msg.replaced", { name: t(CARDS[selected].nameKey), slot: slotIdx + 1 })
+        : t("deck.msg.placed", { name: t(CARDS[selected].nameKey), slot: slotIdx + 1 }),
       tone: "good", key: Date.now(),
     });
     setSelected(null);
@@ -302,8 +302,8 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
       <div className="shrink-0 flex flex-col gap-2 pb-2">
         <p className="text-[11px] text-ink-muted leading-tight text-center">
           {mode === "arena"
-            ? "8 cartes · chaque choix devient 3/2/2/1 copies selon la rareté"
-            : "6 cartes · Constellation Classée"}
+            ? t("deck.sub.arena")
+            : t("deck.sub.ranked")}
         </p>
         <div className="flex items-center justify-center">
           <CurrencyBadges inert />
@@ -318,7 +318,7 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
          *  propre, 8 cartes = 4×2 ; plus de slots vides en bout de ligne. */}
         <div>
           <h2 className="text-[11px] uppercase tracking-[0.25em] font-bold text-emerald-400 mb-2">
-            Mon deck ({equipped}/{TOTAL})
+            {t("deck.myDeck", { n: equipped, total: TOTAL })}
           </h2>
           <div className={"grid gap-2 " + (TOTAL === 6 ? "grid-cols-3" : TOTAL === 10 ? "grid-cols-5" : "grid-cols-4")}>
             {(deck as (CardId | null)[]).map((cardId, i) => (
@@ -343,7 +343,7 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
           >
             <span className="flex items-center gap-2">
               <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-ink-muted">
-                Collection
+                {t("deck.collection")}
               </span>
               <span className="text-[9px] font-black tabular-nums px-1.5 py-0.5 rounded-full bg-hairline text-ink-muted">
                 {ownedCount}/{ALL_CARD_IDS.length}
@@ -378,13 +378,13 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
                       inputMode="search"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Rechercher une carte…"
+                      placeholder={t("deck.searchPlaceholder")}
                       className="w-full pl-8 pr-8 py-1.5 text-xs rounded-lg bg-surface-raised border border-hairline focus:border-white/40 focus:outline-none text-white placeholder:text-ink-faint transition"
                     />
                     {searchQuery && (
                       <button
                         onClick={() => setSearchQuery("")}
-                        aria-label="Effacer la recherche"
+                        aria-label={t("deck.clearSearch")}
                         className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-hairline text-ink-muted hover:text-white text-[10px] flex items-center justify-center"
                       >✕</button>
                     )}
@@ -397,7 +397,7 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
                     <RarityTab
                       active={rarityFilter === "all"}
                       onClick={() => { hapticTap(); setRarityFilter("all"); }}
-                      label="Toutes"
+                      label={t("deck.filter.all")}
                       count={`${ownedCount}/${ALL_CARD_IDS.length}`}
                       dotClass="bg-white/70"
                     />
@@ -406,7 +406,7 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
                         key={r}
                         active={rarityFilter === r}
                         onClick={() => { hapticTap(); setRarityFilter(r); }}
-                        label={RARITY_FR[r]}
+                        label={t(RARITY_TAB_KEY[r])}
                         count={`${ownedByRarity[r].owned}/${ownedByRarity[r].total}`}
                         dotClass={RARITY_DOT[r]}
                         activeRingClass={RARITY_RING[r]}
@@ -422,7 +422,7 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
                         active={voieFilter === "myvoie"}
                         onClick={() => { hapticTap(); setVoieFilter("myvoie"); }}
                         icon="✦"
-                        label="Ma Voie"
+                        label={t("deck.filter.myPath")}
                       />
                       {(["rock", "paper", "scissors", "lizard", "spock"] as const).map((m) => (
                         <FilterChip
@@ -437,13 +437,13 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
                         active={voieFilter === "neutral"}
                         onClick={() => { hapticTap(); setVoieFilter("neutral"); }}
                         icon="○"
-                        label="Neutres"
+                        label={t("deck.filter.neutral")}
                       />
                       <FilterChip
                         active={voieFilter === "all"}
                         onClick={() => { hapticTap(); setVoieFilter("all"); }}
                         icon="∗"
-                        label="Toutes"
+                        label={t("deck.filter.all")}
                       />
                     </div>
                   )}
@@ -457,26 +457,26 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
                       active={ownedOnly}
                       onClick={() => { hapticTap(); setOwnedOnly((v) => !v); }}
                       icon="📥"
-                      label="Possédées"
+                      label={t("deck.filter.owned")}
                     />
                     <FilterChip
                       active={inDeckOnly}
                       onClick={() => { hapticTap(); setInDeckOnly((v) => !v); }}
                       icon="✓"
-                      label="Dans mon deck"
+                      label={t("deck.filter.inDeck")}
                     />
                     <FilterChip
                       active={passiveOnly}
                       onClick={() => { hapticTap(); setPassiveOnly((v) => !v); }}
                       icon="∞"
-                      label="Passives"
+                      label={t("deck.filter.passive")}
                     />
                     {anyFilterActive && (
                       <button
                         onClick={() => { hapticTap(); clearAllFilters(); }}
                         className="ml-auto text-[10px] uppercase tracking-wider text-ink-muted hover:text-white px-2 py-1 transition"
                       >
-                        Réinitialiser
+                        {t("deck.reset")}
                       </button>
                     )}
                   </div>
@@ -527,7 +527,7 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
           onClick={handleSave}
           className="w-full py-3 rounded-2xl font-bold text-white bg-themed shadow-lg transition"
         >
-          Sauvegarder le deck
+          {t("deck.save")}
         </motion.button>
       </div>
 

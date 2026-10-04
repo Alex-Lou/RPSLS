@@ -18,6 +18,7 @@ import { PadPreviewModal } from "./PadPreviewModal";
 import { BackdropPeekOverlay } from "./BackdropPeekOverlay";
 import { SectionCard } from "./SectionCard";
 import { StyleLegend } from "./StyleBadges";
+import { bgLabel } from "./padText";
 
 /** Personal image library cap. JPEG-encoded at quality 0.82 at MAX×MAX
  *  yields ~150-400 KB each, so 6 images stays well under localStorage's
@@ -344,7 +345,7 @@ export function StyleSection() {
        (player.ownedPremiumSets ?? []).includes(currentBg.premiumSetId) && (
         <PremiumIntensitySlider
           setId={currentBg.premiumSetId}
-          label={currentBg.label}
+          label={bgLabel(t, currentBg)}
           accent={currentBg.accent ?? null}
         />
       )}
@@ -354,7 +355,7 @@ export function StyleSection() {
       <BackdropPeekOverlay
         peek={peek}
         peekPremiumPending={peekPremiumPending}
-        currentBg={currentBg}
+        currentBg={currentBg && { ...currentBg, label: bgLabel(t, currentBg) }}
         onConfirm={confirmPeek}
         onClose={closePeek}
         onBuy={(setId) => setPremiumModalSetId(setId)}

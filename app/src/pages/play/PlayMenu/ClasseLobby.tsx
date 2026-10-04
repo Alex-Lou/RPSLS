@@ -83,7 +83,7 @@ export function ClasseLobby({
       }
     >
       {/* Rang · bilan du ladder Classé (classeLp / classeStats). */}
-      <LobbyRankCard lp={classeLp} unit="PR" wins={cs.wins} losses={cs.losses} draws={cs.draws} />
+      <LobbyRankCard lp={classeLp} unit={t("play.rp")} wins={cs.wins} losses={cs.losses} draws={cs.draws} />
     </ModeLobbyShell>
   );
 }

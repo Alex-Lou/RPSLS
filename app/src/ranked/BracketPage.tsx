@@ -25,10 +25,10 @@ import { useImmersive, useTopBar } from "../nav/topBarStore";
 import { useT } from "../i18n";
 import { LoadingTip } from "../flavor/LoadingTip";
 
-const SIZE_META: Record<TournamentSize, { title: string; sub: string; glyph: string; art: string }> = {
-  4:  { title: "Rapide",    sub: "4 adversaires CPU · 2 tours",  glyph: "⚡",  art: "/Icones Tournoi/ConstRankedRapide.png" },
-  8:  { title: "Classique", sub: "8 adversaires CPU · 3 tours",  glyph: "🛡️", art: "/Icones Tournoi/ConstRankedClassique.png" },
-  16: { title: "Épique",    sub: "16 adversaires CPU · 4 tours", glyph: "👑", art: "/Icones Tournoi/ConstRankedEpique.png" },
+const SIZE_META: Record<TournamentSize, { titleKey: string; subKey: string; glyph: string; art: string }> = {
+  4:  { titleKey: "bracket.size.4.title",  subKey: "bracket.size.4.sub",  glyph: "⚡",  art: "/Icones Tournoi/ConstRankedRapide.png" },
+  8:  { titleKey: "bracket.size.8.title",  subKey: "bracket.size.8.sub",  glyph: "🛡️", art: "/Icones Tournoi/ConstRankedClassique.png" },
+  16: { titleKey: "bracket.size.16.title", subKey: "bracket.size.16.sub", glyph: "👑", art: "/Icones Tournoi/ConstRankedEpique.png" },
 };
 
 export function BracketPage({
@@ -132,14 +132,14 @@ export function BracketPage({
             color: "transparent",
           }}
         >
-          <span className="text-2xl">🏆</span> Tournoi
+          <span className="text-2xl">🏆</span> {t("lobby.tournament")}
         </h1>
         <p className="text-[11px] text-ink-faint mt-1">
           {selecting
-            ? "Choisis la taille du tableau · adversaires CPU (entraînement)"
+            ? t("bracket.sub.select")
             : !joined
-            ? "Aperçu du tableau · intègre-toi pour lancer le tournoi"
-            : "En cours… · adversaires CPU"}
+            ? t("bracket.sub.preview")
+            : t("bracket.sub.running")}
         </p>
       </div>
 
@@ -177,7 +177,7 @@ export function BracketPage({
             letterSpacing: "0.04em",
           }}
         >
-          Intégrer le tournoi
+          {t("bracket.join")}
         </motion.button>
       )}
 
@@ -201,7 +201,7 @@ export function BracketPage({
           className="flex flex-col items-center gap-3 py-3"
         >
           <div className="text-center text-sm font-semibold text-ink-muted">
-            Tu as été éliminé. Regarde la suite !
+            {t("bracket.eliminated")}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -216,7 +216,7 @@ export function BracketPage({
               }}
               className="px-5 py-2.5 rounded-2xl text-sm font-bold text-white bg-themed shadow-themed transition"
             >
-              Nouveau tournoi
+              {t("bracket.newTournament")}
             </button>
             <button
               onClick={onBack}
@@ -226,7 +226,7 @@ export function BracketPage({
                 border: "1px solid color-mix(in oklab, var(--theme-primary) 35%, transparent)",
               }}
             >
-              Quitter
+              {t("bracket.quit")}
             </button>
           </div>
         </motion.div>
@@ -236,7 +236,7 @@ export function BracketPage({
       {!selecting && joined && !playerMatch && !eliminated && tournament.phase === "running" && (
         <div className="flex flex-col items-center gap-2 py-2 max-w-sm mx-auto px-4">
           <div className="text-center text-[11px] text-ink-faint">
-            Les autres joueurs terminent leur manche… patiente encore un peu 🙂
+            {t("bracket.waitingOthers")}
           </div>
           <LoadingTip rotateMs={4000} className="justify-center text-center" />
         </div>
@@ -264,6 +264,7 @@ export function BracketPage({
  * pulsing trophy gives the tournament its own start beat.
  */
 function TournamentPreparingOverlay({ onDone }: { onDone: () => void }) {
+  const t = useT();
   const [beat, setBeat] = useState(3);
   useEffect(() => {
     if (beat === 0) {
@@ -300,10 +301,10 @@ function TournamentPreparingOverlay({ onDone }: { onDone: () => void }) {
             backgroundImage: "linear-gradient(90deg, var(--theme-primary), var(--theme-secondary))",
           }}
         >
-          Le tournoi se prépare…
+          {t("bracket.preparing.title")}
         </motion.h2>
         <p className="text-[12px] text-ink-faint max-w-xs leading-snug px-6">
-          Les 8 challengers prennent place sur leur estrade. Premier coup d'envoi imminent.
+          {t("bracket.preparing.sub")}
         </p>
         <motion.div
           key={beat}
@@ -317,7 +318,7 @@ function TournamentPreparingOverlay({ onDone }: { onDone: () => void }) {
             filter: "drop-shadow(0 2px 12px color-mix(in oklab, var(--theme-primary) 60%, transparent))",
           }}
         >
-          {beat > 0 ? beat : "GO !"}
+          {beat > 0 ? beat : t("bracket.go")}
         </motion.div>
       </div>
     </motion.div>
@@ -336,6 +337,7 @@ function hasPlayerPending(t: TournamentState): boolean {
 /* ──────────── Size picker ──────────── */
 
 function SizePicker({ onPick }: { onPick: (s: TournamentSize) => void }) {
+  const t = useT();
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -379,9 +381,9 @@ function SizePicker({ onPick }: { onPick: (s: TournamentSize) => void }) {
                   className="text-lg font-extrabold text-white"
                   style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
                 >
-                  {meta.title}
+                  {t(meta.titleKey)}
                 </div>
-                <div className="text-[11px] text-zinc-300/80">{meta.sub}</div>
+                <div className="text-[11px] text-zinc-300/80">{t(meta.subKey)}</div>
               </div>
               <span
                 className="text-2xl font-black tabular-nums"
@@ -402,6 +404,7 @@ function SizePicker({ onPick }: { onPick: (s: TournamentSize) => void }) {
 function CombatButton({ oppName, oppAvatar, onClick }: {
   oppName: string; oppAvatar: string; onClick: () => void;
 }) {
+  const t = useT();
   const isPhoto = /^(data:|\/|https?:)/.test(oppAvatar);
   return (
     <motion.button
@@ -411,7 +414,7 @@ function CombatButton({ oppName, oppAvatar, onClick }: {
       whileTap={{ scale: 0.98 }}
       transition={{ type: "spring", stiffness: 280, damping: 22 }}
       onClick={onClick}
-      aria-label={`Combattre ${oppName}`}
+      aria-label={t("bracket.fightAria", { name: oppName })}
       // Bold, unmistakable primary CTA: a SOLID theme gradient (like the Lock
       // button) so it reads as "the action" while still wearing the active
       // palette. White text + the opponent's avatar give it presence.
@@ -443,7 +446,7 @@ function CombatButton({ oppName, oppAvatar, onClick }: {
           className="flex flex-col items-start leading-tight text-white"
           style={{ fontFamily: "var(--font-headline)", textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}
         >
-          <span className="text-[10px] uppercase tracking-[0.25em] opacity-80">Combattre</span>
+          <span className="text-[10px] uppercase tracking-[0.25em] opacity-80">{t("bracket.fight")}</span>
           <span className="text-lg font-extrabold" style={{ letterSpacing: "0.04em" }}>
             {oppName.toUpperCase()}
           </span>

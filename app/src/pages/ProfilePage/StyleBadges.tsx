@@ -4,6 +4,7 @@ import { PremiumBadge } from "../../ui/PremiumBadge";
 /** Pastille « LIVE » : fond animé en temps réel. `inline` = version
  *  statique pour la légende (sinon positionnée en absolu sur la vignette). */
 export function LiveChip({ inline = false }: { inline?: boolean }) {
+  const t = useT();
   return (
     <span
       className={
@@ -12,7 +13,7 @@ export function LiveChip({ inline = false }: { inline?: boolean }) {
       }
     >
       <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" aria-hidden />
-      LIVE
+      {t("profile.badge.live")}
     </span>
   );
 }

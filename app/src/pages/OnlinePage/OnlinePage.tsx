@@ -234,8 +234,8 @@ export function OnlinePage() {
       return Promise.reject(
         new Error(
           serverConfig.mode === "cloud"
-            ? "No cloud server URL set. Open Server settings."
-            : "No LAN server URL set. Open Server settings."
+            ? t("online.err.noCloudUrl")
+            : t("online.err.noLanUrl")
         )
       );
     }
@@ -424,7 +424,7 @@ export function OnlinePage() {
           id: `${prev.matchId || "online"}-${Date.now()}`,
           mode: "online",
           bestOf: prev.bestOf,
-          opponent: { kind: "human", nickname: prev.opponent || "Anonymous" },
+          opponent: { kind: "human", nickname: prev.opponent || t("online.anonymous") },
           scorePlayer:   prev.youAre === "a" ? msg.score_a : msg.score_b,
           scoreOpponent: prev.youAre === "a" ? msg.score_b : msg.score_a,
           outcome,
@@ -559,7 +559,7 @@ export function OnlinePage() {
             id: `${lm.matchId || "lanes"}-${Date.now()}`,
             mode: "constellation",
             bestOf: lm.winTo,
-            opponent: { kind: "human", nickname: lm.opponent || "Anonymous" },
+            opponent: { kind: "human", nickname: lm.opponent || t("online.anonymous") },
             scorePlayer: winsYou,
             scoreOpponent: winsOpp,
             outcome,
@@ -608,10 +608,7 @@ export function OnlinePage() {
   /* ── Actions ── */
   function handleConnectError(e: unknown) {
     const reason = e instanceof Error ? e.message : String(e);
-    setErrMsg(
-      `Couldn't reach the server.\n${reason}\n\n` +
-        `→ The free cloud instance may be asleep — the first try can take up to ~90s to wake it. Give it a moment and retry.`
-    );
+    setErrMsg(t("online.err.unreachable", { reason }));
     setPhase("error");
   }
 
@@ -1020,9 +1017,9 @@ export function OnlinePage() {
               animate={{ opacity: [0.3, 1, 0.3] }}
               transition={{ duration: 1, repeat: Infinity }}
             />
-            <span className="font-semibold">Reconnecting…</span>
+            <span className="font-semibold">{t("online.reconnecting")}</span>
             <span className="text-amber-300/70">
-              your connection blinked — we're getting back online
+              {t("online.reconnecting.sub")}
             </span>
           </motion.div>
         )}
@@ -1053,8 +1050,8 @@ export function OnlinePage() {
             key="wait"
             label={
               connStatus === "waking" && serverConfig.mode === "cloud"
-                ? "Waking up free server (up to ~90s, only on first connect)…"
-                : "Connecting…"
+                ? t("online.waking")
+                : t("online.connecting")
             }
             onCancel={cancel}
           />
@@ -1068,17 +1065,17 @@ export function OnlinePage() {
             exit={{ opacity: 0 }}
             className="flex flex-col items-center gap-4 py-10"
           >
-            <div className="text-sm text-zinc-400">Share this code with a friend</div>
+            <div className="text-sm text-zinc-400">{t("online.lobby.share")}</div>
             <div className="text-5xl sm:text-6xl font-black tracking-[0.4em] font-mono text-themed">
               {lobbyCode}
             </div>
-            <div className="text-xs text-zinc-500">Best of {bestOf} · waiting…</div>
+            <div className="text-xs text-zinc-500">{t("online.lobby.waiting", { n: bestOf })}</div>
             <DotPulse />
             <button
               onClick={cancel}
               className="mt-4 px-5 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-200 text-sm transition"
             >
-              Cancel
+              {t("online.cancel")}
             </button>
           </motion.div>
         )}
@@ -1139,7 +1136,7 @@ export function OnlinePage() {
                 />
               )}
               {phase === "matched" && !showMatchFoundSplash && (
-                <div className="text-zinc-400 text-sm">Preparing round 1…</div>
+                <div className="text-zinc-400 text-sm">{t("online.preparing")}</div>
               )}
             </div>
 
@@ -1164,8 +1161,8 @@ export function OnlinePage() {
                     <span className="inline-block w-3 h-3 rounded-full border-2 border-white/30 border-t-white/80 animate-spin" />
                     <span className={oppWaitLevel >= 2 ? "text-rose-200" : "text-zinc-300"}>
                       {oppWaitLevel >= 2
-                        ? "Adversaire probablement déconnecté"
-                        : "L'adversaire prend son temps…"}
+                        ? t("online.oppWait.dropped")
+                        : t("online.oppWait.slow")}
                     </span>
                   </div>
                   {oppWaitLevel >= 2 && (
@@ -1173,7 +1170,7 @@ export function OnlinePage() {
                       onClick={leaveMatch}
                       className="px-4 py-1.5 rounded-xl bg-rose-500/25 hover:bg-rose-500/40 border border-rose-400/50 text-rose-100 text-[11px] font-bold transition"
                     >
-                      Quitter le match
+                      {t("online.oppWait.leave")}
                     </button>
                   )}
                 </motion.div>
@@ -1184,7 +1181,7 @@ export function OnlinePage() {
               onClick={() => setQuitOpen(true)}
               className="mt-2 self-center px-4 py-2 rounded-xl bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-500/40 text-zinc-400 hover:text-rose-200 text-xs transition"
             >
-              🏳️ Forfeit match
+              {t("online.forfeit")}
             </button>
             <OnlineMatchGuard onQuitRequest={() => setQuitOpen(true)} />
             <AnimatePresence>
@@ -1224,11 +1221,11 @@ export function OnlinePage() {
           >
             <MatchPrepScreen
               key={`lanes-prep-${lanesMatch.matchId}`}
-              youName={player.nickname || "Toi"}
+              youName={player.nickname || t("online.you")}
               youAvatar={player.avatar}
               youThemeId={player.themeId}
               youBackgroundId={player.backgroundId ?? "default"}
-              oppName={lanesMatch.opponent || "Adversaire"}
+              oppName={lanesMatch.opponent || t("online.opponent")}
               // No avatar exchange in the protocol yet — use a placeholder
               // glyph; the persona theme + bg already gives a distinct look.
               oppAvatar="🛡️"
@@ -1321,7 +1318,7 @@ export function OnlinePage() {
             className="flex-1 flex flex-col min-h-0"
           >
             <div className="mb-2 self-center px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-200 text-[11px] font-semibold">
-              🤖 Aucun joueur trouvé — match d'entraînement
+              {t("online.botFallback")}
             </div>
             <LocalLanesGame winTo={lanesWinTo} onQuit={backToMenu} />
           </motion.div>
@@ -1337,13 +1334,13 @@ export function OnlinePage() {
           >
             <div className="text-4xl">⚠️</div>
             <pre className="text-rose-200/90 text-xs sm:text-sm whitespace-pre-wrap text-center max-w-prose font-sans leading-relaxed">
-              {errMsg || "Something went wrong."}
+              {errMsg || t("online.err.generic")}
             </pre>
             <button
               onClick={backToMenu}
               className="mt-2 px-5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm transition"
             >
-              Back to menu
+              {t("online.backToMenu")}
             </button>
           </motion.div>
         )}

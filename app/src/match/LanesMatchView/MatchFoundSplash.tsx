@@ -33,7 +33,7 @@ export function MatchFoundSplash({
           transition={{ duration: 0.9, delay: 0.4 }}
           className="text-5xl sm:text-7xl font-black bg-gradient-to-br from-amber-300 to-rose-400 bg-clip-text text-transparent"
         >
-          VS
+          {t("match.vs")}
         </motion.div>
         <NameTag name={opp} accent="rose" align="left" />
       </motion.div>
@@ -43,7 +43,7 @@ export function MatchFoundSplash({
         transition={{ delay: 0.9 }}
         className="mt-8 text-sm uppercase tracking-[0.3em] text-ink-muted text-center px-4"
       >
-        {t("lanes.matchFoundSub", { lanes, winTo })}
+        {t(winTo > 1 ? "lanes.matchFoundSub" : "lanes.matchFoundSubOne", { lanes, winTo })}
       </motion.div>
     </motion.div>
   );
@@ -66,7 +66,7 @@ function NameTag({
           " bg-clip-text text-transparent"
         }
       >
-        {name || "Anonymous"}
+        {name || t("match.anonymous")}
       </div>
     </div>
   );

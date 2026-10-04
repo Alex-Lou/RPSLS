@@ -3,17 +3,17 @@ import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
 import { MODE_META } from "../types";
 import type { MatchRecord, RecordMode, Outcome } from "../types";
-import { MOVE_META, AI_MOOD_META } from "../engine/game";
+import { AI_MOOD_META } from "../engine/game";
 import { useT } from "../i18n";
 
 const FILTERS: Array<{ id: "all" | RecordMode; label: string }> = [
-  { id: "all",           label: "All" },
-  { id: "online",        label: "Online" },
-  { id: "constellation", label: "Constellation" },
-  { id: "casual",        label: "Casual" },
-  { id: "ranked",        label: "Ranked" },
-  { id: "training",      label: "Training" },
-  { id: "hotseat",       label: "Hot-seat" },
+  { id: "all",           label: "history.filter.all" },
+  { id: "online",        label: "mode.online" },
+  { id: "constellation", label: "mode.constellation" },
+  { id: "casual",        label: "mode.casual" },
+  { id: "ranked",        label: "mode.ranked" },
+  { id: "training",      label: "mode.training" },
+  { id: "hotseat",       label: "mode.hotseat" },
 ];
 
 export function HistoryPage() {
@@ -33,7 +33,7 @@ export function HistoryPage() {
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="font-headline text-3xl font-extrabold tracking-tight">{t("nav.history")}</h1>
-        <span className="text-sm text-ink-faint">{history.length} match{history.length === 1 ? "" : "es"}</span>
+        <span className="text-sm text-ink-faint">{t(history.length === 1 ? "history.count.one" : "history.count.many", { n: history.length })}</span>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -48,15 +48,15 @@ export function HistoryPage() {
                 : "bg-hairline border-hairline text-ink-muted hover:text-white hover:border-white/30")
             }
           >
-            {f.label}
+            {t(f.label)}
           </button>
         ))}
       </div>
 
       {filtered.length === 0 ? (
         <div className="bg-surface border border-hairline rounded-3xl p-10 text-center">
-          <p className="text-ink-muted">No matches yet.</p>
-          <p className="text-xs text-ink-faint mt-1">Play your first round to see it here.</p>
+          <p className="text-ink-muted">{t("history.empty")}</p>
+          <p className="text-xs text-ink-faint mt-1">{t("history.empty.subtitle")}</p>
         </div>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -85,10 +85,11 @@ export function HistoryPage() {
 function Row({
   match, isOpen, onToggle,
 }: { match: MatchRecord; isOpen: boolean; onToggle: () => void }) {
+  const t = useT();
   const outcomeColor = outcomeClass(match.outcome);
   const oppLabel =
     match.opponent.kind === "cpu"
-      ? `CPU ${AI_MOOD_META[match.opponent.mood].emoji}`
+      ? `${t("match.cpu")} ${AI_MOOD_META[match.opponent.mood].emoji}`
       : match.opponent.nickname;
 
   return (
@@ -107,20 +108,20 @@ function Row({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className={"text-sm font-bold uppercase tracking-wider " + outcomeColor.text}>
-              {match.outcome}
+              {t(`history.outcome.${match.outcome}`)}
             </span>
             {match.forfeit && (
               <span
                 className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 flex items-center gap-0.5"
-                title="Forfeit — match abandoned mid-way"
+                title={t("history.forfeit.title")}
               >
-                🏳️ Forfeit
+                🏳️ {t("history.forfeit")}
               </span>
             )}
             <span className="text-ink-faint text-xs">·</span>
-            <span className="text-xs text-ink-muted">{MODE_META[match.mode].label}</span>
+            <span className="text-xs text-ink-muted">{t(`mode.${match.mode}`)}</span>
             <span className="text-ink-faint text-xs">·</span>
-            <span className="text-xs text-ink-muted">vs {oppLabel}</span>
+            <span className="text-xs text-ink-muted">{t("history.vs")} {oppLabel}</span>
             {/* VOIE jouée (Constellation Pro) — Alex 2026-06-13 « voies jouées
              *  dans l'historique ». N'apparaît que pour les matchs Arena. */}
             {match.playerVoie && (
@@ -128,15 +129,15 @@ function Row({
                 <span className="text-ink-faint text-xs">·</span>
                 <span
                   className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-200"
-                  title={match.oppVoie ? `Ta Voie : ${MOVE_META[match.playerVoie].label} — adv : ${MOVE_META[match.oppVoie].label}` : "Voie jouée"}
+                  title={match.oppVoie ? t("history.voie.vs", { you: t(`element.${match.playerVoie}`), opp: t(`element.${match.oppVoie}`) }) : t("history.voie.played")}
                 >
-                  ✦ {MOVE_META[match.playerVoie].label}
+                  ✦ {t(`element.${match.playerVoie}`)}
                 </span>
               </>
             )}
           </div>
           <div className="text-xs text-ink-faint mt-0.5">
-            {match.scorePlayer} — {match.scoreOpponent} · BO{match.bestOf} · {ago(match.timestamp)}
+            {match.scorePlayer} — {match.scoreOpponent} · {t("history.bo", { n: match.bestOf })} · {ago(t, match.timestamp)}
           </div>
         </div>
 
@@ -154,7 +155,7 @@ function Row({
               "text-xs font-semibold px-2 py-0.5 rounded-full " +
               (match.lpDelta > 0 ? "bg-rose-500/20 text-rose-300" : "bg-rose-500/30 text-rose-200")
             }>
-              {match.lpDelta > 0 ? "+" : ""}{match.lpDelta} LP
+              {match.lpDelta > 0 ? "+" : ""}{match.lpDelta} {t("sidebar.lp")}
             </span>
           )}
         </div>
@@ -179,16 +180,16 @@ function Row({
                   key={i}
                   className="flex items-center gap-3 text-sm bg-hairline rounded-xl px-3 py-2"
                 >
-                  <span className="text-xs text-ink-faint w-8">R{i + 1}</span>
+                  <span className="text-xs text-ink-faint w-8">{t("history.round", { n: i + 1 })}</span>
                   <span className="capitalize flex-1 text-ink">
-                    {MOVE_META[r.playerMove].label}
+                    {t(`element.${r.playerMove}`)}
                   </span>
-                  <span className="text-xs text-ink-faint italic">vs</span>
+                  <span className="text-xs text-ink-faint italic">{t("history.vs")}</span>
                   <span className="capitalize flex-1 text-right text-ink">
-                    {MOVE_META[r.opponentMove].label}
+                    {t(`element.${r.opponentMove}`)}
                   </span>
                   <span className={"text-xs font-bold uppercase " + outcomeClass(r.result).text}>
-                    {r.result}
+                    {t(`history.outcome.${r.result}`)}
                   </span>
                 </div>
               ))}
@@ -208,10 +209,10 @@ function outcomeClass(o: Outcome) {
     : { bg: "bg-zinc-500/20",    text: "text-ink-muted" };
 }
 
-function ago(t: number): string {
-  const s = Math.floor((Date.now() - t) / 1000);
-  if (s < 60)        return `${s}s ago`;
-  if (s < 3600)      return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400)     return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
+function ago(t: (key: string, params?: Record<string, string | number>) => string, ts: number): string {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60)        return t("history.ago.s", { n: s });
+  if (s < 3600)      return t("history.ago.m", { n: Math.floor(s / 60) });
+  if (s < 86400)     return t("history.ago.h", { n: Math.floor(s / 3600) });
+  return t("history.ago.d", { n: Math.floor(s / 86400) });
 }

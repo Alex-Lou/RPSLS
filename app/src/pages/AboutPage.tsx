@@ -82,7 +82,7 @@ export function AboutPage() {
       </ul>
 
       <p className="text-center text-[10px] text-zinc-600 mt-2">
-        RPSLS · v0.1 · built with Tauri + React
+        {t("about.footer")}
       </p>
     </motion.div>
   );
