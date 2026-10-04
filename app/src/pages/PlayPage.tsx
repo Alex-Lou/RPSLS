@@ -24,6 +24,7 @@ import { Game } from "./play/PlayGame";
 import { ModeSelect, SandboxView, ConstellationLobby, ClasseLobby } from "./play/PlayMenu";
 import { setOnlineIntent } from "../online/onlineIntent";
 import { consumePlayReturnView } from "../online/playReturnView";
+import { backPromptActive } from "../match/sharedMatchUI/androidBack";
 
 type View =
   | { kind: "select" }
@@ -86,7 +87,11 @@ export function PlayPage({
   useEffect(() => {
     if (view.kind === "select") return;
     history.pushState({ rpslsView: view.kind }, "");
-    const onPop = () => setView({ kind: "select" });
+    const onPop = () => {
+      // Un match / lobby gère le retour lui-même (modale de confirmation).
+      if (backPromptActive()) return;
+      setView({ kind: "select" });
+    };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, [view.kind]);

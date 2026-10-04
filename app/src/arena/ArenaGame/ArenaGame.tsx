@@ -18,7 +18,7 @@
 import { type MutableRefObject, useEffect, useRef, useState } from "react";
 import {
   hapticLock, hapticMatchStart, hapticMatchWin, hapticMatchLoss,
-  hapticTap, hapticWin, hapticLoss,
+  hapticTap,
 } from "../../haptic";
 import { useStore } from "../../store/store";
 import { CARDS } from "../../ranked/cards";
@@ -363,7 +363,12 @@ export function ArenaGame({
     hapticTap();
   }
   // Fermeture (« C'est parti ! ») : le CPU mulligan UNE fois, puis on ferme.
+  // Double tap sur « C'est parti ! » pendant l'animation de sortie de la
+  // modale (encore cliquable) : le CPU mulliganait DEUX fois.
+  const mulliganDoneRef = useRef(false);
   function handleMulliganClose() {
+    if (mulliganDoneRef.current) return;
+    mulliganDoneRef.current = true;
     setBoard((cur) => ({ ...cur, [oppSide]: mulliganSwap(cur[oppSide], cpuMulliganIndices(cur[oppSide]), rngPair.current[oppSide]) }));
     setMulliganOpen(false);
   }
@@ -706,9 +711,10 @@ export function ArenaGame({
         setResolving(false);
         setBoard((cur) => advanceToNextTurn(cur, rngPair.current));
       },
-      onMatchEnd: (winnerIsPlayer) => {
+      // Vibration de fin : UNE seule, dans l'effet de fin de match (perspective
+      // mySide). Ici elle doublait la vibration.
+      onMatchEnd: () => {
         setResolving(false);
-        if (winnerIsPlayer) hapticWin(); else hapticLoss();
       },
       onLaneResolved: (o) => turnRec.lane(o),
     });
@@ -720,21 +726,41 @@ export function ArenaGame({
     return <ArenaMatchSplash playerName={player.nickname || "Toi"} playerAvatar={player.avatar} cpuName={oppName} cpuAvatar={oppAvatar} />;
   }
 
+  // Sortie du match (burger / retour Android) : montée AUSSI en mort subite,
+  // sinon backRef restait null et « Quitter » ne faisait rien.
+  const backButton = (
+    <FloatingMatchBackButton
+      ref={backRef}
+      onClick={handleForfeit}
+      label={t("match.quit")}
+      hidden
+      confirm={{
+        title: t("match.quitConfirm"),
+        body: t("arena.quit.body"),
+        confirmLabel: t("arena.quit.confirm"),
+        cancelLabel: t("arena.quit.cancel"),
+        severity: "danger",
+      }}
+    />
+  );
+
   if (board.phase === "sudden-death") {
     // Round 10 VRAI BUT D'OR — Mort subite RPSLS. Le component gère le picker
     // + reveal + counter check. Quand résolu, assigne 1 HP au winner et flip
     // la phase à match-end pour que ArenaMatchEnd affiche le résultat propre.
     return (
+      <>
+      {backButton}
       <ArenaSuddenDeath
         onResolved={(winner) => {
           endReasonRef.current = "suddendeath"; // télémétrie : fin par mort subite
           const nextBoard: BoardState = winner === "a"
             ? { ...board, a: { ...board.a, hp: 1 }, b: { ...board.b, hp: 0 }, phase: "match-end" }
             : { ...board, a: { ...board.a, hp: 0 }, b: { ...board.b, hp: 1 }, phase: "match-end" };
-          setBoard(nextBoard);
-          if (winner === "a") hapticMatchWin(); else hapticMatchLoss();
+          setBoard(nextBoard); // vibration de fin : effet de fin de match (une seule)
         }}
       />
+      </>
     );
   }
 
@@ -742,8 +768,11 @@ export function ArenaGame({
     return (
       <ArenaMatchEnd
         board={board}
+        mySide={mySide}
         onQuit={onQuit}
-        onRematch={() => {
+        // En ligne : pas de « Rejouer » (session close → le soft-reset local
+        // lançait un faux match qui se bloquait au 1er tour).
+        onRematch={online ? undefined : () => {
           resolverCancelRef.current?.(); // coupe toute chaîne résiduelle (anti double-pilotage)
           // Bubble up to ArenaPage so a FRESH coin flip + new theme + new
           // CPU persona is picked for the rematch (Alex: "rematch doit refaire
@@ -751,6 +780,7 @@ export function ArenaGame({
           // handler, fall back to a local soft-reset.
           if (onRematch) { onRematch(); return; }
           matchEndedRef.current = false;
+          mulliganDoneRef.current = false;
           setMulliganOpen(true);
           setMulliganSwapsLeft(2);
           rngPair.current = makeRngPair(randomSeed()); // graine FRAÎCHE par match (comme le shared_seed online)
@@ -792,19 +822,7 @@ export function ArenaGame({
        *  garde son imperative handle (triggerConfirm) et le confirm modal. Le
        *  drawer burger expose la sortie via matchExitStore (Alex 2026-06-11
        *  "DANS le burger, pas 2 boutons HUD"). */}
-      <FloatingMatchBackButton
-        ref={backRef}
-        onClick={handleForfeit}
-        label="Quitter le match"
-        hidden
-        confirm={{
-          title: "Abandonner le match ?",
-          body: "C'est compté comme une défaite dans tes stats Constellation Pro. Tu peux toujours rejouer juste après.",
-          confirmLabel: "Forfait",
-          cancelLabel: "Continuer",
-          severity: "danger",
-        }}
-      />
+      {backButton}
       {/* Round 16 : DEUX exigences Alex — (1) moves/deck PAS rétrécis → la plan
        *  phase est DEHORS du slot mesuré (jamais scalée). (2) CADRE du pad plus
        *  haut, cartes INCHANGÉES, espace au centre → BoardFillSlot mesure la

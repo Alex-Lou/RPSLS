@@ -46,13 +46,20 @@ export function ArenaHandFanout({
         for (const sp of intent.spells) {
           queuedById.set(sp.id, (queuedById.get(sp.id) ?? 0) + 1);
         }
-        const visibleHand: Array<{ id: CardId; i: number }> = [];
+        // `key` STABLE = id + n° d'exemplaire (1re, 2e copie…). L'ancienne clé
+        // `${id}-${index}` changeait pour toutes les cartes à droite d'une carte
+        // jouée → elles étaient REMONTÉES et rejouaient l'anim de pioche au lieu
+        // de simplement se resserrer.
+        const visibleHand: Array<{ id: CardId; key: string }> = [];
         const skipLeft = new Map(queuedById);
+        const seen = new Map<CardId, number>();
         for (let i = 0; i < me.hand.length; i++) {
           const id = me.hand[i];
           const left = skipLeft.get(id) ?? 0;
           if (left > 0) { skipLeft.set(id, left - 1); continue; }
-          visibleHand.push({ id, i });
+          const copy = seen.get(id) ?? 0;
+          seen.set(id, copy + 1);
+          visibleHand.push({ id, key: `${id}#${copy}` });
         }
         return visibleHand.length > 0 ? (
         // Alex feedback : "pas dispo le slide" → ajout de touchAction
@@ -74,7 +81,7 @@ export function ArenaHandFanout({
           className="h-full flex items-end justify-center gap-0.5 px-1 pb-0.5 w-full"
         >
           <AnimatePresence>
-          {visibleHand.map(({ id, i }, pos) => {
+          {visibleHand.map(({ id, key }, pos) => {
             const card = CARDS[id];
             const supported = arenaSupported(id);
             const cannotAfford = manaLeft < arenaSpellCost(me, id);
@@ -106,7 +113,7 @@ export function ArenaHandFanout({
             const overlap = n > 6 ? 12 : n > 4 ? 8 : 5;
             return (
               <motion.div
-                key={`${id}-${i}`}
+                key={key}
                 layout
                 // PIOCHE animée (Alex 2026-06-13) : la carte GLISSE depuis la
                 // droite (le deck) avec une rotation, au lieu d'apparaître.

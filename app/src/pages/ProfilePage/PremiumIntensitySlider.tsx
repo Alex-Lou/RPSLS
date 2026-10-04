@@ -1,4 +1,5 @@
 import { useIntensityValue } from "./useIntensityValue";
+import { useT } from "../../i18n";
 
 /**
  * PremiumIntensitySlider — discreet "thermometer" slider that adjusts the
@@ -16,6 +17,7 @@ export function PremiumIntensitySlider({ setId, label, accent }: {
   accent: { from: string; to: string } | null;
 }) {
   const [intensity, setValue] = useIntensityValue(setId);
+  const t = useT();
   // Range widened to [0.1, 2.0] — Alex flagged that at the previous min
   // (0.4) the rain was still pouring. 0.1 = barely-there sprinkle, 2.0 =
   // a downpour you can't look away from. 1.0 stays the "shipping look".
@@ -29,7 +31,7 @@ export function PremiumIntensitySlider({ setId, label, accent }: {
     <section className="bg-surface border border-hairline rounded-3xl p-4 sm:p-5">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-muted">
-          Intensité — {label}
+          {t("premium.intensity")} — {label}
         </h2>
         <span
           className="text-xs font-black tabular-nums px-2 py-0.5 rounded-full"
@@ -88,7 +90,7 @@ export function PremiumIntensitySlider({ setId, label, accent }: {
                      [&::-moz-range-thumb]:rounded-full
                      [&::-moz-range-thumb]:bg-white
                      [&::-moz-range-thumb]:border-0"
-          aria-label="Intensité des effets premium"
+          aria-label={t("premium.intensityAria")}
         />
       </div>
       <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-ink-faint mt-1.5">

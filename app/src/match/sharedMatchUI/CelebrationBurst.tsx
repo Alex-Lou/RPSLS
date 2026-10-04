@@ -44,11 +44,14 @@ export function CelebrationBurst({ variant = "default" }: { variant?: "default" 
       {pieces.map((p, i) => (
         <motion.span
           key={i}
-          initial={{ top: "-8%", opacity: 0, rotate: 0 }}
-          animate={{ top: "110%", x: p.drift, opacity: [0, 1, 1, 0.9, 0], rotate: p.rot }}
+          // Chute en `y` (transform, composité GPU) et non plus en `top` : des
+          // dizaines de confettis recalculaient la mise en page à chaque image.
+          initial={{ y: "-8vh", opacity: 0, rotate: 0 }}
+          animate={{ y: "110vh", x: p.drift, opacity: [0, 1, 1, 0.9, 0], rotate: p.rot }}
           transition={{ duration: p.dur, delay: 0.12 + p.delay, ease: [0.25, 0.1, 0.5, 1] }}
           className="absolute block"
           style={{
+            top: 0,
             left: `${p.x}%`,
             width: p.w,
             height: p.h,

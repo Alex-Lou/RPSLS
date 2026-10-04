@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { BurstCanvas } from "../../fx/LevelUpOverlay";
 import { CARDS } from "../../ranked/cards";
@@ -47,8 +47,12 @@ export function PackOpeningModal({
       return next;
     });
   }
+  // Le bouton « Tout révéler » devient « Terminer » au même endroit : un
+  // double tap fermait le pack avant que le joueur voie ses cartes.
+  const revealedAtRef = useRef(0);
   function revealAll() {
     if (allRevealed) return;
+    revealedAtRef.current = Date.now();
     hapticMatchWin();
     setRevealed(result.cards.map(() => true));
   }
@@ -85,14 +89,14 @@ export function PackOpeningModal({
         <div className="text-center">
           <div className="text-3xl mb-1">🎉</div>
           <h2 className="text-lg font-black bg-gradient-to-br from-amber-300 to-orange-400 bg-clip-text text-transparent">
-            Pack ouvert
+            {t("shop.pack.opened")}
           </h2>
           <p className="text-[11px] text-ink-muted mt-1">
             {allRevealed
               ? result.dustGained > 0
-                ? <>Doublons → <span className="text-violet-300 font-bold">+{result.dustGained} ✨</span></>
-                : "Tu as ouvert ton pack."
-              : "Touche chaque carte pour la révéler"}
+                ? <>{t("shop.pack.dupes")} → <span className="text-violet-300 font-bold">+{result.dustGained} ✨</span></>
+                : t("shop.pack.openedSub")
+              : t("shop.pack.tapToReveal")}
           </p>
         </div>
 
@@ -113,13 +117,15 @@ export function PackOpeningModal({
             comportements selon l'état du flip. */}
         <motion.button
           whileTap={{ scale: 0.97 }}
-          onClick={allRevealed ? onClose : revealAll}
+          onClick={allRevealed
+            ? () => { if (Date.now() - revealedAtRef.current > 500) onClose(); }
+            : revealAll}
           className={
             "w-full py-3 rounded-2xl font-bold text-white shadow-lg transition " +
             (allRevealed ? "bg-themed" : "bg-violet-500/40 hover:bg-violet-500/60 border border-violet-400/50")
           }
         >
-          {allRevealed ? "Terminer" : "Tout révéler"}
+          {allRevealed ? t("shop.pack.done") : t("shop.pack.revealAll")}
         </motion.button>
       </motion.div>
     </motion.div>

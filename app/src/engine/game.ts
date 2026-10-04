@@ -24,7 +24,13 @@ export interface RoundResult {
 }
 
 export async function resolveRound(a: Move, b: Move): Promise<RoundResult> {
-  return invoke<RoundResult>("resolve_round", { a, b });
+  try {
+    return await invoke<RoundResult>("resolve_round", { a, b });
+  } catch {
+    // Pont Tauri indisponible / en erreur : même règle, calculée en local.
+    // Sans ce repli, la partie restait bloquée sur le compte à rebours.
+    return localResolve(a, b);
+  }
 }
 
 /** RPSLS verbs, indexed VERBS[winner][loser]. Mirrors the Rust canon. */

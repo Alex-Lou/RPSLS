@@ -11,6 +11,15 @@ import { useNoMenuFx } from "../../fx/menuFx";
  * `onBack` is wrapped in a ref internally so passing a fresh closure every
  * render doesn't re-register the listener.
  */
+/** Nombre d'écrans qui gèrent EUX-MÊMES le retour (match, lobby…). Tant qu'il
+ *  est > 0, les écouteurs `popstate` de navigation (App, PlayPage) doivent
+ *  s'abstenir : sinon un appui sur retour démontait le match AVANT la modale
+ *  de confirmation → sortie sans forfait ni abandon enregistré. */
+let backPromptCount = 0;
+export function backPromptActive(): boolean {
+  return backPromptCount > 0;
+}
+
 export function useAndroidBackPrompt(onBack: () => void) {
   // A match/game surface is mounted → silence the playful menu touch particles.
   useNoMenuFx();
@@ -24,7 +33,11 @@ export function useAndroidBackPrompt(onBack: () => void) {
       cbRef.current();
     };
     window.addEventListener("popstate", handler);
-    return () => window.removeEventListener("popstate", handler);
+    backPromptCount++;
+    return () => {
+      backPromptCount = Math.max(0, backPromptCount - 1);
+      window.removeEventListener("popstate", handler);
+    };
   }, []);
 }
 

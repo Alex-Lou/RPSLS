@@ -12,6 +12,7 @@ import "./theme/fonts";
 // Side-effect: registers the native Google sign-in provider when a
 // VITE_GOOGLE_CLIENT_ID is configured (otherwise no-op → Google button hidden).
 import "./online/googleProvider";
+import { MotionConfig } from "motion/react";
 
 // Boot Sentry as early as possible — before React renders — so it catches
 // any early errors. It is a NO-OP if the user hasn't opted in OR if no
@@ -21,7 +22,11 @@ initSentry(useStore.getState().player.crashReports ?? false);
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <AppErrorBoundary>
-      <App />
+      {/* Respecte « Réduire les animations » du téléphone (accessibilité) :
+          Motion coupe alors les déplacements/zooms, garde les fondus. */}
+      <MotionConfig reducedMotion="user">
+        <App />
+      </MotionConfig>
     </AppErrorBoundary>
   </React.StrictMode>,
 );

@@ -226,6 +226,13 @@ export function Game({
       onQuit();
       return;
     }
+    // Le match est DÉJÀ joué (révélation de la dernière manche) : on montre
+    // l'écran de fin, qui enregistre le vrai résultat. Avant, quitter ici
+    // enregistrait une défaite par forfait même après une victoire.
+    if (phase.kind === "reveal" && phase.matchOver) {
+      setPhase({ kind: "match-end" });
+      return;
+    }
     const tgt = target(match);
     const opponent: Opponent = isHotseat
       ? { kind: "human", nickname: "Guest" }

@@ -42,6 +42,7 @@ const QuestsPage   = lazy(() => import("./pages/QuestsPage").then(m => ({ defaul
 const LeaderboardPage = lazy(() => import("./pages/LeaderboardPage").then(m => ({ default: m.LeaderboardPage })));
 const ShopPage     = lazy(() => import("./pages/ShopPage").then(m => ({ default: m.ShopPage })));
 import { SeasonRolloverModal } from "./ranked/SeasonRolloverModal";
+import { backPromptActive } from "./match/sharedMatchUI/androidBack";
 const PacksPage    = lazy(() => import("./pages/PacksPage").then(m => ({ default: m.PacksPage })));
 const AboutPage    = lazy(() => import("./pages/AboutPage").then(m => ({ default: m.AboutPage })));
 const ContactPage  = lazy(() => import("./pages/ContactPage").then(m => ({ default: m.ContactPage })));
@@ -226,7 +227,11 @@ export default function App() {
     // Push a history entry so that the Android back button (which navigates
     // history backwards in the WebView) brings us to Play instead of closing.
     history.pushState({ rpslsPage: page }, "");
-    const onPop = () => setPage("play");
+    const onPop = () => {
+      // Un match / lobby gère le retour lui-même (modale de confirmation).
+      if (backPromptActive()) return;
+      setPage("play");
+    };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, [page]);
@@ -413,7 +418,10 @@ export default function App() {
                 <AnimatePresence mode="wait">
                   {page === "play"    && <PageWrap key="play"><PlayPage onNavigate={navigateTo} homeNonce={homeNonce} /></PageWrap>}
                   {page !== "play" && (
-                    <Suspense key="lazy-routes" fallback={<RouteFallback />}>
+                    // key={page} : chaque page différée est un enfant DISTINCT de
+                    // AnimatePresence → l'ancienne joue sa sortie (avant : une clé
+                    // fixe, l'ancienne page disparaissait sèchement entre 2 pages lazy).
+                    <Suspense key={`lazy-${page}`} fallback={<RouteFallback />}>
                       {page === "online"  && <PageWrap key="online"><OnlinePage /></PageWrap>}
                       {page === "leaderboard" && <PageWrap key="leaderboard"><LeaderboardPage /></PageWrap>}
                       {page === "shop"    && <PageWrap key="shop"><ShopPage /></PageWrap>}

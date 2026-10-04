@@ -13,6 +13,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { CardImage } from "../ranked/CardImage";
 import type { CardId } from "../ranked/rankedTypes";
+import { useT } from "../i18n";
 
 export function ArenaMulligan({
   hand, swapsLeft, onRejectOne, onClose,
@@ -24,6 +25,7 @@ export function ArenaMulligan({
   onRejectOne: (handIndex: number) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   // Groupe les doublons : une tuile par carte, avec ses indices de main.
   const groups: { id: CardId; indices: number[] }[] = [];
   hand.forEach((id, i) => {
@@ -48,14 +50,14 @@ export function ArenaMulligan({
         className="w-full max-w-sm rounded-3xl border-2 border-amber-400/50 bg-zinc-950/97 p-4 shadow-2xl"
       >
         <div className="text-center mb-3">
-          <div className="text-base font-black text-amber-200 uppercase tracking-wider">🔁 Main de départ</div>
+          <div className="text-base font-black text-amber-200 uppercase tracking-wider">🔁 {t("arena.mull.title")}</div>
           <p className="text-[11.5px] text-ink mt-1.5 leading-snug">
             <b>Tape une carte</b> qui ne te plaît pas (trop chère, inutile contre ta Voie…) : elle est <b>remplacée sur-le-champ</b> par une autre de ton deck.
           </p>
           <p className={"text-[11px] mt-1.5 font-black " + (canReject ? "text-amber-300" : "text-emerald-300")}>
             {canReject
-              ? `${swapsLeft} échange${swapsLeft > 1 ? "s" : ""} restant${swapsLeft > 1 ? "s" : ""}`
-              : "Plus d'échange — prêt !"}
+              ? t(swapsLeft > 1 ? "arena.mull.left" : "arena.mull.leftOne", { n: swapsLeft })
+              : t("arena.mull.none")}
           </p>
         </div>
         <div className="flex items-end justify-center gap-2 flex-wrap mb-4 min-h-[80px]">
@@ -89,7 +91,7 @@ export function ArenaMulligan({
                     </span>
                   )}
                   {canReject && (
-                    <span className="absolute bottom-0 inset-x-0 bg-rose-600/85 text-white text-[8px] font-black text-center py-0.5 tracking-wider">↻ REJETER</span>
+                    <span className="absolute bottom-0 inset-x-0 bg-rose-600/85 text-white text-[8px] font-black text-center py-0.5 tracking-wider">↻ {t("arena.mull.reject")}</span>
                   )}
                 </motion.button>
               );
@@ -101,7 +103,7 @@ export function ArenaMulligan({
           className="w-full py-2.5 rounded-2xl font-black text-sm text-zinc-900 active:scale-95 transition"
           style={{ background: "linear-gradient(135deg, #fde68a, #f59e0b)" }}
         >
-          C'est parti !
+          {t("arena.mull.go")}
         </button>
       </motion.div>
     </motion.div>
