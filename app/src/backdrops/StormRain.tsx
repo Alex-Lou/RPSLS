@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useRef } from "react";
-import { menuFxSuppressed } from "../fx/menuFx";
+import { menuFxSuppressed, onFxGateChange } from "../fx/menuFx";
 import { useStore } from "../store/store";
 import { gfxDensity } from "../graphics/graphicsQuality";
 
@@ -57,7 +57,7 @@ export function StormRain() {
     let xMin = 0, xMax = 0;
 
     const resize = () => {
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      dpr = Math.min(window.devicePixelRatio || 1, 1.5); // 1.5 : comme le fond WebGL, ~45 % de pixels en moins qu'à 2
       w = window.innerWidth; h = window.innerHeight;
       canvas.width = Math.floor(w * dpr); canvas.height = Math.floor(h * dpr);
       canvas.style.width = w + "px"; canvas.style.height = h + "px";
@@ -98,7 +98,9 @@ export function StormRain() {
     }
 
     const frame = () => {
-      if (menuFxSuppressed()) { ctx.clearRect(0, 0, w, h); raf = requestAnimationFrame(frame); return; }
+      // Match / écran sans effets : on efface UNE fois et la boucle s'arrête
+      // (avant : clearRect plein écran à 60 fps pour rien). Relance : onFxGateChange.
+      if (menuFxSuppressed()) { ctx.clearRect(0, 0, w, h); raf = 0; return; }
       ctx.clearRect(0, 0, w, h);
       ctx.lineCap = "round";
       for (const d of drops) {
@@ -113,6 +115,8 @@ export function StormRain() {
           // with the old narrow range (that's what kept the lower-left dry).
           Object.assign(d, makeDrop(false));
         }
+        // Goutte entièrement hors écran (spawn à gauche de 0, cf. xMin) : rien à tracer.
+        if (d.x < 0 || d.y < 0) continue;
         ctx.strokeStyle = `rgba(210,230,245,${d.a})`;
         ctx.lineWidth = d.w;
         ctx.beginPath();
@@ -138,6 +142,9 @@ export function StormRain() {
       if (document.hidden) { if (raf) cancelAnimationFrame(raf); raf = 0; }
       else if (!raf) raf = requestAnimationFrame(frame);
     };
+    const offGate = onFxGateChange(() => {
+      if (!raf && !document.hidden && !menuFxSuppressed()) raf = requestAnimationFrame(frame);
+    });
 
     resize();
     window.addEventListener("resize", resize);
@@ -148,6 +155,7 @@ export function StormRain() {
       if (raf) cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
       document.removeEventListener("visibilitychange", onVis);
+      offGate();
     };
   }, []);
 

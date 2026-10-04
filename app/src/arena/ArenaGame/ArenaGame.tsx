@@ -75,6 +75,7 @@ import { useArenaForge } from "./useArenaForge";
 import { prepareResolveStart } from "./arenaResolvePrep";
 import { recordWatcherMatch, watcherUuid, watcherAppVersion, watcherEnabled, createTurnRecorder, buildTurnPlays, buildCardLedger, type WatcherMatchRecord, type TurnRecorder } from "../arenaTelemetry";
 import { startMatchFps, stopMatchFps } from "../../graphics/fpsSampler";
+import { useMatchSurface } from "../../fx/menuFx";
 
 // Alex feedback 2026-06-09 point #7 : décompte+GO trop rapide. Bumpé de
 // 1800 → 2600ms pour laisser le "GO!" durer un peu et faire monter le
@@ -99,6 +100,7 @@ export function ArenaGame({
    *  intents/mulligan + la déclaration d'issue. Cf. arenaOnlineDriver. */
   online?: ArenaOnlineDriver;
 }) {
+  useMatchSurface();
   const player = useStore((s) => s.player);
   const difficulty = player.difficulty ?? "normal";
   const recordArenaMatch = useStore((s) => s.recordArenaMatch);

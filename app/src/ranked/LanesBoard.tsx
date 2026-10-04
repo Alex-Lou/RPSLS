@@ -17,6 +17,7 @@ import type { CardId, LaneTarget, PlayedCard } from "./rankedTypes";
 import { useT } from "../i18n";
 import { useStore } from "../store/store";
 import { BattlePad } from "../BattlePad";
+import { useGfxAllows } from "../graphics/graphicsQuality";
 
 const IDENTITY_KEYS = [
   "lanes.identity.force",
@@ -79,6 +80,8 @@ export function LanesBoard({
   // The pad is the player's own — unless a coin-flipped arena overrides it
   // for this duel (see ranked/arena.tsx).
   const padId = useArenaPad(useStore((s) => s.player.padId));
+  // Fond de plateau animé seulement en qualité Haute (chauffe en longue partie).
+  const padAnim = useGfxAllows("padAnim");
   return (
     <div
       className={
@@ -93,7 +96,7 @@ export function LanesBoard({
       {/* Battle-pad backdrop — the user-chosen pad IS the visible surface the
           lanes sit on. Fully opaque so the chosen theme actually shows. */}
       <div className="absolute inset-0 pointer-events-none">
-        <BattlePad padId={padId} className="w-full h-full" compact />
+        <BattlePad padId={padId} className="w-full h-full" compact frozen={!padAnim} />
       </div>
       {/* Radial vignette: very dark in the centre (where the lanes sit) so
           busy pad decorations — Cosmos atom orbit, Quantum particle traces,

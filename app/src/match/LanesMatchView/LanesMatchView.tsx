@@ -25,6 +25,7 @@ import { PickStage } from "./PickStage";
 import { LockedStage, RevealCountdown } from "./LockedStage";
 import { RevealStage } from "./RevealStage";
 import { HelpModal } from "./HelpModal";
+import { useMatchSurface } from "../../fx/menuFx";
 
 /* ──────────── Main view ──────────── */
 
@@ -41,6 +42,7 @@ export function LanesMatchView({
   showTimer = true,
   competitive = true,
 }: LanesMatchViewProps & { onRematch?: () => void }) {
+  useMatchSurface();
   const t = useT();
   const recordAbandon = useStore((s) => s.recordAbandon);
   /* The phase is derived from the props — no listener, no race. */

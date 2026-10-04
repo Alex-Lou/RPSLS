@@ -36,6 +36,8 @@ import { RevealPanel } from "./RevealPanel";
 import { AtoutPicker } from "./AtoutPicker";
 import { AtoutBar } from "./AtoutBar";
 import { EndPanel } from "./EndPanel";
+import { useMatchSurface } from "../../../fx/menuFx";
+import { useGfxAllows } from "../../../graphics/graphicsQuality";
 
 type Phase =
   | { kind: "atout-select" }
@@ -66,10 +68,13 @@ export function Game({
   /** Classé 1v1 — enable the pre-match Atout picker + in-match perks. */
   withAtouts?: boolean;
 }) {
+  useMatchSurface();
   const recordMatch = useStore((s) => s.recordMatch);
   const recordDailyComplete = useStore((s) => s.recordDailyComplete);
   const profileNickname = useStore((s) => s.player.nickname);
   const padId = useStore((s) => s.player.padId);
+  // Fond de plateau animé seulement en qualité Haute (chauffe en longue partie).
+  const padAnim = useGfxAllows("padAnim");
   const difficulty = useStore((s) => s.player.difficulty);
   const t = useT();
 
@@ -384,7 +389,7 @@ export function Game({
           {/* compact = suppress the big animated centrepiece (orbiting
               electrons, etc.) so the pad reads as a CALM, stable backdrop
               behind the cards instead of churning during the match. */}
-          <BattlePad padId={padId} className="w-full h-full opacity-90" compact />
+          <BattlePad padId={padId} className="w-full h-full opacity-90" compact frozen={!padAnim} />
           <div
             className="absolute inset-0"
             style={{

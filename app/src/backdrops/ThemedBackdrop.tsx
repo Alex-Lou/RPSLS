@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { menuFxSuppressed } from "../fx/menuFx";
+import { matchActive, menuFxSuppressed, onFxGateChange } from "../fx/menuFx";
 import { useStore } from "../store/store";
 import { FRAG, VERT } from "./shaders";
 
@@ -177,6 +177,10 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
         swipeMag = Math.max(0, swipeMag - dt * 1.2);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
       }
+      // Match en cours : une image dessinée suffit, le fond reste affiché FIGÉ
+      // (le plateau le recouvre) au lieu de tourner à 60 fps toute la partie.
+      // Relancé par onFxGateChange à la sortie du match.
+      if (matchActive() && last > 0) { running = false; return; }
       rafRef.current = requestAnimationFrame(frame);
     };
     const startLoop = () => {
@@ -199,7 +203,10 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
     };
     canvas.addEventListener("webglcontextlost", onLost as EventListener, false);
     canvas.addEventListener("webglcontextrestored", onRestored as EventListener, false);
-    window.addEventListener("resize", resize);
+    // Un redimensionnement efface le canvas : on relance pour redessiner (en
+    // match, `frame` refait une image puis s'arrête).
+    const onResize = () => { resize(); startLoop(); };
+    window.addEventListener("resize", onResize);
 
     // Touch interaction → feed finger position (GL y-up) + press state + swipe
     // magnitude to the shader. Listened on window since the canvas is
@@ -253,17 +260,20 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
 
     const onVis = () => { if (document.hidden) stopLoop(); else startLoop(); };
     document.addEventListener("visibilitychange", onVis);
+    // Sortie de match → l'animation reprend (entrée : `frame` s'arrête seule).
+    const offMatch = onFxGateChange(() => { if (!document.hidden) startLoop(); });
 
     if (buildGL()) startLoop();
 
     return () => {
       stopLoop();
-      window.removeEventListener("resize", resize);
+      window.removeEventListener("resize", onResize);
       window.removeEventListener("pointerdown", onTDown);
       window.removeEventListener("pointermove", onTMove);
       window.removeEventListener("pointerup", onTUp);
       window.removeEventListener("pointercancel", onTUp);
       document.removeEventListener("visibilitychange", onVis);
+      offMatch();
       canvas.removeEventListener("webglcontextlost", onLost as EventListener);
       canvas.removeEventListener("webglcontextrestored", onRestored as EventListener);
       if (gl) {

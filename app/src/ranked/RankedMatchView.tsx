@@ -31,6 +31,7 @@ import type {
   PlayedCard,
   RoundBonusBreakdown,
 } from "./rankedTypes";
+import { useMatchSurface } from "../fx/menuFx";
 
 /* ──────────── Public surface ──────────── */
 
@@ -157,6 +158,7 @@ export function RankedMatchView({
   onPickMove, onClearLane, onPlayCard, onCancelCard, onLock,
   revealAugurFor, onLeave, onRematch, onNext, showTimer = true,
 }: RankedMatchViewProps) {
+  useMatchSurface();
   const t = useT();
   const phase: Phase = (() => {
     if (end) return "match-end";
