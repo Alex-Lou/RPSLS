@@ -135,6 +135,8 @@ const en: Record<string, string> = {
   "arena.mull.go": "Let's go!",
   "premium.intensity": "Intensity",
   "premium.intensityAria": "Premium effects intensity",
+  "settings.fastCombat": "Fast combat",
+  "settings.fastCombatHint": "Shorter pauses between combat steps (Constellation Pro, Ranked). Animations stay complete.",
   "ranked.match.foundKicker": "Ranked Constellation",
   "ranked.match.foundSub": "First to {{winTo}} round-wins · Mana & Cards",
   "ranked.match.bo5": "Best of 5",

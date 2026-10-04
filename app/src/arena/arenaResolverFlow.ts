@@ -84,6 +84,10 @@ export interface ResolverFlowArgs {
    *  égalité parfaite (double KO ou hard-cap à PV égaux) devient un NUL propre
    *  (match-end, les deux à 0). Défaut false → comportement vs-CPU inchangé. */
   noSuddenDeath?: boolean;
+  /** Facteur appliqué aux SEULES pauses de lecture (révélation, invocations,
+   *  fin de tour, victoire) — réglage « combat rapide ». 1 = rythme posé.
+   *  Les durées d'animation (sorts, charges de lane) ne sont jamais réduites. */
+  holdScale?: number;
   setBoard: (b: BoardState) => void;
   setOppPreview: (i: TurnIntent | null) => void;
   setPlayerPreview: (i: TurnIntent | null) => void;
@@ -165,7 +169,7 @@ const VICTORY_REVEAL_MS = 1_600;
  *  observable side-effect. */
 export function runResolverFlow(args: ResolverFlowArgs): () => void {
   const {
-    startBoard, playerIntent, cpuIntent, rng, mySide = "a", noSuddenDeath = false,
+    startBoard, playerIntent, cpuIntent, rng, mySide = "a", noSuddenDeath = false, holdScale = 1,
     setBoard, setOppPreview, setPlayerPreview, setResolveStep,
     setCombatLane, setCombatChargers, setHeroHit, setTauntBlock, setAntiTaunt, setRiposteFX, setSpellFX, setImpactFX, setProjectileFX,
     onSettle, onAdvanceTurn, onMatchEnd, onLaneResolved,
@@ -178,6 +182,8 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
   // vérifié en tête de CHAQUE callback → la chaîne s'arrête net. runResolverFlow
   // renvoie un cancel() que ArenaGame appelle au unmount / forfait.
   let aborted = false;
+  // Pauses de lecture, éventuellement raccourcies (bornées pour rester lisibles).
+  const hold = (ms: number) => Math.round(ms * Math.min(1, Math.max(0.4, holdScale)));
 
   // Le « moment » Légendaire/Finisher est géré PAR CARTE dans la file de
   // spell-spotlight (Step 1) — plus besoin d'un flag global de tour.
@@ -569,7 +575,7 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
               // pas moi. mySide="a" → bDead&&!aDead (inchangé) ; camp B → l'inverse.
               const playerWon = mySide === "a" ? (bDead && !aDead) : (aDead && !bDead);
               onMatchEnd(playerWon);
-            }, VICTORY_REVEAL_MS);
+            }, hold(VICTORY_REVEAL_MS));
           } else {
             setBoard(b);
           }
@@ -589,11 +595,11 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
             // subite était ANNULÉE et le match reprenait comme si de rien.
             if (b.phase === "match-end" || b.phase === "sudden-death") return;
             onAdvanceTurn();
-          }, SETTLE_MS);
+          }, hold(SETTLE_MS));
         }, COMBAT_MS);
-      }, SUMMONS_MS);
+      }, hold(SUMMONS_MS));
     }, spellsPhaseMs);
-  }, REVEAL_MS);
+  }, hold(REVEAL_MS));
 
   return () => { aborted = true; };
 }

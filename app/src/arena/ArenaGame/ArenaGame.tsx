@@ -669,6 +669,8 @@ export function ArenaGame({
     } catch { /* télémétrie fail-soft */ }
 
     resolverCancelRef.current = runResolverFlow({
+      // Réglage « combat rapide » (Profil) : pauses de lecture raccourcies.
+      holdScale: useStore.getState().player.fastCombat ? 0.5 : 1,
       startBoard,
       playerIntent: safeIntent,
       cpuIntent: safeCpuIntent,

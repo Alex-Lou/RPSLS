@@ -233,6 +233,11 @@ export interface Player {
    *  appareil rame malgré de bonnes specs, l'échantillonneur FPS rétrograde ce
    *  palier (persisté → s'applique dès le prochain lancement). Alex 2026-06-20. */
   graphicsMeasured?: "low" | "medium" | "high";
+  /** Combat Arena « rapide » : raccourcit les TEMPS D'ATTENTE entre les étapes
+   *  de résolution (révélation, invocations, fin de tour, écran de victoire) et
+   *  la pause entre deux manches en Classé. Les animations elles-mêmes gardent
+   *  leur durée (rien n'est coupé). Opt-in : défaut = rythme posé (lisibilité). */
+  fastCombat?: boolean;
 }
 
 /** Where a pad shows up in the Profile pad picker's 3-way sub-filter.
