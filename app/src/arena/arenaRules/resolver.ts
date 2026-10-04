@@ -30,7 +30,7 @@ import { makeCreature, endOfTurnReset, gainStrateIfHeld } from "./heroCreature";
 import { drawCards } from "./boardInit";
 import type { CardId } from "../../ranked/rankedTypes";
 import type { Move } from "../../engine/game";
-import type { RngPair } from "../../engine/rng";
+import { randomPair, type RngPair } from "../../engine/rng";
 
 /* ───────────────────────── Resolver ───────────────────────── */
 
@@ -103,6 +103,7 @@ export function truncateIntentByCaps(intent: TurnIntent): TurnIntent {
  *  (documented bias — alternative is random which breaks reproducibility).
  *  Same priority WITHIN a side : original tap order (intent.spells order). */
 export function applyAllSpells(board: BoardState, intentA: TurnIntent, intentB: TurnIntent, rng?: RngPair): BoardState {
+  const r = rng ?? randomPair(); // repli unique (vs-CPU / sims), cf. engine/rng.ts
   // Alex feedback 2026-06-09 v2 : aligné sur les caps UI (ArenaGame.addSpell)
   // — le filet engine truncate selon les mêmes règles que l'UI (cf.
   // truncateIntentByCaps ci-dessus).
@@ -151,7 +152,7 @@ export function applyAllSpells(board: BoardState, intentA: TurnIntent, intentB: 
     // (Larcin, Roue du Destin, Cascade, Reflet-Écho…) tirent de façon déterministe.
     // rngPair = paire complète pour les sorts GLOBAUX (Juge/Genèse : chaque camp
     // pioche de SON flux, pas de celui du lanceur — invariant « un flux par camp »).
-    const ctx: ArenaSpellContext = { board: b, side, spell, rng: side === "a" ? rng?.a : rng?.b, rngPair: rng };
+    const ctx: ArenaSpellContext = { board: b, side, spell, rng: side === "a" ? r.a : r.b, rngPair: r };
     b = applyArenaSpell(ctx);
     // Réverbération (2026-06-12) : on mémorise le dernier sort NON-réverbération
     // appliqué par CE côté ce tour, pour que Réverbération (priorité plus tardive)
@@ -215,6 +216,7 @@ export function applySummons(board: BoardState, intent: TurnIntent, side: Side):
 }
 
 export function endOfTurnCleanup(board: BoardState, rng?: RngPair): BoardState {
+  const r = rng ?? randomPair(); // repli unique (vs-CPU / sims), cf. engine/rng.ts
   // STRATES (Voie Montagne) appliquées APRÈS le reset, en passant le
   // summonedThisTurn ORIGINAL (avant reset) → une Pierre ne gagne pas de Strate
   // le tour de son arrivée, seulement après avoir TENU un tour. Cf. gainStrateIfHeld.
@@ -288,11 +290,11 @@ export function endOfTurnCleanup(board: BoardState, rng?: RngPair): BoardState {
   let aHero = engines.a;
   let bHero = engines.b;
   if (aHero.sillageActive && board.a.sillageDodgedThisTurn) {
-    aHero = drawCards(aHero, 1, rng?.a);
+    aHero = drawCards(aHero, 1, r.a);
     alog("turn", `a 🌀 SILLAGE SPECTRAL → esquive ce tour = pioche 1`);
   }
   if (bHero.sillageActive && board.b.sillageDodgedThisTurn) {
-    bHero = drawCards(bHero, 1, rng?.b);
+    bHero = drawCards(bHero, 1, r.b);
     alog("turn", `b 🌀 SILLAGE SPECTRAL → esquive ce tour = pioche 1`);
   }
   // Reset des flags PER-TOUR : Mirage (Sillage esquive + Nuée imblocable) + Montagne

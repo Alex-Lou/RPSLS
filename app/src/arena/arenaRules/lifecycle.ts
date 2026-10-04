@@ -10,7 +10,7 @@ import {
 } from "../arenaTypes";
 import { creatureEffectiveAtk } from "./heroCreature";
 import { drawCards } from "./boardInit";
-import type { RngPair } from "../../engine/rng";
+import { randomPair, type RngPair } from "../../engine/rng";
 
 /* ───────────────────────── Turn lifecycle ───────────────────────── */
 
@@ -18,6 +18,7 @@ import type { RngPair } from "../../engine/rng";
  *  mana refreshes to maxMana, each hero draws 1 card. Clears any per-turn
  *  reveal state (Augur, etc.). */
 export function advanceToNextTurn(board: BoardState, rng?: RngPair): BoardState {
+  const r = rng ?? randomPair(); // repli unique (vs-CPU / sims), cf. engine/rng.ts
   const nextTurn = board.turn + 1;
   alogSetTurn(nextTurn);
   alog("turn", `=== Tour ${nextTurn} === a.hp=${board.a.hp} b.hp=${board.b.hp}`);
@@ -93,10 +94,10 @@ export function advanceToNextTurn(board: BoardState, rng?: RngPair): BoardState 
   // Filet de sécurité (Alex 2026-06-11) : si après la pioche la main est VIDE,
   // on pioche 1 de plus — MAIS seulement HORS ouverture (capNext>0), sinon le
   // filet forcerait une carte pendant les T1-3 « invocations seulement ».
-  const drawnA = drawCards(heroAVerger, drawA, rng?.a);
-  const safeA = capNext > 0 && drawnA.hand.length === 0 ? drawCards(drawnA, 1, rng?.a) : drawnA;
-  const drawnB = drawCards(heroBVerger, drawB, rng?.b);
-  const safeB = capNext > 0 && drawnB.hand.length === 0 ? drawCards(drawnB, 1, rng?.b) : drawnB;
+  const drawnA = drawCards(heroAVerger, drawA, r.a);
+  const safeA = capNext > 0 && drawnA.hand.length === 0 ? drawCards(drawnA, 1, r.a) : drawnA;
+  const drawnB = drawCards(heroBVerger, drawB, r.b);
+  const safeB = capNext > 0 && drawnB.hand.length === 0 ? drawCards(drawnB, 1, r.b) : drawnB;
   // FATIGUE (Alex 2026-06-17 rethink Phase 1) : si le deck est SEC (vide) au
   // moment de piocher, le héros prend des dégâts CROISSANTS (1, 2, 3…) → le
   // moment « plus de cartes » devient une horloge léthale qui FORCE la fin au

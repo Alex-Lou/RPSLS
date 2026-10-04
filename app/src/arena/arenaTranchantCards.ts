@@ -34,7 +34,7 @@ export function applyEstafilade(board: BoardState, side: Side, spell: PlayedSpel
 /** Saignée (Tranchant) — CARD-ADVANTAGE aggro : pioche 1 carte, +1 de plus si tu
  *  contrôles ≥2 Ciseaux (un board agressif établi te ravitaille). Comble le trou de
  *  card-disadvantage de l'aggro (la main se vide → essoufflement late). */
-export function applySaignee(board: BoardState, side: Side, rng: Rng = Math.random): BoardState {
+export function applySaignee(board: BoardState, side: Side, rng: Rng): BoardState {
   const hero = side === "a" ? board.a : board.b;
   let scissors = 0;
   for (const lane of board.lanes) {
