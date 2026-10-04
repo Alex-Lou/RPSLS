@@ -22,10 +22,11 @@ pub(super) async fn lanes_rematch_window(
     b: &Arc<Session>,
     rx: &mut mpsc::UnboundedReceiver<LanesCommand>,
 ) -> LanesRematch {
-    let window = Duration::from_secs(30);
+    // Échéance FIXE : un message ne relance pas la fenêtre.
+    let deadline = Instant::now() + Duration::from_secs(30);
     let mut offered_by: Option<PlayerSlot> = None;
     loop {
-        match timeout(window, rx.recv()).await {
+        match timeout_at(deadline, rx.recv()).await {
             Err(_) | Ok(None) => return LanesRematch::Done,
             Ok(Some(cmd)) => match cmd {
                 LanesCommand::RequestRematch { slot } => match offered_by {

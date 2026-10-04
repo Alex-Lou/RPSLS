@@ -9,6 +9,7 @@ use std::time::Instant;
 use crate::ccg_engine::{start_ccg_match, CcgCommand};
 use crate::hello;
 use crate::lanes_engine::{start_lanes_match, LanesCommand};
+use crate::lobby::JoinLobby;
 use crate::match_engine::{start_match, MatchCommand};
 use crate::player_state;
 use crate::protocol::{ClientMessage, PlayerSlot, ServerMessage};
@@ -54,9 +55,12 @@ pub(crate) async fn handle_client_message(
             if !validate_best_of(best_of) {
                 return reply_error(session, "bad_best_of", "best_of must be odd 1..=9");
             }
+            // Un seul salon par hôte : recréer remplace l'ancien (anti-spam mémoire).
+            state.lobbies.remove_lobby_by_host(&session.id);
             if state.lobbies.lobby_count() >= state.max_lobbies {
                 return reply_error(session, "server_full", "too many open lobbies right now — try again in a moment");
             }
+            leave_current_match(state, session);
             let code = state.lobbies.create_lobby(session.clone(), best_of);
             session.send(ServerMessage::LobbyCreated { code, best_of });
         }
@@ -84,22 +88,29 @@ pub(crate) async fn handle_client_message(
             if matches_full(state) {
                 return reply_error(session, "server_full", "too many active matches right now — try again in a moment");
             }
-            let Some(lobby) = state.lobbies.join_lobby(&normalized) else {
-                state.lobby_attempts.record_failed(session.peer_ip);
-                return reply_error(session, "lobby_not_found", "no lobby with that code");
+            let lobby = match state.lobbies.join_lobby(&normalized, session) {
+                JoinLobby::Joined(lobby) => lobby,
+                JoinLobby::NotFound => {
+                    state.lobby_attempts.record_failed(session.peer_ip);
+                    return reply_error(session, "lobby_not_found", "no lobby with that code");
+                }
+                // Son propre salon (même session ou même player_id) : refusé
+                // SANS consommer le salon.
+                JoinLobby::SelfMatch => {
+                    return reply_error(session, "self_match", "cannot join your own lobby");
+                }
             };
-            // Don't let yourself join your own lobby.
-            if lobby.host.id == session.id {
-                return reply_error(session, "self_lobby", "cannot join your own lobby");
-            }
             // Legit join — clear any pent-up counter for this IP.
             state.lobby_attempts.record_success(session.peer_ip);
+            leave_current_match(state, session);
             let a_id = lobby.host.id.clone();
             let b_id = session.id.clone();
+            // on_end : ne retire que les entrées de CE match (canal fermé), pas celles
+            // d'un nouveau match où une session est déjà repartie.
             let st = state.clone();
             let match_tx = start_match(lobby.host.clone(), session.clone(), lobby.best_of, Box::new(move || {
-                st.in_match.remove(&a_id);
-                st.in_match.remove(&b_id);
+                st.in_match.remove_if(&a_id, |_, e| e.0.is_closed());
+                st.in_match.remove_if(&b_id, |_, e| e.0.is_closed());
             }));
             state
                 .in_match
@@ -118,13 +129,16 @@ pub(crate) async fn handle_client_message(
             if matches_full(state) {
                 return reply_error(session, "server_full", "too many active matches right now — try again in a moment");
             }
+            leave_current_match(state, session);
             if let Some(opp) = state.lobbies.join_or_match(session.clone(), best_of).await {
                 let a_id = opp.id.clone();
                 let b_id = session.id.clone();
+                // on_end : ne retire que les entrées de CE match (canal fermé), pas celles
+                // d'un nouveau match où une session est déjà repartie.
                 let st = state.clone();
                 let match_tx = start_match(opp.clone(), session.clone(), best_of, Box::new(move || {
-                    st.in_match.remove(&a_id);
-                    st.in_match.remove(&b_id);
+                    st.in_match.remove_if(&a_id, |_, e| e.0.is_closed());
+                    st.in_match.remove_if(&b_id, |_, e| e.0.is_closed());
                 }));
                 state
                     .in_match
@@ -147,6 +161,7 @@ pub(crate) async fn handle_client_message(
             if matches_full(state) {
                 return reply_error(session, "server_full", "too many active matches right now — try again in a moment");
             }
+            leave_current_match(state, session);
             if let Some(opp) = state
                 .lobbies
                 .join_or_match_lanes(session.clone(), win_to)
@@ -154,10 +169,12 @@ pub(crate) async fn handle_client_message(
             {
                 let a_id = opp.id.clone();
                 let b_id = session.id.clone();
+                // on_end : ne retire que les entrées de CE match (canal fermé), pas celles
+                // d'un nouveau match où une session est déjà repartie.
                 let st = state.clone();
                 let lanes_tx = start_lanes_match(opp.clone(), session.clone(), win_to, Box::new(move || {
-                    st.in_lanes.remove(&a_id);
-                    st.in_lanes.remove(&b_id);
+                    st.in_lanes.remove_if(&a_id, |_, e| e.0.is_closed());
+                    st.in_lanes.remove_if(&b_id, |_, e| e.0.is_closed());
                 }));
                 state
                     .in_lanes
@@ -185,13 +202,16 @@ pub(crate) async fn handle_client_message(
             if matches_full(state) {
                 return reply_error(session, "server_full", "too many active matches right now — try again in a moment");
             }
+            leave_current_match(state, session);
             if let Some(opp) = state.lobbies.join_or_match_ccg(session.clone(), win_to, variant, ruleset_hash).await {
                 let a_id = opp.id.clone();
                 let b_id = session.id.clone();
+                // on_end : ne retire que les entrées de CE match (canal fermé), pas celles
+                // d'un nouveau match où une session est déjà repartie.
                 let st = state.clone();
                 let ccg_tx = start_ccg_match(opp.clone(), session.clone(), win_to, Box::new(move || {
-                    st.in_ccg.remove(&a_id);
-                    st.in_ccg.remove(&b_id);
+                    st.in_ccg.remove_if(&a_id, |_, e| e.0.is_closed());
+                    st.in_ccg.remove_if(&b_id, |_, e| e.0.is_closed());
                 }));
                 state.in_ccg.insert(opp.id.clone(), (ccg_tx.clone(), PlayerSlot::A));
                 state.in_ccg.insert(session.id.clone(), (ccg_tx, PlayerSlot::B));
@@ -236,17 +256,7 @@ pub(crate) async fn handle_client_message(
             }
         }
 
-        ClientMessage::LeaveMatch => {
-            if let Some((_, (tx, slot))) = state.in_match.remove(&session.id) {
-                let _ = tx.send(MatchCommand::Leave { slot });
-            }
-            if let Some((_, (tx, slot))) = state.in_lanes.remove(&session.id) {
-                let _ = tx.send(LanesCommand::Leave { slot });
-            }
-            if let Some((_, (tx, slot))) = state.in_ccg.remove(&session.id) {
-                let _ = tx.send(CcgCommand::Leave { slot });
-            }
-        }
+        ClientMessage::LeaveMatch => leave_current_match(state, session),
 
         ClientMessage::Chat { emoji } => {
             // Hard cap chat payload: max 8 graphemes, strip control + bidi
@@ -274,15 +284,22 @@ pub(crate) async fn handle_client_message(
         }
 
         ClientMessage::RequestRematch => {
-            if let Some(entry) = state.in_match.get(&session.id) {
+            let delivered = if let Some(entry) = state.in_match.get(&session.id) {
                 let (tx, slot) = entry.value().clone();
-                let _ = tx.send(MatchCommand::RequestRematch { slot });
+                tx.send(MatchCommand::RequestRematch { slot }).is_ok()
             } else if let Some(entry) = state.in_lanes.get(&session.id) {
                 let (tx, slot) = entry.value().clone();
-                let _ = tx.send(LanesCommand::RequestRematch { slot });
+                tx.send(LanesCommand::RequestRematch { slot }).is_ok()
             } else if let Some(entry) = state.in_ccg.get(&session.id) {
                 let (tx, slot) = entry.value().clone();
-                let _ = tx.send(CcgCommand::RequestRematch { slot });
+                tx.send(CcgCommand::RequestRematch { slot }).is_ok()
+            } else {
+                false
+            };
+            // Match déjà clos (adversaire parti / fenêtre expirée) : refus
+            // immédiat plutôt qu'un silence.
+            if !delivered {
+                session.send(ServerMessage::RematchDeclined);
             }
         }
 
@@ -336,6 +353,21 @@ pub(crate) async fn handle_client_message(
         ClientMessage::ClaimCpuRewards { rewards } => wallet::handle(session, WalletOp::ClaimCpuRewards(rewards)),
         ClientMessage::ClaimUnlocks { card_ids } => wallet::handle(session, WalletOp::ClaimUnlocks(card_ids)),
         ClientMessage::ClaimSeason => wallet::handle(session, WalletOp::ClaimSeason),
+    }
+}
+
+/// Quitte le match (classique / lanes / ccg) où la session est encore inscrite
+/// — même effet qu'un `LeaveMatch` client. Appelé aussi avant de rejoindre une
+/// file / un salon : l'ancienne task (fenêtre de rematch) se termine proprement.
+fn leave_current_match(state: &AppState, session: &Session) {
+    if let Some((_, (tx, slot))) = state.in_match.remove(&session.id) {
+        let _ = tx.send(MatchCommand::Leave { slot });
+    }
+    if let Some((_, (tx, slot))) = state.in_lanes.remove(&session.id) {
+        let _ = tx.send(LanesCommand::Leave { slot });
+    }
+    if let Some((_, (tx, slot))) = state.in_ccg.remove(&session.id) {
+        let _ = tx.send(CcgCommand::Leave { slot });
     }
 }
 

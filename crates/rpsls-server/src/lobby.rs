@@ -36,6 +36,25 @@ struct CcgQueueEntry {
     ruleset_hash: String,
 }
 
+/// Issue d'une tentative `join_lobby`.
+pub enum JoinLobby {
+    /// Salon trouvé et consommé.
+    Joined(Lobby),
+    NotFound,
+    /// Salon de ce même joueur : refusé, le salon reste ouvert.
+    SelfMatch,
+}
+
+/// Même joueur : même session, OU même `player_id` non vide (deux onglets /
+/// appareils). On n'apparie jamais un joueur contre lui-même (double crédit).
+fn same_player(a: &Session, b: &Session) -> bool {
+    if a.id == b.id {
+        return true;
+    }
+    let pid = a.player_id();
+    !pid.is_empty() && pid == b.player_id()
+}
+
 #[derive(Debug, Default)]
 pub struct LobbyManager {
     /// Open private lobbies, by code.
@@ -89,11 +108,15 @@ impl LobbyManager {
         }
     }
 
-    /// Try to join a lobby. Returns the host session if found, removing the
-    /// lobby (it's consumed).
-    pub fn join_lobby(&self, code: &str) -> Option<Lobby> {
+    /// Try to join a lobby. Returns the lobby if found, removing it (it's
+    /// consumed) — sauf si son hôte est le même joueur que `joiner`.
+    pub fn join_lobby(&self, code: &str, joiner: &Session) -> JoinLobby {
         let key = code.to_uppercase();
-        self.lobbies.remove(&key).map(|(_, lobby)| lobby)
+        match self.lobbies.remove_if(&key, |_, l| !same_player(&l.host, joiner)) {
+            Some((_, lobby)) => JoinLobby::Joined(lobby),
+            None if self.lobbies.contains_key(&key) => JoinLobby::SelfMatch,
+            None => JoinLobby::NotFound,
+        }
     }
 
     /// Remove a lobby hosted by a given session id (e.g. on disconnect).
@@ -105,10 +128,12 @@ impl LobbyManager {
     /// is already waiting, return them and pop from the queue.
     pub async fn join_or_match(&self, player: Arc<Session>, best_of: u8) -> Option<Arc<Session>> {
         let mut q = self.queue.lock().await;
-        // Find first entry with same best_of and not the same session.
+        // Re-join = on remplace l'ancienne entrée (pas de doublons dans la file).
+        q.retain(|e| e.player.id != player.id);
+        // Find first entry with same best_of and not the same player.
         if let Some(idx) = q
             .iter()
-            .position(|e| e.best_of == best_of && e.player.id != player.id)
+            .position(|e| e.best_of == best_of && !same_player(&e.player, &player))
         {
             let entry = q.remove(idx);
             return Some(entry.player);
@@ -141,9 +166,10 @@ impl LobbyManager {
         win_to: u8,
     ) -> Option<Arc<Session>> {
         let mut q = self.lanes_queue.lock().await;
+        q.retain(|e| e.player.id != player.id);
         if let Some(idx) = q
             .iter()
-            .position(|e| e.best_of == win_to && e.player.id != player.id)
+            .position(|e| e.best_of == win_to && !same_player(&e.player, &player))
         {
             let entry = q.remove(idx);
             return Some(entry.player);
@@ -179,11 +205,12 @@ impl LobbyManager {
         ruleset_hash: String,
     ) -> Option<Arc<Session>> {
         let mut q = self.ccg_queue.lock().await;
+        q.retain(|e| e.player.id != player.id);
         if let Some(idx) = q.iter().position(|e| {
             e.win_to == win_to
                 && e.variant == variant
                 && e.ruleset_hash == ruleset_hash
-                && e.player.id != player.id
+                && !same_player(&e.player, &player)
         }) {
             let entry = q.remove(idx);
             return Some(entry.player);
@@ -208,5 +235,61 @@ impl LobbyManager {
             .position(|e| e.player.id == session_id)
             .map(|i| (i + 1) as u32)
             .unwrap_or(0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn session(id: &str, pid: &str) -> Arc<Session> {
+        let (tx, _rx) = tokio::sync::mpsc::channel(crate::session::OUTGOING_CAPACITY);
+        let s = Session::new(id.into(), id.into(), tx, std::net::IpAddr::from([127, 0, 0, 1]));
+        // Direct (pas set_player_id : il touche Redis).
+        *s.player_id.lock().unwrap() = pid.into();
+        Arc::new(s)
+    }
+
+    /// Deux onglets du même player_id ne s'apparient pas ; un tiers, si.
+    #[tokio::test]
+    async fn queues_never_match_a_player_against_itself() {
+        let m = LobbyManager::new();
+        let (tab1, tab2, other) = (session("s1", "p1"), session("s2", "p1"), session("s3", "p2"));
+        assert!(m.join_or_match(tab1.clone(), 3).await.is_none());
+        assert!(m.join_or_match(tab2.clone(), 3).await.is_none());
+        assert_eq!(m.join_or_match(other.clone(), 3).await.unwrap().id, "s1");
+        assert!(m.join_or_match_lanes(tab1.clone(), 3).await.is_none());
+        assert!(m.join_or_match_lanes(tab2.clone(), 3).await.is_none());
+        let ccg = |s: &Arc<Session>| m.join_or_match_ccg(s.clone(), 3, "arena".into(), "h".into());
+        assert!(ccg(&tab1).await.is_none());
+        assert!(ccg(&tab2).await.is_none());
+        assert_eq!(ccg(&other).await.unwrap().id, "s1");
+        // player_id vide (vieux client) : seules les sessions comptent.
+        assert!(m.join_or_match(session("s4", ""), 5).await.is_none());
+        assert!(m.join_or_match(session("s5", ""), 5).await.is_some());
+    }
+
+    /// Re-join de la même session : une seule entrée dans la file.
+    #[tokio::test]
+    async fn rejoining_a_queue_does_not_duplicate() {
+        let m = LobbyManager::new();
+        let s = session("s1", "p1");
+        for _ in 0..3 {
+            assert!(m.join_or_match(s.clone(), 3).await.is_none());
+            assert!(m.join_or_match_lanes(s.clone(), 3).await.is_none());
+        }
+        assert_eq!(m.queue.lock().await.len(), 1);
+        assert_eq!(m.lanes_queue.lock().await.len(), 1);
+    }
+
+    /// Rejoindre son propre salon (autre onglet) : refusé SANS consommer le salon.
+    #[test]
+    fn self_join_keeps_the_lobby_open() {
+        let m = LobbyManager::new();
+        let code = m.create_lobby(session("s1", "p1"), 3);
+        assert!(matches!(m.join_lobby(&code, &session("s2", "p1")), JoinLobby::SelfMatch));
+        assert!(matches!(m.join_lobby(&code, &session("s1", "p1")), JoinLobby::SelfMatch));
+        assert!(matches!(m.join_lobby(&code, &session("s3", "p2")), JoinLobby::Joined(_)));
+        assert!(matches!(m.join_lobby(&code, &session("s3", "p2")), JoinLobby::NotFound));
     }
 }

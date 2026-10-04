@@ -195,7 +195,8 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
       // scale for casual modes. Constellation Pro is higher-effort (longer
       // matches, deeper strategy) so it pays slightly above Constellation
       // Ranked: win 20, draw 10, loss 5.
-      const reward = ARENA_ECLATS[outcome];
+      // Forfait = ni éclats ni XP (avant : 5 💎 par forfait → farm le plus rapide).
+      const reward = meta?.forfeit ? 0 : ARENA_ECLATS[outcome];
       const xpDelta = meta?.forfeit ? 0 : ARENA_XP[outcome];
       // HISTORIQUE (Alex 2026-06-13 « voies jouées dans l'historique ») : on
       // journalise AUSSI le match vs-CPU (avant : SEULS les compteurs
@@ -235,7 +236,7 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
     });
     // Portefeuille actif : un match Arena EN LIGNE est crédité par le serveur
     // (fin de match ccg) ; contre le CPU, le gain est réclamé (cf. recordMatch).
-    if (!meta?.online) enqueueCpuReward("arena", outcome);
+    if (!meta?.online && !meta?.forfeit) enqueueCpuReward("arena", outcome);
     enqueueUnlocks((get().player.cardCollection ?? []).filter((id) => !before.includes(id)));
   },
 

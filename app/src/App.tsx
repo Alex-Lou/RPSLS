@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store/store";
 import { useArenaOverride } from "./ranked/arenaOverride";
@@ -18,6 +18,7 @@ import { Sidebar, MobileShell, type Page } from "./Sidebar";
 import { PlayPage } from "./pages/PlayPage";
 import { FloatingMatchBackButton } from "./match/sharedMatchUI";
 import { useMatchFullscreen } from "./match/matchFullscreenStore";
+import { getMatchExit, subscribeMatchExit } from "./matchExitStore";
 import { UserHeader } from "./UserHeader";
 import { LevelUpWatcher } from "./fx/LevelUpOverlay";
 import { useT } from "./i18n";
@@ -121,6 +122,7 @@ export default function App() {
   const gfxQuartz = useGfxAllows("quartzScene");
   // Match arène en cours → shell PLEIN ÉCRAN (sidebar masquée + cap max-w-md retiré).
   const matchFullscreen = useMatchFullscreen();
+  const matchExit = useSyncExternalStore(subscribeMatchExit, getMatchExit, () => null);
 
   function navigateTo(next: Page) {
     if (next === "play") setHomeNonce((n) => n + 1);
@@ -390,7 +392,8 @@ export default function App() {
             {/* Global "back to Play" arrow, parked right next to the burger
                 on every non-Play page. Avoids the Android system back button
                 (which closes the app) being the only escape route. */}
-            {page !== "play" && (
+            {/* Masquée pendant un match en ligne (sortie = burger / modale de forfait). */}
+            {page !== "play" && !matchExit && (
               <FloatingMatchBackButton
                 onClick={() => navigateTo("play")}
                 label={t("nav.backToPlay")}

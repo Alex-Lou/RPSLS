@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
 import { GameMode } from "../types";
@@ -61,6 +61,11 @@ export function PlayPage({
   homeNonce?: number;
 }) {
   const [view, setView] = useState<View>({ kind: "select" });
+  // Clé de montage d'un match : change à chaque NOUVELLE vue (setView), mais
+  // reste stable entre deux rendus. Avant, `Date.now()` dans la clé remontait
+  // (et effaçait sans l'enregistrer) le match en cours à chaque re-rendu de la
+  // page (saison posée par le portefeuille, autodétection graphique…).
+  const viewNonce = useMemo(() => Date.now(), [view]);
   const [tournament, setTournament] = useState<TournamentState>(() => {
     const p = useStore.getState().player;
     const l = levelFromXp(p.xp);
@@ -225,7 +230,7 @@ export function PlayPage({
         )}
         {view.kind === "game" && (
           <Game
-            key={`${view.mode}-${view.bestOf}-${view.daily?.date ?? ""}-${Date.now()}`}
+            key={`${view.mode}-${view.bestOf}-${view.daily?.date ?? ""}-${viewNonce}`}
             mode={view.mode}
             bestOf={view.bestOf}
             daily={view.daily}
@@ -236,7 +241,7 @@ export function PlayPage({
         )}
         {view.kind === "lanes_cpu" && (
           <motion.div
-            key={`lanes-cpu-${view.winTo}-${Date.now()}`}
+            key={`lanes-cpu-${view.winTo}-${viewNonce}`}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
@@ -373,7 +378,7 @@ export function PlayPage({
         )}
         {view.kind === "classe_match" && (
           <Game
-            key={`classe-match-${view.oppName}-${Date.now()}`}
+            key={`classe-match-${view.oppName}-${viewNonce}`}
             mode="ranked"
             bestOf={5}
             withAtouts

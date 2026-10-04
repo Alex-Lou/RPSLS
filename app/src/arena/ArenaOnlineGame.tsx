@@ -16,6 +16,7 @@ import { useStore } from "../store/store";
 import { CARDS } from "../ranked/cards";
 import type { CardId } from "../ranked/rankedTypes";
 import type { Move } from "../engine/game";
+import type { PlayerSlot } from "../online/online";
 import { MOVES } from "../engine/game";
 import { OnlineClient } from "../online/online";
 import { resolveWsUrl, helloFrame } from "../online/transientSession";
@@ -27,7 +28,10 @@ import { makeArenaOnlineDriver, type ArenaOnlineDriver } from "./arenaOnlineDriv
 import { ArenaGame } from "./ArenaGame";
 import { useT } from "../i18n";
 
-type Phase = "connecting" | "searching" | "setup" | "playing" | "error" | "desync";
+type Phase = "connecting" | "searching" | "setup" | "playing" | "error" | "desync"
+  // Fin décidée par le SERVEUR (forfait) : l'adversaire est parti / a calé, ou
+  // c'est moi qui ai calé. ArenaGame attendait un intent qui ne viendra jamais.
+  | "oppLeft" | "oppLeftSetup" | "timedOut";
 
 /** Round réservé pour l'échange initial deck+Voie (cf. arenaOnlineDriver). */
 const ROUND_SETUP = 0;
@@ -53,6 +57,10 @@ export function ArenaOnlineGame({ onBack }: { onBack: () => void }) {
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [driver, setDriver] = useState<ArenaOnlineDriver | null>(null);
   const clientRef = useRef<OnlineClient | null>(null);
+  const youAreRef = useRef<PlayerSlot | null>(null);
+  const phaseRef = useRef<Phase>("connecting");
+  phaseRef.current = phase;
+  const recordArenaMatch = useStore((s) => s.recordArenaMatch);
 
   useEffect(() => {
     let alive = true;
@@ -75,10 +83,24 @@ export function ArenaOnlineGame({ onBack }: { onBack: () => void }) {
       {
         onError: (_code, message) => { if (alive) { setErrMsg(message); setPhase("error"); } },
         onOpponentLeft: () => { /* ArenaGame affiche déjà sa fin/forfait ; le retour hub est manuel */ },
-        onMatchEnd: (_winner, _forfeit, desync) => {
+        onMatchEnd: (winner, forfeit, desync) => {
+          if (!alive) return;
           // Le serveur a DROP le match (hash d'état ou résultats divergents →
           // triche/bug détecté) : aucun résultat crédité, on l'annonce (Phase 4).
-          if (alive && desync) setPhase("desync");
+          if (desync) { setPhase("desync"); return; }
+          // Fin normale (les deux ont déclaré l'issue) : ArenaGame affiche déjà
+          // son écran de fin et a enregistré le résultat.
+          if (!forfeit) return;
+          if (phaseRef.current !== "playing") { setPhase("oppLeftSetup"); return; }
+          const won = winner !== null && winner === youAreRef.current;
+          // Gains crédités par le serveur (online) : ici l'historique/stats local.
+          recordArenaMatch(won ? "win" : "loss", {
+            playerVoie: myAffinity,
+            oppVoie: undefined,
+            forfeit: !won,
+            online: true,
+          });
+          setPhase(won ? "oppLeft" : "timedOut");
         },
       },
     );
@@ -95,6 +117,7 @@ export function ArenaOnlineGame({ onBack }: { onBack: () => void }) {
 
         const info = await session.waitMatchFound();
         if (!alive) return;
+        youAreRef.current = info.youAre;
         setPhase("setup");
 
         // Prep : prêt + pièce serveur (gate le double-ready ; on ignore le camp
@@ -147,7 +170,17 @@ export function ArenaOnlineGame({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-center">
-      {phase === "desync" ? (
+      {phase === "oppLeft" || phase === "oppLeftSetup" || phase === "timedOut" ? (
+        <>
+          <div className={"text-lg font-bold " + (phase === "oppLeft" ? "text-emerald-300" : phase === "timedOut" ? "text-rose-300" : "text-amber-300")}>
+            {t(phase === "oppLeft" ? "arena.online.oppLeftWin" : phase === "timedOut" ? "arena.online.timedOut" : "arena.online.oppLeftSetup")}
+          </div>
+          <div className="text-sm text-ink-muted max-w-xs">
+            {t(phase === "oppLeft" ? "arena.online.oppLeftWinSub" : phase === "timedOut" ? "arena.online.timedOutSub" : "arena.online.oppLeftSetupSub")}
+          </div>
+          <button onClick={quit} className="mt-2 px-5 py-2 rounded-xl bg-surface border border-hairline font-semibold">{t("arena.online.back")}</button>
+        </>
+      ) : phase === "desync" ? (
         <>
           <div className="text-lg font-bold text-amber-300">{t("arena.online.cancelled")}</div>
           <div className="text-sm text-ink-muted max-w-xs">{t("arena.online.desync")}</div>

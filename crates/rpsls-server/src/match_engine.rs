@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use rpsls_core::{Match, MatchStatus, Move};
 use tokio::sync::mpsc;
-use tokio::time::{timeout, timeout_at, Instant};
+use tokio::time::{timeout_at, Instant};
 use uuid::Uuid;
 
 use crate::protocol::{OpponentInfo, PlayerSlot, ServerMessage};
@@ -175,10 +175,12 @@ async fn rematch_window(
     b: &Arc<Session>,
     rx: &mut mpsc::UnboundedReceiver<MatchCommand>,
 ) -> RematchOutcome {
-    let window = Duration::from_secs(30);
+    // Échéance FIXE : un message (ex. Chat) ne relance pas la fenêtre, sinon
+    // la task pourrait vivre indéfiniment.
+    let deadline = Instant::now() + Duration::from_secs(30);
     let mut offered_by: Option<PlayerSlot> = None;
     loop {
-        match timeout(window, rx.recv()).await {
+        match timeout_at(deadline, rx.recv()).await {
             Err(_) | Ok(None) => return RematchOutcome::Done,
             Ok(Some(cmd)) => match cmd {
                 MatchCommand::RequestRematch { slot } => match offered_by {

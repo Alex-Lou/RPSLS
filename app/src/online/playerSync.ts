@@ -16,6 +16,7 @@ import { PAD_META } from "../types";
 import { todayDateKey } from "../engine/daily";
 import { type OnlineClient, type PlayerProgress } from "./online";
 import { resolveWsUrl, helloFrame } from "./transientSession";
+import { saveAnchor } from "./playerAnchor";
 import { useStore, emptyByMove } from "../store/store";
 import { THEMES } from "../theme/theme";
 import { BACKGROUNDS_BY_ID } from "../theme/themes";
@@ -66,7 +67,10 @@ export function buildProgressFromPlayer(player: Player): PlayerProgress {
     // (Alex 2026-06-13). Lu du STORE (global, pas sur `player`). Restauré
     // uniquement sur install fraîche côté merge → jamais d'écrasement d'un
     // historique local non vide.
-    history: useStore.getState().history?.slice(0, 60) ?? [],
+    // SANS le détail des manches : 60 matchs Bo9 avec `rounds` dépassaient la
+    // limite de 64 KiB par message du serveur → socket coupée, sync perdue en
+    // silence. Le détail reste sur l'appareil ; le cloud garde le résumé.
+    history: (useStore.getState().history?.slice(0, 60) ?? []).map((h) => ({ ...h, rounds: [] })),
     // ── Progression réparée 2026-06-14 : ces champs étaient ABSENTS du payload
     // → jamais persistés → perdus à chaque install propre (défis du jour
     // re-réclamables, quête pentagramme + Voie réinitialisées). ──
@@ -503,6 +507,13 @@ function pushPlayerStateOneShot(): void {
     // contents) is the source of truth; bootSync at next launch handles the
     // proper union-merge. The goal here is just to persist the change.
     if (msg.type === "state_loaded") {
+      // Joueur neuf : le serveur vient de créer son jeton (TOFU). Le garder,
+      // sinon tous les Hello suivants seraient refusés (auth_failed).
+      const token = (msg as { claim_token?: string | null }).claim_token;
+      if (token && !useStore.getState().player.claimToken) {
+        useStore.getState().applyServerSync({ claimToken: token });
+        void saveAnchor(player.id, token).catch(() => undefined);
+      }
       try {
         const progress = buildProgressFromPlayer(useStore.getState().player);
         ws.send(JSON.stringify({ type: "sync_state", state: progress }));

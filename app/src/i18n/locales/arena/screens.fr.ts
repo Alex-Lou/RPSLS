@@ -184,6 +184,12 @@ const strings: Record<string, string> = {
   "arena.online.searching": "Recherche d’un adversaire…",
   "arena.online.preparing": "Préparation du duel…",
   "arena.online.cancel": "Annuler",
+  "arena.online.oppLeftWin": "Victoire — ton adversaire a quitté",
+  "arena.online.oppLeftWinSub": "Il est parti ou ne répondait plus : la victoire t’est attribuée.",
+  "arena.online.oppLeftSetup": "Ton adversaire a quitté",
+  "arena.online.oppLeftSetupSub": "Le duel n’avait pas encore commencé : rien n’est compté.",
+  "arena.online.timedOut": "Défaite — temps écoulé",
+  "arena.online.timedOutSub": "Tu n’as pas joué à temps : le serveur a attribué la victoire à ton adversaire.",
 
   // ── Splash d’intro ──
   "arena.splash.goal": "Premier héros à **0 ❤** perd. Invoque, lance des sorts, joue intelligent.",

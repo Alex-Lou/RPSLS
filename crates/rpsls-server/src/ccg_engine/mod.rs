@@ -29,6 +29,11 @@ const COIN_REVEAL_PAUSE: Duration = Duration::from_millis(4000);
 /// Large : un joueur réfléchit + anime le reveal entre deux tours.
 const TURN_DEADLINE: Duration = Duration::from_secs(60);
 const REMATCH_WINDOW: Duration = Duration::from_secs(30);
+/// Tours RÉELS (round ≥ 1, hors mulligan) relayés en dessous desquels une
+/// partie ne paie RIEN aux deux camps (ni forfait ni résultat déclaré) : une
+/// partie à 20 PV ne se joue pas en 2 tours → anti-farm (abandon en prep /
+/// mulligan, ou résultat déclaré d'emblée par deux comptes complices).
+const MIN_PAID_TURNS: u32 = 3;
 
 /// Commandes envoyées à un match CCG en cours.
 #[derive(Debug)]
@@ -113,32 +118,34 @@ async fn run_ccg_match(
 
         // Prep : double-ready + pièce serveur (identique au Lanes).
         if let PrepEnd::Aborted { winner } = ccg_prep(&a, &b, &mut rx).await {
+            // `w` = camp RESTÉ : c'est lui qu'on prévient (pas le partant).
             if let Some(w) = winner {
-                session_for(other_slot(w), &a, &b).send(ServerMessage::OpponentLeft);
+                session_for(w, &a, &b).send(ServerMessage::OpponentLeft);
             }
-            broadcast_end(&a, &b, winner, true, false);
+            // Rien n'a été joué → aucun crédit.
+            broadcast_end(&a, &b, winner, true, false, false);
             break;
         }
 
         // Boucle de relais des tours.
         match ccg_relay(&a, &b, &mut rx).await {
-            RelayEnd::Result { winner } => {
-                broadcast_end(&a, &b, winner, false, false);
+            RelayEnd::Result { winner, paid } => {
+                broadcast_end(&a, &b, winner, false, false, paid);
                 match ccg_rematch(&a, &b, &mut rx).await {
                     Rematch::Restart => continue,
                     Rematch::Done => break,
                 }
             }
-            RelayEnd::Forfeit { winner } => {
+            RelayEnd::Forfeit { winner, paid } => {
                 if let Some(w) = winner {
                     session_for(w, &a, &b).send(ServerMessage::OpponentLeft);
                 }
-                broadcast_end(&a, &b, winner, true, false);
+                broadcast_end(&a, &b, winner, true, false, paid);
                 break;
             }
             RelayEnd::Desync => {
                 // Anti-triche : hash/résultat divergent → match ANNULÉ, aucun crédit.
-                broadcast_end(&a, &b, None, false, true);
+                broadcast_end(&a, &b, None, false, true, false);
                 break;
             }
             RelayEnd::Disconnect => break,
@@ -209,9 +216,10 @@ async fn ccg_prep(
 
 enum RelayEnd {
     /// Fin propre : les DEUX clients ont déclaré le MÊME vainqueur + hash final.
-    Result { winner: Option<PlayerSlot> },
+    /// `paid` = au moins MIN_PAID_TURNS tours réels relayés (sinon aucun crédit).
+    Result { winner: Option<PlayerSlot>, paid: bool },
     /// Forfait (leave / timeout d'un côté). `winner` = camp resté.
-    Forfeit { winner: Option<PlayerSlot> },
+    Forfeit { winner: Option<PlayerSlot>, paid: bool },
     /// DÉSYNCHRONISATION (anti-triche Phase 4) : hash d'état divergent en cours
     /// de partie OU déclarations de résultat incohérentes → match droppé, aucun crédit.
     Desync,
@@ -232,6 +240,8 @@ async fn ccg_relay(
     // Résultats déclarés (winner + hash final) — on attend les DEUX pour comparer.
     let mut a_res: Option<(Option<PlayerSlot>, String)> = None;
     let mut b_res: Option<(Option<PlayerSlot>, String)> = None;
+    // Tours réels relayés (round 0 = mulligan, non compté).
+    let mut turns = 0u32;
 
     // ABSOLUTE deadline, re-armed only on real progress: a side's FIRST lock of
     // the turn or FIRST result declaration (the other side then gets a full
@@ -247,7 +257,7 @@ async fn ccg_relay(
                     (false, true) => Some(PlayerSlot::B),
                     _ => None,
                 };
-                return RelayEnd::Forfeit { winner };
+                return RelayEnd::Forfeit { winner, paid: turns >= MIN_PAID_TURNS };
             }
             Ok(None) => return RelayEnd::Disconnect,
             Ok(Some(cmd)) => match cmd {
@@ -283,6 +293,9 @@ async fn ccg_relay(
                             round_no: a_round,
                             intent: a_intent,
                         });
+                        if a_round >= 1 {
+                            turns += 1;
+                        }
                         deadline = Instant::now() + TURN_DEADLINE;
                     }
                 }
@@ -302,13 +315,13 @@ async fn ccg_relay(
                     // On attend les DEUX déclarations, puis on compare (anti-triche).
                     if let (Some((aw, ah)), Some((bw, bh))) = (&a_res, &b_res) {
                         if aw == bw && ah == bh {
-                            return RelayEnd::Result { winner: *aw };
+                            return RelayEnd::Result { winner: *aw, paid: turns >= MIN_PAID_TURNS };
                         }
                         return RelayEnd::Desync;
                     }
                 }
                 CcgCommand::Leave { slot } => {
-                    return RelayEnd::Forfeit { winner: Some(other_slot(slot)) };
+                    return RelayEnd::Forfeit { winner: Some(other_slot(slot)), paid: turns >= MIN_PAID_TURNS };
                 }
                 _ => {}
             },
@@ -329,8 +342,10 @@ async fn ccg_rematch(
     rx: &mut mpsc::UnboundedReceiver<CcgCommand>,
 ) -> Rematch {
     let mut offered_by: Option<PlayerSlot> = None;
+    // Échéance FIXE : un message (chat, re-demande…) ne relance pas la fenêtre.
+    let deadline = Instant::now() + REMATCH_WINDOW;
     loop {
-        match timeout(REMATCH_WINDOW, rx.recv()).await {
+        match timeout_at(deadline, rx.recv()).await {
             Err(_) | Ok(None) => return Rematch::Done,
             Ok(Some(cmd)) => match cmd {
                 CcgCommand::RequestRematch { slot } => match offered_by {
@@ -373,12 +388,20 @@ fn broadcast_ready_state(a: &Arc<Session>, b: &Arc<Session>, ready_a: bool, read
     b.send(ServerMessage::PrepReadyState { you_ready: ready_b, opp_ready: ready_a });
 }
 
-fn broadcast_end(a: &Arc<Session>, b: &Arc<Session>, winner: Option<PlayerSlot>, forfeit: bool, desync: bool) {
+fn broadcast_end(
+    a: &Arc<Session>,
+    b: &Arc<Session>,
+    winner: Option<PlayerSlot>,
+    forfeit: bool,
+    desync: bool,
+    paid: bool,
+) {
     let msg = ServerMessage::CcgMatchEnd { winner, forfeit, desync };
     a.send(msg.clone());
     b.send(msg);
-    // Éclats Arena crédités par le serveur, JAMAIS sur un match annulé (desync).
-    if !desync {
+    // Éclats Arena crédités par le serveur, JAMAIS sur un match annulé (desync)
+    // ni sur une partie quasi pas jouée (`paid` = false, cf. MIN_PAID_TURNS).
+    if !desync && paid {
         crate::wallet::handlers::credit_match_end(a, b, winner, forfeit, "arena");
     }
     // Pas de leaderboard::record_result — beta sans LP (relais aveugle =
@@ -418,7 +441,43 @@ mod tests {
     }
 
     fn turn(slot: PlayerSlot) -> CcgCommand {
-        CcgCommand::Turn { slot, round_no: 1, intent: Value::Null, state_hash: String::new() }
+        turn_at(slot, 1)
+    }
+
+    fn turn_at(slot: PlayerSlot, round_no: u32) -> CcgCommand {
+        CcgCommand::Turn { slot, round_no, intent: Value::Null, state_hash: String::new() }
+    }
+
+    /// Forfait / résultat avant MIN_PAID_TURNS tours réels (mulligan exclu) →
+    /// non payé ; au-delà → payé.
+    #[tokio::test]
+    async fn only_matches_with_enough_real_turns_pay() {
+        async fn relay_after(rounds: &[u32], last: Vec<CcgCommand>) -> RelayEnd {
+            let (a, b) = (session("a"), session("b"));
+            let (tx, mut rx) = mpsc::unbounded_channel();
+            for &r in rounds {
+                tx.send(turn_at(PlayerSlot::A, r)).unwrap();
+                tx.send(turn_at(PlayerSlot::B, r)).unwrap();
+            }
+            for cmd in last {
+                tx.send(cmd).unwrap();
+            }
+            ccg_relay(&a, &b, &mut rx).await
+        }
+        let leave = || vec![CcgCommand::Leave { slot: PlayerSlot::A }];
+        let result = || {
+            [PlayerSlot::A, PlayerSlot::B]
+                .map(|slot| CcgCommand::Result { slot, winner: Some(PlayerSlot::A), state_hash: "h".into() })
+                .into()
+        };
+        assert!(matches!(relay_after(&[], leave()).await, RelayEnd::Forfeit { paid: false, .. }));
+        assert!(matches!(relay_after(&[0, 1, 2], leave()).await, RelayEnd::Forfeit { paid: false, .. }));
+        assert!(matches!(relay_after(&[0], result()).await, RelayEnd::Result { paid: false, .. }));
+        assert!(matches!(
+            relay_after(&[0, 1, 2, 3], leave()).await,
+            RelayEnd::Forfeit { winner: Some(PlayerSlot::B), paid: true }
+        ));
+        assert!(matches!(relay_after(&[0, 1, 2, 3], result()).await, RelayEnd::Result { paid: true, .. }));
     }
 
     /// H3 : renvoyer son tour en boucle ne relance plus l'horloge — le camp muet
@@ -438,7 +497,7 @@ mod tests {
             .await
             .expect("le relais doit se terminer");
         spam.abort();
-        assert!(matches!(end, RelayEnd::Forfeit { winner: Some(PlayerSlot::A) }));
+        assert!(matches!(end, RelayEnd::Forfeit { winner: Some(PlayerSlot::A), paid: false }));
         assert_eq!(start.elapsed(), TURN_DEADLINE);
     }
 
@@ -460,7 +519,7 @@ mod tests {
             .await
             .expect("le relais doit se terminer");
         driver.abort();
-        assert!(matches!(end, RelayEnd::Forfeit { winner: Some(PlayerSlot::A) }));
+        assert!(matches!(end, RelayEnd::Forfeit { winner: Some(PlayerSlot::A), paid: false }));
         assert_eq!(start.elapsed(), late_lock + TURN_DEADLINE);
     }
 }

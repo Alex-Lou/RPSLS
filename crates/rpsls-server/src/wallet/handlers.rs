@@ -184,8 +184,8 @@ pub async fn grant_welcome(pid: &str) {
 /// Éclats de fin de match EN LIGNE, crédités par le serveur (qui connaît le
 /// résultat) aux joueurs dont le portefeuille existe. `mode` : "online"
 /// (classique), "constellation" (lanes) ou "arena" (Constellation Pro). Même
-/// barème que l'app : le perdant par forfait ne touche rien (sauf Arena, qui
-/// paie la défaite comme `recordArenaMatch`).
+/// barème que l'app : le perdant par forfait ne touche rien (Arena compris :
+/// la défaite « normale » y paie comme `recordArenaMatch`, pas l'abandon).
 pub fn credit_match_end(a: &Arc<Session>, b: &Arc<Session>, winner: Option<PlayerSlot>, forfeit: bool, mode: &'static str) {
     for (slot, s) in [(PlayerSlot::A, a), (PlayerSlot::B, b)] {
         let outcome = match winner {
@@ -193,11 +193,7 @@ pub fn credit_match_end(a: &Arc<Session>, b: &Arc<Session>, winner: Option<Playe
             Some(w) if w == slot => "win",
             Some(_) => "loss",
         };
-        let amount = match (mode, outcome) {
-            ("arena", o) => crate::economy::arena_eclats(o),
-            (_, "loss") if forfeit => 0,
-            (m, o) => crate::economy::eclats_reward(m, o),
-        };
+        let amount = match_reward(mode, outcome, forfeit);
         let pid = s.player_id();
         if amount == 0 || pid.is_empty() {
             continue;
@@ -216,5 +212,15 @@ pub fn credit_match_end(a: &Arc<Session>, b: &Arc<Session>, winner: Option<Playe
                 Err(e) => warn!(player_id = %pid, code = e.code(), "match reward NOT credited"),
             }
         });
+    }
+}
+
+/// Éclats d'une fin de match pour un camp (`outcome` : win / loss / draw).
+pub(crate) fn match_reward(mode: &str, outcome: &str, forfeit: bool) -> u64 {
+    match (mode, outcome) {
+        ("arena", "loss") if forfeit => 0,
+        ("arena", o) => crate::economy::arena_eclats(o),
+        (_, "loss") if forfeit => 0,
+        (m, o) => crate::economy::eclats_reward(m, o),
     }
 }
