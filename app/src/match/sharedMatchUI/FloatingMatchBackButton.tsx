@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useState } from "react";
+import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import type { MatchBackHandle } from "./androidBack";
@@ -32,13 +32,16 @@ export const FloatingMatchBackButton = forwardRef<
   }
 >(function FloatingMatchBackButtonImpl({ onClick, label, confirm, hidden = false }, ref) {
   const [open, setOpen] = useState(false);
+  // Confirmation déjà donnée : la modale reste cliquable pendant son anim de
+  // sortie → un double tap appelait onClick deux fois (double forfait).
+  const confirmedRef = useRef(false);
   const handleClick = () => {
-    if (confirm) setOpen(true);
+    if (confirm) { confirmedRef.current = false; setOpen(true); }
     else onClick();
   };
   useImperativeHandle(ref, () => ({
     triggerConfirm: () => {
-      if (confirm) setOpen(true);
+      if (confirm) { confirmedRef.current = false; setOpen(true); }
       else onClick();
     },
   }), [confirm, onClick]);
@@ -97,7 +100,12 @@ export const FloatingMatchBackButton = forwardRef<
                   {confirm.cancelLabel ?? "Annuler"}
                 </button>
                 <button
-                  onClick={() => { setOpen(false); onClick(); }}
+                  onClick={() => {
+                    if (confirmedRef.current) return;
+                    confirmedRef.current = true;
+                    setOpen(false);
+                    onClick();
+                  }}
                   className={
                     "flex-1 py-2.5 rounded-2xl font-bold text-sm text-white shadow-lg transition active:scale-[0.97] " +
                     (confirm.severity === "danger"

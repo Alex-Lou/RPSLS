@@ -124,6 +124,19 @@ export function RankedGame({
   const pharePendingRef = useRef(false);
   const [mana, setMana] = useState(1);
   const [battle, setBattle] = useState<RankedBattleState>(() => makeBattle(savedDeck, rng));
+  // Toujours le DERNIER état rendu. startNextRound est appelé depuis des
+  // setTimeout programmés plusieurs secondes avant : il lisait la main/pioche
+  // d'AVANT la résolution (closure périmée) puis l'écrasait → la carte jouée
+  // revenait en main, la défausse s'annulait, le reset de Genèse / du rematch
+  // était perdu.
+  const battleRef = useRef(battle);
+  battleRef.current = battle;
+  // Issue déjà enregistrée pour CE match (victoire/défaite), en attendant
+  // l'écran de fin (5,5 s plus tard) : sans ça, Retour → Forfait pendant ce
+  // délai enregistrait EN PLUS une défaite par forfait.
+  const recordedOutcomeRef = useRef<"win" | "loss" | null>(null);
+  const leftRef = useRef(false);
+  const aliveRef = useRef(true);
   const [lastResult, setLastResult] = useState<RankedRoundResultData | null>(null);
   const [end, setEnd] = useState<RankedEndData | null>(null);
   /** Riposte sub-phase: when set, the player played Riposte on a lane and
@@ -196,7 +209,9 @@ export function RankedGame({
   }, []);
 
   useEffect(() => {
+    aliveRef.current = true;
     return () => {
+      aliveRef.current = false;
       if (deadlineTimerRef.current) window.clearTimeout(deadlineTimerRef.current);
     };
   }, []);
@@ -204,6 +219,9 @@ export function RankedGame({
   /* ──────────── Round loop ──────────── */
 
   function startNextRound() {
+    // Écran quitté entre-temps (timer programmé avant le démontage) : rien.
+    if (!aliveRef.current) return;
+    const battle = battleRef.current;
     const nextNo = roundNoRef.current + 1;
     roundNoRef.current = nextNo;
 
@@ -971,6 +989,7 @@ export function RankedGame({
     // still flip the round).
     if (!riposteWillFire && (nextRoundWinsA >= winTo || nextRoundWinsB >= winTo)) {
       const youWon = nextRoundWinsA >= winTo;
+      recordedOutcomeRef.current = youWon ? "win" : "loss";
       recordMatch({
         id: `ranked-cpu-${Date.now()}`,
         mode: "constellation",
@@ -1020,6 +1039,8 @@ export function RankedGame({
   }
 
   function rematch() {
+    recordedOutcomeRef.current = null;
+    leftRef.current = false;
     setRound(null);
     setLastResult(null);
     setEnd(null);
@@ -1229,6 +1250,8 @@ export function RankedGame({
    *  path: record the result + show the cinematic end screen. */
   function finalizeMatch(winsA: number, winsB: number) {
     const youWon = winsA > winsB;
+    if (recordedOutcomeRef.current) return; // déjà enregistré pour ce match
+    recordedOutcomeRef.current = youWon ? "win" : "loss";
     recordMatch({
       id: `ranked-cpu-${Date.now()}`,
       mode: "constellation",
@@ -1268,7 +1291,11 @@ export function RankedGame({
   // bracket as a loss instead of unmounting back to the lobby — that keeps the
   // bracket consistent (no orphan slot) and respects the confirm dialog.
   function handleLeave() {
-    if (!end) {
+    // Double tap sur « Forfait » pendant la sortie animée : une seule fois.
+    if (leftRef.current) return;
+    leftRef.current = true;
+    const recorded = recordedOutcomeRef.current;
+    if (!end && !recorded) {
       recordMatch({
         id: `ranked-forfeit-${Date.now()}`,
         mode: "constellation",
@@ -1284,7 +1311,9 @@ export function RankedGame({
         forfeit: true,
       });
     }
-    if (onMatchResult) onMatchResult(false);
+    // Match déjà gagné (écran de fin pas encore affiché) : on remonte le VRAI
+    // résultat au tournoi, pas une défaite.
+    if (onMatchResult) onMatchResult(recorded === "win");
     else onQuit();
   }
 

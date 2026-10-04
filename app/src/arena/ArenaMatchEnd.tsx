@@ -7,43 +7,49 @@
  * polish can grow (anim, particles, mastery XP, etc.) without bloating
  * the orchestrator.
  *
- * Reward economy mirrors the recordArenaMatch store action: win = 20
- * éclats, draw = 10, loss = 5. Numbers shown here are display-only — the
- * actual credit happened in the store before this screen mounted.
+ * Reward economy mirrors the recordArenaMatch store action (ARENA_ECLATS).
+ * Numbers shown here are display-only — the actual credit happened in the
+ * store (or on the server, online) before this screen mounted.
  */
 
 import { motion } from "motion/react";
 import { useStore } from "../store/store";
-import type { BoardState } from "./arenaTypes";
-
-const ECLAT_REWARD = { win: 20, draw: 10, loss: 5 };
+import { useT } from "../i18n";
+import { ARENA_ECLATS } from "../engine/economy";
+import type { BoardState, Side } from "./arenaTypes";
 
 export interface ArenaMatchEndProps {
   board: BoardState;
+  /** Camp du joueur LOCAL (en ligne, le serveur peut lui donner « b »). */
+  mySide: Side;
   onQuit: () => void;
-  onRematch: () => void;
+  /** Absent = pas de revanche proposée (en ligne : la session est close). */
+  onRematch?: () => void;
 }
 
-export function ArenaMatchEnd({ board, onQuit, onRematch }: ArenaMatchEndProps) {
-  const playerName = useStore((s) => s.player.nickname) || "Toi";
-  const aDead = board.a.hp <= 0;
-  const bDead = board.b.hp <= 0;
-  const youWon = bDead && !aDead;
-  const draw = aDead && bDead;
+export function ArenaMatchEnd({ board, mySide, onQuit, onRematch }: ArenaMatchEndProps) {
+  const t = useT();
+  const me = board[mySide];
+  const opp = board[mySide === "a" ? "b" : "a"];
+  const playerName = useStore((s) => s.player.nickname) || t("lanes.you");
+  const meDead = me.hp <= 0;
+  const oppDead = opp.hp <= 0;
+  const youWon = oppDead && !meDead;
+  const draw = meDead && oppDead;
   const outcome: "win" | "loss" | "draw" = draw ? "draw" : youWon ? "win" : "loss";
 
-  const title = draw ? "ÉGALITÉ" : youWon ? "VICTOIRE" : "DÉFAITE";
+  const title = draw ? t("lanes.endDraw") : youWon ? t("lanes.victory") : t("lanes.defeat");
   const titleColor = draw ? "text-zinc-300" : youWon ? "text-emerald-300" : "text-rose-300";
   const auraColor =
     draw ? "rgba(161,161,170,0.4)" :
     youWon ? "rgba(52,211,153,0.55)" :
     "rgba(244,63,94,0.55)";
   const subtitle =
-    draw ? "Les deux héros sont tombés."
-    : youWon ? `${playerName} reste debout.`
-    : "L'adversaire t'a achevé.";
+    draw ? t("arena.end.subDraw")
+    : youWon ? t("arena.end.subWin", { name: playerName })
+    : t("arena.end.subLoss");
 
-  const reward = ECLAT_REWARD[outcome];
+  const reward = ARENA_ECLATS[outcome];
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-4 px-4 relative overflow-hidden">
@@ -94,21 +100,21 @@ export function ArenaMatchEnd({ board, onQuit, onRematch }: ArenaMatchEndProps) 
         className="flex items-center gap-4 text-xs text-ink"
       >
         <div className="flex flex-col items-center">
-          <span className="text-[9px] uppercase tracking-wider text-ink-muted">Toi</span>
+          <span className="text-[9px] uppercase tracking-wider text-ink-muted">{t("lanes.you")}</span>
           <span className={"font-black text-base " + (youWon ? "text-emerald-300" : "text-white")}>
-            ❤ {board.a.hp}
+            ❤ {me.hp}
           </span>
         </div>
         <div className="text-ink-faint">vs</div>
         <div className="flex flex-col items-center">
-          <span className="text-[9px] uppercase tracking-wider text-ink-muted">Adv</span>
+          <span className="text-[9px] uppercase tracking-wider text-ink-muted">{t("arena.end.opp")}</span>
           <span className={"font-black text-base " + (youWon ? "text-rose-300/70" : "text-rose-300")}>
-            ❤ {board.b.hp}
+            ❤ {opp.hp}
           </span>
         </div>
         <div className="text-ink-faint">·</div>
         <div className="flex flex-col items-center">
-          <span className="text-[9px] uppercase tracking-wider text-ink-muted">Tour</span>
+          <span className="text-[9px] uppercase tracking-wider text-ink-muted">{t("arena.end.turn")}</span>
           <span className="font-black text-base text-sky-300">{board.turn}</span>
         </div>
       </motion.div>
@@ -122,7 +128,7 @@ export function ArenaMatchEnd({ board, onQuit, onRematch }: ArenaMatchEndProps) 
       >
         <span className="text-xl">💎</span>
         <span className="text-cyan-100 font-black text-sm tabular-nums">+{reward}</span>
-        <span className="text-[10px] text-cyan-200 uppercase tracking-wider">éclats</span>
+        <span className="text-[10px] text-cyan-200 uppercase tracking-wider">{t("arena.end.eclats")}</span>
       </motion.div>
 
       {/* CTAs */}
@@ -132,7 +138,7 @@ export function ArenaMatchEnd({ board, onQuit, onRematch }: ArenaMatchEndProps) 
         transition={{ delay: 1.05, duration: 0.3 }}
         className="flex items-center gap-2 mt-2"
       >
-        <button
+        {onRematch && <button
           onClick={onRematch}
           className="px-5 py-2.5 rounded-2xl font-bold text-white text-sm shadow-lg"
           style={{
@@ -142,13 +148,13 @@ export function ArenaMatchEnd({ board, onQuit, onRematch }: ArenaMatchEndProps) 
             letterSpacing: "0.06em",
           }}
         >
-          🔁 Rejouer
-        </button>
+          {t("lanes.rematch")}
+        </button>}
         <button
           onClick={onQuit}
           className="px-5 py-2.5 rounded-2xl font-bold text-ink-muted hover:text-white text-sm bg-hairline ring-1 ring-hairline"
         >
-          Retour au menu
+          {t("lanes.backToMenu")}
         </button>
       </motion.div>
     </div>

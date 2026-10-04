@@ -218,8 +218,10 @@ function QuestRow({
             <motion.span
               aria-hidden
               className="absolute inset-y-0 -left-1/3 w-1/3"
-              style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)", transform: "skewX(-18deg)" }}
-              animate={{ left: ["-33%", "133%"] }}
+              // Balayage en `x` (transform) au lieu de `left` (layout à chaque image).
+              // 500 % de sa propre largeur (1/3 du bouton) = de -33 % à +133 %.
+              style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)", skewX: -18 }}
+              animate={{ x: ["0%", "500%"] }}
               transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 0.6, ease: "easeInOut" }}
             />
             <span className="relative">{t("quests.btn.claim")}</span>

@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { useIntensityValue } from "./useIntensityValue";
+import { useT } from "../../i18n";
 
 /**
  * PeekIntensitySlider — VERTICAL slider mounted inside the full-screen
@@ -22,6 +23,7 @@ export function PeekIntensitySlider({ setId, accent }: {
   accent: { from: string; to: string } | null;
 }) {
   const [intensity, setValue] = useIntensityValue(setId);
+  const t = useT();
   const MIN = 0.1, MAX = 2.0;
   const fillPct = ((intensity - MIN) / (MAX - MIN)) * 100;
   const accentGrad = accent
@@ -59,7 +61,7 @@ export function PeekIntensitySlider({ setId, accent }: {
       "
     >
       <div className="text-[9px] uppercase tracking-[0.22em] font-black text-white/95 px-2 py-0.5 rounded-full bg-black/55 backdrop-blur-md border border-white/15 drop-shadow">
-        Intensité
+        {t("premium.intensity")}
       </div>
       <div
         className="text-[10px] font-black tabular-nums px-2 py-0.5 rounded-full"
@@ -78,7 +80,7 @@ export function PeekIntensitySlider({ setId, accent }: {
       <div
         ref={trackRef}
         role="slider"
-        aria-label="Intensité des effets premium"
+        aria-label={t("premium.intensityAria")}
         aria-valuemin={MIN}
         aria-valuemax={MAX}
         aria-valuenow={intensity}
