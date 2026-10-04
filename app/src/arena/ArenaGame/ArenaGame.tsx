@@ -365,7 +365,8 @@ export function ArenaGame({
   // Online v1 : FORGE désactivée — le dépôt est une mutation de board HORS intent
   // (setBoard direct) → elle ne passe pas par le lockstep et desyncrait les deux
   // clients. À relayer plus tard. Local : handlers normaux.
-  const forgeTap = online ? () => {} : handleForgeTap;
+  // Tuto : Forge coupée aussi (déposer la carte du script la retirerait de la main).
+  const forgeTap = online || tutorial ? () => {} : handleForgeTap;
   const forgeDeposit = online ? (_id: CardId) => {} : handleForgeDeposit;
 
   // Rejet IMMÉDIAT d'une carte → remplacée EN PLACE (le joueur voit la nouvelle
@@ -913,7 +914,7 @@ export function ArenaGame({
         onRemoveSummon={removeSummon}
         onLock={handleLockTurn}
         onForgeTap={forgeTap}
-        onForgeDeposit={forgeDeposit}
+        onForgeDeposit={tutorial ? undefined : forgeDeposit}
         incomingAttackKey={heroHit?.side === "you" ? heroHit.key : null}
         playerName={player.nickname || "Toi"}
         playerAvatar={player.avatar}
