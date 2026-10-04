@@ -28,8 +28,9 @@ const GROUPS: SliderGroup[] = [
     knobs: [
       { knob: "chipCap", label: "Chip / tour (cap)", min: 0, max: 4 },
       { knob: "convergenceDmgCap", label: "Convergence (cap)", min: 2, max: 10 },
-      { knob: "intricationCap", label: "Intrication (cap)", min: 2, max: 10 },
+      { knob: "intricationCap", label: "Intrication (cap)", min: 0, max: 10 },
       { knob: "calculDiscount", label: "Calcul (−coût sorts)", min: 0, max: 3 },
+      { knob: "entropyHealReduction", label: "Entropie (−PV/soin adverse)", min: 0, max: 3 },
     ],
   },
   {

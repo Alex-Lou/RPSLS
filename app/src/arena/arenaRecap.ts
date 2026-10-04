@@ -66,6 +66,9 @@ export function buildTurnRecap(prev: BoardState, next: BoardState, mySide: Side,
   const dmgDealt = Math.max(0, prev[oppSide].hp - next[oppSide].hp);
   const dmgTaken = Math.max(0, prev[mySide].hp - next[mySide].hp);
   const heal = Math.max(0, next[mySide].hp - prev[mySide].hp);
+  // ENTROPIE (Cosmos) : PV de soin rognés ce tour, de mon côté et côté adverse.
+  const cut = (s: Side): number => Math.max(0, (next[s].entropyHealCut ?? 0) - (prev[s].entropyHealCut ?? 0));
+  const myCut = cut(mySide), oppCut = cut(oppSide);
   const engDelta = (engineGauge(next[mySide])?.value ?? 0) - (engineGauge(prev[mySide])?.value ?? 0);
 
   let headline: string;
@@ -86,7 +89,8 @@ export function buildTurnRecap(prev: BoardState, next: BoardState, mySide: Side,
   const chips: RecapChip[] = [];
   if (dmgDealt > 0) chips.push({ label: tNow("arena.recap.chip.dealt", { n: dmgDealt }), tone: "good" });
   if (dmgTaken > 0) chips.push({ label: tNow("arena.recap.chip.taken", { n: dmgTaken }), tone: "bad" });
-  if (heal > 0)     chips.push({ label: tNow("arena.recap.chip.heal", { n: heal }), tone: "good" });
+  if (heal > 0)     chips.push({ label: myCut > 0 ? tNow("arena.recap.chip.healEntropy", { n: heal, k: myCut }) : tNow("arena.recap.chip.heal", { n: heal }), tone: "good" });
+  if (oppCut > 0)   chips.push({ label: tNow("arena.recap.chip.entropyOpp", { k: oppCut }), tone: "engine" });
   if (engDelta > 0) chips.push({ label: tNow("arena.recap.chip.engine", { n: engDelta }), tone: "engine" });
 
   return { headline, tone, chips, key };

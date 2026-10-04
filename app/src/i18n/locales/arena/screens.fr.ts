@@ -56,7 +56,7 @@ const strings: Record<string, string> = {
   "arena.voie.spock.short": "Cosmos",
   "arena.voie.spock.bonus": "+{bonusAtk} ATK (ATK {atk} au lieu de {baseAtk})",
   "arena.voie.spock.but": "Remplir ta jauge de Voie ({cap}) : chaque duel RPSLS gagné par un Spock la fait monter → Finisher.",
-  "arena.voie.spock.plus": "LOGIQUE : tes Spock ignorent les sorts ciblés ET la Provocation adverse. Tanky ({hp} PV) + ATK élevée.",
+  "arena.voie.spock.plus": "LOGIQUE : tes Spock ignorent les sorts ciblés ET la Provocation adverse. Tanky ({hp} PV) + ATK élevée. ENTROPIE : chaque soin du héros adverse perd {entropy} PV (jamais moins de 1 PV par soin).",
   "arena.voie.spock.moins": "DÉTACHÉ : tes Spock ignorent aussi TES buffs (Surge, Précision…). Peu d’options offensives.",
   "arena.voie.spock.perso": "Jauge à 2+ : tes sorts coûtent {tempo} mana de moins. Finisher CALCUL : tous tes sorts coûtent {calcul} mana de moins (min 0).",
 

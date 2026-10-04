@@ -31,8 +31,9 @@ import { CREATURE_STATS, LANE_COUNT, type BoardState, type LaneIndex, type Plann
  *  nouvel effet de sort, changement d'ordre de résolution, fix de règle… Deux
  *  clients de versions différentes auront des hash différents → match refusé,
  *  plutôt qu'un desync silencieux.
- *  v2 (2026-10) : double KO par FATIGUE → départage (matchEnd.tieBreak) au lieu du nul. */
-export const ARENA_ENGINE_VERSION = 2;
+ *  v2 (2026-10) : double KO par FATIGUE → départage (matchEnd.tieBreak) au lieu du nul.
+ *  v3 (2026-10) : passif Cosmos ENTROPIE (arenaRules/entropy — soins adverses −1, plancher 1). */
+export const ARENA_ENGINE_VERSION = 3;
 
 /** Bornes de fil (anti-DoS) : un intent surdimensionné est rejeté AVANT toute
  *  logique. Les vrais caps de RÈGLE (sorts/tour) sont ré-appliqués par le

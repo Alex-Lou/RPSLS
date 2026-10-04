@@ -36,6 +36,9 @@ export function friendlyArenaLog(e: ArenaLogEntry): string | null {
     return tNow("arena.log.turn", { turn: x[1], a: x[2], b: x[3] });
   if (/BUT D'OR|Mort subite/i.test(m)) return tNow("arena.log.suddenDeath");
   if (/HARD CAP/.test(m)) return tNow("arena.log.hardCap");
+  // ENTROPIE (passif Cosmos) : un soin héros rogné.
+  if ((x = m.match(/^ENTROPIE → soin (\d+) réduit à (\d+) PV/)))
+    return tNow("arena.log.entropy", { from: x[1], to: x[2] });
 
   // ── Invocations ──
   if ((x = m.match(/^([ab]) pose (\w+) L(\d)/)))

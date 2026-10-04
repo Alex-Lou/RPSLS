@@ -1,5 +1,7 @@
 import { CREATURE_STATS, type Creature, type HeroState, type Side } from "../arenaTypes";
 import { BALANCE } from "../arenaBalance";
+import { alog } from "../arenaLog";
+import { entropyCut } from "./entropy";
 import type { Move } from "../../engine/game";
 
 /* ───────────────────────── Hero helpers ───────────────────────── */
@@ -17,7 +19,15 @@ export function healHero(hero: HeroState, amount: number): HeroState {
   // ÉCRASEMENT / CATACLYSME (Montagne) : « ne peut pas être soigné ce tour » →
   // TOUT soin héros (sorts, Sève, cartes à la pioche) passe par ici et est coupé.
   if (hero.healLockedThisTurn) return hero;
-  return { ...hero, hp: Math.min(hero.maxHp, hero.hp + amount) };
+  // ENTROPIE (Cosmos, PASSE ANTI-SOIN 2026-10) : face au Cosmos, chaque soin perd
+  // BALANCE.cosmos.entropyHealReduction PV (jamais sous 1, cf. entropy.ts). On ne
+  // compte que les PV RÉELLEMENT retirés (un soin à PV pleins n'affiche pas de
+  // faux « Entropie »).
+  const full = Math.min(hero.maxHp, hero.hp + amount);
+  const hp = Math.min(hero.maxHp, hero.hp + amount - entropyCut(hero, amount));
+  if (hp === full) return { ...hero, hp };
+  alog("spell", `ENTROPIE → soin ${full - hero.hp} réduit à ${hp - hero.hp} PV (Cosmos)`);
+  return { ...hero, hp, entropyHealCut: (hero.entropyHealCut ?? 0) + (full - hp) };
 }
 
 /* ───────────────────────── Creature helpers ───────────────────────── */

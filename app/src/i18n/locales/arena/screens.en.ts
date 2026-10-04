@@ -56,7 +56,7 @@ const strings: Record<string, string> = {
   "arena.voie.spock.short": "Cosmos",
   "arena.voie.spock.bonus": "+{bonusAtk} ATK ({atk} ATK instead of {baseAtk})",
   "arena.voie.spock.but": "Fill your Path gauge ({cap}): every RPSLS duel won by a Spock raises it → Finisher.",
-  "arena.voie.spock.plus": "LOGIC: your Spocks ignore targeted spells AND enemy Taunt. Tanky ({hp} HP) + high ATK.",
+  "arena.voie.spock.plus": "LOGIC: your Spocks ignore targeted spells AND enemy Taunt. Tanky ({hp} HP) + high ATK. ENTROPY: every heal on the enemy hero loses {entropy} HP (never below 1 HP per heal).",
   "arena.voie.spock.moins": "DETACHED: your Spocks also ignore YOUR buffs (Surge, Precision…). Few offensive options.",
   "arena.voie.spock.perso": "Gauge at 2+: your spells cost {tempo} less mana. CALCULATION Finisher: all your spells cost {calcul} less mana (min 0).",
 

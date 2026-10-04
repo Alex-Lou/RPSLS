@@ -88,7 +88,9 @@ export function ArenaHeroStrip({
   // Sangsue, etc.) → confusion "vie qui monte/descend mystère".
   const prevHpRef = useRef(hero.hp);
   const [dmgPop, setDmgPop] = useState<{ n: number; key: number } | null>(null);
-  const [healPop, setHealPop] = useState<{ n: number; key: number } | null>(null);
+  // `cut` = PV rognés par l'ENTROPIE (Cosmos adverse) sur ce soin → « Entropie −k ».
+  const [healPop, setHealPop] = useState<{ n: number; cut: number; key: number } | null>(null);
+  const prevCutRef = useRef(hero.entropyHealCut ?? 0);
   // Goutte de sang sous la barre de vie quand le héros est BAS (≤5 PV) et vient
   // de prendre un coup (Alex 2026-06-13). One-shot, timer nettoyé → leak-free.
   const [bloodDrip, setBloodDrip] = useState<{ key: number } | null>(null);
@@ -131,9 +133,10 @@ export function ArenaHeroStrip({
       setDmgPop({ n: prev - hero.hp, key: Date.now() });
       if (hero.hp > 0 && hero.hp <= 5) setBloodDrip({ key: Date.now() });
     } else if (hero.hp > prev) {
-      setHealPop({ n: hero.hp - prev, key: Date.now() });
+      setHealPop({ n: hero.hp - prev, cut: Math.max(0, (hero.entropyHealCut ?? 0) - prevCutRef.current), key: Date.now() });
     }
     prevHpRef.current = hero.hp;
+    prevCutRef.current = hero.entropyHealCut ?? 0;
   }, [hero.hp]);
   // Opp avant sa 1ʳᵉ étoile → Voie cachée (couleur neutre, pas de glyphe/nom, pas
   // de motif d'aura). `< 1` couvre le frame courant, `!voieSeen` la persistance.
@@ -192,6 +195,11 @@ export function ArenaHeroStrip({
               style={{ textShadow: "0 2px 8px rgba(52,211,153,0.85), 0 0 2px black" }}
             >
               +{healPop.n}
+              {healPop.cut > 0 && (
+                <span className="absolute top-full mt-[-2px] text-[10px] font-black uppercase tracking-wide text-violet-300 whitespace-nowrap">
+                  {t("arena.strip.entropyCut", { k: healPop.cut })}
+                </span>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

@@ -55,6 +55,8 @@ const strings: Record<string, string> = {
   "arena.recap.chip.dealt": "−{n} foe",
   "arena.recap.chip.taken": "−{n} you",
   "arena.recap.chip.heal": "+{n} HP",
+  "arena.recap.chip.healEntropy": "+{n} HP (Entropy −{k})",
+  "arena.recap.chip.entropyOpp": "Entropy −{k} HP opp",
   "arena.recap.chip.engine": "Path +{n} ★",
 
   "arena.engine.label.rockStack": "Mountain",
@@ -92,6 +94,7 @@ const strings: Record<string, string> = {
   "arena.log.theOppCreature": "the enemy creature",
   "arena.log.turn": "🕐 Turn {turn} — You {a} ❤ · Opponent {b} ❤",
   "arena.log.suddenDeath": "🌟 Perfect tie — SUDDEN DEATH!",
+  "arena.log.entropy": "🌌 Entropy (Cosmos): a {from} HP heal only restores {to}.",
   "arena.log.hardCap": "⏱ Turn limit reached — the most wounded hero loses.",
   "arena.log.summon": "🌟 {who}: {move} summoned on {lane}",
   "arena.log.supernovaHero": "💥 {who}: Supernova strikes {hero} (−6 ❤)",
