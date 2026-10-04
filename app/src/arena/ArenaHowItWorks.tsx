@@ -14,6 +14,7 @@ import { CREATURE_PASSIVES, CREATURE_STATS, MANA_CAP, MOVE_DESIGN_NOTES, TURN_HA
 import type { Move } from "../engine/game";
 import type { ReactNode } from "react";
 import { useT } from "../i18n";
+import { provocationRuleParams } from "./arenaVoieText";
 
 /** Rend un texte traduit où **gras** devient un <strong> (classe optionnelle). */
 export function richText(s: string, strongClass?: string): ReactNode[] {
@@ -96,9 +97,9 @@ export function ArenaHowItWorks({ onClose }: { onClose: () => void }) {
             body=""
             sub={[
               t("arena.how.whyRock.1"),
-              t("arena.how.whyRock.2"),
+              t("arena.how.whyRock.2", provocationRuleParams()),
               t("arena.how.whyRock.3"),
-              t("arena.how.whyRock.4"),
+              t("arena.how.whyRock.4", provocationRuleParams()),
             ]}
           />
           <Section

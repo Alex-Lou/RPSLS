@@ -233,11 +233,6 @@ function ComboBanner({ combo }: { combo: ComboTheme }) {
         (epic ? "text-amber-300/90" : rare ? "text-fuchsia-300/80" : "text-ink-muted")}>
         {tag}
       </div>
-      {combo.bonus != null && combo.bonus > 0 && (
-        <div className="text-[10px] uppercase tracking-wider text-amber-300/70 mt-1">
-          {t("lanes.styleBonus", { n: combo.bonus })}
-        </div>
-      )}
     </motion.div>
   );
 }
@@ -297,7 +292,7 @@ function SideLaneCard({
       </div>
       <div className="relative">
         <Hand move={move} size="sm" emphasis={isWin ? "winner" : isLoss ? "loser" : "default"} />
-        {favoured && revealed && <FavouredBadge winning={isWin} />}
+        {favoured && revealed && <FavouredBadge />}
       </div>
       <span className={
         "text-[9px] uppercase tracking-wider font-bold leading-none " +
@@ -313,30 +308,21 @@ function SideLaneCard({
 
 /**
  * Badge that pops on a lane reveal when the placed move was on its
- * favoured lane. The "+1" floats upward when it actually won the lane,
- * making the identity bonus *visible* in the moment.
+ * favoured lane. Purely cosmetic here: Constellation (local, bot and
+ * online) awards NO point for a favoured lane — that bonus only exists in
+ * Ranked (rankedRules.ts computeRoundBonuses, rendered by the ranked board).
+ * So no "+1" float: just the ✨ marker, win or lose.
  */
-function FavouredBadge({ winning }: { winning: boolean }) {
+function FavouredBadge() {
   return (
-    <>
-      <motion.span
-        initial={{ scale: 0, rotate: -30 }}
-        animate={{ scale: 1, rotate: 0 }}
-        transition={{ type: "spring", stiffness: 280, damping: 12, delay: 0.1 }}
-        className="absolute -top-2 -right-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400 text-zinc-900 shadow-lg flex items-center gap-1"
-      >
-        ✨
-      </motion.span>
-      {winning && (
-        <motion.span
-          initial={{ opacity: 0, y: 0, scale: 0.5 }}
-          animate={{ opacity: [0, 1, 1, 0], y: -28, scale: [0.5, 1.4, 1.2, 1] }}
-          transition={{ duration: 1.2, delay: 0.3 }}
-          className="absolute -top-1 left-1/2 -translate-x-1/2 text-amber-300 text-base font-black drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]"
-        >
-          +1 ✨
-        </motion.span>
-      )}
-    </>
+    <motion.span
+      aria-hidden
+      initial={{ scale: 0, rotate: -30 }}
+      animate={{ scale: 1, rotate: 0 }}
+      transition={{ type: "spring", stiffness: 280, damping: 12, delay: 0.1 }}
+      className="absolute -top-2 -right-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400 text-zinc-900 shadow-lg flex items-center gap-1"
+    >
+      ✨
+    </motion.span>
   );
 }

@@ -40,8 +40,9 @@ type View =
   | { kind: "ranked_bracket" }
   // Pre-match staging: deck check + pad swap + coin flip for the arena.
   // `direct` = duel rapide hors tournoi (retour lobby, pas de bracket) — Alex 2026-07.
-  | { kind: "ranked_prep"; oppName: string; oppAvatar: string; direct?: boolean }
-  | { kind: "ranked_match"; oppName: string; oppAvatar: string; arena?: Arena; direct?: boolean }
+  // oppName = graine de persona (oppPersona) ; oppLabel = nom affiché (défaut : oppName).
+  | { kind: "ranked_prep"; oppName: string; oppAvatar: string; oppLabel?: string; direct?: boolean }
+  | { kind: "ranked_match"; oppName: string; oppAvatar: string; oppLabel?: string; arena?: Arena; direct?: boolean }
   // Classé (classic 1v1) hub — its own lobby + tournament + match.
   | { kind: "classe_lobby" }
   | { kind: "classe_bracket" }
@@ -266,7 +267,7 @@ export function PlayPage({
             key="ranked-bracket"
             tournament={tournament}
             setTournament={setTournament}
-            onStartMatch={(name, avatar) => setView({ kind: "ranked_prep", oppName: name, oppAvatar: avatar })}
+            onStartMatch={(name, avatar, label) => setView({ kind: "ranked_prep", oppName: name, oppAvatar: avatar, oppLabel: label })}
             onBack={() => setView({ kind: "ranked_lobby" })}
           />
         )}
@@ -280,14 +281,14 @@ export function PlayPage({
               youAvatar={me.avatar}
               youThemeId={me.themeId}
               youBackgroundId={me.backgroundId ?? "default"}
-              oppName={view.oppName}
+              oppName={view.oppLabel ?? view.oppName}
               oppAvatar={view.oppAvatar}
               oppThemeId={persona.themeId}
               oppPadId={persona.padId}
               oppBackgroundId={persona.backgroundId}
               onBack={() => setView(view.direct ? { kind: "ranked_lobby" } : { kind: "ranked_bracket" })}
               onReady={(arena) =>
-                setView({ kind: "ranked_match", oppName: view.oppName, oppAvatar: view.oppAvatar, arena, direct: view.direct })
+                setView({ kind: "ranked_match", oppName: view.oppName, oppAvatar: view.oppAvatar, oppLabel: view.oppLabel, arena, direct: view.direct })
               }
             />
           );
@@ -299,7 +300,7 @@ export function PlayPage({
             <ArenaPadProvider value={view.arena?.side === "opp" ? view.arena.padId : null}>
               <RankedGame
                 winTo={3}
-                opponentName={view.oppName}
+                opponentName={view.oppLabel ?? view.oppName}
                 onQuit={() => setView(view.direct ? { kind: "ranked_lobby" } : { kind: "ranked_bracket" })}
                 onMatchResult={(won) => {
                   // Duel direct : retour au lobby (le match est déjà enregistré par

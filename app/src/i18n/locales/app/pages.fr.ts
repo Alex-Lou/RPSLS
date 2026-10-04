@@ -86,6 +86,26 @@ const strings: Record<string, string> = {
   "profile.badge.live": "ANIMÉ",
   "nav.menu.open": "Ouvrir le menu",
   "nav.menu.close": "Fermer le menu",
+  // Erreurs serveur génériques (online/serverErrors.ts) + états de revanche.
+  "online.serverErr.self_match": "Tu ne peux pas rejoindre ton propre salon. Partage ce code avec un ami, ou saisis le sien.",
+  "online.serverErr.lobby_not_found": "Aucun salon avec ce code. Vérifie le code, ou demande-en un nouveau à ton ami.",
+  "online.serverErr.bad_code": "Code invalide\u00a0: 6 caractères, lettres A–Z et chiffres 2–9.",
+  "online.serverErr.lobby_rate_limited": "Trop de codes invalides. Réessaie dans une minute.",
+  "online.serverErr.server_full": "Le serveur est complet pour le moment. Réessaie dans un instant.",
+  "online.serverErr.bad_best_of": "Format de match invalide (meilleur de 1 à 9, nombre impair).",
+  "online.serverErr.bad_win_to": "Format de match invalide (de 1 à 5 Manches gagnantes).",
+  "online.serverErr.bad_ccg_join": "Partie refusée par le serveur\u00a0: version de l’app incompatible. Mets l’app à jour.",
+  "online.serverErr.bad_message": "Le serveur n’a pas compris la demande. Mets l’app à jour puis réessaie.",
+  "online.serverErr.hello_limited": "Trop de tentatives de connexion. Reviens au menu et réessaie.",
+  "online.serverErr.auth_needed": "Connecte-toi à ton compte pour jouer en ligne.",
+  "online.serverErr.auth_failed": "Session invalide. Reconnecte-toi à ton compte.",
+  "online.serverErr.auth_transient": "Le serveur n’a pas pu vérifier ta session. Réessaie dans un instant.",
+  "online.serverErr.unknown": "Le serveur a refusé la demande (code\u00a0: {code}).",
+  "online.rematch.offerHint": "La proposition expire 30\u00a0s après la fin du match.",
+  "online.rematch.sent": "Revanche proposée",
+  "online.rematch.accepted": "Revanche acceptée",
+  "online.rematch.starting": "Lancement du nouveau match…",
+  "online.rematch.expired": "La proposition de revanche a expiré",
 };
 
 export default strings;

@@ -729,7 +729,8 @@ export function ArenaGame({
       },
       onAdvanceTurn: () => {
         setResolving(false);
-        setBoard((cur) => advanceToNextTurn(cur, rngPair.current));
+        // noSuddenDeath IDENTIQUE au resolver (double KO de fatigue → même départage).
+        setBoard((cur) => advanceToNextTurn(cur, rngPair.current, { noSuddenDeath: !!online }));
       },
       // Vibration de fin : UNE seule, dans l'effet de fin de match (perspective
       // mySide). Ici elle doublait la vibration.

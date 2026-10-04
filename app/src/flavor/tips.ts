@@ -43,8 +43,8 @@ export const TIPS: Tip[] = [
   { id: "winto-bestof5", category: "gameplay", icon: "🏆", text: "Constellation Ranked plays best-of-5 rounds." },
 
   // ───── Strategy ─────
-  { id: "combo-triple", category: "strategy", icon: "✨", text: "A combo (same move on all 3 lanes) gives +1 bonus point." },
-  { id: "favoured-lane", category: "strategy", icon: "🎯", text: "Each lane has a 'favoured' move that adds +1 when it wins there." },
+  { id: "combo-triple", category: "strategy", icon: "✨", text: "In Ranked, a combo (same move on all 3 lanes) gives +1 bonus point if you don't lose the round." },
+  { id: "favoured-lane", category: "strategy", icon: "🎯", text: "In Ranked, each lane has a 'favoured' move that adds +1 when it wins there." },
   { id: "save-mana", category: "strategy", icon: "🔋", text: "Saving mana for round 4 unlocks Supernova plays." },
   { id: "curse-deny", category: "strategy", icon: "💀", text: "Curse is best on the lane your opponent always plays safe." },
   { id: "precision-favour", category: "strategy", icon: "🎯", text: "Precision marks any lane as favoured — boost a non-natural pick." },

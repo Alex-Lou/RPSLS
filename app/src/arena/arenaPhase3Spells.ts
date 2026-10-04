@@ -99,7 +99,7 @@ export function applyMascaradeEnchainee(board: BoardState, side: Side, spell: Pl
   return withMyCreatureOnLane(board, side, spell.lane, { ...me, dodgeCharges: Math.max(me.dodgeCharges, Math.min(BALANCE.mirage.dodgeSpellCap, me.dodgeCharges + 1)) });
 }
 
-/** Fuite Masquée (Mirage) — mon Lézard ciblé gagne +2 charges d'Esquive (cap 3)
+/** Fuite Masquée (Mirage) — mon Lézard ciblé gagne +2 charges d'Esquive (cap mirage.dodgeSpellCap)
  *  mais −1 ATK ce tour (esquive contre tempo). Lizard-only : fizzle sinon. */
 export function applyFuiteMasquee(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   if (spell.kind !== "lane") return board;
@@ -184,7 +184,7 @@ export function applyLoiCausalite(board: BoardState, side: Side, spell: PlayedSp
 }
 
 /** Convergence Cosmique (Cosmos) — dégâts directs au héros adverse égaux à MON
- *  mana max actuel, PLAFONNÉS à convergenceDmgCap (=3, anti-burst-éco). Récompense le ramp
+ *  mana max actuel, PLAFONNÉS à BALANCE.cosmos.convergenceDmgCap (anti-burst-éco). Récompense le ramp
  *  Offre/Dilatation/Sablier. Inévitabilité d'éco, distincte de Singularité
  *  (qui scale sur le nombre de créatures). */
 export function applyConvergence(board: BoardState, side: Side): BoardState {

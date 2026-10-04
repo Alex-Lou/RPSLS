@@ -32,8 +32,9 @@ import { buildCpuSignatureDeck } from "../src/arena/arenaDecks";
 import { cpuArenaDecision } from "../src/arena/arenaAI";
 import { TURN_HARD_CAP } from "../src/arena/arenaTypes/constants";
 import { makeRngPair } from "../src/engine/rng";
+import { makeCreature } from "../src/arena/arenaRules/heroCreature";
 import type { Move } from "../src/engine/game";
-import type { CpuPersona, TurnIntent } from "../src/arena/arenaTypes";
+import type { BoardState, CpuPersona, TurnIntent } from "../src/arena/arenaTypes";
 
 /* ── Piège anti-fuite ─────────────────────────────────────────────────────── */
 
@@ -183,6 +184,42 @@ try {
 } catch (e) {
   failures++;
   console.log(`✗ smoke sans pair : le chemin par défaut a crashé — ${(e as Error).message}`);
+}
+
+// DOUBLE KO PAR FATIGUE (Alex 2026-10 « Plafond 20 + départage ») : les deux
+// decks secs, la fatigue tue les DEUX héros au même advance → MÊME départage que
+// le double KO de combat (PV AVANT la fatigue, puis créatures vivantes, puis mort
+// subite vs-CPU / NUL online). Un seul mort garde endReason "fatigue". Seedé +
+// piégé (le verdict doit être lockstep-safe).
+{
+  const pair = makeRngPair(99);
+  const base = withTrap(() => makeInitialBoard(
+    buildCpuSignatureDeck("rock"), buildCpuSignatureDeck("paper"), "rock", "paper", undefined, pair));
+  const dry = (b: BoardState, hpA: number, hpB: number, stacks: number): BoardState => ({
+    ...b, turn: 12, phase: "planning",
+    a: { ...b.a, hp: hpA, deck: [], discard: [], fatigueStacks: stacks },
+    b: { ...b.b, hp: hpB, deck: [], discard: [], fatigueStacks: stacks },
+  });
+  const cases: { label: string; board: BoardState; noSD: boolean; expect: (r: BoardState) => boolean }[] = [
+    { label: "PV avant fatigue 3 vs 2 → a gagne (tiebreak-start-hp)", board: dry(base, 3, 2, 4), noSD: false,
+      expect: (r) => r.phase === "match-end" && r.endReason === "tiebreak-start-hp" && r.a.hp >= 1 && r.b.hp === 0 },
+    { label: "PV égaux, b a 1 créature de plus → b gagne (tiebreak-board)", noSD: true,
+      board: (() => { const d = dry(base, 2, 2, 4); return { ...d, lanes: d.lanes.map((l, i) => (i === 1 ? { ...l, b: makeCreature("paper", "b") } : l)) }; })(),
+      expect: (r) => r.phase === "match-end" && r.endReason === "tiebreak-board" && r.b.hp >= 1 && r.a.hp === 0 },
+    { label: "égalité totale vs-CPU → mort subite", board: dry(base, 2, 2, 4), noSD: false,
+      expect: (r) => r.phase === "sudden-death" && r.endReason === "sudden-death" },
+    { label: "égalité totale online (noSuddenDeath) → NUL propre", board: dry(base, 2, 2, 4), noSD: true,
+      expect: (r) => r.phase === "match-end" && r.endReason === "draw" && r.a.hp === 0 && r.b.hp === 0 },
+    { label: "un seul mort → endReason fatigue", board: { ...dry(base, 2, 9, 4) }, noSD: true,
+      expect: (r) => r.phase === "match-end" && r.endReason === "fatigue" && r.a.hp === 0 && r.b.hp > 0 },
+  ];
+  for (const c of cases) {
+    const r1 = withTrap(() => advanceToNextTurn(c.board, makeRngPair(7), { noSuddenDeath: c.noSD }));
+    const r2 = withTrap(() => advanceToNextTurn(c.board, makeRngPair(7), { noSuddenDeath: c.noSD }));
+    const good = c.expect(r1) && JSON.stringify(r1) === JSON.stringify(r2);
+    if (!good) failures++;
+    console.log(`${good ? "✓" : "✗"} fatigue double KO — ${c.label} (phase=${r1.phase}, reason=${r1.endReason}, a=${r1.a.hp}, b=${r1.b.hp})`);
+  }
 }
 
 console.log(`\n── Résultat : ${games} parties seedées ×2 runs — ${failures === 0 ? "TOUT EST DÉTERMINISTE ✅" : `${failures} ÉCHEC(S) ❌`} ──`);

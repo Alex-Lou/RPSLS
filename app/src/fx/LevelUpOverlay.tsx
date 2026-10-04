@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
 import { levelFromXp } from "../engine/leveling";
 import { useT } from "../i18n";
 import { hapticMatchWin } from "../haptic";
+import {
+  MATCH_GRACE_MS, celebratedLevel, levelUpOwnedByMatchEnd, subscribeLevelUpGate,
+} from "./levelUpGate";
 
 /**
  * Level-up celebration — a FULLY CODED WebGL burst (no PNG sprites). A single
@@ -11,6 +14,10 @@ import { hapticMatchWin } from "../haptic";
  * hot bloom core and a sparkle field, all driven by a normalised 0→1 time so
  * the explosion peaks early then fades out smoothly over ~2.5s. The "LEVEL UP"
  * banner springs in over the top.
+ *
+ * Only for level-ups gained OUTSIDE a match end screen: a level earned in a
+ * match is celebrated by the end screen's LevelBar (see levelUpGate.ts); the
+ * overlay only catches up afterwards if that screen never showed it.
  *
  * Perf: one full-screen triangle, one shader, DPR-capped, auto-unmounts when
  * the parent clears the celebration (so the rAF loop is short-lived).
@@ -23,17 +30,43 @@ export function LevelUpWatcher() {
   const level = levelFromXp(xp).level;
   const prev = useRef(level);
   const [celebrate, setCelebrate] = useState<number | null>(null);
+  // Niveau gagné en match, laissé à l'écran de fin (voir levelUpGate.ts).
+  const deferred = useRef<number | null>(null);
+  const graceTimer = useRef<number | null>(null);
+
+  // Rattrapage : l'écran de fin est parti (ou n'est jamais venu) sans avoir
+  // montré ce niveau → on le célèbre maintenant, une seule fois.
+  const flush = useCallback(() => {
+    const lvl = deferred.current;
+    if (lvl === null || levelUpOwnedByMatchEnd()) return;
+    deferred.current = null;
+    if (lvl > celebratedLevel()) setCelebrate(lvl);
+  }, []);
 
   useEffect(() => {
     if (level > prev.current) {
-      setCelebrate(level);
-      hapticMatchWin();
-      const id = window.setTimeout(() => setCelebrate(null), DURATION_S * 1000 + 200);
-      prev.current = level;
-      return () => window.clearTimeout(id);
+      if (levelUpOwnedByMatchEnd()) {
+        deferred.current = Math.max(deferred.current ?? 0, level);
+        if (graceTimer.current !== null) window.clearTimeout(graceTimer.current);
+        graceTimer.current = window.setTimeout(flush, MATCH_GRACE_MS + 100);
+      } else {
+        setCelebrate(level);
+      }
     }
     prev.current = level;
-  }, [level]);
+  }, [level, flush]);
+
+  useEffect(() => subscribeLevelUpGate(flush), [flush]);
+  useEffect(() => () => {
+    if (graceTimer.current !== null) window.clearTimeout(graceTimer.current);
+  }, []);
+
+  useEffect(() => {
+    if (celebrate === null) return;
+    hapticMatchWin();
+    const id = window.setTimeout(() => setCelebrate(null), DURATION_S * 1000 + 200);
+    return () => window.clearTimeout(id);
+  }, [celebrate]);
 
   return (
     <AnimatePresence>

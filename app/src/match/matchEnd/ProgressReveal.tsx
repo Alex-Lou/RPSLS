@@ -10,6 +10,7 @@
  * Les maths viennent des helpers existants (levelFromXp, rankProgress,
  * levelUpEclats, LEVEL_UP_STARS) : aucun barème dupliqué ici.
  */
+import { useEffect } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useT } from "../../i18n";
 import { formatNumber } from "../../i18n/format";
@@ -18,6 +19,7 @@ import { levelFromXp } from "../../engine/leveling";
 import { rankFromLp, rankProgress } from "../../engine/rank";
 import { LEVEL_UP_STARS, levelUpEclats } from "../../engine/economy";
 import { SETTLE_MS, useAfter, useBeforeAfter, useReduced } from "./matchEndHooks";
+import { markLevelCelebrated } from "../../fx/levelUpGate";
 
 const FILL_S = 1.3;
 /** Délai (s) depuis le montage de la barre, `delay` étant compté depuis le
@@ -91,6 +93,8 @@ export function LevelBar({ xpGained, delay }: { xpGained: number; delay: number 
   // Le libellé bascule sur le nouveau niveau à mi-course du « tour » de barre.
   const crossed = useAfter((local(delay) + FILL_S * 0.5) * 1000, settled && leveled);
   const shown = leveled && crossed ? la : leveled ? lb : la;
+  // Badge « NIVEAU N ! » montré → l'overlay global n'a pas à le rejouer.
+  useEffect(() => { if (leveled && crossed) markLevelCelebrated(la.level); }, [leveled, crossed, la.level]);
   if (!settled) return <div className="h-9 w-full" aria-hidden />;
   return (
     <div className="w-full flex flex-col gap-1">

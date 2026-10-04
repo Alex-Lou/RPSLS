@@ -21,10 +21,15 @@ import type { AppState } from "./storeTypes";
 import { defaultPlayer, detectLocale, defaultServerConfig, HISTORY_LIMIT } from "./storeDefaults";
 import { applyRankedUnlocks } from "./rankedUnlocks";
 import { enqueueCpuReward, enqueueDailyClaim, enqueueUnlocks, notifyLevelUp } from "../online/wallet";
+import { deferLevelUpToMatchEnd } from "../fx/levelUpGate";
 
 /** Passage de niveau (XP avant → après) : le serveur paiera ✦ + 💎. */
-function checkLevelUp(xpBefore: number, xpAfter: number): void {
-  if (levelFromXp(xpAfter).level > levelFromXp(xpBefore).level) notifyLevelUp();
+function checkLevelUp(xpBefore: number, xpAfter: number, fromMatch = false): void {
+  if (levelFromXp(xpAfter).level > levelFromXp(xpBefore).level) {
+    // Niveau gagné en match : c'est l'écran de fin qui le célèbre (une fois).
+    if (fromMatch) deferLevelUpToMatchEnd();
+    notifyLevelUp();
+  }
 }
 
 export const createSlice: StateCreator<AppState> = (set, get) => ({
@@ -119,7 +124,7 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
       enqueueCpuReward(claimMode, m.outcome, { bestOf: m.bestOf, sweep });
     }
     enqueueUnlocks((get().player.cardCollection ?? []).filter((id) => !before.includes(id)));
-    checkLevelUp(xpBefore, get().player.xp);
+    checkLevelUp(xpBefore, get().player.xp, true);
   },
 
   // Ladder Classé SEUL (classeLp + classeStats), sans toucher rankLp/xp/history —
@@ -274,7 +279,7 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
     // (fin de match ccg) ; contre le CPU, le gain est réclamé (cf. recordMatch).
     if (!meta?.online && !meta?.forfeit) enqueueCpuReward("arena", outcome);
     enqueueUnlocks((get().player.cardCollection ?? []).filter((id) => !before.includes(id)));
-    checkLevelUp(xpBefore, get().player.xp);
+    checkLevelUp(xpBefore, get().player.xp, true);
   },
 
   restoreHistory: (h) => set({ history: h }),

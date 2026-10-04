@@ -10,14 +10,21 @@ import {
 } from "../arenaTypes";
 import { creatureEffectiveAtk } from "./heroCreature";
 import { drawCards } from "./boardInit";
+import { tieBreak } from "./matchEnd";
 import { randomPair, type RngPair } from "../../engine/rng";
 
 /* ───────────────────────── Turn lifecycle ───────────────────────── */
 
 /** Advance the board to the next planning turn: mana ↑ by 1 (cap MANA_CAP),
  *  mana refreshes to maxMana, each hero draws 1 card. Clears any per-turn
- *  reveal state (Augur, etc.). */
-export function advanceToNextTurn(board: BoardState, rng?: RngPair): BoardState {
+ *  reveal state (Augur, etc.).
+ *  `opts.noSuddenDeath` (online) : un DOUBLE KO par fatigue finit en NUL propre
+ *  au lieu de la mort subite — MÊME option que resolveTurn / runResolverFlow. */
+export function advanceToNextTurn(
+  board: BoardState,
+  rng?: RngPair,
+  opts: { noSuddenDeath?: boolean } = {},
+): BoardState {
   const r = rng ?? randomPair(); // repli unique (vs-CPU / sims), cf. engine/rng.ts
   const nextTurn = board.turn + 1;
   alogSetTurn(nextTurn);
@@ -122,17 +129,21 @@ export function advanceToNextTurn(board: BoardState, rng?: RngPair): BoardState 
   const nextBTurns = Math.max(0, (board.augurTurnsLeftB ?? 0) - 1);
   // Si la FATIGUE met un héros à 0 PV en début de tour, la partie FINIT ici
   // (le useEffect ArenaGame sur board.phase==="match-end" enregistre + affiche
-  // l'écran de fin). Les deux à 0 le même tour → match-end = nul (matchResult).
-  // En entrée d'advanceToNextTurn les 2 héros sont >0 (le resolver a déjà géré
-  // les morts de combat) → seul un coup de fatigue peut faire passer ≤0 ici.
-  const fatiguePhase = a.hp <= 0 || b.hp <= 0 ? "match-end" : "planning";
-  return {
+  // l'écran de fin). En entrée d'advanceToNextTurn les 2 héros sont >0 (le
+  // resolver a déjà géré les morts de combat) → seul un coup de fatigue peut
+  // faire passer ≤0 ici.
+  //  - UN seul héros à 0 → KO par fatigue (endReason "fatigue").
+  //  - les DEUX à 0 le même tour → MÊME départage que le double KO de combat
+  //    (Alex 2026-10 « Plafond 20 + départage », cf. matchEnd.tieBreak) : PV
+  //    AVANT la fatigue (= début de ce coup), puis créatures vivantes, puis mort
+  //    subite (vs-CPU) / NUL propre (online, noSuddenDeath).
+  const aDead = a.hp <= 0;
+  const bDead = b.hp <= 0;
+  const base: BoardState = {
     ...board,
     lanes: lanesAfterFinishers,
     turn: nextTurn,
-    phase: fatiguePhase,
-    // Raison affichée sur l'écran de fin (sinon une mort de fatigue n'en avait pas).
-    ...(fatiguePhase === "match-end" ? { endReason: "fatigue" as const } : {}),
+    phase: "planning",
     a, b,
     augurRevealedA: nextATurns > 0 ? board.augurRevealedA : [],
     augurRevealedB: nextBTurns > 0 ? board.augurRevealedB : [],
@@ -149,6 +160,13 @@ export function advanceToNextTurn(board: BoardState, rng?: RngPair): BoardState 
     lastSpellAppliedA: undefined,
     lastSpellAppliedB: undefined,
   };
+  if (aDead && bDead) {
+    alog("turn", `DOUBLE KO FATIGUE (a.hp=${a.hp}, b.hp=${b.hp}) → départage`);
+    return tieBreak({ a: safeA.hp, b: safeB.hp }, base, !!opts.noSuddenDeath);
+  }
+  // Raison affichée sur l'écran de fin (sinon une mort de fatigue n'en avait pas).
+  if (aDead || bDead) return { ...base, phase: "match-end", endReason: "fatigue" };
+  return base;
 }
 
 function refreshHero(hero: HeroState): HeroState {

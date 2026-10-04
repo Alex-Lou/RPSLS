@@ -73,10 +73,10 @@ export interface HeroState {
    *  anti-taunt) pour toutes mes créatures Tranchant. Vérifié dans
    *  resolveLaneCombat (save check) et findDeflector (skip). */
   lameActive?: boolean;
-  /** Lot D — flag MÉTAMORPHOSE : Esquive infinie pour mes Lézard (dodge
-   *  refresh à chaque endOfTurnReset). */
+  /** Lot D — flag MÉTAMORPHOSE : posé au cast (recharge UNIQUE de l'Esquive de
+   *  mes Lézards, cf. arenaFinishers.applyMetamorphose — plus de refresh/tour). */
   metamorphoseActive?: boolean;
-  /** Lot D — flag CALCUL QUANTIQUE : tous mes sorts coûtent −1m (min 0).
+  /** Lot D — flag CALCUL QUANTIQUE : tous mes sorts coûtent −BALANCE.cosmos.calculDiscount (min 0).
    *  Vérifié dans applyAllSpells.cost. */
   calculActive?: boolean;
   /** SILLAGE SPECTRAL (Mirage, 2026-06-28) — aura active après cast : la 1ère
