@@ -140,7 +140,9 @@ function SidebarBody({
       </div>
 
       {/* Nav */}
-      <nav className="mt-6 flex flex-col gap-1">
+      {/* Items ~48 px (py-2 + icône 32) au lieu de ~60 : tout le menu tient
+          mieux sur un téléphone, et le fondu bas signale qu'il reste à défiler. */}
+      <nav className="mt-4 flex flex-col gap-0.5">
         {NAV.map((item) => {
           const active = page === item.id;
           return (
@@ -148,7 +150,7 @@ function SidebarBody({
               key={item.id}
               onClick={() => handleNav(item.id)}
               className={
-                "flex items-center gap-3 px-3 py-3 rounded-xl text-base font-semibold tracking-wide transition " +
+                "flex items-center gap-3 px-3 py-2 rounded-xl text-base font-semibold tracking-wide transition " +
                 (active
                   ? "bg-hairline text-white"
                   : "text-ink-muted hover:text-white hover:bg-hairline")
@@ -179,6 +181,8 @@ function SidebarBody({
           );
         })}
       </nav>
+      {/* Indice de défilement : fondu collé en bas de la zone scrollable. */}
+      <div aria-hidden className="sticky bottom-0 h-6 pointer-events-none bg-gradient-to-t from-surface-raised to-transparent" />
       </div>
 
       {/* Pinned footer — language always reachable, kept above the Android nav. */}

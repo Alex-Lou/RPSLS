@@ -71,7 +71,15 @@ export interface BoardState {
    *  leur lane si libre). Posé par applyPhenix, consommé par endOfTurnCleanup. */
   phenixReviveA?: { lane: LaneIndex; move: Move }[];
   phenixReviveB?: { lane: LaneIndex; move: Move }[];
+  /** Raison de la fin de match (Alex 2026-10 « Plafond 20 + départage ») —
+   *  posée par decideMatchEnd (arenaRules/matchEnd), lisible par l'écran de fin. */
+  endReason?: MatchEndReason;
 }
+
+/** ko = un héros à 0 ; cap-hp = plafond, PV les plus bas perdent ;
+ *  tiebreak-start-hp / tiebreak-board = départage (PV de début de tour /
+ *  créatures vivantes) ; sudden-death = mort subite RPSLS ; draw = nul (online). */
+export type MatchEndReason = "ko" | "cap-hp" | "tiebreak-start-hp" | "tiebreak-board" | "sudden-death" | "draw";
 
 export type ArenaPhase =
   | "draw"        // turn start, mana up, draw a card

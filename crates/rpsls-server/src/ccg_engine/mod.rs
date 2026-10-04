@@ -402,7 +402,7 @@ fn broadcast_end(
     // Éclats Arena crédités par le serveur, JAMAIS sur un match annulé (desync)
     // ni sur une partie quasi pas jouée (`paid` = false, cf. MIN_PAID_TURNS).
     if !desync && paid {
-        crate::wallet::handlers::credit_match_end(a, b, winner, forfeit, "arena");
+        crate::wallet::handlers::credit_match_end(a, b, winner, forfeit, "arena", true);
     }
     // Pas de leaderboard::record_result — beta sans LP (relais aveugle =
     // résultat client-authoritative). Sur desync=true, aucun crédit de toute façon.

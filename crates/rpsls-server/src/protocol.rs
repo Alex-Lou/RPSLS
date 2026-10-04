@@ -148,13 +148,35 @@ pub enum ClientMessage {
     ClaimUnlocks { card_ids: Vec<String> },
     /// Fin de saison (horloge serveur).
     ClaimSeason,
+    /// Passages de niveau : `level` = niveau ACTUEL du client (calculé depuis
+    /// l'XP). Le serveur paie les niveaux pas encore payés, à débit borné.
+    ClaimLevel { level: u32 },
+    /// Défis quotidiens réclamés (au plus 3 par date, ±1 jour du jour serveur).
+    ClaimDailies { claims: Vec<DailyClaim> },
 }
 
-/// Un gain de match vs CPU à réclamer (`mode` : mode de `eclats_per_win`, ou "arena").
+/// Un gain de match vs CPU à réclamer (`mode` : casual | ranked | constellation
+/// | arena). Champs optionnels : anciens clients → ×1, sans anti-rejeu.
 #[derive(Debug, Clone, Deserialize)]
 pub struct CpuReward {
     pub mode: String,
     pub outcome: String,
+    /// Id unique généré par le client (anti-rejeu, cf. `recent_claim_ids`).
+    #[serde(default)]
+    pub id: Option<String>,
+    /// bestOf (classique) ou winTo (Constellation) → multiplicateur de longueur.
+    #[serde(default)]
+    pub best_of: Option<u32>,
+    /// Victoire sans manche concédée (déblocage « vortex »).
+    #[serde(default)]
+    pub sweep: bool,
+}
+
+/// Un défi quotidien réclamé : `date` = « AAAA-MM-JJ » (jour local du client).
+#[derive(Debug, Clone, Deserialize)]
+pub struct DailyClaim {
+    pub date: String,
+    pub id: String,
 }
 
 /* ──────────── Server → Client ──────────── */
@@ -329,6 +351,9 @@ pub enum ServerMessage {
         eclats: Option<u64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         dust: Option<u64>,
+        /// Étoiles créditées (passage de niveau, saison).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        stars: Option<u64>,
         /// Cartes ajoutées (craft, déblocages).
         #[serde(skip_serializing_if = "Vec::is_empty")]
         cards: Vec<String>,

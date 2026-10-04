@@ -3,6 +3,7 @@
  * Pur TS, sérialisable (prêt à passer dans un Web Worker plus tard si besoin).
  */
 import type { Move } from "../../engine/game";
+import type { MatchEndReason } from "../../arena/arenaTypes";
 
 export type Diff = "easy" | "normal" | "hard";
 
@@ -27,6 +28,8 @@ export interface MatchTrace {
   hpBByTurn: number[];
   finisherA: boolean;
   finisherB: boolean;
+  /** Raison de fin (KO, plafond, départage, mort subite…) — cf. decideMatchEnd. */
+  endReason?: MatchEndReason;
 }
 
 /** Stats agrégées d'UNE Voie sur tout un batch (toutes positions/adversaires). */

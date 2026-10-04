@@ -410,13 +410,18 @@ export function Game({
           />
         </div>
 
-        <div className="relative w-full h-full flex items-center justify-center p-3 sm:p-8">
+        {/* items-center-safe + overflow-y-auto : un panneau plus haut que le
+            plateau (écran de fin sur petit téléphone) s'aligne en haut et
+            défile, au lieu d'être rogné des deux côtés (trophée / pied coupés). */}
+        <div className="relative w-full h-full flex items-center-safe justify-center p-3 sm:p-8 overflow-y-auto overflow-x-hidden">
           <AnimatePresence mode="wait">
         {phase.kind === "p1-pick" && (
           <PickPanel
             key="p1"
             title={t("match.pickTitle", { name: labelA })}
-            subtitle={isHotseat ? t("match.pickHotseat") : t("match.pickSubtitle")}
+            // « 8 secondes pour verrouiller » n'a de sens qu'avec le chrono
+            // (hotseat) : vs CPU il n'y a pas de compte à rebours.
+            subtitle={isHotseat ? t("match.pickHotseat") : undefined}
             onPick={onP1Pick}
             onTimeout={isHotseat ? undefined : onP1Timeout}
             // Solo vs CPU = no countdown (no move played for you). Hotseat keeps
@@ -503,7 +508,10 @@ export function Game({
       </div>
 
       {/* Useful facts panel — collapsible, fills the space below the board */}
-      <MatchFacts mode={mode} mood={!isHotseat ? mood : null} difficulty={difficulty} />
+      {/* Masqué sur l'écran de fin : la place va au panneau de résultats. */}
+      {phase.kind !== "match-end" && (
+        <MatchFacts mode={mode} mood={!isHotseat ? mood : null} difficulty={difficulty} />
+      )}
     </motion.div>
   );
 }

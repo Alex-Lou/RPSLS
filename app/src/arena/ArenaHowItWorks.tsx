@@ -10,7 +10,7 @@
 
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
-import { CREATURE_PASSIVES, CREATURE_STATS, MOVE_DESIGN_NOTES } from "./arenaTypes";
+import { CREATURE_PASSIVES, CREATURE_STATS, MANA_CAP, MOVE_DESIGN_NOTES, TURN_HARD_CAP } from "./arenaTypes";
 import type { Move } from "../engine/game";
 import type { ReactNode } from "react";
 import { useT } from "../i18n";
@@ -57,21 +57,21 @@ export function ArenaHowItWorks({ onClose }: { onClose: () => void }) {
             title={t("arena.how.turn.title")}
             body=""
             sub={[
-              t("arena.how.turn.1"),
+              t("arena.how.turn.1", { maxMana: MANA_CAP }),
               t("arena.how.turn.2"),
               t("arena.how.turn.3"),
               t("arena.how.turn.4"),
               t("arena.how.turn.5"),
               t("arena.how.turn.6"),
               t("arena.how.turn.7"),
-              t("arena.how.turn.8"),
+              t("arena.how.turn.8", { cap: TURN_HARD_CAP }),
             ]}
           />
           <Section
             title={t("arena.how.example.title")}
             body={t("arena.how.example.body")}
           />
-          <Section title={t("arena.how.mana.title")} body={t("arena.how.mana.body")} />
+          <Section title={t("arena.how.mana.title")} body={t("arena.how.mana.body", { maxMana: MANA_CAP })} />
           <Section title={t("arena.how.persist.title")} body={t("arena.how.persist.body")} />
           <Section
             title={t("arena.how.combat.title")}

@@ -14,10 +14,11 @@ import {
   applySummons,
   creditManaGrants,
   creatureEffectiveAtk,
+  decideMatchEnd,
   endOfTurnCleanup,
   resolveLaneCombatAt,
 } from "./arenaRules";
-import { CREATURE_STATS, TURN_HARD_CAP, moveCountersMove, type BoardState, type LaneIndex, type Side, type TurnIntent } from "./arenaTypes";
+import { CREATURE_STATS, moveCountersMove, type BoardState, type LaneIndex, type Side, type TurnIntent } from "./arenaTypes";
 import type { Move } from "../engine/game";
 import type { RngPair } from "../engine/rng";
 import type { CardId } from "../ranked/rankedTypes";
@@ -520,45 +521,15 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
           if (aborted) return;
           b = endOfTurnCleanup(b, rng);
           const prePhase = b.phase; // phase de jeu AVANT tout flip match-end (pour l'écran d'attente du coup fatal)
-          if (b.a.hp <= 0 && b.b.hp <= 0) {
-            // Round 10 VRAI BUT D'OR : égalité parfaite → phase sudden-death
-            // (Mort subite RPSLS) au lieu de match-end direct. ArenaGame
-            // détecte cette phase et affiche le component ArenaSuddenDeath.
-            alog("turn", `MATCH END — ÉGALITÉ (a.hp=${b.a.hp}, b.hp=${b.b.hp}) → 🌟 BUT D'OR / Mort subite RPSLS`);
-            if (!noSuddenDeath) {
-              b = { ...b, phase: "sudden-death" };
-              setBoard(b);
-              // Pas de onMatchEnd ici — le sudden-death component va le triggerer
-              // après résolution. Délai 1.6s pour laisser respirer la transition.
-              return;
-            }
-            // Online : pas de mort subite (non déterministe) → on tombe en
-            // match-end NUL ci-dessous (les deux héros sont déjà à ≤0).
-          }
-          if (b.a.hp <= 0 || b.b.hp <= 0) {
-            b = { ...b, phase: "match-end" };
-          } else if (b.turn >= TURN_HARD_CAP) {
-            // Fail-safe documenté (arenaTypes.TURN_HARD_CAP) mais jamais câblé
-            // jusqu'ici : un match trop défensif doit FINIR. Au tour 30 résolu,
-            // le héros au HP le plus bas perd (HP forcé à 0 pour que MatchEnd
-            // et recordArenaMatch lisent le verdict normalement). HP égaux →
-            // BUT D'OR, même chemin que l'égalité parfaite.
-            if (b.a.hp === b.b.hp) {
-              alog("turn", `HARD CAP T${b.turn} — HP égaux (${b.a.hp}) → 🌟 BUT D'OR / Mort subite RPSLS`);
-              if (!noSuddenDeath) {
-                b = { ...b, phase: "sudden-death" };
-                setBoard(b);
-                return;
-              }
-              // Online : NUL forcé (les deux à 0 → match-end draw), pas de mort subite.
-              b = { ...b, a: { ...b.a, hp: 0 }, b: { ...b.b, hp: 0 }, phase: "match-end" };
-            } else {
-              const aLoses = b.a.hp < b.b.hp;
-              alog("turn", `HARD CAP T${b.turn} — ${aLoses ? "a" : "b"} perd (HP ${b.a.hp} vs ${b.b.hp})`);
-              b = aLoses
-                ? { ...b, a: { ...b.a, hp: 0 }, phase: "match-end" }
-                : { ...b, b: { ...b.b, hp: 0 }, phase: "match-end" };
-            }
+          // Verdict de fin de tour : SOURCE UNIQUE partagée avec resolveTurn (pur)
+          // → KO, double KO / plafond à PV égaux → départage (PV de début de tour,
+          // puis créatures vivantes), puis mort subite (vs-CPU) ou NUL (online).
+          b = decideMatchEnd({ a: startBoard.a.hp, b: startBoard.b.hp }, b, { noSuddenDeath });
+          if (b.phase === "sudden-death") {
+            // ArenaGame détecte cette phase et affiche ArenaSuddenDeath, qui
+            // déclenche lui-même la fin après résolution (pas de onMatchEnd ici).
+            setBoard(b);
+            return;
           }
           const aDead = b.a.hp <= 0;
           const bDead = b.b.hp <= 0;

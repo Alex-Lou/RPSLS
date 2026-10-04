@@ -9,6 +9,8 @@ export interface QuestDef {
   desc: string;
   target: number;
   xpReward: number;
+  /** Retiré des quêtes (Alex 2026-10) : il gonflait le LP LOCAL hors serveur.
+   *  Champ gardé optionnel pour la compatibilité d'affichage (QuestsPage). */
   lpReward?: number;
   /** Returns current progress (capped at target by the consumer). */
   progress: (p: Player, h: MatchRecord[]) => number;
@@ -108,7 +110,6 @@ export const QUESTS: QuestDef[] = [
     desc: "Defeat the Logical CPU 3 times.",
     target: 3,
     xpReward: 100,
-    lpReward: 15,
     progress: (_p, h) => Math.min(winsAgainstMood(h, "logical"), 3),
   },
   {
@@ -118,7 +119,6 @@ export const QUESTS: QuestDef[] = [
     desc: "Defeat the Aggressive CPU 3 times.",
     target: 3,
     xpReward: 100,
-    lpReward: 15,
     progress: (_p, h) => Math.min(winsAgainstMood(h, "aggressive"), 3),
   },
   {

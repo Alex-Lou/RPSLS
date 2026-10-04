@@ -85,6 +85,18 @@ pub struct SeasonReward {
     pub min_lp: u64,
     pub eclats: u64,
     pub dust: u64,
+    /// ✦ de fin de saison.
+    #[serde(default)]
+    pub stars: u64,
+}
+
+/// Règle de déblocage générée depuis rankedUnlocks.ts : `card` s'obtient quand
+/// le compteur `kind` (constellWins | constellSweeps | rankLp) atteint `min`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct UnlockRule {
+    pub card: String,
+    pub kind: String,
+    pub min: u64,
 }
 
 /// Bonus de bienvenue (monnaies accordées une fois à l'inscription). Le champ
@@ -118,7 +130,17 @@ struct EconomyMeta {
     arena_eclats: HashMap<String, u64>,
     cpu_eclats_daily_cap: u64,
     unlock_cards: Vec<String>,
+    unlock_rules: Vec<UnlockRule>,
+    starter_cards: Vec<String>,
     season_duration_ms: u64,
+    length_mult_best_of: HashMap<String, u64>,
+    length_mult_win_to: HashMap<String, u64>,
+    level_up_eclats_base: u64,
+    level_up_eclats_per_level: u64,
+    level_up_stars: u64,
+    level_up_daily_max: u32,
+    daily_challenge_eclats: u64,
+    daily_challenges_per_day: usize,
 }
 
 const ECONOMY_META_JSON: &str = include_str!("../economy_meta.json");
@@ -231,6 +253,53 @@ pub fn is_unlock_card(id: &str) -> bool {
     economy_meta().unlock_cards.iter().any(|c| c == id)
 }
 
+/// Règle de déblocage d'une carte (None si la carte n'est pas un déblocage).
+pub fn unlock_rule(id: &str) -> Option<&'static UnlockRule> {
+    economy_meta().unlock_rules.iter().find(|r| r.card == id)
+}
+
+/// Collection de départ (STARTER_COLLECTION de cards.ts).
+pub fn starter_cards() -> &'static [String] {
+    &economy_meta().starter_cards
+}
+
+/// Multiplicateur de longueur (%) d'un match vs CPU — miroir de
+/// `lengthMultPct` (economy.ts). Classique : par bestOf ; Constellation : par
+/// winTo. Longueur absente ou inconnue → 100.
+pub fn length_mult_pct(mode: &str, best_of: Option<u32>) -> u64 {
+    let Some(n) = best_of else { return 100 };
+    let table = match mode {
+        "casual" | "ranked" => &economy_meta().length_mult_best_of,
+        "constellation" => &economy_meta().length_mult_win_to,
+        _ => return 100,
+    };
+    table.get(&n.to_string()).copied().unwrap_or(100)
+}
+
+/// Montant × multiplicateur, arrondi au plus proche (= Math.round côté client).
+pub fn scale_by_length(amount: u64, mode: &str, best_of: Option<u32>) -> u64 {
+    (amount * length_mult_pct(mode, best_of) + 50) / 100
+}
+
+/// 💎 d'un passage au niveau `level` (25 + 5 × niveau).
+pub fn level_up_eclats(level: u32) -> u64 {
+    let m = economy_meta();
+    m.level_up_eclats_base + m.level_up_eclats_per_level * level as u64
+}
+pub fn level_up_stars() -> u64 {
+    economy_meta().level_up_stars
+}
+/// Niveaux payés au plus par jour UTC (le surplus attend le lendemain).
+pub fn level_up_daily_max() -> u32 {
+    economy_meta().level_up_daily_max
+}
+pub fn daily_challenge_eclats() -> u64 {
+    economy_meta().daily_challenge_eclats
+}
+pub fn daily_challenges_per_day() -> usize {
+    economy_meta().daily_challenges_per_day
+}
+
 /// Durée d'une saison (ms) — SEASON_DURATION_MS côté client.
 pub fn season_duration_ms() -> u64 {
     economy_meta().season_duration_ms
@@ -280,27 +349,41 @@ mod tests {
         assert_eq!(dust_per_duplicate("legendary"), 100);
         assert_eq!(dust_per_duplicate("common"), 5);
         assert_eq!(craft_cost_for_rarity("epic"), 200);
-        // Codex : 8 paliers, premier (5,50,0), dernier seuil 46.
+        // Codex : 8 paliers étalés jusqu'aux 110 cartes obtenables.
         let codex = codex_tiers();
         assert_eq!(codex.len(), 8);
-        assert_eq!((codex[0].threshold, codex[0].eclats, codex[0].dust), (5, 50, 0));
-        assert_eq!(codex[7].threshold, 46);
+        assert_eq!((codex[0].threshold, codex[0].eclats, codex[0].dust), (20, 50, 0));
+        assert_eq!((codex[7].threshold, codex[7].eclats, codex[7].dust), (110, 1000, 500));
         // Saison : 5 paliers, bronze (0,50,..) et diamond (1750,700,200).
         let season = season_rewards();
         assert_eq!(season.len(), 5);
         assert_eq!((season[0].min_lp, season[0].eclats), (0, 50));
-        assert_eq!((season[4].min_lp, season[4].eclats, season[4].dust), (1750, 700, 200));
+        assert_eq!((season[4].min_lp, season[4].eclats, season[4].dust, season[4].stars), (1750, 700, 200, 100));
+        assert_eq!(season[0].stars, 10);
         // Bonus de bienvenue (single source economy.ts, lu par account.rs).
         assert_eq!((welcome_eclats(), welcome_dust(), welcome_stars()), (300, 150, 30));
         // Whitelist sets premium : ids connus acceptés, id forgé rejeté.
         assert!(is_premium_set("eclipse"));
         assert!(is_premium_set("quartz"));
         assert!(!is_premium_set("forged-set-xyz"));
-        assert_eq!(premium_set_cost("quartz"), Some(800));
-        assert_eq!(premium_set_cost("void"), Some(900));
+        assert_eq!(premium_set_cost("quartz"), Some(300));
+        assert_eq!(premium_set_cost("void"), Some(300));
         assert_eq!(premium_set_cost("forged-set-xyz"), None);
-        assert_eq!((arena_eclats("win"), arena_eclats("draw"), arena_eclats("loss")), (20, 10, 5));
-        assert_eq!(cpu_eclats_daily_cap(), 300);
+        assert_eq!((arena_eclats("win"), arena_eclats("draw"), arena_eclats("loss")), (40, 20, 10));
+        assert_eq!(cpu_eclats_daily_cap(), 375);
+        assert_eq!(eclats_per_win("training"), 0);
+        assert_eq!(eclats_per_win("hotseat"), 0);
+        // Multiplicateurs de longueur + règles de déblocage générés.
+        assert_eq!(length_mult_pct("ranked", Some(7)), 180);
+        assert_eq!(length_mult_pct("constellation", Some(1)), 50);
+        assert_eq!(scale_by_length(15, "casual", Some(5)), 21);
+        let r = unlock_rule("supernova").unwrap();
+        assert_eq!((r.kind.as_str(), r.min), ("rankLp", 1500));
+        assert_eq!(unlock_rule("vortex").unwrap().kind, "constellSweeps");
+        assert!(unlock_rule("aegis").is_none());
+        assert_eq!(starter_cards().len(), 6);
+        assert_eq!((level_up_eclats(1), level_up_stars(), level_up_daily_max()), (30, 10, 5));
+        assert_eq!((daily_challenge_eclats(), daily_challenges_per_day()), (25, 3));
         assert!(is_unlock_card("supernova"));
         assert!(!is_unlock_card("aegis"));
         assert_eq!(season_duration_ms(), 30 * 24 * 3600 * 1000);

@@ -17,8 +17,8 @@ use dashmap::DashMap;
 use tokio::sync::Mutex;
 use tracing::warn;
 
-use super::{Wallet, WalletError};
-use crate::player_state;
+use super::{Wallet, WalletError, WALLET_LAUNCH_MS};
+use crate::player_state::{self, PlayerProgress};
 
 const KEY_PREFIX: &str = "wallet:";
 
@@ -95,22 +95,51 @@ pub async fn get(pid: &str) -> Result<Option<Wallet>, StoreError> {
     load(pid).await
 }
 
-/// Crée le portefeuille au premier `WalletInit` (migration : reprise de la
-/// ligne `player:{pid}`), ou renvoie l'existant. Idempotent.
+/// Crée le portefeuille au premier `WalletInit` (ou à l'activation forcée du
+/// Hello), ou renvoie l'existant. Idempotent.
+/// - identité ANTÉRIEURE au lancement (pas de `born:` ou `born` < `WALLET_LAUNCH_MS`)
+///   avec une ligne player → migration BORNÉE de cette ligne ;
+/// - sinon (identité neuve, ou aucune ligne) → portefeuille NEUF : cartes de
+///   départ + bonus de bienvenue si le parcours compte l'a accordé
+///   (`welcomed:{pid}`). La ligne player, écrite par le client, n'est pas lue.
 pub async fn init(pid: &str) -> Result<Wallet, StoreError> {
     locked(pid, || async {
         if let Some(w) = load(pid).await? {
             return Ok(w);
         }
-        let progress = player_state::load(pid)
-            .await
-            .map_err(|_| StoreError::Backend)?
-            .unwrap_or_default();
-        let w = Wallet::from_progress(&progress, now_ms());
+        let (born, progress, welcomed) = tokio::join!(
+            player_state::born_ms(pid),
+            player_state::load(pid),
+            crate::account::is_welcomed(pid),
+        );
+        let born = born.map_err(|_| StoreError::Backend)?;
+        let progress = progress.map_err(|_| StoreError::Backend)?;
+        let welcomed = welcomed.map_err(|_| StoreError::Backend)?;
+        let w = build_initial(born, progress.as_ref(), welcomed, now_ms());
         save(pid, &w).await?;
         Ok(w)
     })
     .await
+}
+
+/// Choix migration bornée / portefeuille neuf (PUR, testé).
+pub(crate) fn build_initial(born: Option<u64>, row: Option<&PlayerProgress>, welcomed: bool, now: u64) -> Wallet {
+    let legacy = born.map_or(true, |b| b < WALLET_LAUNCH_MS);
+    match row {
+        Some(p) if legacy => {
+            let mut w = Wallet::from_progress(p, now);
+            // Le bonus éventuel est déjà dans la ligne : pas de second don.
+            w.welcomed = welcomed;
+            w
+        }
+        _ => {
+            let mut w = Wallet::fresh(now);
+            if welcomed {
+                w.apply_welcome(crate::account::WELCOME_CARDS);
+            }
+            w
+        }
+    }
 }
 
 /// Applique une opération à un portefeuille EXISTANT : lit, valide, écrit, sous

@@ -45,16 +45,24 @@ export function ModeSelect({
     setBurgerHidden(true);
     const main = MENU_SCROLL_LOCKED ? document.querySelector("main") : null;
     const prevOverflow = main?.style.overflowY ?? "";
+    // Petit téléphone (360×760…) : si le contenu DÉBORDE malgré le compactage,
+    // on ne bloque PAS le scroll (sinon la grille des modes était rognée et
+    // inatteignable). Le lock ne s'applique que quand tout tient réellement.
     const applyLock = () => {
       if (!main) return;
       const portrait = window.matchMedia("(orientation:portrait)").matches;
-      main.style.overflowY = portrait ? "hidden" : "";
+      const fits = main.scrollHeight <= main.clientHeight + 1;
+      main.style.overflowY = portrait && fits ? "hidden" : "";
     };
     applyLock();
+    // Re-mesure quand le contenu change de taille (polices, entrée animée…).
+    const ro = main && typeof ResizeObserver !== "undefined" ? new ResizeObserver(applyLock) : null;
+    if (main && ro) { ro.observe(main); Array.from(main.children).forEach((c) => ro.observe(c)); }
     window.addEventListener("orientationchange", applyLock);
     window.addEventListener("resize", applyLock);
     return () => {
       setBurgerHidden(false);
+      ro?.disconnect();
       window.removeEventListener("orientationchange", applyLock);
       window.removeEventListener("resize", applyLock);
       if (main) main.style.overflowY = prevOverflow;
@@ -82,7 +90,7 @@ export function ModeSelect({
           // user picks one). Font stays --font-headline (per-theme, with the
           // default baked into THEMES); bespoke per-theme title fonts land in
           // the theme-bundle pass.
-          className="text-3xl sm:text-5xl font-black uppercase bg-clip-text text-transparent leading-[1.04]"
+          className="text-3xl sm:text-5xl [@media(max-height:800px)]:text-2xl font-black uppercase bg-clip-text text-transparent leading-[1.04]"
           style={{
             backgroundImage:
               "linear-gradient(135deg, color-mix(in oklab, var(--theme-primary) 70%, #fff) 0%, #ffffff 48%, color-mix(in oklab, var(--theme-secondary) 70%, #fff) 100%)",
@@ -102,7 +110,7 @@ export function ModeSelect({
         <motion.p
           animate={{ y: [0, -2, 0], opacity: [0.92, 1, 0.92] }}
           transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut", delay: 0.8 }}
-          className="mt-1 sm:mt-2.5 text-ink text-xs sm:text-sm leading-snug tracking-[0.18em] uppercase"
+          className="mt-1 sm:mt-2.5 text-ink text-xs sm:text-sm [@media(max-height:800px)]:text-[10px] leading-snug tracking-[0.18em] [@media(max-height:800px)]:tracking-[0.1em] uppercase"
           style={{ fontFamily: "var(--font-body)", textShadow: "0 1px 6px rgba(0,0,0,0.7)" }}
         >
           {t("splash.tagline")}
@@ -112,8 +120,11 @@ export function ModeSelect({
       <DailyChallengesPanel onStart={onStart} onGoOnline={onGoOnline} onGoConstellation={onGoConstellation} />
 
       {/* Mode tiles — 2 columns even on mobile so the 6 tiles fit one viewport.
-       *  Compacté (Alex 2026-06-12) : tout le menu doit tenir SANS scroll. */}
-      <div className="grid grid-cols-2 landscape:grid-cols-3 gap-2 sm:gap-3 flex-1 min-h-0 grid-rows-3 landscape:grid-rows-2 auto-rows-fr max-h-[46vh] landscape:max-h-none content-start">
+       *  Compacté (Alex 2026-06-12) : tout le menu doit tenir SANS scroll.
+       *  min-h-min : la grille ne descend jamais sous la hauteur de ses tuiles
+       *  (avant : min-h-0 + max-h 46vh → tuiles superposées et rognées en 360×760) ;
+       *  si ça ne tient pas, le <main> redevient scrollable (cf. applyLock). */}
+      <div className="grid grid-cols-2 landscape:grid-cols-3 gap-2 sm:gap-3 flex-1 min-h-min grid-rows-3 landscape:grid-rows-2 auto-rows-fr max-h-[46vh] landscape:max-h-none content-start">
         {ALL_CARDS.map((m, i) => {
           if (m === "online") {
             return (
@@ -265,7 +276,7 @@ export function ModeSelect({
                 setMode(m); setPendingMode(m);
               }}
               className={
-                "p-2.5 sm:p-4 rounded-2xl border transition flex flex-col gap-1.5 min-h-[124px] landscape:min-h-[88px] " +
+                "p-2.5 sm:p-4 rounded-2xl border transition flex flex-col gap-1.5 min-h-[124px] [@media(max-height:800px)]:min-h-[100px] landscape:min-h-[88px] " +
                 (TILE_ACCENT[m]
                   ? TILE_BASE + " " + TILE_ACCENT[m]
                   : "border-hairline bg-surface hover:border-white/20") + " " +

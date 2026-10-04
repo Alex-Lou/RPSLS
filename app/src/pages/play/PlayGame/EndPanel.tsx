@@ -1,7 +1,7 @@
 import { motion } from "motion/react";
 import { MatchState, status, AiMood, AI_MOOD_META } from "../../../engine/game";
 import { GameMode, REWARDS, classeLpDelta } from "../../../types";
-import { eclatsReward } from "../../../engine/economy";
+import { eclatsReward, scaleByLength } from "../../../engine/economy";
 import { streakBonusXp, streakXpMultiplier } from "../../../match/streak";
 import { useT } from "../../../i18n";
 import { useStore } from "../../../store/store";
@@ -24,7 +24,8 @@ export function EndPanel({
   const bestStreakHolder = streaks.bestA >= streaks.bestB ? labelA : labelB;
   const r = REWARDS[mode];
   const playerWon = s === "a_won";
-  const baseXp = playerWon ? r.xpWin : r.xpLoss;
+  // Même multiplicateur de longueur que recordMatch (Bo1 ×0,4 … Bo7 ×1,8).
+  const baseXp = scaleByLength(playerWon ? r.xpWin : r.xpLoss, mode, match.bestOf);
   const lpDelta = playerWon ? r.lpWin : r.lpLoss;
   // Streak bonus is owned by the store (recordMatch → streakBonusXp). Mirror
   // the same math here so the displayed total matches what was credited.
@@ -48,7 +49,7 @@ export function EndPanel({
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
       transition={{ type: "spring", stiffness: 220, damping: 18 }}
-      className="bg-surface-raised rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 p-3 sm:p-8 border border-hairline flex flex-col items-center text-center"
+      className="w-full bg-surface-raised rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 p-3 sm:p-8 border border-hairline flex flex-col items-center text-center"
     >
       {/* Cinematic match-end shared with Constellation Lanes — same trophy
           breath / wordmark pulse / quote / rematch buttons feel everywhere. */}
@@ -68,7 +69,7 @@ export function EndPanel({
           // the player sees their rank move; other modes keep their REWARDS lp
           // (online-only, so 0 for vs-CPU casual/hotseat).
           lp: mode === "ranked" ? classeLpDelta(outcome) : (lpDelta !== 0 ? lpDelta : undefined),
-          eclats: eclatsReward(mode, outcome),
+          eclats: eclatsReward(mode, outcome, match.bestOf),
         }}
       />
 

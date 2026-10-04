@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ThemedBackdrop, type BackdropScene } from "../backdrops/ThemedBackdrop";
 import { useGfxAllows } from "../graphics/graphicsQuality";
 
@@ -64,6 +64,9 @@ function SplashStaticFallback() {
 function DefaultCosmicShader() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
+  // Échec WebGL (pas de contexte, compilation/link KO, contexte perdu) → fond
+  // cosmique statique au lieu d'un canvas mort gris clair sous le texte blanc.
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -73,7 +76,7 @@ function DefaultCosmicShader() {
     const gl =
       (canvas.getContext("webgl2", { alpha: false, antialias: false, depth: false }) as WebGL2RenderingContext | null) ??
       (canvas.getContext("webgl",  { alpha: false, antialias: false, depth: false }) as WebGLRenderingContext  | null);
-    if (!gl) return;
+    if (!gl) { setFailed(true); return; }
 
     // Resize canvas to fill its CSS box at devicePixelRatio capped at 2
     // (above 2 the perf hit isn't worth it on mobile).
@@ -207,13 +210,13 @@ function DefaultCosmicShader() {
 
     const vs = compile(gl.VERTEX_SHADER,   vsSrc);
     const fs = compile(gl.FRAGMENT_SHADER, fsSrc);
-    if (!vs || !fs) return;
+    if (!vs || !fs) { setFailed(true); return; }
     const prog = gl.createProgram();
-    if (!prog) return;
+    if (!prog) { setFailed(true); return; }
     gl.attachShader(prog, vs);
     gl.attachShader(prog, fs);
     gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { setFailed(true); return; }
     gl.useProgram(prog);
 
     // Single covering triangle — bigger than the viewport, GPU clips the rest.
@@ -240,11 +243,14 @@ function DefaultCosmicShader() {
     const stopLoop = () => { running = false; cancelAnimationFrame(rafRef.current); };
     const onVis = () => { if (document.hidden) stopLoop(); else startLoop(); };
     document.addEventListener("visibilitychange", onVis);
+    const onLost = () => { stopLoop(); setFailed(true); };
+    canvas.addEventListener("webglcontextlost", onLost);
     frame();
 
     return () => {
       stopLoop();
       document.removeEventListener("visibilitychange", onVis);
+      canvas.removeEventListener("webglcontextlost", onLost);
       window.removeEventListener("resize", resize);
       gl.deleteProgram(prog);
       gl.deleteBuffer(buf);
@@ -254,6 +260,7 @@ function DefaultCosmicShader() {
     };
   }, []);
 
+  if (failed) return <SplashStaticFallback />;
   return (
     <canvas
       ref={canvasRef}

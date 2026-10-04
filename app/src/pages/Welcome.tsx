@@ -55,7 +55,9 @@ export function Welcome({ onDone }: { onDone: () => void }) {
           }}
         />
 
-        <div className="absolute top-4 right-4 z-10">
+        {/* Sélecteur de langue DANS le flux (avant : absolute top-right, il
+            chevauchait le titre « Welcome » sur téléphone). */}
+        <div className="relative z-10 flex justify-end -mt-4 -mr-4 mb-2">
           <LanguagePicker />
         </div>
 

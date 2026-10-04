@@ -83,7 +83,8 @@ export function DailyChallengesPanel({
               {t("play.daily.title")}
             </div>
             <div className="text-sm sm:text-lg font-bold leading-tight">
-              {claimedCount}/{quests.length} ✓
+              {/* ✓ seulement quand les 3 sont faits (avant : « 0/3 ✓ »). */}
+              {claimedCount}/{quests.length}{claimedCount === quests.length ? " ✓" : ""}
             </div>
           </div>
           {claimable > 0 ? (
@@ -160,26 +161,28 @@ export function DailyChallengesPanel({
                           {value}/{q.target}
                         </span>
                       </div>
-                    </div>
-                    <div className="shrink-0">
-                      {claimed ? (
-                        <span className="text-emerald-400 text-xl">✓</span>
-                      ) : complete ? (
-                        <motion.button
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => claimDailyQuest(q.id, q.xpReward)}
-                          className="px-3 py-2 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-zinc-900 font-bold text-xs shadow-lg shadow-amber-900/40"
-                        >
-                          {t("quests.btn.claim")}
-                        </motion.button>
-                      ) : (
-                        <button
-                          onClick={() => play(q)}
-                          className="px-3 py-2 rounded-xl bg-hairline hover:bg-hairline border border-hairline text-white font-bold text-xs transition"
-                        >
-                          {t("play.daily.start")}
-                        </button>
-                      )}
+                      {/* Action SOUS la description (avant : colonne de droite
+                          qui écrasait le texte avec 3× « Défi du jour → »). */}
+                      <div className="mt-2 flex justify-end">
+                        {claimed ? (
+                          <span className="text-emerald-400 text-xl">✓</span>
+                        ) : complete ? (
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => claimDailyQuest(q.id, q.xpReward)}
+                            className="min-h-[40px] px-4 py-2 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-zinc-900 font-bold text-xs shadow-lg shadow-amber-900/40"
+                          >
+                            {t("quests.btn.claim")}
+                          </motion.button>
+                        ) : (
+                          <button
+                            onClick={() => play(q)}
+                            className="min-h-[40px] px-4 py-2 rounded-xl bg-hairline hover:bg-hairline border border-hairline text-white font-bold text-xs transition"
+                          >
+                            {t("play.daily.start")}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );

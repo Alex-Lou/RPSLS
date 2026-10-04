@@ -353,6 +353,8 @@ pub(crate) async fn handle_client_message(
         ClientMessage::ClaimCpuRewards { rewards } => wallet::handle(session, WalletOp::ClaimCpuRewards(rewards)),
         ClientMessage::ClaimUnlocks { card_ids } => wallet::handle(session, WalletOp::ClaimUnlocks(card_ids)),
         ClientMessage::ClaimSeason => wallet::handle(session, WalletOp::ClaimSeason),
+        ClientMessage::ClaimLevel { level } => wallet::handle(session, WalletOp::ClaimLevel(level)),
+        ClientMessage::ClaimDailies { claims } => wallet::handle(session, WalletOp::ClaimDailies(claims)),
     }
 }
 

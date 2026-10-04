@@ -16,11 +16,11 @@ import { AnimatePresence, motion } from "motion/react";
 import { formatNumber } from "../../i18n/format";
 import { useStore } from "../../store/store";
 import { useT } from "../../i18n";
-import { ALL_CARD_IDS, CARDS, RARITY_BG, RARITY_COLOR } from "../../ranked/cards";
+import { CARDS, RARITY_BG, RARITY_COLOR } from "../../ranked/cards";
 import { CardImage } from "../../ranked/CardImage";
 import type { CardId } from "../../ranked/rankedTypes";
 import { CurrencyBadges } from "../../ranked/CurrencyBadges";
-import { PACK_COST, type PackResult, craftCost } from "../../engine/economy";
+import { PACKABLE_IDS, PACK_COST, type PackResult, craftCost } from "../../engine/economy";
 import { walletClaimCodex, walletCraft, walletErrorKey, walletOpenPack } from "../../online/wallet";
 import { hapticTap, hapticMatchWin } from "../../haptic";
 import { useNoMenuFx } from "../../fx/menuFx";
@@ -47,7 +47,9 @@ export function ShopPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const lockedCards = ALL_CARD_IDS.filter((id) => !collection.includes(id));
+  // Forgeables = obtenables seulement (les Finishers, jamais deckables, sont
+  // refusés par le serveur).
+  const lockedCards = PACKABLE_IDS.filter((id) => !collection.includes(id));
   const canBuyPack = eclats >= PACK_COST && !busy;
 
   async function serverAction<T>(call: () => Promise<{ ok: true; update: T } | { ok: false; code: string }>) {

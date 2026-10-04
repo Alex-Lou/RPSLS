@@ -52,7 +52,8 @@ export function runMatch(voieA: Move, voieB: Move, diff: Diff, seed: number): Ma
       // EXILÉES. Sans lui le Lab simulait un autre jeu (cartes jamais dépensées).
       const p = prepareResolveStart(board, ia, ib, "a");
       board = resolveTurn(p.startBoard, p.safeIntent, p.safeCpuIntent);
-      if (board.phase === "match-end") break;
+      // match-end (KO / plafond / départage) OU sudden-death (égalité totale).
+      if (board.phase !== "planning") break;
       board = advanceToNextTurn(board);
       hpA.push(board.a.hp);
       hpB.push(board.b.hp);
@@ -62,11 +63,14 @@ export function runMatch(voieA: Move, voieB: Move, diff: Diff, seed: number): Ma
     const r = matchResult(board);
     let winner: "a" | "b" | "draw";
     if (r) winner = r.winner;
-    else winner = board.a.hp > board.b.hp ? "a" : board.b.hp > board.a.hp ? "b" : "draw"; // hard-cap → PV
+    // Mort subite RPSLS = pile ou face → comptée NUL (0,5) dans les stats.
+    else if (board.phase === "sudden-death") winner = "draw";
+    else winner = board.a.hp > board.b.hp ? "a" : board.b.hp > board.a.hp ? "b" : "draw"; // filet (garde)
 
     return {
       winner,
       turns: board.turn,
+      endReason: board.endReason,
       voieA,
       voieB,
       hpAByTurn: hpA,

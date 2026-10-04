@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { matchActive, menuFxSuppressed, onFxGateChange } from "../fx/menuFx";
 import { useStore } from "../store/store";
 import { FRAG, VERT } from "./shaders";
@@ -53,6 +53,10 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
   const intensity = useStore((s) => s.player.premiumIntensity?.[scene] ?? 1.0);
   const intensityRef = useRef(intensity);
   intensityRef.current = intensity;
+  // WebGL KO (contexte refusé, shader qui ne compile pas, contexte perdu) :
+  // on MASQUE le canvas pour laisser voir le dégradé sombre du thème. Un canvas
+  // WebGL mort s'affiche gris clair → texte blanc illisible par-dessus.
+  const [glFailed, setGlFailed] = useState(false);
 
   // GL setup runs ONCE per mount (deps: []). It used to depend on [scene],
   // so every theme change tore the context down (loseContext) and then
@@ -197,9 +201,9 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
     // browser refuses to fire `webglcontextrestored`, so the canvas stays a
     // dead grey/white rectangle forever. Mobile GPUs drop contexts on memory
     // pressure / returning from background / hitting the live-context cap.
-    const onLost = (e: Event) => { e.preventDefault(); stopLoop(); };
+    const onLost = (e: Event) => { e.preventDefault(); stopLoop(); setGlFailed(true); };
     const onRestored = () => {
-      if (buildGL()) { start = performance.now(); startLoop(); }
+      if (buildGL()) { setGlFailed(false); start = performance.now(); startLoop(); }
     };
     canvas.addEventListener("webglcontextlost", onLost as EventListener, false);
     canvas.addEventListener("webglcontextrestored", onRestored as EventListener, false);
@@ -264,6 +268,7 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
     const offMatch = onFxGateChange(() => { if (!document.hidden) startLoop(); });
 
     if (buildGL()) startLoop();
+    else setGlFailed(true);
 
     return () => {
       stopLoop();
@@ -303,8 +308,8 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
   }, [scene]);
 
   return (
-    <div className="fixed inset-0 z-0 pointer-events-none" style={{ background: "#0b0d12" }}>
-      <canvas ref={canvasRef} aria-hidden className="w-full h-full block" />
+    <div className="fixed inset-0 z-0 pointer-events-none" style={{ background: SCENE_GRADIENT[scene] ?? "#0b0d12" }}>
+      <canvas ref={canvasRef} aria-hidden className="w-full h-full block" style={glFailed ? { visibility: "hidden" } : undefined} />
       <div
         className="absolute inset-0"
         style={{ background: "radial-gradient(ellipse 75% 65% at 50% 45%, transparent 40%, rgba(5,7,11,0.5) 100%)" }}

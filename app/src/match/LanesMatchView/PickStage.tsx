@@ -119,7 +119,7 @@ function LaneSlot({
   const t = useT();
   const identity = laneIdentityAt(index);
   const favoured = pick ? laneFavoursMove(index, pick) : false;
-  const idKey = IDENTITY_KEYS[index];
+  const idKey = IDENTITY_KEYS[identity.index];
   const title = t(`${idKey}.title`);
   const hint = t(`${idKey}.hint`);
 

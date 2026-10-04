@@ -12,13 +12,20 @@ import {
   SEASON_DURATION_MS,
   eclatsReward,
   masteryXpForMatch,
+  scaleByLength,
   seasonRewardForLp,
   softResetLp,
 } from "../engine/economy";
+import { levelFromXp } from "../engine/leveling";
 import type { AppState } from "./storeTypes";
 import { defaultPlayer, detectLocale, defaultServerConfig, HISTORY_LIMIT } from "./storeDefaults";
 import { applyRankedUnlocks } from "./rankedUnlocks";
-import { enqueueCpuReward, enqueueUnlocks } from "../online/wallet";
+import { enqueueCpuReward, enqueueDailyClaim, enqueueUnlocks, notifyLevelUp } from "../online/wallet";
+
+/** Passage de niveau (XP avant → après) : le serveur paiera ✦ + 💎. */
+function checkLevelUp(xpBefore: number, xpAfter: number): void {
+  if (levelFromXp(xpAfter).level > levelFromXp(xpBefore).level) notifyLevelUp();
+}
 
 export const createSlice: StateCreator<AppState> = (set, get) => ({
   player: defaultPlayer(),
@@ -35,8 +42,23 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
   updateProfile: (patch) =>
     set((s) => ({ player: { ...s.player, ...patch } })),
 
-  recordMatch: (m) => {
+  recordMatch: (rawMatch) => {
     const before = get().player.cardCollection ?? [];
+    const xpBefore = get().player.xp;
+    // Match arbitré par le serveur (vs humain en ligne) : crédité par le serveur
+    // lui-même. Tout le reste (CPU, hotseat) est RÉCLAMÉ au serveur. Le repli bot
+    // d'une recherche en ligne (mode "online" vs CPU) se réclame en "ranked" :
+    // le serveur refuse "online" dans une réclamation CPU.
+    const serverRefereed = rawMatch.opponent.kind === "human" && rawMatch.mode !== "hotseat";
+    const claimMode = !serverRefereed && rawMatch.mode === "online" ? "ranked" : rawMatch.mode;
+    // Multiplicateur de longueur (Bo1 ×0.4 … Bo7 ×1.8 ; winTo 1 ×0.5 … 3 ×1.4)
+    // sur l'XP des matchs vs CPU — même table que les 💎 (et que le serveur).
+    const m = serverRefereed
+      ? rawMatch
+      : { ...rawMatch, xpDelta: scaleByLength(rawMatch.xpDelta, claimMode, rawMatch.bestOf) };
+    const eclats = serverRefereed
+      ? eclatsReward(m.mode, m.outcome)
+      : eclatsReward(claimMode, m.outcome, m.bestOf);
     set((s) => {
       const p = structuredClone(s.player);
       // Win-streak momentum: roll the streak, then top up the win XP with
@@ -56,7 +78,7 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
       p.rankLp = Math.max(0, p.rankLp + safeLpDelta);
       // Soft-currency éclats earned every finished match (no forfeit).
       if (!m.forfeit) {
-        p.eclats = (p.eclats ?? 0) + eclatsReward(m.mode, m.outcome);
+        p.eclats = (p.eclats ?? 0) + eclats;
       }
       // Classé (classic 1v1) local ladder — its OWN classement, separate
       // from the online-only rankLp above. Quick match + tournament both
@@ -89,15 +111,15 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
         history: newHistory,
       };
     });
-    // Portefeuille actif : le gain local ci-dessus n'est qu'un affichage
-    // optimiste. Un match arbitré par le serveur (vs humain en ligne) est crédité
-    // par le serveur lui-même ; tout le reste (CPU, hotseat) est RÉCLAMÉ au
-    // serveur, qui applique barème + plafond quotidien.
-    const serverRefereed = m.opponent.kind === "human" && m.mode !== "hotseat";
-    if (!serverRefereed && !m.forfeit && eclatsReward(m.mode, m.outcome) > 0) {
-      enqueueCpuReward(m.mode, m.outcome);
+    // Le gain local ci-dessus n'est qu'un affichage optimiste : le serveur
+    // applique barème × longueur + plafond quotidien. `sweep` = victoire sans
+    // manche concédée (règle « vortex » de rankedUnlocks.ts).
+    if (!serverRefereed && !m.forfeit && eclats > 0) {
+      const sweep = m.outcome === "win" && m.scorePlayer === m.bestOf && m.scoreOpponent === 0;
+      enqueueCpuReward(claimMode, m.outcome, { bestOf: m.bestOf, sweep });
     }
     enqueueUnlocks((get().player.cardCollection ?? []).filter((id) => !before.includes(id)));
+    checkLevelUp(xpBefore, get().player.xp);
   },
 
   // Ladder Classé SEUL (classeLp + classeStats), sans toucher rankLp/xp/history —
@@ -118,8 +140,11 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
       return { player: p };
     }),
 
-  grantXp: (amount) =>
-    set((s) => ({ player: { ...s.player, xp: Math.max(0, s.player.xp + Math.round(amount)) } })),
+  grantXp: (amount) => {
+    const xpBefore = get().player.xp;
+    set((s) => ({ player: { ...s.player, xp: Math.max(0, s.player.xp + Math.round(amount)) } }));
+    checkLevelUp(xpBefore, get().player.xp);
+  },
 
   recordAbandon: () => {
     const now = Date.now();
@@ -135,27 +160,35 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
     return extra;
   },
 
-  claimQuest: (id, xpReward, lpReward = 0) =>
+  // `lpReward` ignoré (Alex 2026-10) : il gonflait le LP LOCAL (paliers de
+  // saison / déblocages) sans passer par le serveur. Paramètre gardé pour la
+  // compatibilité d'appel (QuestsPage).
+  claimQuest: (id, xpReward, _lpReward = 0) => {
+    const xpBefore = get().player.xp;
     set((s) => {
       if (s.player.claimedQuests.includes(id)) return s;
       return {
         player: {
           ...s.player,
           xp: s.player.xp + xpReward,
-          rankLp: s.player.rankLp + lpReward,
           claimedQuests: [...s.player.claimedQuests, id],
         },
       };
-    }),
+    });
+    checkLevelUp(xpBefore, get().player.xp);
+  },
 
-  claimDailyQuest: (id, xpReward) =>
+  claimDailyQuest: (id, xpReward) => {
+    const xpBefore = get().player.xp;
+    const today = todayDateKey();
+    let claimed = false;
     set((s) => {
-      const today = todayDateKey();
       const cur =
         s.player.dailyClaims && s.player.dailyClaims.date === today
           ? s.player.dailyClaims
           : { date: today, ids: [] };
       if (cur.ids.includes(id)) return s;
+      claimed = true;
       return {
         player: {
           ...s.player,
@@ -163,7 +196,11 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
           dailyClaims: { date: today, ids: [...cur.ids, id] },
         },
       };
-    }),
+    });
+    // +25 💎 par défi, versés par le serveur (≤ 3 par date, plafond CPU).
+    if (claimed) enqueueDailyClaim(today, id);
+    checkLevelUp(xpBefore, get().player.xp);
+  },
 
   recordDailyComplete: (date) =>
     set((s) => {
@@ -184,6 +221,7 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
   }),
   recordArenaMatch: (outcome, meta) => {
     const before = get().player.cardCollection ?? [];
+    const xpBefore = get().player.xp;
     set((s) => {
       const cur = s.player.arenaStats ?? { wins: 0, losses: 0, draws: 0 };
       const next = {
@@ -191,10 +229,8 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
         losses: cur.losses + (outcome === "loss" ? 1 : 0),
         draws:  cur.draws + (outcome === "draw" ? 1 : 0),
       };
-      // Éclats reward — mirrors the existing eclatsReward(mode, outcome)
-      // scale for casual modes. Constellation Pro is higher-effort (longer
-      // matches, deeper strategy) so it pays slightly above Constellation
-      // Ranked: win 20, draw 10, loss 5.
+      // Éclats reward — ARENA_ECLATS (40/20/10) : le mode le plus long est le
+      // mieux payé (Alex 2026-10). Pas de multiplicateur de longueur ici.
       // Forfait = ni éclats ni XP (avant : 5 💎 par forfait → farm le plus rapide).
       const reward = meta?.forfeit ? 0 : ARENA_ECLATS[outcome];
       const xpDelta = meta?.forfeit ? 0 : ARENA_XP[outcome];
@@ -238,6 +274,7 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
     // (fin de match ccg) ; contre le CPU, le gain est réclamé (cf. recordMatch).
     if (!meta?.online && !meta?.forfeit) enqueueCpuReward("arena", outcome);
     enqueueUnlocks((get().player.cardCollection ?? []).filter((id) => !before.includes(id)));
+    checkLevelUp(xpBefore, get().player.xp);
   },
 
   restoreHistory: (h) => set({ history: h }),
@@ -294,6 +331,7 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
         rankLp: lpAfter,
         eclats: (s.player.eclats ?? 0) + reward.eclats,
         dust: (s.player.dust ?? 0) + reward.dust,
+        stars: (s.player.stars ?? 0) + reward.stars,
         season: { number: season.number + 1, startedAt: now },
       },
     }));
