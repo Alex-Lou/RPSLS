@@ -1,4 +1,4 @@
-import { useStore } from "../../store/store";
+import { useIntensityValue } from "./useIntensityValue";
 
 /**
  * PremiumIntensitySlider — discreet "thermometer" slider that adjusts the
@@ -15,17 +15,11 @@ export function PremiumIntensitySlider({ setId, label, accent }: {
   label: string;
   accent: { from: string; to: string } | null;
 }) {
-  const intensity = useStore((s) => s.player.premiumIntensity?.[setId] ?? 1.0);
-  const updateProfile = useStore((s) => s.updateProfile);
+  const [intensity, setValue] = useIntensityValue(setId);
   // Range widened to [0.1, 2.0] — Alex flagged that at the previous min
   // (0.4) the rain was still pouring. 0.1 = barely-there sprinkle, 2.0 =
   // a downpour you can't look away from. 1.0 stays the "shipping look".
   const MIN = 0.1, MAX = 2.0;
-  const setValue = (v: number) => {
-    const clamped = Math.max(MIN, Math.min(MAX, v));
-    const current = useStore.getState().player.premiumIntensity ?? {};
-    updateProfile({ premiumIntensity: { ...current, [setId]: clamped } });
-  };
   // Map [MIN, MAX] -> [0, 100] for the visual fill.
   const fillPct = ((intensity - MIN) / (MAX - MIN)) * 100;
   const accentGrad = accent
