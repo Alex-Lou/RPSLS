@@ -38,8 +38,9 @@ function award(b: BoardState, winner: Side, reason: MatchEndReason): BoardState 
 }
 
 /** Départage (a) PV de début de tour, (b) créatures vivantes, (c) mort subite
- *  ou nul (online). Utilisé pour le double KO ET le plafond à PV égaux. */
-function tieBreak(startHp: { a: number; b: number }, b: BoardState, noSuddenDeath: boolean): BoardState {
+ *  ou nul (online). Utilisé pour le double KO (combat ET fatigue, cf.
+ *  lifecycle.advanceToNextTurn) et le plafond à PV égaux. */
+export function tieBreak(startHp: { a: number; b: number }, b: BoardState, noSuddenDeath: boolean): BoardState {
   if (startHp.a !== startHp.b) {
     const w: Side = startHp.a > startHp.b ? "a" : "b";
     alog("turn", `DÉPARTAGE — PV en début de tour (${startHp.a} vs ${startHp.b}) → ${w} gagne`);

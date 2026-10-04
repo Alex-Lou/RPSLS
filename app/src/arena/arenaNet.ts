@@ -30,8 +30,9 @@ import { CREATURE_STATS, LANE_COUNT, type BoardState, type LaneIndex, type Plann
  *  LOGIQUE de résolution non capté par la donnée hashée (BALANCE/cartes/stats) :
  *  nouvel effet de sort, changement d'ordre de résolution, fix de règle… Deux
  *  clients de versions différentes auront des hash différents → match refusé,
- *  plutôt qu'un desync silencieux. */
-export const ARENA_ENGINE_VERSION = 1;
+ *  plutôt qu'un desync silencieux.
+ *  v2 (2026-10) : double KO par FATIGUE → départage (matchEnd.tieBreak) au lieu du nul. */
+export const ARENA_ENGINE_VERSION = 2;
 
 /** Bornes de fil (anti-DoS) : un intent surdimensionné est rejeté AVANT toute
  *  logique. Les vrais caps de RÈGLE (sorts/tour) sont ré-appliqués par le

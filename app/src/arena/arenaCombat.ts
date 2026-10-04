@@ -51,24 +51,12 @@ function damageCreaturePierce(c: Creature, dmg: number): Creature | null {
   return { ...c, hp: newHp };
 }
 
-/** Run combat on a SINGLE lane — exported so the UI can sequence the
- *  3-lane combat phase one lane at a time (better readability + per-lane
- *  shake/death anim cues). The full-board resolver below just chains this. */
+/** Run combat on a SINGLE lane — exported so the UI (arenaResolverFlow) AND the
+ *  pure resolver sequence the 3-lane combat phase one lane at a time (better
+ *  readability + per-lane shake/death anim cues). Damage is applied
+ *  SIMULTANEOUSLY within the lane; empty lane → attacker hits the opposing hero. */
 export function resolveLaneCombatAt(board: BoardState, laneIdx: LaneIndex): BoardState {
   return resolveLaneCombat(board, laneIdx);
-}
-
-/** Run combat across all 3 lanes. Damage is applied SIMULTANEOUSLY (both
- *  creatures' new HP computed from the original state of the lane). Empty
- *  lane → attacker hits the opposing hero for its effective ATK.
- *  Exported for UI sequencing. */
-export function resolveCombat(board: BoardState): BoardState {
-  let b = board;
-  for (let i = 0; i < b.lanes.length; i++) {
-    b = resolveLaneCombat(b, i as LaneIndex);
-    if (b.a.hp <= 0 || b.b.hp <= 0) break; // short-circuit on lethal
-  }
-  return b;
 }
 
 function resolveLaneCombat(boardIn: BoardState, laneIdx: LaneIndex): BoardState {

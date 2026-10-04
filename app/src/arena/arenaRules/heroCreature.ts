@@ -28,17 +28,18 @@ export function makeCreature(move: Move, side: Side, affinity?: Move): Creature 
   // Voie bonuses (Constellation Pro v2 Couche 1) — applied at summon if the
   // creature's move matches the hero's affinity. See ArenaLobby's VOIE_BONUS
   // for the user-facing description.
-  //   Pierre  : provocationCharges 2 (au lieu de 1)
-  //   Ciseaux : hp +1 (HP 2 au lieu de 1 — survit à un échange)
-  //   Spock   : voieAtkBonus +1 (ATK perm 3 au lieu de 2)
+  // Valeurs = BALANCE (arenaBalance) — ne pas recopier les nombres ici :
+  //   Pierre  : provocationCharges = montagne.voieProvocationCharges (au lieu de 1)
+  //   Ciseaux : hp + tranchant.voieScissorsHp (survit à un échange)
+  //   Spock   : voieAtkBonus + engine.voieAtkBonus (ATK perm)
   //   Feuille : wiltSkipNext true → Fanaison ralentie (wilt tous les 2 tours)
-  //   Lézard  : dodgeCharges 2 (au lieu de 1) + voieAtkBonus +1 (ATK 2 au lieu
-  //             de 1 — l'esquive devait pouvoir CONVERTIR ; sim : Lézard pur mur
-  //             ne gagnait jamais, Mirage à 20%).
+  //   Lézard  : dodgeCharges = mirage.voieLizardDodge + voieAtkBonus +
+  //             engine.voieAtkBonus (l'esquive devait pouvoir CONVERTIR ; sim :
+  //             Lézard pur mur ne gagnait jamais, Mirage à 20%).
   const voieRockCharges = matchesAffinity && move === "rock" ? BALANCE.montagne.voieProvocationCharges : (move === "rock" ? 1 : 0);
   const voieScissorsHpBonus = matchesAffinity && move === "scissors" ? BALANCE.tranchant.voieScissorsHp : 0;
   const voieAtkBonus = matchesAffinity && (move === "spock" || move === "lizard") ? BALANCE.engine.voieAtkBonus : 0;
-  // Lot B Round 8 : Lézard base 1 charge dodge, Voie Lézard 2 charges (tunable).
+  // Lot B Round 8 : Lézard base 1 charge dodge, Voie Lézard = mirage.voieLizardDodge (tunable).
   const dodgeCharges = move === "lizard" ? (matchesAffinity ? BALANCE.mirage.voieLizardDodge : 1) : 0;
   // Voie Feuille : flag persistent + toggle wiltSkipNext démarre à true.
   // 1er endOfTurnReset SKIP (Feuille reste ATK 3 ce tour), 2e wilt à 1, 3e
@@ -57,7 +58,7 @@ export function makeCreature(move: Move, side: Side, affinity?: Move): Creature 
     taunt:       move === "rock",     // 🛡 Provocation
     pierces:     move === "scissors", // ⚔ Tranchant
     pierceUsed:  false,                // Tranchant : 1 charge (consume au 1er bypass Aegis)
-    dodgeCharges,                      // ✨ Esquive (Lézard 1 ou 2 charges)
+    dodgeCharges,                      // ✨ Esquive (Lézard : 1, ou voieLizardDodge en Voie)
     spellImmune: move === "spock",    // 🧬 Logique
     summonedThisTurn: true,           // Lente (Pierre 0 ATK) / Lent (Lézard 1)
     wiltedSteps: 0,                    // Fanaison (Feuille: -1/turn ou -1/2 turns Voie)
@@ -112,7 +113,7 @@ export function dodgeSave(c: Creature): Creature {
 
 /** Apply damage to a creature, honoring its defenses in order:
  *   1. Esquive (Lézard dodgeCharges) — intrinsèque, prioritaire sur divineShield.
- *      Consume 1 charge (et fait grandir le Lézard, cf. dodgeSave). Voie = 2 charges.
+ *      Consume 1 charge (et fait grandir le Lézard, cf. dodgeSave). Voie = voieLizardDodge.
  *   2. Divine Shield (Aegis spell) — consommé au 1er dégât.
  *  Returns the new creature, or null if it died. */
 export function damageCreature(c: Creature, dmg: number): Creature | null {
@@ -150,7 +151,8 @@ export function healCreature(c: Creature, amount: number): Creature {
  *    dès le tour suivant, contrairement au texte de la carte. */
 /** STRATES — Voie de la Montagne (Alex 2026-06-17, pilote « Voies = archétypes »).
  *  Une PIERRE du joueur Montagne qui a TENU un tour (a survécu au combat ET
- *  n'était pas fraîchement posée) gagne +1 ATK PERMANENT (voieAtkBonus), cap +3.
+ *  n'était pas fraîchement posée) gagne +strateAtk ATK PERMANENT (voieAtkBonus) et
+ *  +strateHp PV (BALANCE.montagne), ATK cumulée capée STRATE_CAP.
  *  « La défense produit l'offensive » : le mur qui tient grossit en menace. 100%
  *  ADDITIF (ne change jamais l'issue du combat) → faible risque. `wasFreshlySummoned`
  *  = c.summonedThisTurn AVANT endOfTurnReset (sinon une Pierre gagnerait une Strate

@@ -5,11 +5,13 @@
  * (cf arenaRules.applySummons), cast 1× par match (cost 4 mana, cf cards.ts).
  *
  * Effets :
- * - 🪨 FORTERESSE  : tes Pierres existantes prennent 🛡 + ATK base 3 perm
- * - 📄 VERGER       : Fanaison off + heal hero 1/tour plancher (2 si counter Feuille), persistent
+ * (valeurs = BALANCE, cf. arenaBalance — ne pas recopier les nombres ici)
+ * - 🪨 FORTERESSE  : tes Pierres existantes prennent 🛡 + montagne.forteresseAtk ATK perm
+ * - 📄 VERGER       : Fanaison off + heal hero 1/tour plancher (min(foret.seveHealVerger,
+ *                     Sève+1) si counter Feuille), persistent
  * - ✂️ LAME         : ton Tranchant pierce TOUT (Aegis, Provoc, anti-taunt)
- * - 🦎 MÉTAMORPHOSE : Esquive infinie (dodge refresh chaque tour)
- * - 🖖 CALCUL       : tous tes sorts coûtent −1m (min 0)
+ * - 🦎 MÉTAMORPHOSE : recharge UNIQUE de l'Esquive au cast (mirage.dodgeCumulativeCap)
+ * - 🖖 CALCUL       : tous tes sorts coûtent −cosmos.calculDiscount mana (min 0)
  *
  * KISS : 1 fonction `applyFinisher()` qui dispatch sur l'id. Pas de classe,
  * pas d'effets découpés en N fichiers, juste un module focalisé sur le Lot D.
@@ -80,7 +82,7 @@ function mutateLaneCreature(
 }
 
 /** Effet FORTERESSE — tes Pierres existantes prennent 🛡 (divineShield) + ATK
- *  perm +2 (base 1 + 2 = 3). N'affecte pas les Pierres futures (design : c'est
+ *  perm +BALANCE.montagne.forteresseAtk. N'affecte pas les Pierres futures (design : c'est
  *  un sort "snap des Pierres présentes" — incitation à poser 3 Pierres avant
  *  de cast).
  *
@@ -103,13 +105,14 @@ function applyForteresse(board: BoardState, side: Side): BoardState {
       count++;
     }
   }
-  alog("spell", `${side} FINISHER FORTERESSE → ${count} Pierre(s) 🛡 +2 ATK perm`);
+  alog("spell", `${side} FINISHER FORTERESSE → ${count} Pierre(s) 🛡 +${BALANCE.montagne.forteresseAtk} ATK perm`);
   return b;
 }
 
 /** Effet VERGER ÉTERNEL — Fanaison off (wiltedSteps=0 sur toutes mes Feuilles)
  *  + flag vergerActive : Fanaison gelée (endOfTurnReset) ET soin Sève qui ne tarit
- *  jamais — 1 PV/tour plancher, 2 si counter Feuille gagné (cf seveHealAmount). */
+ *  jamais — 1 PV/tour plancher, min(seveHealVerger, Sève+1) si counter Feuille
+ *  gagné (cf seveHealAmount). */
 function applyVerger(board: BoardState, side: Side): BoardState {
   let b = board;
   let count = 0;
@@ -124,7 +127,7 @@ function applyVerger(board: BoardState, side: Side): BoardState {
   b = side === "a"
     ? { ...b, a: { ...hero, vergerActive: true } }
     : { ...b, b: { ...hero, vergerActive: true } };
-  alog("spell", `${side} FINISHER VERGER → ${count} Feuille(s) Fanaison off + heal 1-2/tour (Sève entretenue)`);
+  alog("spell", `${side} FINISHER VERGER → ${count} Feuille(s) Fanaison off + heal ≥1/tour (Sève entretenue)`);
   return b;
 }
 
@@ -139,18 +142,16 @@ function applyLame(board: BoardState, side: Side): BoardState {
   return b;
 }
 
-/** MÉTAMORPHOSE — niveau d'Esquive « infinie » (Alex 2026-06-23, audit) : on
- *  recharge les Lézards à un SENTINEL élevé chaque tour → ils encaissent autant
- *  de coups/tour qu'il faut sans tomber = réellement INTOUCHABLES. L'ancien
- *  max(.,1) ne donnait qu'1 charge : il DÉGRADAIT même un Lézard de Voie (2
- *  charges), et un coup de combat + un sort le même tour le tuait — en
- *  contradiction directe avec le texte « Esquive infinie / intouchables ». */
+/** MÉTAMORPHOSE — historique : « Esquive infinie » (2026-06-23, sentinel élevé
+ *  rechargé chaque tour) → rendait le Lézard mathématiquement intouchable ;
+ *  remplacé par la recharge unique plafonnée ci-dessous. */
 // Métamorphose recharge l'Esquive au CAP GLOBAL (BALANCE.mirage.dodgeCumulativeCap,
-// tunable) chaque tour — au lieu d'un « 9 intouchable » sans contre-jeu (audit
-// 2026-06-28 : Mirage injuste/illisible, 19 esquives/partie). Refresh = oui, infini = non.
+// tunable) — au lieu d'un « 9 intouchable » sans contre-jeu (audit 2026-06-28 :
+// Mirage injuste/illisible, 19 esquives/partie). BURST UNIQUE (2026-06-28, cf.
+// lifecycle) : recharge UNE fois au cast, plus de refresh par tour.
 
-/** Effet MÉTAMORPHOSE — flag metamorphoseActive + Lézards rechargés à
- *  METAMORPHOSE_DODGE (intouchables), refresh à chaque endOfTurnReset. */
+/** Effet MÉTAMORPHOSE — flag metamorphoseActive + Lézards rechargés une fois à
+ *  BALANCE.mirage.dodgeCumulativeCap (puis ils redeviennent mortels). */
 function applyMetamorphose(board: BoardState, side: Side): BoardState {
   let b = board;
   let count = 0;
@@ -165,7 +166,7 @@ function applyMetamorphose(board: BoardState, side: Side): BoardState {
   b = side === "a"
     ? { ...b, a: { ...hero, metamorphoseActive: true } }
     : { ...b, b: { ...hero, metamorphoseActive: true } };
-  alog("spell", `${side} FINISHER MÉTAMORPHOSE → ${count} Lézard(s) ✨ + dodge refresh/tour`);
+  alog("spell", `${side} FINISHER MÉTAMORPHOSE → ${count} Lézard(s) ✨ recharge Esquive (une fois)`);
   return b;
 }
 

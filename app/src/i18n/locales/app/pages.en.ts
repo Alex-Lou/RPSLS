@@ -86,6 +86,26 @@ const strings: Record<string, string> = {
   "profile.badge.live": "LIVE",
   "nav.menu.open": "Open menu",
   "nav.menu.close": "Close menu",
+  // Generic server errors (online/serverErrors.ts) + rematch states.
+  "online.serverErr.self_match": "You can’t join your own lobby. Share this code with a friend, or enter theirs.",
+  "online.serverErr.lobby_not_found": "No lobby with that code. Check it, or ask your friend for a new one.",
+  "online.serverErr.bad_code": "Invalid code: 6 characters, letters A–Z and digits 2–9.",
+  "online.serverErr.lobby_rate_limited": "Too many invalid codes. Try again in a minute.",
+  "online.serverErr.server_full": "The server is full right now. Try again in a moment.",
+  "online.serverErr.bad_best_of": "Invalid match format (best of 1 to 9, odd number).",
+  "online.serverErr.bad_win_to": "Invalid match format (1 to 5 Rounds to win).",
+  "online.serverErr.bad_ccg_join": "Game refused by the server: incompatible app version. Please update the app.",
+  "online.serverErr.bad_message": "The server didn’t understand the request. Update the app and try again.",
+  "online.serverErr.hello_limited": "Too many connection attempts. Go back to the menu and try again.",
+  "online.serverErr.auth_needed": "Sign in to your account to play online.",
+  "online.serverErr.auth_failed": "Invalid session. Please sign in to your account again.",
+  "online.serverErr.auth_transient": "The server couldn’t verify your session. Try again in a moment.",
+  "online.serverErr.unknown": "The server refused the request (code: {code}).",
+  "online.rematch.offerHint": "The offer expires 30s after the match ends.",
+  "online.rematch.sent": "Rematch offered",
+  "online.rematch.accepted": "Rematch accepted",
+  "online.rematch.starting": "Starting the new match…",
+  "online.rematch.expired": "The rematch offer has expired",
 };
 
 export default strings;

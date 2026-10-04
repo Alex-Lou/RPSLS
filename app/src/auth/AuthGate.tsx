@@ -108,7 +108,9 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
     }
   };
 
-  const errorMsg = error ? t(`auth.err.${error}`) : null;
+  // Code serveur inattendu → texte générique plutôt que la clé brute.
+  const errorText = error ? t(`auth.err.${error}`) : null;
+  const errorMsg = errorText && errorText.startsWith("auth.err.") ? t("auth.err.unknown") : errorText;
 
   return (
     <motion.div

@@ -116,12 +116,14 @@ async function playOnline(seed: number, voieA: Move, voieB: Move): Promise<{ dif
     ]);
     // Résolution CANONIQUE de chaque côté : A(mySide=a)→(aIntent,aGotOpp) ;
     // B(mySide=b)→(bGotOpp,bIntent). aGotOpp==bIntent, bGotOpp==aIntent ⇒ mêmes inputs.
-    boardA = trap(() => resolveTurn(boardA, aIntent, aGotOpp, drvA.rngPair));
-    boardB = trap(() => resolveTurn(boardB, bGotOpp, bIntent, drvB.rngPair));
+    // noSuddenDeath = true comme en vrai online (ArenaGame : !!online) → double KO
+    // (combat OU fatigue) tranché à l'identique des deux côtés, jamais de mort subite.
+    boardA = trap(() => resolveTurn(boardA, aIntent, aGotOpp, drvA.rngPair, { noSuddenDeath: true }));
+    boardB = trap(() => resolveTurn(boardB, bGotOpp, bIntent, drvB.rngPair, { noSuddenDeath: true }));
     snapsA.push(JSON.stringify(boardA)); snapsB.push(JSON.stringify(boardB));
     if (boardA.phase === "match-end" || boardB.phase === "match-end") break;
-    boardA = trap(() => advanceToNextTurn(boardA, drvA.rngPair));
-    boardB = trap(() => advanceToNextTurn(boardB, drvB.rngPair));
+    boardA = trap(() => advanceToNextTurn(boardA, drvA.rngPair, { noSuddenDeath: true }));
+    boardB = trap(() => advanceToNextTurn(boardB, drvB.rngPair, { noSuddenDeath: true }));
     snapsA.push(JSON.stringify(boardA)); snapsB.push(JSON.stringify(boardB));
     if (boardA.phase === "match-end" || boardB.phase === "match-end") break;
   }

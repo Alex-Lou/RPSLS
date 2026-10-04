@@ -136,8 +136,9 @@ export interface Creature {
    *  Set inherently on Rock creatures at summon. */
   taunt: boolean;
   /** Lézard's "Esquive" innate passive — chaque charge ignore 1 damage source.
-   *  Lézard base : 1 charge. Voie Lézard (affinity match) : 2 charges initiales.
-   *  Métamorphose finisher : refill 1 charge fin de tour.
+   *  Lézard base : 1 charge. Voie Lézard (affinity match) : BALANCE.mirage.voieLizardDodge
+   *  charges (+ jauge Mirage, borné dodgeCapOnSummon). Métamorphose finisher :
+   *  recharge UNIQUE au cast jusqu'à BALANCE.mirage.dodgeCumulativeCap.
    *
    *  Round 8 refactor : était `dodgeCharge: boolean`, maintenant un compteur.
    *  > 0 = peut esquiver (consume 1 par save). 0 = plus de save Esquive. */
@@ -183,7 +184,8 @@ export interface Creature {
    *  applyAegis ; comportement validé live, ce n'est PAS un "+1" cumulable).
    *  Always 0 on non-Rock moves.
    *
-   *  Voie de la Pierre (affinity match) : 2 charges initiales au lieu d'1.
+   *  Voie de la Pierre (affinity match) : BALANCE.montagne.voieProvocationCharges
+   *  charges initiales au lieu d'1.
    *
    *  Why a charge instead of permanent: Alex flagged that a board with
    *  several Pierres becomes a permanent stalemate. The charge forces a

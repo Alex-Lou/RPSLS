@@ -2,11 +2,11 @@ import { alog, csnap } from "../arenaLog";
 import { AFFINITY_TO_FINISHER } from "../arenaFinishers";
 import { applyEnginesEndOfTurn, engineMaxed, trancheAtkBonus, mirageDodgeBonus, mirageAtkBonus, riseEngineOnHeld } from "../arenaEngines";
 import { BALANCE } from "../arenaBalance";
-// resolveCombat vit dans ./arenaCombat (déplacé 2026-06-09 : arenaRules > 700 l).
+// Le combat par lane vit dans ./arenaCombat (déplacé 2026-06-09 : arenaRules > 700 l).
 // Le cycle arenaRules<->arenaCombat tient car arenaCombat n'importe que les
 // primitives feuilles (creatureEffectiveAtk/damageCreature/damageHero), sans
-// back-dépendance sur ce resolver. resolveCombat + resolveLaneCombatAt sont
-// re-exportés par le barrel (index.ts) pour préserver le contract des callsites.
+// back-dépendance sur ce resolver. resolveLaneCombatAt est re-exporté par le
+// barrel (index.ts) pour préserver le contract des callsites.
 import { resolveLaneCombatAt } from "../arenaCombat";
 import { decideMatchEnd } from "./matchEnd";
 import {

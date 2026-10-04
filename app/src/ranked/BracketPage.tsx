@@ -36,7 +36,9 @@ export function BracketPage({
 }: {
   tournament: TournamentState;
   setTournament: (fn: (t: TournamentState) => TournamentState) => void;
-  onStartMatch: (oppName: string, oppAvatar: string) => void;
+  /** `oppName` = graine STABLE de la persona adverse (oppPersona : thème/pad),
+   *  jamais traduite ; `oppLabel` = nom affiché (suffixe IA/CPU traduit). */
+  onStartMatch: (oppName: string, oppAvatar: string, oppLabel: string) => void;
   onBack: () => void;
 }) {
   const simRef = useRef(false);
@@ -186,7 +188,13 @@ export function BracketPage({
         <CombatButton
           oppName={playerMatch.opp.name}
           oppAvatar={playerMatch.opp.avatar}
-          onClick={() => onStartMatch(playerMatch.opp.name + " (CPU)", playerMatch.opp.avatar)}
+          // Graine historique « Nom (CPU) » conservée telle quelle (même persona
+          // qu'avant) ; seul le libellé affiché est traduit.
+          onClick={() => onStartMatch(
+            playerMatch.opp.name + " (CPU)",
+            playerMatch.opp.avatar,
+            t("bracket.cpuName", { name: playerMatch.opp.name }),
+          )}
         />
       )}
 
@@ -245,6 +253,7 @@ export function BracketPage({
       <AnimatePresence>
         {preparing && (
           <TournamentPreparingOverlay
+            size={tournament.size}
             onDone={() => {
               setPreparing(false);
               setJoined(true);
@@ -263,7 +272,7 @@ export function BracketPage({
  * actually starting. A 3-2-1 countdown over a darkened backdrop with a
  * pulsing trophy gives the tournament its own start beat.
  */
-function TournamentPreparingOverlay({ onDone }: { onDone: () => void }) {
+function TournamentPreparingOverlay({ size, onDone }: { size: number; onDone: () => void }) {
   const t = useT();
   const [beat, setBeat] = useState(3);
   useEffect(() => {
@@ -304,7 +313,7 @@ function TournamentPreparingOverlay({ onDone }: { onDone: () => void }) {
           {t("bracket.preparing.title")}
         </motion.h2>
         <p className="text-[12px] text-ink-faint max-w-xs leading-snug px-6">
-          {t("bracket.preparing.sub")}
+          {t("bracket.preparing.sub", { n: size })}
         </p>
         <motion.div
           key={beat}

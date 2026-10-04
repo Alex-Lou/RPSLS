@@ -115,14 +115,32 @@ export interface ArenaBalance {
  *   - Cosmos : convergenceDmgCap 3→5, intricationCap 3→4 (vs Forêt 9%→~16%).
  *   - Mirage : dodgeCumulativeCap 4→3, dodgeGrowAtkCap 3→2, coupDansLombreCap 3→2.
  *   - Tranchant : trancheAtkPerStack 2→4 (jauge = vrai payoff offensif).
- *   - Montagne : strateAtk 2→1. Forêt : sangsueCap 3→2. */
+ *   - Montagne : strateAtk 2→1. Forêt : sangsueCap 3→2.
+ *
+ *  PASSE DUELS 2026-10 (Alex « ≤ 70 % par duel Voie vs Voie, sans dégrader l'écart
+ *  global »). Mesurée par scripts/voie-matrix.ts (IA hard vs hard, côtés alternés,
+ *  1000 parties/duel × 4 graines). Avant : pire duel Forêt>Cosmos ~83 %, Cosmos>
+ *  Tranchant ~75 %, écart global ~6 pts. Après : Forêt>Cosmos ~77 %, Cosmos>
+ *  Montagne ~71 %, tous les autres ≤ 70 %, écart global ~5 pts. Chiffres seuls :
+ *   - Cosmos : convergenceDmgCap 5→7 + tempoDiscount 1→2 (reach/tempo vs le mur
+ *     Forêt), intricationCap 4→2 (le burst « par Spock » punissait surtout les
+ *     Voies qui perdent leurs lanes vs Spock : Tranchant / Montagne).
+ *   - Tranchant : voieScissorsHp 1→3 (le Ciseaux de Voie survit au chip Spock),
+ *     trancheAtkPerStack 4→2 (compense : la jauge écrasait Mirage/Montagne).
+ *   - Montagne : forteresseAtk 2→4, grondementCap 3→4 (vraie menace de fin vs Cosmos).
+ *   - Mirage : dodgeCapOnSummon 3→2, dodgeSpellCap 3→2, dodgeCumulativeCap 3→2,
+ *     coupDansLombreCap 2→1 (Mirage dominait Tranchant/Montagne une fois Cosmos calmé).
+ *  RESTE Forêt>Cosmos ~77 % : STRUCTUREL. Il ne baisse qu'en coupant le sustain Forêt
+ *  (Second Souffle / Drain / Sève), ce qui effondre la Forêt contre TOUTES les Voies
+ *  (écart global → 8-25 pts). Passer ≤ 70 % demande une règle (anti-soin côté Cosmos,
+ *  ou contre-jeu Spock vs Feuille), hors périmètre « chiffres seuls ». */
 export const DEFAULT_BALANCE: ArenaBalance = {
-  engine: { cap: 3, risePerCounterWin: 1, voieAtkBonus: 1, trancheAtkPerStack: 4 },
-  montagne: { strateAtk: 1, strateHp: 1, forteresseAtk: 2, voieProvocationCharges: 3, eboulisPerRock: 2, eboulisCap: 10, grondementCap: 3 },
+  engine: { cap: 3, risePerCounterWin: 1, voieAtkBonus: 1, trancheAtkPerStack: 2 },
+  montagne: { strateAtk: 1, strateHp: 1, forteresseAtk: 4, voieProvocationCharges: 3, eboulisPerRock: 2, eboulisCap: 10, grondementCap: 4 },
   foret: { seveHealActive: 1, seveHealVerger: 1, drainAmount: 2, secondWindHeal: 1, photosyntheseHeal: 2, sangsueCap: 2 },
-  tranchant: { voieScissorsHp: 1, acuiteAtkCap: 2 },
-  mirage: { dodgeCapOnSummon: 3, dodgeSpellCap: 3, coupDansLombreCap: 2, voieLizardDodge: 1, dodgeGrowAtk: 1, dodgeGrowAtkCap: 2, dodgeRiposte: 0.5, dodgeCumulativeCap: 3 },
-  cosmos: { chipCap: 0, convergenceDmgCap: 5, intricationCap: 4, calculDiscount: 1, tempoDiscount: 1 },
+  tranchant: { voieScissorsHp: 3, acuiteAtkCap: 2 },
+  mirage: { dodgeCapOnSummon: 2, dodgeSpellCap: 2, coupDansLombreCap: 1, voieLizardDodge: 1, dodgeGrowAtk: 1, dodgeGrowAtkCap: 2, dodgeRiposte: 0.5, dodgeCumulativeCap: 2 },
+  cosmos: { chipCap: 0, convergenceDmgCap: 7, intricationCap: 2, calculDiscount: 1, tempoDiscount: 2 },
 };
 function clone(b: ArenaBalance): ArenaBalance {
   return {

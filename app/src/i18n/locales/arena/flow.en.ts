@@ -66,7 +66,7 @@ const strings: Record<string, string> = {
   "arena.engine.effect.paper": "your hero regenerates more",
   "arena.engine.effect.scissors": "your creatures in play hit harder",
   "arena.engine.effect.lizard": "your elusive Lizards hit harder",
-  "arena.engine.effect.spock": "the inevitable gnaws at the enemy hero",
+  "arena.engine.effect.spock": "your spells get cheaper",
 
   "arena.castdraw.mana": "+{n} MANA",
   "arena.castdraw.maxMana": "+{n} MAX MANA",

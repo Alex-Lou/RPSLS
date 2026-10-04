@@ -16,7 +16,7 @@ const strings: Record<string, string> = {
   "bracket.quit": "Quit",
   "bracket.waitingOthers": "The other players are finishing their match… hang on a moment 🙂",
   "bracket.preparing.title": "The tournament is getting ready…",
-  "bracket.preparing.sub": "The 8 challengers take their places. Kick-off is imminent.",
+  "bracket.preparing.sub": "The {n} challengers take their places. Kick-off is imminent.",
   "bracket.go": "GO!",
   "bracket.fight": "Fight",
   "bracket.fightAria": "Fight {name}",
@@ -201,6 +201,7 @@ const strings: Record<string, string> = {
   "ranked.sudden.win": "You win the round!",
   "ranked.sudden.loss": "Round lost in sudden death.",
   "ranked.sudden.draw": "Another draw — play again!",
+  "bracket.cpuName": "{name} (CPU)",
 };
 
 export default strings;

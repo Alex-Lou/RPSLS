@@ -26,6 +26,7 @@ import { arenaRulesetHash } from "./arenaNet";
 import { ArenaOnlineSession } from "./arenaOnlineSession";
 import { makeArenaOnlineDriver, type ArenaOnlineDriver } from "./arenaOnlineDriver";
 import { ArenaGame } from "./ArenaGame";
+import { serverErrorText } from "../online/serverErrors";
 import { useT } from "../i18n";
 
 type Phase = "connecting" | "searching" | "setup" | "playing" | "error" | "desync"
@@ -81,7 +82,7 @@ export function ArenaOnlineGame({ onBack }: { onBack: () => void }) {
       (msg) => client.send(msg),
       { winTo: 1, rulesetHash: arenaRulesetHash() }, // Arena = 1 partie à mort (win_to inerte côté règle)
       {
-        onError: (_code, message) => { if (alive) { setErrMsg(message); setPhase("error"); } },
+        onError: (code) => { if (alive) { setErrMsg(serverErrorText(code)); setPhase("error"); } },
         onOpponentLeft: () => { /* ArenaGame affiche déjà sa fin/forfait ; le retour hub est manuel */ },
         onMatchEnd: (winner, forfeit, desync) => {
           if (!alive) return;

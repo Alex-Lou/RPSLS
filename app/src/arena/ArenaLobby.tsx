@@ -28,6 +28,7 @@ import { VOIE_EMBLEM } from "./voieEmblem";
 import { TutorialOfferModal } from "./tutorial/TutorialOfferModal";
 import { skipArenaTutorial } from "./tutorial/tutorialProgress";
 import { useT } from "../i18n";
+import { voieTextParams } from "./arenaVoieText";
 
 const VOIES: Move[] = ["rock", "paper", "scissors", "lizard", "spock"];
 /** Bonus Voie (texte i18n : arena.voie.<move>.bonus). */
@@ -268,7 +269,7 @@ export function ArenaLobby({
             </span>
           </div>
           <p className="text-[12.5px] leading-snug text-fuchsia-100/90 mt-1">
-            {t(voieBonusKey(affinity))}
+            {t(voieBonusKey(affinity), voieTextParams(affinity))}
           </p>
           {!voieExpanded && (
             <p className="text-[10px] text-fuchsia-300/70 mt-1 italic">{t("arena.lobby.details")}</p>
@@ -287,10 +288,10 @@ export function ArenaLobby({
               className="overflow-hidden"
             >
               <div className="rounded-lg bg-black/30 border border-fuchsia-700/25 px-3 pt-2.5 pb-1 mt-0.5">
-                <FicheRow icon={PRO_ICON("fiche-but")} label={t("arena.lobby.fiche.but")} text={t(voieFicheKey(affinity, "but"))} />
-                <FicheRow icon={PRO_ICON("fiche-force")} label={t("arena.lobby.fiche.force")} text={t(voieFicheKey(affinity, "plus"))} />
-                <FicheRow icon={PRO_ICON("fiche-faiblesse")} label={t("arena.lobby.fiche.faiblesse")} text={t(voieFicheKey(affinity, "moins"))} />
-                <FicheRow icon={PRO_ICON("fiche-particularite")} label={t("arena.lobby.fiche.perso")} text={t(voieFicheKey(affinity, "perso"))} />
+                <FicheRow icon={PRO_ICON("fiche-but")} label={t("arena.lobby.fiche.but")} text={t(voieFicheKey(affinity, "but"), voieTextParams(affinity))} />
+                <FicheRow icon={PRO_ICON("fiche-force")} label={t("arena.lobby.fiche.force")} text={t(voieFicheKey(affinity, "plus"), voieTextParams(affinity))} />
+                <FicheRow icon={PRO_ICON("fiche-faiblesse")} label={t("arena.lobby.fiche.faiblesse")} text={t(voieFicheKey(affinity, "moins"), voieTextParams(affinity))} />
+                <FicheRow icon={PRO_ICON("fiche-particularite")} label={t("arena.lobby.fiche.perso")} text={t(voieFicheKey(affinity, "perso"), voieTextParams(affinity))} />
               </div>
             </motion.div>
           )}
@@ -361,10 +362,10 @@ export function ArenaLobby({
                     <div className="text-[10px] uppercase tracking-wider" style={{ color: pal.hex }}>{CREATURE_PASSIVES[ficheVoie].name}</div>
                   </div>
                 </div>
-                <FicheRow icon={PRO_ICON("fiche-but")} label={t("arena.lobby.fiche.but")} text={t(voieFicheKey(ficheVoie, "but"))} />
-                <FicheRow icon={PRO_ICON("fiche-force")} label={t("arena.lobby.fiche.force")} text={t(voieFicheKey(ficheVoie, "plus"))} />
-                <FicheRow icon={PRO_ICON("fiche-faiblesse")} label={t("arena.lobby.fiche.faiblesse")} text={t(voieFicheKey(ficheVoie, "moins"))} />
-                <FicheRow icon={PRO_ICON("fiche-particularite")} label={t("arena.lobby.fiche.perso")} text={t(voieFicheKey(ficheVoie, "perso"))} />
+                <FicheRow icon={PRO_ICON("fiche-but")} label={t("arena.lobby.fiche.but")} text={t(voieFicheKey(ficheVoie, "but"), voieTextParams(ficheVoie))} />
+                <FicheRow icon={PRO_ICON("fiche-force")} label={t("arena.lobby.fiche.force")} text={t(voieFicheKey(ficheVoie, "plus"), voieTextParams(ficheVoie))} />
+                <FicheRow icon={PRO_ICON("fiche-faiblesse")} label={t("arena.lobby.fiche.faiblesse")} text={t(voieFicheKey(ficheVoie, "moins"), voieTextParams(ficheVoie))} />
+                <FicheRow icon={PRO_ICON("fiche-particularite")} label={t("arena.lobby.fiche.perso")} text={t(voieFicheKey(ficheVoie, "perso"), voieTextParams(ficheVoie))} />
                 <button
                   onClick={() => setFicheVoie(null)}
                   className="mt-4 w-full py-2.5 rounded-2xl font-bold text-sm text-white"

@@ -189,7 +189,7 @@ function LaneSlot({
                                           "bg-emerald-300")
                 }
               >
-                ✨ +1
+                ✨
               </motion.span>
             )}
           </>

@@ -33,9 +33,9 @@ export * from "./boardInit";
 export * from "./resolver";
 export * from "./lifecycle";
 export * from "./matchEnd";
-// resolveCombat / resolveLaneCombatAt vivent dans ./arenaCombat (déplacés
-// 2026-06-09 quand arenaRules dépassait 700 l). Re-exportés ici pour préserver
+// resolveLaneCombatAt vit dans ./arenaCombat (déplacé 2026-06-09 quand
+// arenaRules dépassait 700 l). Re-exporté ici pour préserver
 // le contract des callsites qui importent depuis "./arenaRules". heroCreature
 // (re-exporté ci-dessus AVANT) fournit à arenaCombat ses primitives feuilles
 // → le cycle arenaRules<->arenaCombat reste sain.
-export { resolveCombat, resolveLaneCombatAt } from "../arenaCombat";
+export { resolveLaneCombatAt } from "../arenaCombat";

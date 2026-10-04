@@ -25,6 +25,7 @@ import { useT } from "../../i18n";
 import { CelebrationBurst } from "../sharedMatchUI/CelebrationBurst";
 import { RewardChips, type MatchEndRewards } from "./RewardChips";
 import { LevelBar, TierBar } from "./ProgressReveal";
+import { claimLevelUps } from "../../fx/levelUpGate";
 
 export type EndOutcome = "win" | "loss" | "draw";
 export interface EndAction { label: string; onClick: () => void }
@@ -227,6 +228,9 @@ export function MatchEndScreen(props: MatchEndScreenProps) {
   const xp = rewards?.xp ?? 0;
   const showLevel = props.showLevelBar ?? xp > 0;
   const hasProgress = showLevel || (!!props.lpLadder && !!rewards?.lp);
+  // Tant que la barre de niveau est affichée, c'est elle (et non l'overlay
+  // global LevelUpWatcher) qui célèbre un éventuel passage de niveau.
+  useEffect(() => (showLevel ? claimLevelUps() : undefined), [showLevel]);
 
   const screen = (
     <motion.div
