@@ -146,6 +146,27 @@ pub async fn overlay_best_effort(pid: &str, p: &mut PlayerProgress) {
     }
 }
 
+/// ACTIVATION FORCÉE (éco lot 3), appelée au `Hello` : tout joueur qui a déjà
+/// une ligne `player:{pid}` reçoit son portefeuille (même migration plafonnée que
+/// `WalletInit`), même si son app ne l'a jamais demandé (anciennes versions).
+/// Dès lors le serveur fait foi sur l'éco, quelle que soit la version de l'app.
+///
+/// `row_exists = false` (joueur tout neuf) : on NE crée PAS ici — l'app à jour
+/// pousse d'abord son état local (`SyncState`) puis envoie `WalletInit`, qui
+/// migre cet état ; créer maintenant figerait un portefeuille vide.
+/// Au mieux : en cas d'erreur, la progression part telle quelle.
+pub async fn ensure_and_overlay(pid: &str, p: &mut PlayerProgress, row_exists: bool) {
+    match store::get(pid).await {
+        Ok(Some(w)) => w.overlay_onto(p),
+        Ok(None) if row_exists => match store::init(pid).await {
+            Ok(w) => w.overlay_onto(p),
+            Err(e) => warn!(player_id = %pid, code = e.code(), "forced wallet activation failed"),
+        },
+        Ok(None) => {}
+        Err(_) => warn!(player_id = %pid, "wallet overlay skipped (backend error)"),
+    }
+}
+
 /// Bonus de bienvenue versé dans le portefeuille s'il existe déjà. Sinon rien :
 /// la ligne player le porte et la migration le reprendra.
 pub async fn grant_welcome(pid: &str) {
@@ -189,7 +210,9 @@ pub fn credit_match_end(a: &Arc<Session>, b: &Arc<Session>, winner: Option<Playe
             })
             .await {
                 Ok(((), w)) => reply(&session, "match_reward", w, Outcome { eclats: Some(amount), ..Default::default() }),
-                Err(StoreError::NotInitialized) => {} // ancienne app : elle crédite en local
+                // Joueur jamais passé par un Hello authentifié avec une ligne
+                // existante (rarissime depuis l'activation forcée) : rien à créditer.
+                Err(StoreError::NotInitialized) => {}
                 Err(e) => warn!(player_id = %pid, code = e.code(), "match reward NOT credited"),
             }
         });

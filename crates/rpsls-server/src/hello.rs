@@ -105,12 +105,14 @@ pub(crate) fn handle_hello(
                 return;
             };
 
+            // Ligne déjà en base → portefeuille forcé (éco lot 3, cf. ensure_and_overlay).
+            let row_exists = progress.is_some();
             match stored_token {
                 Some(ref st) if client_token == *st => {
                     // Token matches — authenticate the session. (Le pseudo est
                     // déjà adopté en synchrone avant ce spawn, cf. plus haut.)
                     let mut state = progress.unwrap_or_default();
-                    crate::wallet::handlers::overlay_best_effort(&pid, &mut state).await;
+                    crate::wallet::handlers::ensure_and_overlay(&pid, &mut state, row_exists).await;
                     session_clone.set_player_id(pid);
                     session_clone.send(ServerMessage::StateLoaded {
                         state,
@@ -137,7 +139,7 @@ pub(crate) fn handle_hello(
                     match player_state::try_create_claim_token(&pid).await {
                         Ok(Some(new_token)) => {
                             let mut state = progress.unwrap_or_default();
-                            crate::wallet::handlers::overlay_best_effort(&pid, &mut state).await;
+                            crate::wallet::handlers::ensure_and_overlay(&pid, &mut state, row_exists).await;
                             session_clone.set_player_id(pid);
                             session_clone.send(ServerMessage::StateLoaded {
                                 state,

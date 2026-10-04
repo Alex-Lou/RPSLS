@@ -221,3 +221,27 @@ async fn unreadable_wallet_is_an_error_never_recreated() {
     // La ligne n'a pas été écrasée par une migration.
     assert_eq!(crate::test_upstash::read(&format!("wallet:{pid}")).as_deref(), Some("{not json"));
 }
+
+#[tokio::test]
+async fn hello_forces_wallet_only_for_existing_rows() {
+    crate::test_upstash::ensure();
+    // Joueur existant sur l'ancien flux : ligne player, pas de portefeuille.
+    let pid = "wallet-test-forced";
+    let row = PlayerProgress { eclats: 120, card_collection: vec!["aegis".into()], ..Default::default() };
+    crate::test_upstash::put(&format!("player:{pid}"), &serde_json::to_string(&row).unwrap());
+    let mut p = row.clone();
+    super::handlers::ensure_and_overlay(pid, &mut p, true).await;
+    let w = store::get(pid).await.unwrap().expect("portefeuille créé au Hello");
+    assert_eq!((w.eclats, p.eclats), (120, 120));
+    // Ensuite la ligne player (écrite par l'app) ne fait plus foi.
+    let mut forged = PlayerProgress { eclats: 9_999_999, ..Default::default() };
+    super::handlers::ensure_and_overlay(pid, &mut forged, true).await;
+    assert_eq!(forged.eclats, 120);
+    assert_eq!(forged.card_collection, vec!["aegis".to_string()]);
+
+    // Joueur tout neuf (aucune ligne) : rien n'est créé, l'app migrera son état local.
+    let fresh = "wallet-test-fresh";
+    let mut empty = PlayerProgress::default();
+    super::handlers::ensure_and_overlay(fresh, &mut empty, false).await;
+    assert!(store::get(fresh).await.unwrap().is_none());
+}
