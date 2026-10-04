@@ -800,6 +800,7 @@ export function ArenaGame({
       <ArenaMatchEnd
         board={board}
         mySide={mySide}
+        oppName={oppName}
         onQuit={onQuit}
         // En ligne : pas de « Rejouer » (session close → le soft-reset local
         // lançait un faux match qui se bloquait au 1er tour).

@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState, useSyncExternalStore } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store/store";
 import { useArenaOverride } from "./ranked/arenaOverride";
@@ -12,13 +12,13 @@ import { PremiumTouchLayer, isPremiumFxScene } from "./backdrops/PremiumTouchLay
 import { StormRain } from "./backdrops/StormRain";
 import { useBackdropPeek } from "./backdrops/previewScene";
 import { ThemeTouchFX } from "./fx/ThemeTouchFX";
-import { Sidebar, MobileShell, type Page } from "./Sidebar";
+import { Sidebar, MobileShell, useOwnChrome, type Page } from "./Sidebar";
 // PlayPage stays eagerly imported — it's the initial route after splash
 // so lazy-loading it would just add a flicker for no gain.
 import { PlayPage } from "./pages/PlayPage";
-import { FloatingMatchBackButton } from "./match/sharedMatchUI";
 import { useMatchFullscreen } from "./match/matchFullscreenStore";
-import { getMatchExit, subscribeMatchExit } from "./matchExitStore";
+import { AppTopBar, PAGE_TITLE_KEY } from "./nav/AppTopBar";
+import { useImmersiveActive } from "./nav/topBarStore";
 import { UserHeader } from "./UserHeader";
 import { LevelUpWatcher } from "./fx/LevelUpOverlay";
 import { useT } from "./i18n";
@@ -122,7 +122,13 @@ export default function App() {
   const gfxQuartz = useGfxAllows("quartzScene");
   // Match arène en cours → shell PLEIN ÉCRAN (sidebar masquée + cap max-w-md retiré).
   const matchFullscreen = useMatchFullscreen();
-  const matchExit = useSyncExternalStore(subscribeMatchExit, getMatchExit, () => null);
+  // Navigation unifiée : barre du haut sur tout écran hors match. Un match
+  // (immersif) garde son HUD flottant ; un écran à chrome propre (menu principal,
+  // plateau Arena…) n'a ni barre ni burger flottant.
+  const immersive = useImmersiveActive() || matchFullscreen;
+  const ownChrome = useOwnChrome();
+  const showTopBar = !immersive && !ownChrome;
+  const mainRef = useRef<HTMLElement>(null);
 
   function navigateTo(next: Page) {
     if (next === "play") setHomeNonce((n) => n + 1);
@@ -382,40 +388,52 @@ export default function App() {
             className={"relative z-10 flex h-full min-h-0" + (peek ? " invisible" : "")}
           >
             {!matchFullscreen && <Sidebar page={page} onNavigate={navigateTo} />}
-            <MobileShell page={page} onNavigate={navigateTo} />
+            <MobileShell page={page} onNavigate={navigateTo} floatingTrigger={immersive && !ownChrome} />
             {/* Theme-coloured touch particles across the menu. Quiet on Contact,
                 and inside any game/deck screen (useNoMenuFx) or the open drawer
                 ([data-no-touchfx]). */}
             <ThemeTouchFX enabled={page !== "contact" && page !== "online"} />
             {/* Global LEVEL UP celebration — catches an XP gain from any surface. */}
             <LevelUpWatcher />
-            {/* Global "back to Play" arrow, parked right next to the burger
-                on every non-Play page. Avoids the Android system back button
-                (which closes the app) being the only escape route. */}
-            {/* Masquée pendant un match en ligne (sortie = burger / modale de forfait). */}
-            {page !== "play" && !matchExit && (
-              <FloatingMatchBackButton
-                onClick={() => navigateTo("play")}
-                label={t("nav.backToPlay")}
-              />
-            )}
             <div className="flex-1 flex flex-col min-w-0 min-h-0">
-              {/* Mobile: clear the floating hamburger (top:max(safe,32)+44h)
-                  with a measured gap, and keep content above the Android
-                  nav bar via safe-area-bottom. Desktop (md+) has no burger. */}
-              {/* Top pad = just enough to clear the 44px floating burger (the
-                  safe-area itself is already paid once by #root, so we don't
-                  double-count it here). Bottom pad = minimal nav-bar clearance
-                  on top of #root's safe-area. Keeps the match using the full
-                  vertical space instead of floating with big top/bottom voids. */}
-              <main className={"flex-1 flex flex-col min-h-0 w-full overflow-x-hidden overflow-y-auto pt-12 pb-4 portrait:min-[900px]:pt-0 portrait:min-[900px]:pb-0 [@media(max-height:540px)]:pt-2 [@media(max-height:540px)]:pb-1" + (matchFullscreen ? "" : " max-w-md mx-auto landscape:max-w-none")}>
+              {/* Barre du haut unifiée (burger + retour à gauche, titre centré).
+                  Titre/retour par défaut = page courante → accueil ; un lobby ou
+                  un sous-écran les remplace via useTopBar(). */}
+              <AnimatePresence initial={false}>
+                {showTopBar && (
+                  <AppTopBar
+                    key="topbar"
+                    mainRef={mainRef}
+                    defaultTitle={page === "play" ? "" : t(PAGE_TITLE_KEY[page])}
+                    defaultBack={page === "play" ? undefined : () => navigateTo(page === "privacy" ? "about" : "play")}
+                    defaultBackLabel={t(page === "privacy" ? "nav.back" : "nav.backToPlay")}
+                  />
+                )}
+              </AnimatePresence>
+              {/* Haut : avec la barre, simple respiration (pt-3) ; match immersif,
+                  dégagement du HUD flottant ; écran à chrome propre (menu
+                  principal, plateau Arena) : pt-12 historique. La safe-area est
+                  déjà payée par #root. Bas = marge au-dessus de la nav Android. */}
+              <main
+                ref={mainRef}
+                className={"flex-1 flex flex-col min-h-0 w-full overflow-x-hidden overflow-y-auto pb-4 portrait:min-[900px]:pb-0 [@media(max-height:540px)]:pb-1 " +
+                  (showTopBar ? "pt-3 [@media(max-height:540px)]:pt-1.5"
+                    // Burger + retour flottants (match) : le contenu démarre SOUS eux
+                    // (fini le label « TOI » du score masqué) ; bas du bouton =
+                    // max(safe-area, 32px) + 54px, #root a déjà payé la safe-area.
+                    : immersive && !ownChrome ? "pt-[calc(max(var(--sai-top),32px)+58px-var(--sai-top))] portrait:min-[900px]:pt-0 [@media(max-height:540px)]:pt-2"
+                    : "pt-12 portrait:min-[900px]:pt-0 [@media(max-height:540px)]:pt-2") +
+                  (matchFullscreen ? "" : " max-w-md mx-auto landscape:max-w-none")}
+              >
                 {/* Persistent player header — shown on every menu page, never on
                     a match surface (Play / Online own internal match states),
                     and never on Profile (which mounts the SAME PlayerBadge as
                     its hero — rendering both would duplicate the badge stack,
                     the bug Alex flagged). Its XP bar is where quest/match XP
                     gains visibly land. */}
-                {page !== "play" && page !== "online" && page !== "profile" && (
+                {/* Pas sur la Boutique non plus : elle affiche déjà ses monnaies
+                    (doublon carte joueur + pastilles relevé à l'audit). */}
+                {page !== "play" && page !== "online" && page !== "profile" && page !== "shop" && (
                   <UserHeader onNavigate={navigateTo} />
                 )}
                 <AnimatePresence mode="wait">

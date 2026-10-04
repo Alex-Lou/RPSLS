@@ -31,7 +31,9 @@ import type { BackgroundId, PadId, ThemeId } from "../../types";
 import { THEMES } from "../../theme/theme";
 import { useStore } from "../../store/store";
 import { hapticTap, hapticMatchStart } from "../../haptic";
-import { FloatingMatchBackButton, hapticTick } from "../../match/sharedMatchUI";
+import { hapticTick } from "../../match/sharedMatchUI";
+import { useTopBar } from "../../nav/topBarStore";
+import { useT } from "../../i18n";
 import type { Arena, OnlinePrep } from "./types";
 import { Coin, FLIP_DURATION_MS } from "./Coin";
 import { FighterCard } from "./FighterCard";
@@ -71,6 +73,9 @@ export function MatchPrepScreen({
   const youPadId = useStore((s) => s.player.padId);
 
   // Coin state: idle → flipping → landed. `winner` is the resolved side.
+  // Retour dans la barre du haut unifiée (plus de flèche flottante).
+  const t = useT();
+  useTopBar({ title: t("lobby.prep.title"), onBack });
   const [phase, setPhase] = useState<"idle" | "flipping" | "landed">("idle");
   const [winner, setWinner] = useState<"you" | "opp" | null>(null);
 
@@ -170,8 +175,6 @@ export function MatchPrepScreen({
       transition={{ duration: 0.3 }}
       className="flex flex-col gap-3 landscape:gap-2 flex-1 min-h-0 py-2 px-3 max-w-md landscape:max-w-2xl mx-auto w-full justify-center"
     >
-      <FloatingMatchBackButton onClick={onBack} label="Retour" />
-
       <div className="text-center shrink-0">
         <h1
           className="text-xl sm:text-2xl landscape:text-lg font-extrabold text-themed leading-tight"

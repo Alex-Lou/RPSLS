@@ -1017,7 +1017,7 @@ export function RankedGame({
           roundWinsOpp: nextRoundWinsB,
           forfeit: false,
           xpGained: youWon ? 60 : 15,
-          eclatsGained: eclatsReward("constellation", youWon ? "win" : "loss"),
+          eclatsGained: eclatsReward("constellation", youWon ? "win" : "loss", winTo),
           youCardsPlayed: youCardsPlayedRef.current.slice(),
           oppCardsPlayed: oppCardsPlayedRef.current.slice(),
         });
@@ -1279,7 +1279,7 @@ export function RankedGame({
         roundWinsOpp: winsB,
         forfeit: false,
         xpGained: youWon ? 60 : 15,
-        eclatsGained: eclatsReward("constellation", youWon ? "win" : "loss"),
+        eclatsGained: eclatsReward("constellation", youWon ? "win" : "loss", winTo),
         youCardsPlayed: youCardsPlayedRef.current.slice(),
         oppCardsPlayed: oppCardsPlayedRef.current.slice(),
       });

@@ -1,13 +1,18 @@
-import { motion } from "motion/react";
 import { MatchState, status, AiMood, AI_MOOD_META } from "../../../engine/game";
 import { GameMode, REWARDS, classeLpDelta } from "../../../types";
 import { eclatsReward, scaleByLength } from "../../../engine/economy";
 import { streakBonusXp, streakXpMultiplier } from "../../../match/streak";
 import { useT } from "../../../i18n";
 import { useStore } from "../../../store/store";
-import { CinematicMatchEnd } from "../../../match/sharedMatchUI";
+import { MatchEndScreen, useEndPhrase } from "../../../match/matchEnd";
 import { Streaks } from "./types";
 
+/**
+ * Fin de match des modes classiques (Entraînement / Normal / Classé / hotseat)
+ * — adaptateur vers l'écran de fin COMMUN (MatchEndScreen). Les gains sont
+ * calculés exactement comme avant (miroir de recordMatch) ; seule la mise en
+ * scène est partagée.
+ */
 export function EndPanel({
   labelA, labelB, match, streaks, mood, mode, isDaily, dailyBonus, onAgain, onQuit, onMatchResult,
 }: {
@@ -42,93 +47,53 @@ export function EndPanel({
   // Map status to outcome from the player's perspective (player is always A).
   const outcome: "win" | "loss" | "draw" =
     s === "a_won" ? "win" : s === "b_won" ? "loss" : "draw";
+  const phrase = useEndPhrase({ youScore: match.scoreA, oppScore: match.scoreB, bestOf: match.bestOf });
+
+  // Détail des multiplicateurs (défi du jour, série) sous les compteurs.
+  const xpNote = xpBonus > 0
+    ? [
+        isDaily && playerWon ? t("match.bonus.daily", { p: Math.round(dailyBonus * 100) }) : null,
+        streakMult > 1 ? t("match.bonus.streak", { x: streakMult.toFixed(1) }) : null,
+        t("match.bonus.breakdown", { a: baseXp, b: xpBonus }),
+      ].filter(Boolean).join(" · ")
+    : undefined;
+
+  // Classé shows its OWN ladder swing (classeLp) as the "LP" line so the player
+  // sees their rank move; other modes keep their REWARDS lp (0 vs CPU).
+  const lp = mode === "ranked" ? classeLpDelta(outcome) : (lpDelta !== 0 ? lpDelta : undefined);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.94 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.96 }}
-      transition={{ type: "spring", stiffness: 220, damping: 18 }}
-      className="w-full bg-surface-raised rounded-2xl sm:rounded-3xl shadow-xl ring-1 ring-white/10 p-3 sm:p-8 border border-hairline flex flex-col items-center text-center"
-    >
-      {/* Cinematic match-end shared with Constellation Lanes — same trophy
-          breath / wordmark pulse / quote / rematch buttons feel everywhere. */}
-      <CinematicMatchEnd
-        outcome={outcome}
-        scoreLine={`${match.scoreA} — ${match.scoreB}`}
-        youScore={match.scoreA}
-        oppScore={match.scoreB}
-        bestOf={match.bestOf}
-        onRematch={onMatchResult ? undefined : onAgain}
-        onBack={onMatchResult ? () => onMatchResult(outcome === "win") : onQuit}
-        rematchLabel={t("match.playAgain")}
-        backLabel={onMatchResult ? "Suivant →" : t("match.back")}
-        reward={{
-          xp: xpDelta > 0 ? xpDelta : undefined,
-          // Classé shows its OWN ladder swing (classeLp) as the "LP" line so
-          // the player sees their rank move; other modes keep their REWARDS lp
-          // (online-only, so 0 for vs-CPU casual/hotseat).
-          lp: mode === "ranked" ? classeLpDelta(outcome) : (lpDelta !== 0 ? lpDelta : undefined),
-          eclats: eclatsReward(mode, outcome, match.bestOf),
-        }}
-      />
-
-      {/* Local single-player extras — compacted to one wrap line so the
-          card stays in one viewport without scroll on typical phones. */}
-      <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-[11px] text-ink-faint">
-        <span className="text-ink-muted font-semibold">
-          {t("match.win.title", { name: winnerLabel })}
-        </span>
-        <span className="opacity-50">·</span>
-        <span>{t("match.win.final", { a: match.scoreA, b: match.scoreB, bo: match.bestOf })}</span>
-        {bestStreak >= 2 && (
-          <>
-            <span className="opacity-50">·</span>
-            <span>🔥 {bestStreak} ({bestStreakHolder})</span>
-          </>
-        )}
-        {mood && (
-          <>
-            <span className="opacity-50">·</span>
-            <span>{AI_MOOD_META[mood].emoji} {t("mood." + mood)}</span>
-          </>
-        )}
-      </div>
-
-      {(xpDelta !== 0 || lpDelta !== 0) && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.7 }}
-          className="flex flex-col items-center gap-1 mt-2"
-        >
-          <div className="flex gap-2 text-xs">
-            {xpDelta !== 0 && (
-              <span className={
-                "px-2.5 py-0.5 rounded-full font-semibold " +
-                (xpDelta > 0 ? "bg-emerald-500/20 text-emerald-300" : "bg-zinc-500/20 text-ink-muted")
-              }>
-                {xpDelta > 0 ? "+" : ""}{xpDelta} XP
-              </span>
-            )}
-            {lpDelta !== 0 && (
-              <span className={
-                "px-2.5 py-0.5 rounded-full font-semibold " +
-                (lpDelta > 0 ? "bg-rose-500/20 text-rose-300" : "bg-rose-500/30 text-rose-200")
-              }>
-                {lpDelta > 0 ? "+" : ""}{lpDelta} LP
-              </span>
-            )}
-          </div>
-          {xpBonus > 0 && (
-            <p className="text-[10px] text-amber-300 font-medium px-2 leading-tight">
-              {isDaily && playerWon && t("match.bonus.daily", { p: Math.round(dailyBonus * 100) }) + " "}
-              {streakMult > 1 && (isDaily ? "· " : "") + t("match.bonus.streak", { x: streakMult.toFixed(1) }) + " "}
-              · {t("match.bonus.breakdown", { a: baseXp, b: xpBonus })}
-            </p>
+    <MatchEndScreen
+      outcome={outcome}
+      subtitle={phrase}
+      score={{
+        you: match.scoreA, opp: match.scoreB,
+        youName: labelA,
+        oppName: labelB,
+        caption: t("end.bestOf", { bo: match.bestOf }),
+      }}
+      rewards={{
+        xp: xpDelta > 0 ? xpDelta : undefined,
+        xpNote,
+        lp,
+        eclats: eclatsReward(mode, outcome, match.bestOf),
+      }}
+      lpLadder={mode === "ranked" ? "classeLp" : undefined}
+      extra={
+        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-[11px] text-ink-faint">
+          {/* Hotseat : le titre est vu du joueur 1 → on nomme le vainqueur. */}
+          {mode === "hotseat" && (
+            <span className="text-ink-muted font-semibold">{t("match.win.title", { name: winnerLabel })}</span>
           )}
-        </motion.div>
-      )}
-    </motion.div>
+          {bestStreak >= 2 && <span>{t("match.win.streak", { n: bestStreak, name: bestStreakHolder })}</span>}
+          {mood && <span>{AI_MOOD_META[mood].emoji} {t("mood." + mood)}</span>}
+        </div>
+      }
+      // Tournoi : un seul bouton « Suivant » qui remonte le résultat au bracket.
+      primary={onMatchResult
+        ? { label: t("end.next"), onClick: () => onMatchResult(outcome === "win") }
+        : { label: t("end.playAgain"), onClick: onAgain }}
+      secondary={onMatchResult ? undefined : { label: t("end.back"), onClick: onQuit }}
+    />
   );
 }

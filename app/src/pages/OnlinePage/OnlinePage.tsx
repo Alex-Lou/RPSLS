@@ -38,7 +38,8 @@ import {
 import { QUEUE_BOT_TIMEOUT_MS, BOT_NAMES, emptyMatch } from "./types";
 import type { Phase, MatchState } from "./types";
 import { useServerStatus } from "./useServerStatus";
-import { Card, ModePicker, LanesWinToPicker, BestOfPicker } from "./MenuPickers";
+import { OnlineMenu } from "./OnlineMenu";
+import { useImmersive } from "../../nav/topBarStore";
 import { ServerStatusBadge, Waiting, DotPulse } from "./StatusAndWaiting";
 import { MatchFoundSplash, ScoreHeader } from "./MatchFlowSplash";
 import { PickStage, LockedStage, RevealCountdown, RevealStage } from "./MatchFlowRound";
@@ -46,6 +47,9 @@ import { MatchEndScene } from "./MatchEndScene";
 import { QueueRadar } from "./QueueRadar";
 import { consumeOnlineIntent, type OnlineIntent } from "../../online/onlineIntent";
 import { setPlayReturnView } from "../../online/playReturnView";
+/** Phases de match (plein écran, HUD propre) — sans barre du haut. */
+const IMMERSIVE_PHASES = new Set<Phase>(["matched", "round", "reveal", "match_end", "lanes_match", "lanes_bot"]);
+
 export function OnlinePage() {
   const t = useT();
   const player = useStore((s) => s.player);
@@ -947,6 +951,15 @@ export function OnlinePage() {
   }
 
   /* ── Derived ── */
+  const statusBadge = (
+    <ServerStatusBadge
+      mode="cloud"
+      url={activeServerUrl}
+      status={connStatus}
+      latencyMs={latencyMs}
+      onRefresh={refreshStatus}
+    />
+  );
   const target = useMemo(() => Math.floor(m.bestOf / 2) + 1, [m.bestOf]);
   const youScore = m.youAre === "a" ? m.scoreA : m.scoreB;
   const oppScore = m.youAre === "a" ? m.scoreB : m.scoreA;
@@ -967,9 +980,13 @@ export function OnlinePage() {
       ? m.lastResult.outcome.verb
       : null;
 
+  // Phases de MATCH = surface immersive (pas de barre du haut, HUD du match).
+  // Menu / file / salon / préparation gardent la barre (retour à gauche).
+  useImmersive(IMMERSIVE_PHASES.has(phase));
+
   /* ── Render ── */
   return (
-    <div className="px-4 pt-2 pb-10 max-w-3xl w-full mx-auto flex-1 flex flex-col min-h-0">
+    <div className={"max-w-3xl w-full mx-auto flex-1 flex flex-col min-h-0 " + (phase === "menu" ? "px-3 pb-1" : "px-4 pt-2 pb-10")}>
       {/* Burger clearance is handled once by <main> in App.tsx now. */}
       {/* Cinematic match-found splash overlay */}
       <AnimatePresence>
@@ -984,21 +1001,9 @@ export function OnlinePage() {
         )}
       </AnimatePresence>
 
-      <div className="flex items-baseline justify-between gap-3 mb-3">
-        <div className="flex items-baseline gap-3">
-          <h1 className="font-headline text-3xl font-black tracking-tight">🌐 {t("nav.online")}</h1>
-          <span className="text-xs text-zinc-500">Beta · {player.nickname}</span>
-        </div>
-      </div>
-
-      {/* Live server status badge */}
-      <ServerStatusBadge
-        mode="cloud"
-        url={activeServerUrl}
-        status={connStatus}
-        latencyMs={latencyMs}
-        onRefresh={refreshStatus}
-      />
+      {/* Statut serveur — dans le héros du menu, au-dessus des autres phases.
+          (Titre « En ligne » + retour : barre du haut unifiée.) */}
+      {phase !== "menu" && statusBadge}
 
       {/* Transient reconnect banner — only shown while the WS is mid-retry. */}
       <AnimatePresence>
@@ -1026,65 +1031,21 @@ export function OnlinePage() {
 
       <AnimatePresence mode="wait">
         {phase === "menu" && (
-          <motion.div
+          <OnlineMenu
             key="menu"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            className="flex flex-col gap-4"
-          >
-            {/* Mode picker — Classic vs Constellation Lanes */}
-            <ModePicker mode={mode} onChange={setMode} />
-
-            {mode === "classic" ? (
-              <BestOfPicker value={bestOf} onChange={setBestOf} />
-            ) : (
-              <LanesWinToPicker value={lanesWinTo} onChange={setLanesWinTo} />
-            )}
-
-            <Card title="🎲 Random match">
-              <p className="text-sm text-zinc-400 mb-3">
-                Join the queue. We'll pair you with the next available player.
-              </p>
-              <button
-                onClick={joinQueue}
-                className="w-full py-3 rounded-xl bg-themed font-semibold text-white shadow-lg shadow-themed active:scale-[0.98] transition"
-              >
-                Find an opponent
-              </button>
-            </Card>
-
-            <Card title="🔒 Private lobby">
-              <p className="text-sm text-zinc-400 mb-3">
-                Create a 6-letter code and share it with a friend.
-              </p>
-              <button
-                onClick={createLobby}
-                className="w-full py-3 rounded-xl bg-emerald-500/90 hover:bg-emerald-500 font-semibold text-white shadow-lg shadow-emerald-500/30 active:scale-[0.98] transition"
-              >
-                Create lobby
-              </button>
-            </Card>
-
-            <Card title="🔑 Join with code">
-              <div className="flex gap-2">
-                <input
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                  placeholder="ABC123"
-                  maxLength={6}
-                  className="flex-1 px-3 py-3 rounded-xl bg-black/40 border border-white/10 font-mono uppercase tracking-widest text-center text-lg"
-                />
-                <button
-                  onClick={joinLobby}
-                  disabled={joinCode.trim().length !== 6}
-                  className="px-5 py-3 rounded-xl bg-sky-500/90 hover:bg-sky-500 disabled:opacity-40 disabled:cursor-not-allowed font-semibold text-white active:scale-[0.98] transition"
-                >
-                  Join
-                </button>
-              </div>
-            </Card>
-          </motion.div>
+            status={statusBadge}
+            mode={mode}
+            onMode={setMode}
+            bestOf={bestOf}
+            onBestOf={setBestOf}
+            lanesWinTo={lanesWinTo}
+            onLanesWinTo={setLanesWinTo}
+            joinCode={joinCode}
+            onJoinCode={setJoinCode}
+            onFind={joinQueue}
+            onCreate={createLobby}
+            onJoin={joinLobby}
+          />
         )}
 
         {(phase === "connecting" || phase === "creating" || phase === "joining") && (

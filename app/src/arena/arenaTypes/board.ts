@@ -79,7 +79,7 @@ export interface BoardState {
 /** ko = un héros à 0 ; cap-hp = plafond, PV les plus bas perdent ;
  *  tiebreak-start-hp / tiebreak-board = départage (PV de début de tour /
  *  créatures vivantes) ; sudden-death = mort subite RPSLS ; draw = nul (online). */
-export type MatchEndReason = "ko" | "cap-hp" | "tiebreak-start-hp" | "tiebreak-board" | "sudden-death" | "draw";
+export type MatchEndReason = "ko" | "cap-hp" | "tiebreak-start-hp" | "tiebreak-board" | "sudden-death" | "draw" | "fatigue";
 
 export type ArenaPhase =
   | "draw"        // turn start, mana up, draw a card

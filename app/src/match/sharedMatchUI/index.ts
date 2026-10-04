@@ -6,22 +6,18 @@
  * Components exported:
  *   - RollingScore: chiffre STATIQUE (maj en place, ni motion ni key → zéro
  *     empilement), fonte mono tabulaire garantie sur tous les thèmes.
- *   - CinematicMatchEnd: trophy/skull/handshake glyph that springs in then
- *     gently floats, gradient VICTOIRE/ÉGALITÉ/DÉFAITE wordmark that
- *     breathes, optional forfeit pill, score card, Rematch + Back buttons,
- *     end-of-match author quote (random per mount).
+ *   (L'écran de fin de match vit désormais dans ../matchEnd — MatchEndScreen,
+ *    commun à tous les modes.)
  *   - AmbientFlavor: ~10 rotating geek one-liners. Atmosphere, not signal.
  *
  * Découpé par responsabilité ; ce barrel ré-exporte tout verbatim pour que le
  * chemin "../match/sharedMatchUI" reste identique pour les 10 consommateurs.
- * (CountUp reste interne au module — utilisé par CinematicMatchEnd, non public.)
  */
 
 export * from "./ScaleToFit";
 export * from "./androidBack";
 export * from "./MatchScoreBar";
 export * from "./FloatingMatchBackButton";
-export * from "./CinematicMatchEnd";
 export { CelebrationBurst } from "./CelebrationBurst";
 export * from "./PickVFX";
 export * from "./AmbientFlavor";

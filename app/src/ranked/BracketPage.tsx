@@ -20,7 +20,9 @@ import {
 } from "./TournamentBracket";
 import { BracketTree } from "./BracketUI";
 import { TournamentPodium } from "./TournamentPodium";
-import { FloatingMatchBackButton, hapticTick } from "../match/sharedMatchUI";
+import { hapticTick } from "../match/sharedMatchUI";
+import { useImmersive, useTopBar } from "../nav/topBarStore";
+import { useT } from "../i18n";
 import { LoadingTip } from "../flavor/LoadingTip";
 
 const SIZE_META: Record<TournamentSize, { title: string; sub: string; glyph: string; art: string }> = {
@@ -85,6 +87,12 @@ export function BracketPage({
   const playerMatch = findPlayerMatch(tournament);
   const eliminated = isPlayerEliminated(tournament);
   const selecting = tournament.phase === "select" || tournament.rounds.length === 0;
+  // Barre du haut (retour à gauche) ; le podium final est une célébration
+  // plein écran → surface immersive avec ses propres boutons flottants.
+  const t = useT();
+  const complete = tournament.phase === "complete";
+  useTopBar(complete ? null : { title: t("lobby.tournament"), onBack });
+  useImmersive(complete);
 
   // Tournament over → celebratory podium takeover.
   if (tournament.phase === "complete") {
@@ -113,9 +121,7 @@ export function BracketPage({
       transition={{ duration: 0.3 }}
       className="flex flex-col gap-3 flex-1 min-h-0 py-2 px-1 max-w-2xl mx-auto w-full"
     >
-      <FloatingMatchBackButton onClick={onBack} label="Retour" />
-
-      <div className="shrink-0 text-center mt-6">
+      <div className="shrink-0 text-center">
         <h1
           className="text-2xl sm:text-3xl font-extrabold flex items-center justify-center gap-2"
           style={{
