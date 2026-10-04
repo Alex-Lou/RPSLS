@@ -16,6 +16,7 @@ import { CREATURE_STATS, type Creature } from "../arenaTypes";
 import { creatureEffectiveAtk } from "../arenaRules";
 import { DisguiseOverlay, CreatureBuffOverlay, CreatureDebuffOverlay, CreatureHealBloom, CreatureStrateOverlay, CreatureMirageOverlay, CreatureSharpenOverlay } from "../ArenaCreatureFX";
 import { creatureReactAnim } from "./creatureSlotAnim";
+import { useT } from "../../i18n";
 
 /** Vecteurs FIXES des étincelles d'impact (pas de Math.random au render —
  *  zéro jitter de re-render). 7 directions en éventail, alternance ambre/rose. */
@@ -84,6 +85,7 @@ function CreatureSlotInner({
   strateGain: { key: number } | null;
   mirageGain: { key: number } | null;
 }) {
+  const t = useT();
   const stats = CREATURE_STATS[creature.move];
   // Effective ATK = base + buff − (Lente/Lent on summon, Fanaison per
   // turn for Paper, Émoussé after 1st combat for Scissors). This is the
@@ -271,7 +273,7 @@ function CreatureSlotInner({
             animate={{ rotate: [0, -6, 6, 0] }}
             transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
             className="absolute top-1 left-1/2 -translate-x-1/2 text-[13px] drop-shadow"
-            title="Engluée — ne peut pas attaquer ce tour"
+            title={t("arena.slot.webbed")}
           >
             🕸️
           </motion.span>
@@ -296,7 +298,7 @@ function CreatureSlotInner({
           />
           <span
             className="absolute top-1 left-1/2 -translate-x-1/2 text-[12px] drop-shadow"
-            title="En phase (Éclipse) — intouchable ce tour, n'attaque pas"
+            title={t("arena.slot.phasedOut")}
           >
             🌘
           </span>
@@ -407,7 +409,7 @@ function CreatureSlotInner({
                 ? "bg-rose-600/90 text-rose-50"
                 : "bg-amber-500/85 text-amber-50")
             }
-            title={atkReduced ? "ATK réduite par un malus actif" : undefined}
+            title={atkReduced ? t("arena.slot.atkReduced") : undefined}
           >
             ⚔ {atk}
             {atkReduced && <span className="text-[8px] opacity-95">↓</span>}
@@ -432,35 +434,35 @@ function CreatureSlotInner({
         {creature.taunt && !passiveSuppressed && creature.provocationCharges > 0 && (
           <span
             className="text-[9px] px-1 py-0.5 rounded bg-amber-400/95 text-black font-black tracking-wider shadow leading-none inline-flex items-center gap-0.5"
-            title={"Provocation — annule la prochaine attaque (charge " + creature.provocationCharges + ")"}
+            title={t("arena.slot.taunt", { n: creature.provocationCharges })}
           >
             🛡{creature.provocationCharges > 1 ? <span className="text-[7px]">×{creature.provocationCharges}</span> : null}
           </span>
         )}
         {creature.move === "paper" && (
-          <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-400/95 text-black font-black tracking-wider shadow leading-none" title="Étouffe — annule la Provocation des Pierres adverses">
+          <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-400/95 text-black font-black tracking-wider shadow leading-none" title={t("arena.slot.stifle")}>
             🌿
           </span>
         )}
         {creature.pierces && (
-          <span className="text-[9px] px-1 py-0.5 rounded bg-rose-400/95 text-black font-black tracking-wider shadow leading-none" title="Tranchant — ignore les boucliers adverses au combat">
+          <span className="text-[9px] px-1 py-0.5 rounded bg-rose-400/95 text-black font-black tracking-wider shadow leading-none" title={t("arena.slot.pierce")}>
             ⚔
           </span>
         )}
         {creature.dodgeCharges > 0 && (
-          <span className="text-[9px] px-1 py-0.5 rounded bg-sky-400/95 text-black font-black tracking-wider shadow leading-none" title="Esquive — la prochaine blessure est ignorée">
+          <span className="text-[9px] px-1 py-0.5 rounded bg-sky-400/95 text-black font-black tracking-wider shadow leading-none" title={t("arena.slot.dodge")}>
             ✨
           </span>
         )}
         {creature.spellImmune && (
-          <span className="text-[9px] px-1 py-0.5 rounded bg-violet-400/95 text-black font-black tracking-wider shadow leading-none" title="Logique — immunisé aux sorts adverses">
+          <span className="text-[9px] px-1 py-0.5 rounded bg-violet-400/95 text-black font-black tracking-wider shadow leading-none" title={t("arena.slot.spellImmune")}>
             🧬
           </span>
         )}
         {/* Spell-granted statuses — secondary row of small emojis */}
-        {creature.divineShield && <span className="text-[10px]" title="Aegis (sort) — prochaine attaque absorbée">🛡️</span>}
-        {creature.anchored && <span className="text-[10px]" title="Ancré (sort) — immun aux sorts opp ce tour">⚓</span>}
-        {creature.ripostePrimed && <span className="text-[10px]" title="Riposte (sort) — si tué en combat, son tueur meurt aussi">⚔️</span>}
+        {creature.divineShield && <span className="text-[10px]" title={t("arena.slot.divineShield")}>🛡️</span>}
+        {creature.anchored && <span className="text-[10px]" title={t("arena.slot.anchored")}>⚓</span>}
+        {creature.ripostePrimed && <span className="text-[10px]" title={t("arena.slot.riposte")}>⚔️</span>}
       </div>
       {/* GOLD HALO — pulsing ring around the whole slot when Provocation is
        *  active AND charged. Hidden when suppressed or out of charges. */}
@@ -526,7 +528,7 @@ function CreatureSlotInner({
             className="absolute inset-0 flex items-center justify-center pointer-events-none"
           >
             <span className="px-1.5 py-0.5 rounded bg-amber-300/95 text-black text-[9px] uppercase tracking-wider font-black shadow-lg whitespace-nowrap">
-              🛡️ ABSORBÉ
+              {t("arena.slot.absorbed")}
             </span>
           </motion.div>
         )}
@@ -543,7 +545,7 @@ function CreatureSlotInner({
             className="absolute inset-0 flex items-center justify-center pointer-events-none"
           >
             <span className="px-1.5 py-0.5 rounded bg-cyan-300/95 text-black text-[9px] uppercase tracking-wider font-black shadow-lg whitespace-nowrap">
-              ✦ ESQUIVÉ
+              {t("arena.slot.dodged")}
             </span>
           </motion.div>
         )}

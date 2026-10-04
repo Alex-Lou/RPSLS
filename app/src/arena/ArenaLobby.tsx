@@ -30,22 +30,11 @@ import { skipArenaTutorial } from "./tutorial/tutorialProgress";
 import { useT } from "../i18n";
 
 const VOIES: Move[] = ["rock", "paper", "scissors", "lizard", "spock"];
-const VOIE_BONUS: Record<Move, string> = {
-  rock:     "Provocation 2 charges (au lieu de 1)",
-  paper:    "Fanaison ralentie (−1 ATK tous les 2 tours)",
-  scissors: "+1 HP (HP 2 au lieu de 1) — survit à un échange",
-  lizard:   "Esquive 2 charges (au lieu de 1)",
-  spock:    "+1 ATK (ATK 3 au lieu de 2)",
-};
+/** Bonus Voie (texte i18n : arena.voie.<move>.bonus). */
+const voieBonusKey = (m: Move): string => `arena.voie.${m}.bonus`;
 /** Renommage épique des Voies (Alex 2026-06-11) — chaque nom évoque l'effet
  *  gameplay et l'identité du symbole. */
-const VOIE_LABEL: Record<Move, string> = {
-  rock:     "Voie de la Montagne",
-  paper:    "Voie de la Forêt",
-  scissors: "Voie du Tranchant",
-  lizard:   "Voie du Mirage",
-  spock:    "Voie du Cosmos",
-};
+const voieLabelKey = (m: Move): string => `arena.voie.${m}.label`;
 /** Icônes de Voie du lobby = les MÉDAILLONS d'emblème (Alex 2026-06-23). LE MÊME
  *  médaillon est désormais affiché sur la jauge de Voie en match
  *  (ArenaConstellationBar) → fil d'identité « ma Voie = ce médaillon, et il se
@@ -55,38 +44,7 @@ const VOIE_ICON: Record<Move, string> = VOIE_EMBLEM;
 const PRO_ICON = (name: string): string => `/MenuIcons/IconConstellationPro/${name}.png`;
 /** Fiche descriptive d'une Voie (Alex 2026-06-11) — affichée au long-press,
  *  comme pour les cartes. Simple et compréhensible. */
-const VOIE_FICHE: Record<Move, { but: string; plus: string; moins: string; perso: string }> = {
-  rock: {
-    but: "Aligner 3 Pierres vivantes pour allumer ta Constellation.",
-    plus: "Tes Pierres ont 2 charges de Provocation : elles DÉVIENT les attaques sur elles et encaissent (3 PV). Le meilleur mur défensif.",
-    moins: "ATK faible : tu gagnes les combats mais infliges peu au héros adverse. Lente : pas de poursuite le tour de pose.",
-    perso: "Finisher FORTERESSE : tes Pierres gagnent un bouclier 🛡 + 2 ATK permanents.",
-  },
-  paper: {
-    but: "Aligner 3 Feuilles vivantes.",
-    plus: "ÉTOUFFE : tes Feuilles annulent la Provocation des Pierres adverses. Le contre naturel de la Montagne.",
-    moins: "Très fragile (1 PV). FANAISON : tes Feuilles perdent de l'ATK au fil des tours.",
-    perso: "En Voie, Fanaison ralentie. Finisher VERGER : Fanaison désactivée + 1-2 PV/tour garantis.",
-  },
-  scissors: {
-    but: "Aligner 3 Ciseaux vivants.",
-    plus: "TRANCHANT : tes Ciseaux percent le 1er bouclier (Aegis). Grosse ATK (4) → forte poursuite sur le héros.",
-    moins: "Fragiles : meurent vite face à un contre.",
-    perso: "En Voie, +1 PV (survit à un échange). Finisher LAME : ton Tranchant perce TOUT (bouclier, Provoc, Esquive).",
-  },
-  lizard: {
-    but: "Aligner 3 Lézards vivants.",
-    plus: "ESQUIVE : tes Lézards évitent une attaque (survie garantie une fois). Polyvalent.",
-    moins: "Stats moyennes partout, pas de gros pic offensif ni défensif.",
-    perso: "En Voie, 2 charges d'Esquive. Finisher MÉTAMORPHOSE : Esquive infinie (rechargée chaque tour).",
-  },
-  spock: {
-    but: "Aligner 3 Spock vivants.",
-    plus: "LOGIQUE : tes Spock ignorent les sorts ciblés ET la Provocation adverse. Tanky (3 PV) + ATK élevée.",
-    moins: "DÉTACHÉ : tes Spock ignorent aussi TES buffs (Surge, Précision…). Peu d'options offensives.",
-    perso: "Finisher CALCUL : tous tes sorts coûtent 1 mana de moins (min 0).",
-  },
-};
+const voieFicheKey = (m: Move, f: "but" | "plus" | "moins" | "perso"): string => `arena.voie.${m}.${f}`;
 
 export function ArenaLobby({
   onTraining,
@@ -155,7 +113,7 @@ export function ArenaLobby({
   return (
     <ModeLobbyShell
       title="Constellation Pro"
-      tagline="3 lanes · Créatures persistantes · RPSLS + Cartes + Mana"
+      tagline={t("arena.lobby.tagline")}
       titleGradient="from-fuchsia-300 to-violet-300"
       onBack={onBack}
       /* Fiche Voie dépliée → CTA poussé dans le scroll (vers le bas), le haut
@@ -170,7 +128,7 @@ export function ArenaLobby({
               <LobbyChip tone="accent">✦ Pro</LobbyChip>
               <LobbyChip>Lv.{lvl.level}</LobbyChip>
               <LobbyChip tone="good">{winrate}% WR</LobbyChip>
-              <LobbyChip>{total} matchs</LobbyChip>
+              <LobbyChip>{t("arena.lobby.matches", { n: total })}</LobbyChip>
             </>
           }
         />
@@ -189,9 +147,9 @@ export function ArenaLobby({
           <div className="flex items-center gap-2.5">
             <img src={PRO_ICON("pro-entrainement")} alt="" draggable={false} className="w-9 h-9 object-contain drop-shadow" />
             <div className="text-left">
-              <div className="text-sm sm:text-base">ENTRAÎNEMENT vs CPU</div>
+              <div className="text-sm sm:text-base">{t("arena.lobby.training")}</div>
               <div className="text-[10px] font-medium opacity-85 normal-case tracking-normal">
-                Match vs ordinateur · choix difficulté
+                {t("arena.lobby.trainingSub")}
               </div>
             </div>
           </div>
@@ -206,24 +164,24 @@ export function ArenaLobby({
             className="bg-surface rounded-2xl px-2 py-2 flex flex-col items-center gap-0.5 border border-hairline hover:bg-hairline transition disabled:opacity-55 disabled:cursor-not-allowed"
           >
             <img src={PRO_ICON("pro-match-rapide")} alt="" draggable={false} className="w-7 h-7 object-contain" />
-            <span className="font-bold text-[10px] text-ink">Match rapide</span>
-            <span className="text-[8px] uppercase tracking-wider" style={{ color: "var(--theme-secondary)" }}>En ligne</span>
+            <span className="font-bold text-[10px] text-ink">{t("arena.lobby.quickMatch")}</span>
+            <span className="text-[8px] uppercase tracking-wider" style={{ color: "var(--theme-secondary)" }}>{t("arena.lobby.online")}</span>
           </button>
           <button
             disabled
             className="bg-surface rounded-2xl px-2 py-2 flex flex-col items-center gap-0.5 opacity-55 cursor-not-allowed border border-hairline"
           >
             <img src={PRO_ICON("pro-tournoi")} alt="" draggable={false} className="w-7 h-7 object-contain" />
-            <span className="font-bold text-[10px]">Tournoi Pro</span>
-            <span className="text-[8px] uppercase tracking-wider text-ink-faint">Bientôt</span>
+            <span className="font-bold text-[10px]">{t("arena.lobby.tournament")}</span>
+            <span className="text-[8px] uppercase tracking-wider text-ink-faint">{t("arena.lobby.soon")}</span>
           </button>
           <button
             onClick={() => setHowItWorksOpen(true)}
             className="bg-surface rounded-2xl px-2 py-2 flex flex-col items-center gap-0.5 border border-hairline hover:bg-hairline transition"
           >
             <img src={PRO_ICON("pro-regles")} alt="" draggable={false} className="w-7 h-7 object-contain" />
-            <span className="font-bold text-[10px] text-ink">Règles</span>
-            <span className="text-[8px] uppercase tracking-wider text-ink-faint">+ symboles</span>
+            <span className="font-bold text-[10px] text-ink">{t("arena.lobby.rules")}</span>
+            <span className="text-[8px] uppercase tracking-wider text-ink-faint">{t("arena.lobby.rulesSub")}</span>
           </button>
           {onTutorial && (
             <button
@@ -260,10 +218,10 @@ export function ArenaLobby({
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-[0.25em] font-bold text-fuchsia-200">
-              ✦ Ma Voie RPSLS
+              {t("arena.lobby.myVoie")}
             </div>
             <div className="text-[15px] font-extrabold mt-0.5 text-zinc-100 truncate">
-              {VOIE_LABEL[affinity]}
+              {t(voieLabelKey(affinity))}
             </div>
           </div>
           <span className="shrink-0 text-[11px] uppercase tracking-wider text-ink-muted whitespace-nowrap">
@@ -281,7 +239,7 @@ export function ArenaLobby({
                 onPointerUp={() => endPressVoie(m, true)}
                 onPointerLeave={() => endPressVoie(m, false)}
                 onPointerCancel={() => endPressVoie(m, false)}
-                title="Tape pour choisir · maintiens pour la fiche"
+                title={t("arena.lobby.voieHint")}
                 className={
                   "relative h-12 rounded-lg flex items-center justify-center transition active:scale-95 " +
                   (isActive ? "scale-110 z-10" : "opacity-65")
@@ -296,7 +254,7 @@ export function ArenaLobby({
                     : "inset 0 1px 0 rgba(255,255,255,0.08)",
                 }}
               >
-                <img src={VOIE_ICON[m]} alt={VOIE_LABEL[m]} draggable={false} className="w-9 h-9 object-contain drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)]" />
+                <img src={VOIE_ICON[m]} alt={t(voieLabelKey(m))} draggable={false} className="w-9 h-9 object-contain drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)]" />
               </button>
             );
           })}
@@ -314,7 +272,7 @@ export function ArenaLobby({
             <span className="text-[13.5px] font-black text-fuchsia-100">{CREATURE_PASSIVES[affinity].name}</span>
             <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-fuchsia-300 ml-auto">
               <img src={PRO_ICON("pro-bonus-voie")} alt="" draggable={false} className="w-4 h-4 object-contain" />
-              Bonus Voie
+              {t("arena.lobby.voieBonus")}
               <motion.span
                 animate={{ rotate: voieExpanded ? 180 : 0 }}
                 transition={{ duration: 0.2 }}
@@ -326,10 +284,10 @@ export function ArenaLobby({
             </span>
           </div>
           <p className="text-[12.5px] leading-snug text-fuchsia-100/90 mt-1">
-            {VOIE_BONUS[affinity]}
+            {t(voieBonusKey(affinity))}
           </p>
           {!voieExpanded && (
-            <p className="text-[10px] text-fuchsia-300/70 mt-1 italic">Détails complets ▾</p>
+            <p className="text-[10px] text-fuchsia-300/70 mt-1 italic">{t("arena.lobby.details")}</p>
           )}
         </button>
         {/* Fiche complète DÉPLIABLE (flèche du cadre Bonus Voie) — même
@@ -345,10 +303,10 @@ export function ArenaLobby({
               className="overflow-hidden"
             >
               <div className="rounded-lg bg-black/30 border border-fuchsia-700/25 px-3 pt-2.5 pb-1 mt-0.5">
-                <FicheRow icon={PRO_ICON("fiche-but")} label="But" text={VOIE_FICHE[affinity].but} />
-                <FicheRow icon={PRO_ICON("fiche-force")} label="Force" text={VOIE_FICHE[affinity].plus} />
-                <FicheRow icon={PRO_ICON("fiche-faiblesse")} label="Faiblesse" text={VOIE_FICHE[affinity].moins} />
-                <FicheRow icon={PRO_ICON("fiche-particularite")} label="Particularité" text={VOIE_FICHE[affinity].perso} />
+                <FicheRow icon={PRO_ICON("fiche-but")} label={t("arena.lobby.fiche.but")} text={t(voieFicheKey(affinity, "but"))} />
+                <FicheRow icon={PRO_ICON("fiche-force")} label={t("arena.lobby.fiche.force")} text={t(voieFicheKey(affinity, "plus"))} />
+                <FicheRow icon={PRO_ICON("fiche-faiblesse")} label={t("arena.lobby.fiche.faiblesse")} text={t(voieFicheKey(affinity, "moins"))} />
+                <FicheRow icon={PRO_ICON("fiche-particularite")} label={t("arena.lobby.fiche.perso")} text={t(voieFicheKey(affinity, "perso"))} />
               </div>
             </motion.div>
           )}
@@ -365,8 +323,8 @@ export function ArenaLobby({
         <div className="flex items-center gap-2.5">
           <img src={PRO_ICON("pro-deck")} alt="" draggable={false} className="w-8 h-8 object-contain drop-shadow" />
           <div className="text-left">
-            <div className="font-bold text-[15px] text-ink">Gérer mon Deck Pro</div>
-            <div className="text-[11px] text-ink-faint">Compose tes 8 cartes (filtre Arena)</div>
+            <div className="font-bold text-[15px] text-ink">{t("arena.lobby.deck")}</div>
+            <div className="text-[11px] text-ink-faint">{t("arena.lobby.deckSub")}</div>
           </div>
         </div>
         <span style={{ color: "var(--theme-secondary)" }}>›</span>
@@ -392,7 +350,6 @@ export function ArenaLobby({
       <AnimatePresence>
         {ficheVoie && (() => {
           const pal = MOVE_PALETTE[ficheVoie];
-          const f = VOIE_FICHE[ficheVoie];
           return (
             <motion.div
               initial={{ opacity: 0 }}
@@ -416,20 +373,20 @@ export function ArenaLobby({
                 <div className="flex items-center gap-2.5 mb-3">
                   <img src={VOIE_ICON[ficheVoie]} alt="" draggable={false} className="w-10 h-10 object-contain drop-shadow" />
                   <div>
-                    <div className="text-base font-black text-white">{VOIE_LABEL[ficheVoie]}</div>
+                    <div className="text-base font-black text-white">{t(voieLabelKey(ficheVoie))}</div>
                     <div className="text-[10px] uppercase tracking-wider" style={{ color: pal.hex }}>{CREATURE_PASSIVES[ficheVoie].name}</div>
                   </div>
                 </div>
-                <FicheRow icon={PRO_ICON("fiche-but")} label="But" text={f.but} />
-                <FicheRow icon={PRO_ICON("fiche-force")} label="Force" text={f.plus} />
-                <FicheRow icon={PRO_ICON("fiche-faiblesse")} label="Faiblesse" text={f.moins} />
-                <FicheRow icon={PRO_ICON("fiche-particularite")} label="Particularité" text={f.perso} />
+                <FicheRow icon={PRO_ICON("fiche-but")} label={t("arena.lobby.fiche.but")} text={t(voieFicheKey(ficheVoie, "but"))} />
+                <FicheRow icon={PRO_ICON("fiche-force")} label={t("arena.lobby.fiche.force")} text={t(voieFicheKey(ficheVoie, "plus"))} />
+                <FicheRow icon={PRO_ICON("fiche-faiblesse")} label={t("arena.lobby.fiche.faiblesse")} text={t(voieFicheKey(ficheVoie, "moins"))} />
+                <FicheRow icon={PRO_ICON("fiche-particularite")} label={t("arena.lobby.fiche.perso")} text={t(voieFicheKey(ficheVoie, "perso"))} />
                 <button
                   onClick={() => setFicheVoie(null)}
                   className="mt-4 w-full py-2.5 rounded-2xl font-bold text-sm text-white"
                   style={{ background: `linear-gradient(135deg, ${pal.hex}, color-mix(in oklab, ${pal.hex} 60%, #000))` }}
                 >
-                  Compris
+                  {t("arena.lobby.gotIt")}
                 </button>
               </motion.div>
             </motion.div>

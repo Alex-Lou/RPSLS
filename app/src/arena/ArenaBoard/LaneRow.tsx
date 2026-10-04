@@ -9,6 +9,7 @@ import { ArenaLaneSlot } from "../ArenaLaneSlot";
 import { MoveAttackCue } from "../ArenaMoveAttackCue";
 import { CardSlot } from "../../ranked/CardSlot";
 import type { BoardState, LaneIndex, Side, TurnIntent } from "../arenaTypes";
+import { useT } from "../../i18n";
 
 export function LaneRow({
   lanes, renderSide, intent, isPlayer, combatLane = null, combatChargers = [],
@@ -47,6 +48,7 @@ export function LaneRow({
    *  Drives the "↻ Remplacer" label override on occupied lanes. */
   summoningMove?: boolean;
 }) {
+  const t = useT();
   // Pierre's Provocation (taunt) is suppressed while opp has ANY of the
   // two RPSLS counters of Rock alive — Paper (Étouffe) OR Spock (Logique
   // anti-taunt). Pre-compute once per row so each slot renders the right
@@ -133,7 +135,7 @@ export function LaneRow({
               clickableLabel={
                 // "↻ Remplacer" si on est en mode summon ET le slot a déjà
                 // une de mes créatures (replace au lieu d'invoquer ici).
-                (summoningMove && !!c && isPlayer) ? "↻ Remplacer" : targetLabel
+                (summoningMove && !!c && isPlayer) ? t("arena.target.replace") : targetLabel
               }
               onClick={valid && onLaneTap ? () => onLaneTap(lane) : undefined}
               onRemoveSummon={isPlayer && onRemoveSummon && plannedSummon ? () => onRemoveSummon(lane) : undefined}

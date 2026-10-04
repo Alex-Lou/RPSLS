@@ -180,7 +180,7 @@ export function ArenaHeroStrip({
                   onPointerLeave={onInspectCard ? cancelInspect : undefined}
                   onPointerCancel={onInspectCard ? cancelInspect : undefined}
                   className={"relative w-9 h-12 sm:w-10 sm:h-[3.4rem] rounded-md overflow-hidden ring-2 ring-amber-300/75 shadow-md shadow-amber-500/30 " + (onInspectCard ? "cursor-pointer active:scale-95" : "")}
-                  title={onInspectCard ? "Maintiens pour la fiche" : t(card.nameKey) + " — " + t(arenaCardDescKey(id))}
+                  title={onInspectCard ? t("arena.strip.holdToInspect") : t(card.nameKey) + " — " + t(arenaCardDescKey(id))}
                 >
                   <CardImage id={id} glyphSize="text-base" />
                   <div className="absolute top-0.5 left-0.5 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-black/80 text-sky-200 text-[8px] font-black tabular-nums">
@@ -398,9 +398,9 @@ export function ArenaHeroStrip({
             animate={{ opacity: [0.7, 1, 0.7], scale: 1 }}
             transition={{ opacity: { duration: 1.4, repeat: Infinity, ease: "easeInOut" }, scale: { type: "spring", stiffness: 320, damping: 22 } }}
             className="absolute top-1 right-1 z-20 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/30 border border-amber-300/70 text-amber-100 text-[9px] font-black uppercase tracking-wider shadow"
-            title="Opp regarde ta main (Augur)"
+            title={t("arena.strip.augurWatching")}
           >
-            👁 Lue
+            {t("arena.strip.augurRead")}
           </motion.div>
         )}
       </div>
@@ -423,7 +423,7 @@ export function ArenaHeroStrip({
             "relative z-10 flex-1 landscape:flex-none flex items-center min-w-0 overflow-visible justify-start pl-1 pr-2 " +
             (onRemoveUtility ? "" : "pointer-events-none")
           }
-          aria-label="Sorts utility planifiés"
+          aria-label={t("arena.strip.plannedUtility")}
         >
           <AnimatePresence>
             {pendingUtility.map((s, idx) => (
@@ -454,6 +454,7 @@ function HeroPortrait({ avatar, ringColor, divineShield, damaged }: {
   divineShield: boolean;
   damaged?: boolean;
 }) {
+  const t = useT();
   const isImage = avatar && (avatar.startsWith("/") || avatar.startsWith("http") || avatar.startsWith("data:"));
   return (
     <motion.div
@@ -477,7 +478,7 @@ function HeroPortrait({ avatar, ringColor, divineShield, damaged }: {
         <span className="absolute inset-0 bg-rose-500/35 pointer-events-none" aria-hidden />
       )}
       {divineShield && (
-        <span className="absolute -bottom-0.5 -right-0.5 text-[10px]" title="Bouclier divin">🛡️</span>
+        <span className="absolute -bottom-0.5 -right-0.5 text-[10px]" title={t("arena.strip.divineShield")}>🛡️</span>
       )}
     </motion.div>
   );

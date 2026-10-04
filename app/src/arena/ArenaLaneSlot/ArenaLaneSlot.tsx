@@ -20,6 +20,7 @@ import { PlannedSlot } from "./PlannedSlot";
 import { EmptySlot } from "./EmptySlot";
 import { DeathShatter } from "./DeathShatter";
 import { CreatureDodgeOverlay } from "../ArenaCreatureFX";
+import { useT } from "../../i18n";
 
 export interface ArenaLaneSlotProps {
   lane: LaneIndex;
@@ -61,11 +62,13 @@ export interface ArenaLaneSlotProps {
 
 function ArenaLaneSlotInner({
   creature, plannedSummon, isPlayer, showPlanned = false, chargeAttack = false,
-  clickable = false, clickableLabel = "✦ jouer ici", onClick,
+  clickable = false, clickableLabel: clickableLabelProp, onClick,
   passiveSuppressed = false,
   deflectingPulse = null,
   onRemoveSummon,
 }: ArenaLaneSlotProps) {
+  const t = useT();
+  const clickableLabel = clickableLabelProp ?? t("arena.slot.playHere");
   // Track previous HP so we can spawn a "-N" floating popup when this lane's
   // creature takes damage. We guard by move identity to avoid false-positives
   // when one creature dies and another spawns on the same lane.

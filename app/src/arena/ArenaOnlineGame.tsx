@@ -25,6 +25,7 @@ import { arenaRulesetHash } from "./arenaNet";
 import { ArenaOnlineSession } from "./arenaOnlineSession";
 import { makeArenaOnlineDriver, type ArenaOnlineDriver } from "./arenaOnlineDriver";
 import { ArenaGame } from "./ArenaGame";
+import { useT } from "../i18n";
 
 type Phase = "connecting" | "searching" | "setup" | "playing" | "error" | "desync";
 
@@ -46,6 +47,7 @@ function parseOppSetup(raw: unknown): { deck: CardId[]; affinity: Move } | null 
 }
 
 export function ArenaOnlineGame({ onBack }: { onBack: () => void }) {
+  const t = useT();
   const player = useStore((s) => s.player);
   const [phase, setPhase] = useState<Phase>("connecting");
   const [errMsg, setErrMsg] = useState<string | null>(null);
@@ -55,7 +57,7 @@ export function ArenaOnlineGame({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     let alive = true;
     const url = resolveWsUrl();
-    if (!url) { setErrMsg("Aucun serveur configuré."); setPhase("error"); return; }
+    if (!url) { setErrMsg(t("arena.online.noServer")); setPhase("error"); return; }
 
     // Mon deck + ma Voie (MÊME dérivation que ArenaGame → board canonique cohérent).
     const myDeck = buildPlayerDeck(
@@ -105,7 +107,7 @@ export function ArenaOnlineGame({ onBack }: { onBack: () => void }) {
         const oppRaw = await session.exchange(ROUND_SETUP, { deck: myDeck, affinity: myAffinity });
         if (!alive) return;
         const oppSetup = parseOppSetup(oppRaw);
-        if (!oppSetup) { setErrMsg("Données adversaire invalides."); setPhase("error"); return; }
+        if (!oppSetup) { setErrMsg(t("arena.online.badOpp")); setPhase("error"); return; }
 
         const d = makeArenaOnlineDriver(session, {
           mySide: info.youAre,
@@ -117,7 +119,7 @@ export function ArenaOnlineGame({ onBack }: { onBack: () => void }) {
         setDriver(d);
         setPhase("playing");
       } catch (e) {
-        if (alive) { setErrMsg(e instanceof Error ? e.message : "Connexion perdue."); setPhase("error"); }
+        if (alive) { setErrMsg(e instanceof Error ? e.message : t("arena.online.connLost")); setPhase("error"); }
       }
     })();
 
@@ -147,23 +149,23 @@ export function ArenaOnlineGame({ onBack }: { onBack: () => void }) {
     <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-center">
       {phase === "desync" ? (
         <>
-          <div className="text-lg font-bold text-amber-300">Match annulé</div>
-          <div className="text-sm text-ink-muted max-w-xs">Désynchronisation détectée entre les deux joueurs — aucun résultat n'est crédité.</div>
-          <button onClick={onBack} className="mt-2 px-5 py-2 rounded-xl bg-surface border border-hairline font-semibold">Retour</button>
+          <div className="text-lg font-bold text-amber-300">{t("arena.online.cancelled")}</div>
+          <div className="text-sm text-ink-muted max-w-xs">{t("arena.online.desync")}</div>
+          <button onClick={onBack} className="mt-2 px-5 py-2 rounded-xl bg-surface border border-hairline font-semibold">{t("arena.online.back")}</button>
         </>
       ) : phase === "error" ? (
         <>
-          <div className="text-lg font-bold text-rose-300">Connexion impossible</div>
+          <div className="text-lg font-bold text-rose-300">{t("arena.online.connFailed")}</div>
           <div className="text-sm text-ink-muted max-w-xs">{errMsg}</div>
-          <button onClick={onBack} className="mt-2 px-5 py-2 rounded-xl bg-surface border border-hairline font-semibold">Retour</button>
+          <button onClick={onBack} className="mt-2 px-5 py-2 rounded-xl bg-surface border border-hairline font-semibold">{t("arena.online.back")}</button>
         </>
       ) : (
         <>
           <div className="text-lg font-bold" style={{ color: "var(--theme-primary)" }}>
-            {phase === "connecting" ? "Connexion…" : phase === "searching" ? "Recherche d'un adversaire…" : "Préparation du duel…"}
+            {phase === "connecting" ? t("arena.online.connecting") : phase === "searching" ? t("arena.online.searching") : t("arena.online.preparing")}
           </div>
           <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--theme-primary)", borderTopColor: "transparent" }} />
-          <button onClick={quit} className="mt-2 px-5 py-2 rounded-xl bg-surface border border-hairline text-sm">Annuler</button>
+          <button onClick={quit} className="mt-2 px-5 py-2 rounded-xl bg-surface border border-hairline text-sm">{t("arena.online.cancel")}</button>
         </>
       )}
     </div>

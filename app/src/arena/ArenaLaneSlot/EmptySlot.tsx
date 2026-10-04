@@ -5,6 +5,7 @@
  */
 
 import { AnimatePresence, motion } from "motion/react";
+import { useT } from "../../i18n";
 
 export function EmptySlot({
   pierced, clickable, clickableLabel, onClick,
@@ -14,12 +15,13 @@ export function EmptySlot({
   clickableLabel: string;
   onClick?: () => void;
 }) {
+  const t = useT();
   // Empty slot — but wrapped as a BUTTON when clickable, with pulsing amber
   // ring so the targeting flow shows valid drops directly on the board.
   // Also hosts the death-ghost overlay (kept for ~650ms after a death).
   const baseEmpty = (
     <div className="aspect-[5/4] w-full rounded-xl border-2 border-dashed border-hairline bg-black/35 flex items-center justify-center relative overflow-hidden">
-      <span className="text-[9px] uppercase tracking-[0.2em] text-zinc-600 font-bold">vide</span>
+      <span className="text-[9px] uppercase tracking-[0.2em] text-zinc-600 font-bold">{t("arena.slot.empty")}</span>
       {/* Aegis pierced chip — the shielded creature here was just pierced
        *  (Tranchant / LAME). Red "bouclier percé" so the pierce is visible. */}
       <AnimatePresence>
@@ -33,7 +35,7 @@ export function EmptySlot({
             className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
           >
             <span className="px-1.5 py-0.5 rounded bg-rose-400/95 text-black text-[9px] uppercase tracking-wider font-black shadow-lg whitespace-nowrap">
-              🩸 Bouclier percé
+              {t("arena.slot.shieldPierced")}
             </span>
           </motion.div>
         )}

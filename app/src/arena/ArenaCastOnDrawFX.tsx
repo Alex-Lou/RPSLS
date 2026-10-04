@@ -22,6 +22,7 @@ import { CardImage } from "../ranked/CardImage";
 import { CARDS } from "../ranked/cards";
 import { useT } from "../i18n";
 import type { BoardState, CastFxKind, CastOnDrawEvent, Side } from "./arenaTypes";
+import { localizeCastOnDrawLabel } from "./arenaCastOnDraw";
 
 const THEME: Record<CastFxKind, { ring: string; glow: string; bolt: string; chip: string; icon: string }> = {
   mana:  { ring: "#38bdf8", glow: "rgba(56,189,248,0.85)",  bolt: "#bae6fd", chip: "from-sky-500 to-cyan-500",       icon: "⚡" },
@@ -177,7 +178,7 @@ export function ArenaCastOnDrawFX({ event, onDone }: ArenaCastOnDrawFXProps) {
           transition={{ duration: 1.2, ease: "easeOut", times: [0, 0.35, 0.85, 1], delay: 0.32 }}
         >
           <span className="text-base leading-none">{th.icon}</span>
-          {event.label}
+          {localizeCastOnDrawLabel(event.label)}
         </motion.div>
 
         {/* nom de la carte, discret sous le chip */}

@@ -14,6 +14,7 @@ import { motion } from "motion/react";
 import { CardImage } from "../ranked/CardImage";
 import { CARDS } from "../ranked/cards";
 import type { CardId } from "../ranked/rankedTypes";
+import { useT } from "../i18n";
 
 const RING_BY_RARITY: Record<string, string> = {
   common: "ring-zinc-300/70",
@@ -41,6 +42,7 @@ interface ArenaSpellQueueChipProps {
 export function ArenaSpellQueueChip({
   id, laneLabel, cost, side = "you", compact = false, fanIndex = 0, onRemove,
 }: ArenaSpellQueueChipProps) {
+  const t = useT();
   const card = CARDS[id];
   if (!card) return null;
   const rarity = card.rarity;
@@ -90,7 +92,7 @@ export function ArenaSpellQueueChip({
         rotate: fanIndex > 0 ? `${Math.min(fanIndex, 4) * 3}deg` : "0deg",
         zIndex: 10 + fanIndex,
       }}
-      aria-label={onRemove ? `Retirer ${card.nameKey}` : card.nameKey}
+      aria-label={onRemove ? t("arena.queue.remove", { name: t(card.nameKey) }) : t(card.nameKey)}
     >
       {/* Wrapper qui clip l'art à l'intérieur du chip seulement (croix exclue) */}
       <div className="absolute inset-0 rounded-md overflow-hidden">

@@ -5,6 +5,7 @@
 
 import { MoveGlyph, MOVE_PALETTE, moveRim, moveGlow } from "../../icons";
 import { type Creature, type LaneIndex } from "../arenaTypes";
+import { useT } from "../../i18n";
 
 export function PlannedSlot({
   plannedSummon, clickable, clickableLabel, onClick, onRemoveSummon,
@@ -15,6 +16,7 @@ export function PlannedSlot({
   onClick?: () => void;
   onRemoveSummon?: () => void;
 }) {
+  const t = useT();
   const pal = MOVE_PALETTE[plannedSummon.move];
   const rim = moveRim(pal.hex);
   const plannedContent = (
@@ -30,7 +32,7 @@ export function PlannedSlot({
         boxShadow: `0 0 10px -3px ${moveGlow(pal.hex)}80`,
       }}
     >
-      <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded bg-black/70 flex items-center gap-0.5" aria-label="en attente">
+      <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded bg-black/70 flex items-center gap-0.5" aria-label={t("arena.slot.pending")}>
         {[0, 1, 2].map((i) => (
           <span
             key={i}
@@ -56,7 +58,7 @@ export function PlannedSlot({
     <button
       onClick={(e) => { e.stopPropagation(); onRemoveSummon(); }}
       className="absolute -top-1.5 -left-1.5 z-40 inline-flex items-center justify-center w-5 h-5 rounded-full bg-rose-600 text-white text-[11px] font-black leading-none shadow-lg ring-2 ring-black/40 active:scale-90"
-      aria-label="Annuler l'invocation"
+      aria-label={t("arena.slot.cancelSummon")}
     >
       ✕
     </button>

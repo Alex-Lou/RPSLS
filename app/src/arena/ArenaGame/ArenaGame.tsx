@@ -22,7 +22,7 @@ import {
 } from "../../haptic";
 import { useStore } from "../../store/store";
 import { CARDS } from "../../ranked/cards";
-import { useT } from "../../i18n";
+import { tNow, useT } from "../../i18n";
 import type { CardId } from "../../ranked/rankedTypes";
 import type { Move } from "../../engine/game";
 import {
@@ -397,7 +397,7 @@ export function ArenaGame({
   // pop le même modal qu'avant.
   useEffect(() => {
     setMatchExit({
-      label: "Quitter Arena",
+      label: tNow("arena.game.quitArena"),
       onExit: () => backRef.current?.triggerConfirm(),
     });
     return () => { setMatchExit(null); };
@@ -743,7 +743,7 @@ export function ArenaGame({
   /* ──────────── Render ──────────── */
 
   if (matchSplash) {
-    return <ArenaMatchSplash playerName={player.nickname || "Toi"} playerAvatar={player.avatar} cpuName={oppName} cpuAvatar={oppAvatar} />;
+    return <ArenaMatchSplash playerName={player.nickname || t("match.you")} playerAvatar={player.avatar} cpuName={oppName} cpuAvatar={oppAvatar} />;
   }
 
   // Sortie du match (burger / retour Android) : montée AUSSI en mort subite,
@@ -916,7 +916,7 @@ export function ArenaGame({
         onForgeTap={forgeTap}
         onForgeDeposit={tutorial ? undefined : forgeDeposit}
         incomingAttackKey={heroHit?.side === "you" ? heroHit.key : null}
-        playerName={player.nickname || "Toi"}
+        playerName={player.nickname || t("match.you")}
         playerAvatar={player.avatar}
       />
       {tutorial && (

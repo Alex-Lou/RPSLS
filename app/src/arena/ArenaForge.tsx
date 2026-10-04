@@ -17,6 +17,7 @@ import { CardImage } from "../ranked/CardImage";
 import { FORGE_RECOVER_COST } from "./arenaTypes";
 import { gfxDensity } from "../graphics/graphicsQuality";
 import type { CardId } from "../ranked/rankedTypes";
+import { useT } from "../i18n";
 
 /** ⚗️ FORGE SLOT — la 4e case de chaque joueur (bande centrale du pad).
  *  Vide : alambic en pointillés (pulse ambre quand un dépôt est possible).
@@ -38,13 +39,14 @@ export function ForgeSlot({
    *  libellé « ✨ Récupérer ». Statique (aucune boucle infinie). */
   forged?: boolean;
 }) {
+  const t = useT();
   const Tag = mine && onTap ? "button" : "div";
   return (
     <Tag
       {...(mine && onTap ? { onClick: onTap, type: "button" as const } : {})}
       {...(mine ? { "data-arena-forge": "you" } : {})}
       className="relative shrink-0 w-9 h-12 landscape:w-[84px] landscape:h-[112px] rounded-md overflow-visible"
-      aria-label={mine ? "Forge (dépôt / fusion / reprise)" : "Forge adverse"}
+      aria-label={mine ? t("arena.forgeui.ariaMine") : t("arena.forgeui.ariaOpp")}
     >
       {/* Halo OR statique d'une carte FORGÉE à récupérer (pas de pulse infini). */}
       {mine && forged && !highlight && (
@@ -117,7 +119,7 @@ export function ForgeSlot({
         // le coût est ANNONCÉ dans l'étiquette « ✨ Récupérer ·1◆ ». Reprendre un
         // simple dépôt reste gratuit → pas de coût affiché.
         const recover = ` ·${FORGE_RECOVER_COST}◆`;
-        const label = !mine ? "Forge" : highlight === "fuse" ? "Fusion ✦" : highlight === "deposit" ? "Déposer" : forged ? `✨ Récupérer${recover}` : card ? "↩ Reprendre" : "Forge";
+        const label = !mine ? t("arena.forgeui.forge") : highlight === "fuse" ? t("arena.forgeui.fuse") : highlight === "deposit" ? t("arena.forgeui.deposit") : forged ? `${t("arena.forgeui.recover")}${recover}` : card ? t("arena.forgeui.takeBack") : t("arena.forgeui.forge");
         // « Reprendre / Récupérer » : petit ENCADRÉ-bouton juste sous la carte
         // (Alex 2026-06-13) → on voit que la forge est tappable pour récupérer.
         const isReprise = mine && !!card && !highlight;

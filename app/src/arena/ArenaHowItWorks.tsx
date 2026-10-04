@@ -12,8 +12,18 @@ import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import { CREATURE_PASSIVES, CREATURE_STATS, MOVE_DESIGN_NOTES } from "./arenaTypes";
 import type { Move } from "../engine/game";
+import type { ReactNode } from "react";
+import { useT } from "../i18n";
+
+/** Rend un texte traduit où **gras** devient un <strong> (classe optionnelle). */
+export function richText(s: string, strongClass?: string): ReactNode[] {
+  return s.split(/\*\*(.+?)\*\*/g).map((part, i) =>
+    i % 2 === 1 ? <strong key={i} className={strongClass}>{part}</strong> : part,
+  );
+}
 
 export function ArenaHowItWorks({ onClose }: { onClose: () => void }) {
+  const t = useT();
   return createPortal(
     <motion.div
       initial={{ opacity: 0 }}
@@ -31,100 +41,100 @@ export function ArenaHowItWorks({ onClose }: { onClose: () => void }) {
       >
         <div className="sticky top-0 z-10 bg-zinc-950/95 backdrop-blur px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
           <h2 className="text-base font-black uppercase tracking-wider text-emerald-300">
-            🃏 Comment ça marche?
+            {t("arena.how.title")}
           </h2>
           <button
             onClick={onClose}
             className="w-7 h-7 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-bold flex items-center justify-center"
-            aria-label="Fermer"
+            aria-label={t("arena.how.close")}
           >
             ✕
           </button>
         </div>
         <div className="p-4 sm:p-5 space-y-5 text-[15px] text-zinc-100">
-          <Section title="🎯 Objectif" body="Premier joueur à amener le héros adverse à 0 ❤ gagne. Tu commences à 20 ❤." />
+          <Section title={t("arena.how.goal.title")} body={t("arena.how.goal.body")} />
           <Section
-            title="🔄 Comment se déroule UN TOUR"
+            title={t("arena.how.turn.title")}
             body=""
             sub={[
-              "1. Tu reçois +1 max-mana (tour N a N max-mana, jusqu'à 10). Ta mana se REMPLIT.",
-              "2. Tu pioches 1 carte (l'opp aussi, en parallèle).",
-              "3. Tu PLANIFIES en même temps que l'opp (vous jouez SIMULTANÉMENT — pas chacun son tour).",
-              "4. Tu peux: tape un coup RPSLS pour invoquer (1 mana, sur ta lane vide), tape une carte pour la jouer (coût variable, vise selon le type).",
-              "5. Tape ✓ FIN DE TOUR. L'opp lock aussi.",
-              "6. Résolution: SORTS (les 2 côtés) → SUMMONS → COMBAT lane 1 → lane 2 → lane 3.",
-              "7. Combat: 2 créatures face à face = elles s'entre-tapent (ATK vs HP, +1 si counter RPSLS). UNE seule créature face à une lane vide opp = elle FRAPPE LE HÉROS OPP direct.",
-              "8. Tour suivant. Pas de limite de tour (sauf sudden death au tour 30).",
+              t("arena.how.turn.1"),
+              t("arena.how.turn.2"),
+              t("arena.how.turn.3"),
+              t("arena.how.turn.4"),
+              t("arena.how.turn.5"),
+              t("arena.how.turn.6"),
+              t("arena.how.turn.7"),
+              t("arena.how.turn.8"),
             ]}
           />
           <Section
-            title="💥 Exemple concret"
-            body="Tour 3: tu as 3 mana. Tu invoques un Scissors (1m, ATK 4 HP 1) dans la lane 3 + tu joues Surge (1m, +3 ATK ce tour) dessus. Opp ne défend pas la lane 3 → ton Scissors (4+3=7 ATK) tape le héros opp pour -7 HP."
+            title={t("arena.how.example.title")}
+            body={t("arena.how.example.body")}
           />
-          <Section title="⋙ Mana" body="1 mana au tour 1, +1 chaque tour jusqu'à 10. Tes coups RPSLS coûtent 1 mana, tes sorts ont leur propre coût (1-4 mana)." />
-          <Section title="🪨 Créatures qui RESTENT sur les lanes" body="Quand tu invoques un coup RPSLS, la créature PERSISTE sur sa lane d'un tour à l'autre — elle garde ses blessures, ses buffs, son shield. Elle ne disparaît QUE si ses HP tombent à 0 (animation rose qui éclate)." />
+          <Section title={t("arena.how.mana.title")} body={t("arena.how.mana.body")} />
+          <Section title={t("arena.how.persist.title")} body={t("arena.how.persist.body")} />
           <Section
-            title="⚔️ Combat — RPSLS-FIRST + POURSUITE + SAUVEGARDES"
+            title={t("arena.how.combat.title")}
             body=""
             sub={[
-              "Deux créatures FACE À FACE : la règle RPSLS tranche. Le perdant MEURT INSTANT, le gagnant survit intact. Ciseau vs Pierre → Ciseau mort, Pierre intacte.",
-              "POURSUITE : le gagnant ne s'arrête pas. Son ATK CONTINUE vers le HÉROS adverse. Spock 2 ATK bat Ciseau → Ciseau mort + 2 dégâts au héros opp. La défense Provocation Pierre (ailleurs) peut détourner cette poursuite.",
-              "MÊME SYMBOLE des deux côtés (Pierre vs Pierre) : pas de winner RPSLS → échange ATK/HP normal (ils s'entre-tapent simultanément, pas de poursuite).",
-              "UNE SEULE créature sur la lane (lane opp vide) : elle frappe directement le HÉROS opp pour son ATK… SAUF si la nature passive de l'opp annule (voir ↓).",
-              "SAUVEGARDES (ordre priorité) : 1) ESQUIVE Lézard (charge consommée) annule mort + poursuite. 2) AEGIS Bouclier (sort) annule mort + poursuite — SAUF si l'attaquant est Ciseau (Tranchant perce Aegis et tue quand même). 3) Sinon : mort + poursuite normale.",
+              t("arena.how.combat.1"),
+              t("arena.how.combat.2"),
+              t("arena.how.combat.3"),
+              t("arena.how.combat.4"),
+              t("arena.how.combat.5"),
             ]}
           />
           {/* THE BIG ONE — single source of truth on les 5 passifs RPSLS.
            *  Replaces 3 scattered earlier sections. */}
           <PassiveGrid />
           <Section
-            title="🪨 Et la chip 'Attaque détournée' alors ?"
-            body="Quand l'attaque d'une créature adverse est annulée par TA Pierre (Provocation), tu vois pop la chip jaune 🪨 ATTAQUE DÉTOURNÉE ! au centre du board. C'est juste la confirmation visuelle que ton héros vient d'être sauvé. La pierre n'encaisse rien, l'attaque part simplement dans le vide. Pour casser cette protection: l'opp doit poser une Feuille (Étouffe) OU détruire ta Pierre en combat / par un sort."
+            title={t("arena.how.deflect.title")}
+            body={t("arena.how.deflect.body")}
           />
           <Section
-            title="🚨 Pourquoi MA Pierre ne défend pas ?"
+            title={t("arena.how.whyRock.title")}
             body=""
             sub={[
-              "Anti-taunt côté opp : si l'opp a une FEUILLE 📄 (Étouffe) ou un SPOCK 🖖 (Logique) vivant n'importe où sur son board, TA Pierre Provocation est CANCELLÉE. Toutes les attaques opp atteignent ton héros directement.",
-              "Pierre déjà consommée : chaque Provoc a 2 charges max (1 base + 1 Voie Pierre). Une fois consommées → Pierre devient passive, aucune deflection.",
-              "Pierre détruite : si ta Pierre est morte (combat counter ou Curse), pas de deflection (évidemment).",
-              "Ta Pierre TOUTES les défend tant que les conditions sont remplies — peu importe ta Voie. Le label 'Voie de la Pierre' sur l'opp signifie juste qu'il a +1 charge initiale.",
+              t("arena.how.whyRock.1"),
+              t("arena.how.whyRock.2"),
+              t("arena.how.whyRock.3"),
+              t("arena.how.whyRock.4"),
             ]}
           />
           <Section
-            title="🛡️ Sorts de défense (en plus des passifs)"
+            title={t("arena.how.defense.title")}
             body=""
             sub={[
-              "🛡️ Bouclier divin (Aegis, sort): la prochaine attaque sur la cible est ENTIÈREMENT absorbée puis le shield disparaît. ATTENTION: les Ciseaux (Tranchant) percent quand même.",
-              "⚓ Ancré (Anchor, sort): la créature ciblée est immunisée aux sorts adverses ce tour seulement (Logique = la version permanente côté Spock).",
-              "⚔️ Riposte (sort): si ta créature MEURT en combat, son tueur meurt aussi (dommage de retour).",
+              t("arena.how.defense.1"),
+              t("arena.how.defense.2"),
+              t("arena.how.defense.3"),
             ]}
           />
           <Section
-            title="🎴 Cibles des cartes (chip dans le coin)"
+            title={t("arena.how.targets.title")}
             body=""
             sub={[
-              "Aegis / Surge / Precision / Anchor / Riposte / Échappée → cible TA CRÉATURE",
-              "Curse / Sangsue / Trou Noir → cible une CRÉATURE ADVERSE",
-              "Mirror → ta lane VIDE face à une créature adverse (copie l'opp)",
-              "Heist / Supernova → frappent directement le HÉROS adverse",
-              "Tide / Oracle / Augur → effet GLOBAL, pas de cible à choisir",
+              t("arena.how.targets.1"),
+              t("arena.how.targets.2"),
+              t("arena.how.targets.3"),
+              t("arena.how.targets.4"),
+              t("arena.how.targets.5"),
             ]}
           />
           <Section
-            title="⚗️ LA FORGE — fusionner deux cartes"
-            body="La petite case « Forge » au centre-droite du pad est ta table d'alchimie. DÉPOSER (gratuit) : sélectionne une carte de ta main puis tape ta Forge — elle y reste posée, visible des deux camps, reprenable d'un tap. FUSIONNER : sélectionne son PARTENAIRE en main (badge ⚗ qui devient OR) et tape la Forge → les deux cartes se consument et la carte fusionnée (plus puissante) arrive sur ta Forge. La récupérer en main coûte 1 mana, puis tu la joues comme un sort. Aucun tour perdu, aucun mana au dépôt."
+            title={t("arena.how.forge.title")}
+            body={t("arena.how.forge.body")}
             sub={[
-              "🃏 Toute carte avec le badge ⚗ a une recette — LONG-PRESS la carte pour voir SA recette exacte + le résultat (toujours à jour, même quand de nouvelles fusions arrivent).",
-              "Quelques exemples pour l'idée :",
-              "🏰 Aegis + Ancre = BASTION (forteresse : bouclier + ancre + provoc)",
-              "☄️ Supernova + Singularité = APOCALYPSE (4 dégâts à toutes + 4 au héros)",
-              "🦎 Chaque Voie a SES fusions — ex. Mirage : Nuée + Coup dans l'Ombre = APOTHÉOSE SPECTRALE",
-              "Badge ⚗ fuchsia = la carte a une recette · OR pulsant = son partenaire est sur ta Forge, fusion possible MAINTENANT.",
+              t("arena.how.forge.1"),
+              t("arena.how.forge.2"),
+              t("arena.how.forge.3"),
+              t("arena.how.forge.4"),
+              t("arena.how.forge.5"),
+              t("arena.how.forge.6"),
             ]}
           />
-          <Section title="✨ Lecture des badges" body="⚔ = ATK · ❤ = HP · les chips +N (vert) ou -N (rouge) en bas-gauche montrent les buffs/debuffs actifs. Les icônes en haut-droit montrent les status. ⚗ = carte fusionnable (Forge)." />
-          <Section title="💡 Astuce" body="Le CPU ne peut JAMAIS occuper toutes les lanes (cap à 2 créatures max). Garde un sort de dégât direct (Heist/Supernova) pour finir l'opp quand son board est plein." />
+          <Section title={t("arena.how.badges.title")} body={t("arena.how.badges.body")} />
+          <Section title={t("arena.how.tip.title")} body={t("arena.how.tip.body")} />
         </div>
       </motion.div>
     </motion.div>,
@@ -137,14 +147,8 @@ export function ArenaHowItWorks({ onClose }: { onClose: () => void }) {
  *  This is the heart of "Comment ça marche" — single-glance strategy from
  *  turn 1. Reads top-to-bottom on mobile, no horizontal scroll. */
 function PassiveGrid() {
+  const t = useT();
   const moves: Move[] = ["rock", "paper", "scissors", "lizard", "spock"];
-  const moveLabel: Record<Move, string> = {
-    rock: "Pierre",
-    paper: "Feuille",
-    scissors: "Ciseaux",
-    lizard: "Lézard",
-    spock: "Spock",
-  };
   const toneBg: Record<string, string> = {
     amber:   "bg-amber-400/95 text-black",
     emerald: "bg-emerald-400/95 text-black",
@@ -155,10 +159,10 @@ function PassiveGrid() {
   return (
     <div>
       <h3 className="text-[12px] font-black uppercase tracking-wider text-emerald-200/95 mb-1">
-        🎴 LES 5 SYMBOLES — pouvoir, force, faiblesse, contres
+        {t("arena.how.grid.title")}
       </h3>
       <p className="text-[13.5px] leading-relaxed text-zinc-300 mb-3">
-        Chaque symbole RPSLS a une <strong className="text-emerald-200">nature passive</strong> gratuite (badge en haut-droit de la créature) ET ses 2 contres RPSLS qui le tuent en combat de lane. Lis ces 5 cartes une fois — c'est ta strat de tout le match.
+        {richText(t("arena.how.grid.intro"), "text-emerald-200")}
       </p>
       <div className="space-y-2.5">
         {moves.map((move) => {
@@ -171,19 +175,19 @@ function PassiveGrid() {
                 <span className={"text-[15px] px-1.5 py-0.5 rounded font-black tracking-wider shadow leading-none " + (toneBg[p.tone] ?? "bg-zinc-400 text-black")}>
                   {p.glyph}
                 </span>
-                <span className="text-[15px] font-black text-zinc-50">{moveLabel[move]}</span>
+                <span className="text-[15px] font-black text-zinc-50">{t(`arena.how.move.${move}`)}</span>
                 <span className="text-[12px] text-zinc-400 tabular-nums ml-auto">⚔ {stats.atk} · ❤ {stats.hp}</span>
                 <span className="text-[13px] font-bold text-emerald-300 whitespace-nowrap">{p.name}</span>
               </div>
               <div className="space-y-1 pl-1">
                 <p className="text-[13px] leading-snug text-emerald-200/95">
-                  <span className="font-black">💪 Bon —</span> {notes.good}
+                  <span className="font-black">{t("arena.how.good")}</span> {notes.good}
                 </p>
                 <p className="text-[13px] leading-snug text-rose-200/95">
-                  <span className="font-black">🔻 Moins bon —</span> {notes.bad}
+                  <span className="font-black">{t("arena.how.bad")}</span> {notes.bad}
                 </p>
                 <p className="text-[13px] leading-snug text-amber-200/95">
-                  <span className="font-black">⚠ 2 contres —</span> {notes.counters}
+                  <span className="font-black">{t("arena.how.counters")}</span> {notes.counters}
                 </p>
               </div>
             </div>
@@ -192,7 +196,7 @@ function PassiveGrid() {
       </div>
       <div className="mt-3 rounded-lg bg-emerald-950/60 border border-emerald-800/40 p-2.5">
         <p className="text-[13px] leading-snug text-emerald-100/95">
-          <span className="font-black text-emerald-300">🎯 Stratégie d'ouverture —</span> Pose une <strong>Pierre</strong> tôt (1 mana, défense). Si opp pose une Pierre, dégaine <strong>Feuille</strong> (cassure board-wide) ou <strong>Spock</strong> (cassure + immunité). Garde <strong>Ciseaux</strong> pour percer un Aegis adverse. <strong>Lézard</strong> = carte-piège anti-finisher. <strong>Spock</strong> = ancrage anti-sorts ET 2e levier anti-Pierre.
+          <span className="font-black text-emerald-300">{t("arena.how.opening.title")}</span> {richText(t("arena.how.opening.body"))}
         </p>
       </div>
     </div>

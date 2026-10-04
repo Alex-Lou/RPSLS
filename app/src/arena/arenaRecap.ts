@@ -13,6 +13,7 @@
  * fatal (match-end/mort subite gèrent leur propre écran).
  */
 import { engineGauge } from "./arenaEngines";
+import { tNow } from "../i18n/core";
 import type { Move } from "../engine/game";
 import type { BoardState, Side } from "./arenaTypes";
 
@@ -32,27 +33,28 @@ export interface TurnRecap {
 
 /* ── Pools d'accroches (mix physique/scientifique/drôle/sérieux) ── */
 
-const DEVASTATING = ["Coup dévastateur", "Énergie cinétique maximale", "Impact sismique", "Onde de choc", "De la physique appliquée"];
-const OFFENSIVE = ["Offensive réussie", "Pression maintenue", "Tu grignotes ses PV", "Momentum en ta faveur", "Avantage net"];
-const EXCHANGE = ["Échange musclé", "Collision frontale", "Action = réaction", "Duel d'usure", "Chacun encaisse"];
-const HEAVY_TAKEN = ["Tu encaisses fort", "Choc violent", "La note est salée", "Impact majeur subi"];
-const TAKEN = ["Sous pression", "Tu prends des coups", "Défense éprouvée", "Ça cogne en face"];
-const HEAL = ["Tu te régénères", "Homéostasie rétablie", "Cellules réparées", "Second souffle"];
-const NEUTRAL = ["Tour d'observation", "Calme avant l'orage", "Repositionnement tactique", "On jauge l'adversaire", "Statu quo… pour l'instant"];
+const keys = (prefix: string, n: number): string[] => Array.from({ length: n }, (_, i) => `arena.recap.${prefix}.${i}`);
+const DEVASTATING = keys("devastating", 5);
+const OFFENSIVE = keys("offensive", 5);
+const EXCHANGE = keys("exchange", 5);
+const HEAVY_TAKEN = keys("heavyTaken", 4);
+const TAKEN = keys("taken", 4);
+const HEAL = keys("heal", 4);
+const NEUTRAL = keys("neutral", 5);
 
 /** Accroches TEINTÉES PAR VOIE quand la jauge monte (payoff d'identité). */
 const VOIE_LINES: Record<Move, string[]> = {
-  rock:     ["La Montagne s'élève", "Strate après strate", "Inébranlable"],
-  paper:    ["La Forêt s'étend", "Racines profondes", "Ça pousse fort"],
-  scissors: ["La lame s'aiguise", "Fil affûté", "Coupe nette"],
-  lizard:   ["Le Mirage se densifie", "Maintenant tu me vois…", "Insaisissable"],
-  spock:    ["Le Cosmos s'aligne", "Fascinant.", "Logique implacable"],
+  rock:     keys("voie.rock", 3),
+  paper:    keys("voie.paper", 3),
+  scissors: keys("voie.scissors", 3),
+  lizard:   keys("voie.lizard", 3),
+  spock:    keys("voie.spock", 3),
 };
-const VOIE_GENERIC = ["La Voie progresse", "L'énergie monte", "Ton archétype s'affirme"];
+const VOIE_GENERIC = keys("voie.generic", 3);
 
 /** Pick DÉTERMINISTE dans un pool depuis `key` (varie par tour, testable). */
 function pick(pool: string[], key: number): string {
-  return pool[(Math.imul(key ^ 0x9e3779b9, 2654435761) >>> 0) % pool.length];
+  return tNow(pool[(Math.imul(key ^ 0x9e3779b9, 2654435761) >>> 0) % pool.length]);
 }
 
 /** Construit le recap depuis (board AVANT résolution) → (board APRÈS). `mySide` =
@@ -82,10 +84,10 @@ export function buildTurnRecap(prev: BoardState, next: BoardState, mySide: Side,
   else                                      { headline = pick(NEUTRAL, key);     tone = "neutral"; }
 
   const chips: RecapChip[] = [];
-  if (dmgDealt > 0) chips.push({ label: `−${dmgDealt} adv`, tone: "good" });
-  if (dmgTaken > 0) chips.push({ label: `−${dmgTaken} toi`, tone: "bad" });
-  if (heal > 0)     chips.push({ label: `+${heal} PV`, tone: "good" });
-  if (engDelta > 0) chips.push({ label: `Voie +${engDelta} ★`, tone: "engine" });
+  if (dmgDealt > 0) chips.push({ label: tNow("arena.recap.chip.dealt", { n: dmgDealt }), tone: "good" });
+  if (dmgTaken > 0) chips.push({ label: tNow("arena.recap.chip.taken", { n: dmgTaken }), tone: "bad" });
+  if (heal > 0)     chips.push({ label: tNow("arena.recap.chip.heal", { n: heal }), tone: "good" });
+  if (engDelta > 0) chips.push({ label: tNow("arena.recap.chip.engine", { n: engDelta }), tone: "engine" });
 
   return { headline, tone, chips, key };
 }

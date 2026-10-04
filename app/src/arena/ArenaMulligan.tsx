@@ -52,7 +52,7 @@ export function ArenaMulligan({
         <div className="text-center mb-3">
           <div className="text-base font-black text-amber-200 uppercase tracking-wider">🔁 {t("arena.mull.title")}</div>
           <p className="text-[11.5px] text-ink mt-1.5 leading-snug">
-            <b>Tape une carte</b> qui ne te plaît pas (trop chère, inutile contre ta Voie…) : elle est <b>remplacée sur-le-champ</b> par une autre de ton deck.
+            <b>{t("arena.fx.mullHint1")}</b>{t("arena.fx.mullHint2")}<b>{t("arena.fx.mullHint3")}</b>{t("arena.fx.mullHint4")}
           </p>
           <p className={"text-[11px] mt-1.5 font-black " + (canReject ? "text-amber-300" : "text-emerald-300")}>
             {canReject

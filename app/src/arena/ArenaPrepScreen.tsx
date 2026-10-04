@@ -20,7 +20,8 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
 import { hapticTap, hapticMatchStart } from "../haptic";
-import { ArenaHowItWorks } from "./ArenaHowItWorks";
+import { ArenaHowItWorks, richText } from "./ArenaHowItWorks";
+import { useT } from "../i18n";
 import { THEMES } from "../theme/theme";
 import { oppPersona } from "../ranked/personaSeed";
 import { Coin } from "../ranked/MatchPrepScreen/Coin";
@@ -53,8 +54,9 @@ export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
    *  this one reads. Alex feedback 2026-06-09. */
   isTraining?: boolean;
 }) {
+  const t = useT();
   const player = useStore((s) => s.player);
-  const playerName = player.nickname || "Toi";
+  const playerName = player.nickname || t("arena.prep.you");
   const playerAvatar = player.avatar;
   const playerThemeId = player.themeId ?? "violet";
   const playerPadId = player.padId;
@@ -116,8 +118,8 @@ export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
       {createPortal(
         <button
           onClick={() => { hapticTap(); onCancel(); }}
-          aria-label="Retour au menu Constellation Pro"
-          title="Retour au menu"
+          aria-label={t("arena.prep.backAria")}
+          title={t("arena.prep.backTitle")}
           className="fixed z-30 w-11 h-11 rounded-2xl bg-amber-500/20 backdrop-blur border border-amber-400/60 text-amber-200 flex items-center justify-center active:scale-95 transition shadow-lg top-[calc(max(var(--sai-top),32px)+10px)] left-[calc(max(var(--sai-left),12px)+44px+8px)] md:top-3 md:left-3"
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
@@ -127,7 +129,7 @@ export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
         document.body,
       )}
       <h2 className="text-center text-[11px] uppercase tracking-[0.3em] font-black text-emerald-300/90">
-        ⚔ Pré-match · Constellation Pro
+        {t("arena.prep.header")}
       </h2>
 
       {/* VS face-off + coin. En paysage : trio étalé (faces VS de chaque côté,
@@ -142,7 +144,7 @@ export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
         <button
           onClick={flip}
           disabled={phase !== "idle"}
-          aria-label="Lancer la pièce"
+          aria-label={t("arena.prep.coinAria")}
           className="shrink-0 bg-transparent border-0 p-0 disabled:cursor-default"
         >
           <Coin
@@ -165,7 +167,7 @@ export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
             exit={{ opacity: 0 }}
             className="text-center text-[11px] uppercase tracking-[0.2em] font-bold text-amber-300"
           >
-            ↑ Touche la pièce pour lancer
+            {t("arena.prep.tapCoin")}
           </motion.div>
         )}
       </AnimatePresence>
@@ -180,7 +182,7 @@ export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
             className="text-center"
           >
             <div className="text-[11px] uppercase tracking-[0.25em] font-black text-amber-300">
-              {winner === "you" ? "✦ TON THÈME EST APPLIQUÉ" : "✦ THÈME DE L'ADVERSAIRE APPLIQUÉ"}
+              {winner === "you" ? t("arena.prep.yourTheme") : t("arena.prep.oppTheme")}
             </div>
             <div className="text-[13px] font-black mt-0.5 text-zinc-100">
               {THEMES[winner === "you" ? playerThemeId : cpu.themeId]?.label ?? "—"}
@@ -216,14 +218,14 @@ export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
             boxShadow: "0 4px 18px -4px color-mix(in oklab, var(--theme-primary) 60%, transparent)",
           } : undefined}
         >
-          ✓ COMMENCER LE MATCH
+          {t("arena.prep.start")}
         </button>
         {isTraining ? (
           <button
             onClick={() => { hapticTap(); setHowOpen(true); }}
             className="shrink-0 w-11 h-11 rounded-full bg-zinc-900 border border-emerald-700/50 text-emerald-300 text-base font-black active:scale-95 shadow-md"
-            aria-label="Comment ça marche"
-            title="Comment ça marche"
+            aria-label={t("arena.prep.howAria")}
+            title={t("arena.prep.howAria")}
           >
             ?
           </button>
@@ -233,9 +235,9 @@ export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
       </div>
 
       <p className="text-center text-[10px] text-zinc-500 max-w-sm">
-        La pièce décide quel thème + pad habille le board pour ce match.
+        {t("arena.prep.coinInfo")}
         {isTraining && (
-          <> Tape <span className="text-emerald-300 font-black">?</span> pour lire les règles avant de te lancer.</>
+          <>{richText(t("arena.prep.rulesHint"), "text-emerald-300 font-black")}</>
         )}
       </p>
 
@@ -255,6 +257,7 @@ function Portrait({ name, avatar, side, themeColor, highlight }: {
   themeColor: string;
   highlight: boolean;
 }) {
+  const t = useT();
   const isImage = avatar && (avatar.startsWith("/") || avatar.startsWith("http") || avatar.startsWith("data:"));
   const ring = side === "you" ? "ring-emerald-400/70" : "ring-rose-400/70";
   return (
@@ -282,7 +285,7 @@ function Portrait({ name, avatar, side, themeColor, highlight }: {
         <span
           className={"text-[10px] uppercase tracking-[0.2em] font-black " + (side === "you" ? "text-emerald-300" : "text-rose-300")}
         >
-          {side === "you" ? "Toi" : "Adversaire"}
+          {side === "you" ? t("arena.prep.you") : t("arena.prep.opp")}
         </span>
         <span className="text-xs font-bold text-zinc-100 truncate max-w-[100px]">{name}</span>
       </div>

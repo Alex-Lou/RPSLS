@@ -14,12 +14,13 @@
 
 import type { Move } from "../engine/game";
 import type { CardId } from "../ranked/rankedTypes";
+import { tNow } from "../i18n/core";
 
 export interface VoieDef {
   move: Move;
-  /** Nom complet affiché (lobby, fiche). */
+  /** Nom complet affiché (lobby, fiche) — localisé (getter tNow). */
   label: string;
-  /** Label COURT (badge Constellation in-match). */
+  /** Label COURT (badge Constellation in-match) — localisé (getter tNow). */
   shortLabel: string;
   /** Icône custom de la Voie (lobby ; en match les MoveGlyph restent). */
   icon: string;
@@ -32,23 +33,33 @@ const ICON_DIR = "/MenuIcons/IconConstellationPro";
 /** Le registre. Une seule entrée par Voie — toute la def vit ici. */
 export const VOIE_DEF: Record<Move, VoieDef> = {
   rock: {
-    move: "rock", label: "Voie de la Montagne", shortLabel: "Montagne",
+    move: "rock",
+    get label() { return tNow("arena.voie.rock.label"); },
+    get shortLabel() { return tNow("arena.voie.rock.short"); },
     icon: `${ICON_DIR}/voie-montagne.png`, finisher: "finisher-forteresse",
   },
   paper: {
-    move: "paper", label: "Voie de la Forêt", shortLabel: "Forêt",
+    move: "paper",
+    get label() { return tNow("arena.voie.paper.label"); },
+    get shortLabel() { return tNow("arena.voie.paper.short"); },
     icon: `${ICON_DIR}/voie-foret.png`, finisher: "finisher-verger",
   },
   scissors: {
-    move: "scissors", label: "Voie du Tranchant", shortLabel: "Tranchant",
+    move: "scissors",
+    get label() { return tNow("arena.voie.scissors.label"); },
+    get shortLabel() { return tNow("arena.voie.scissors.short"); },
     icon: `${ICON_DIR}/voie-tranchant.png`, finisher: "finisher-lame",
   },
   lizard: {
-    move: "lizard", label: "Voie du Mirage", shortLabel: "Mirage",
+    move: "lizard",
+    get label() { return tNow("arena.voie.lizard.label"); },
+    get shortLabel() { return tNow("arena.voie.lizard.short"); },
     icon: `${ICON_DIR}/voie-mirage.png`, finisher: "finisher-metamorphose",
   },
   spock: {
-    move: "spock", label: "Voie du Cosmos", shortLabel: "Cosmos",
+    move: "spock",
+    get label() { return tNow("arena.voie.spock.label"); },
+    get shortLabel() { return tNow("arena.voie.spock.short"); },
     icon: `${ICON_DIR}/voie-cosmos.png`, finisher: "finisher-calcul",
   },
 };

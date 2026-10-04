@@ -29,15 +29,16 @@ export function CenterStatus({
 }) {
   // Combat label no longer says "Lane N" — the per-lane halo + charge anim
   // already tells the eye which lane is live. Less text-clutter at center.
+  const t = useT();
   const label =
-    step === "reveal-opp" ? "Adversaire dévoile son tour" :
-    step === "spells"  ? "✨ Sorts en cours" :
-    step === "summons" ? "🌟 Invocations" :
-    step === "combat"  ? "⚔️ Combat" :
-    step === "settle"  ? "Fin du tour…" :
+    step === "reveal-opp" ? t("arena.board.status.revealOpp") :
+    step === "spells"  ? t("arena.board.status.spells") :
+    step === "summons" ? t("arena.board.status.summons") :
+    step === "combat"  ? t("arena.board.status.combat") :
+    step === "settle"  ? t("arena.board.status.settle") :
     // "· Premier à 0 ❤" seulement au 1er tour (Alex 2026-06-11) : rappel une
     // fois suffit, après c'est juste "Tour N".
-    (turn <= 1 ? "Tour " + turn + " · Premier à 0 ❤" : "Tour " + turn);
+    (turn <= 1 ? t("arena.board.status.turnFirst", { n: turn }) : t("arena.board.status.turn", { n: turn }));
   const tone: ChipTone =
     step === "reveal-opp" ? "rose" :
     step === "spells"  ? "fuchsia" :

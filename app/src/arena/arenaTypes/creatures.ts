@@ -1,5 +1,6 @@
 import type { Move } from "../../engine/game";
 import type { Side } from "./hero";
+import { tNow } from "../../i18n/core";
 
 /* ───────────────────────── Creatures ───────────────────────── */
 
@@ -32,7 +33,7 @@ export interface CreaturePassive {
   glyph: string;
   /** Nom court (label de l'inspect modal + HowItWorks grid). */
   name: string;
-  /** Description courte (1-2 phrases, fr) — pour l'inspect. */
+  /** Description courte (1-2 phrases, localisée via tNow) — pour l'inspect. */
   desc: string;
   /** Tailwind text/bg color hint pour le halo / chip. */
   tone: "amber" | "emerald" | "rose" | "sky" | "violet";
@@ -49,68 +50,54 @@ export interface MoveDesignNote {
   bad: string;
   counters: string;
 }
+/** Textes localisés (i18n) : getters → lus dans la langue courante à chaque accès. */
+const moveNote = (m: Move): MoveDesignNote => ({
+  get good() { return tNow(`arena.movenote.${m}.good`); },
+  get bad() { return tNow(`arena.movenote.${m}.bad`); },
+  get counters() { return tNow(`arena.movenote.${m}.counters`); },
+});
 export const MOVE_DESIGN_NOTES: Record<Move, MoveDesignNote> = {
-  rock: {
-    good: "Provocation board-wide gratuite à 1 mana — héros intouchable par voie libre.",
-    bad: "Lente — 0 ATK le tour de son invocation (ne frappe pas tour 1). Puis ATK 1 ridicule.",
-    counters: "Feuille OU Spock opp vivants → Provocation suspendue. Et les deux la one-shot en combat de lane.",
-  },
-  paper: {
-    good: "Étouffe — annule la Provocation Pierre opp board-wide. DPS 3 solide à l'arrivée.",
-    bad: "Fanaison — perd 1 ATK à chaque fin de tour (3→2→1, plancher 1). À jouer vite. HP 1.",
-    counters: "Ciseaux OU Lézard opp en lane = one-shot la Feuille.",
-  },
-  scissors: {
-    good: "Tranchant — perce un Aegis adverse UNE seule fois (charge unique). ATK 4 (le plus haut du roster).",
-    bad: "Émoussé — −1 ATK permanent après son 1er combat (4→3). HP 1, fragile.",
-    counters: "Pierre OU Spock opp en lane = one-shot le Ciseau.",
-  },
-  lizard: {
-    good: "Esquive — ignore la 1ère blessure (charge unique) puis redevient normal 2/2.",
-    bad: "Lent — 1 ATK le tour de son invocation (devient 2 ensuite).",
-    counters: "Pierre OU Ciseaux opp en lane doivent attaquer 2× (la 1ère avalée par Esquive).",
-  },
-  spock: {
-    good: "Logique — vigile anti-sorts (Curse/Trou Noir/Sangsue ignorés) + casse Provocation Pierre opp.",
-    bad: "Détaché — TES propres sorts (Surge/Tide/Aegis…) ignorent Spock aussi. Il vit en autarcie.",
-    counters: "Feuille OU Lézard opp en lane = one-shot Spock.",
-  },
+  rock: moveNote("rock"),
+  paper: moveNote("paper"),
+  scissors: moveNote("scissors"),
+  lizard: moveNote("lizard"),
+  spock: moveNote("spock"),
 };
 
 export const CREATURE_PASSIVES: Record<Move, CreaturePassive> = {
   rock: {
     id: "provocation",
     glyph: "🛡",
-    name: "Provocation",
-    desc: "Annule toutes les attaques en voie libre adverses tant qu'elle vit. SUSPENDUE si opp a une Feuille OU un Spock en jeu.",
+    get name() { return tNow("arena.passive.rock.name"); },
+    get desc() { return tNow("arena.passive.rock.desc"); },
     tone: "amber",
   },
   paper: {
     id: "etouffe",
     glyph: "🌿",
-    name: "Étouffe",
-    desc: "Casse la Provocation des Pierres adverses tant qu'elle vit. Anti-tank pur.",
+    get name() { return tNow("arena.passive.paper.name"); },
+    get desc() { return tNow("arena.passive.paper.desc"); },
     tone: "emerald",
   },
   scissors: {
     id: "tranchant",
     glyph: "⚔",
-    name: "Tranchant",
-    desc: "Charge unique : perce le 1er bouclier divin (Aegis) adverse rencontré, puis disparaît.",
+    get name() { return tNow("arena.passive.scissors.name"); },
+    get desc() { return tNow("arena.passive.scissors.desc"); },
     tone: "rose",
   },
   lizard: {
     id: "esquive",
     glyph: "✨",
-    name: "Esquive",
-    desc: "Ignore la 1ère blessure subie (charge unique). Ensuite redevient une créature 2/2 normale.",
+    get name() { return tNow("arena.passive.lizard.name"); },
+    get desc() { return tNow("arena.passive.lizard.desc"); },
     tone: "sky",
   },
   spock: {
     id: "logique",
     glyph: "🧬",
-    name: "Logique",
-    desc: "Vigile anti-magie : les sorts ciblés adverses (Curse/Trou Noir/Sangsue) fizzle sur lui. Casse aussi la Provocation Pierre opp.",
+    get name() { return tNow("arena.passive.spock.name"); },
+    get desc() { return tNow("arena.passive.spock.desc"); },
     tone: "violet",
   },
 };

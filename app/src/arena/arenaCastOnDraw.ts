@@ -24,6 +24,7 @@
 import { MANA_CAP, type CastFxKind, type CastOnDrawEvent, type HeroState } from "./arenaTypes";
 import type { CardId } from "../ranked/rankedTypes";
 import type { Rng } from "../engine/rng";
+import { tNow } from "../i18n/core";
 
 interface CastSpec {
   /** Teinte/animation jouée par ArenaCastOnDrawFX. */
@@ -147,4 +148,23 @@ export function resolveCastOnDraw(
   }
 
   return { hero: h, event: { id, fxKind: spec.fxKind, label: parts.join(" · ") || "⚡" }, extraDraws };
+}
+
+/** Traduit pour l'AFFICHAGE un `CastOnDrawEvent.label` (stocké en FR canonique
+ *  dans le board : il entre dans hashBoard, donc NE DOIT PAS dépendre de la
+ *  langue). À appeler côté UI uniquement. Parties inconnues laissées telles quelles. */
+export function localizeCastOnDrawLabel(label: string): string {
+  const part = (p: string): string => {
+    let x: RegExpMatchArray | null;
+    if ((x = p.match(/^\+(\d+) MANA MAX$/))) return tNow("arena.castdraw.maxMana", { n: x[1] });
+    if ((x = p.match(/^\+(\d+) MANA$/))) return tNow("arena.castdraw.mana", { n: x[1] });
+    if ((x = p.match(/^([+−])(\d+) PV$/))) return tNow("arena.castdraw.hp", { sign: x[1], n: x[2] });
+    if ((x = p.match(/^PIOCHE (\d+)$/))) return tNow("arena.castdraw.draw", { n: x[1] });
+    if ((x = p.match(/^DÉFAUSSE (\d+)$/))) return tNow("arena.castdraw.discard", { n: x[1] });
+    if (p === "main vide") return tNow("arena.castdraw.emptyHand");
+    if ((x = p.match(/^PILE → (.+)$/))) return `${tNow("arena.castdraw.heads")} → ${part(x[1])}`;
+    if ((x = p.match(/^FACE → (.+)$/))) return `${tNow("arena.castdraw.tails")} → ${part(x[1])}`;
+    return p;
+  };
+  return label.split(" · ").map(part).join(" · ");
 }

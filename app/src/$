@@ -1,0 +1,106 @@
+arena/ArenaBoard/ArenaBoard.tsx:100:  onLaneTap?: (lane: LaneIndex, side: Side) => void;
+arena/ArenaBoard/ArenaBoard.tsx:103:  onRemoveSpell?: (idx: number) => void;
+arena/ArenaBoard/ArenaBoard.tsx:106:  onRemoveSummon?: (lane: LaneIndex) => void;
+arena/ArenaBoard/ArenaBoard.tsx:112:  onForgeTap?: () => void;
+arena/ArenaBoard/ArenaBoard.tsx:134:    return () => setBurgerHidden(false);
+arena/ArenaBoard/ArenaBoard.tsx:190:  const padId = useArenaPad(useStore((s) => s.player.padId));
+arena/ArenaBoard/ArenaBoardChips.tsx:26:        ((oppPreview?.spells?.some((s) => s.id === "augur") ?? false) ||
+arena/ArenaBoard/ArenaBoardChips.tsx:27:          (playerPreview?.spells?.some((s) => s.id === "augur") ?? false)) && (
+arena/ArenaBoard/ArenaCenterBand.tsx:31:  onForgeTap?: () => void;
+arena/ArenaBoard/ArenaOppCardInspect.tsx:17:  onClose: () => void;
+arena/ArenaBoard/LaneRow.tsx:15:  validLanes = [false, false, false], targetLabel = "", onLaneTap,
+arena/ArenaBoard/LaneRow.tsx:31:  onLaneTap?: (lane: LaneIndex) => void;
+arena/ArenaBoard/LaneRow.tsx:37:  onRemoveSticker?: (idx: number) => void;
+arena/ArenaBoard/LaneRow.tsx:39:  onRemoveSummon?: (lane: LaneIndex) => void;
+arena/ArenaBoard/LaneRow.tsx:68:        const plannedSummon = intent?.summons.find((s) => s.lane === lane) ?? null;
+arena/ArenaBoard/LaneRow.tsx:83:        const laneStickers = stickers.filter((s) => s.lane === lane);
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:47:  onClick?: () => void;
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:59:  onRemoveSummon?: () => void;
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:64:  clickable = false, clickableLabel = "✦ jouer ici", onClick,
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:109:      const id = window.setTimeout(() => setDmgPop(null), 1000);
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:110:      const sid = window.setTimeout(() => setHitShake(null), 480);
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:117:      const id = window.setTimeout(() => setHealFlash(null), 900);
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:119:      return () => window.clearTimeout(id);
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:124:      const id = window.setTimeout(() => setShieldBlocked(null), 1400);
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:126:      return () => window.clearTimeout(id);
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:138:      const id = window.setTimeout(() => setDodgedHit(null), 1400);
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:140:      return () => window.clearTimeout(id);
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:155:      const id = window.setTimeout(() => setDeathGhost(null), 470);
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:162:        pid = window.setTimeout(() => setPierced(null), 1400);
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:185:      const id = window.setTimeout(() => setDisguiseFlash(null), 850);
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:187:      return () => window.clearTimeout(id);
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:205:      const id = window.setTimeout(() => setBuffPulse(null), 680);
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:207:      return () => window.clearTimeout(id);
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:213:      const id = window.setTimeout(() => setDebuffPulse(null), 620);
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:215:      return () => window.clearTimeout(id);
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:232:      const id = window.setTimeout(() => setStrateGain(null), 760);
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:234:      return () => window.clearTimeout(id);
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:249:      const id = window.setTimeout(() => setMirageGain(null), 720);
+arena/ArenaLaneSlot/ArenaLaneSlot.tsx:251:      return () => window.clearTimeout(id);
+arena/ArenaLaneSlot/CreatureSlot.tsx:73:  onClick?: () => void;
+arena/ArenaLaneSlot/CreatureSlot.tsx:274:            title="Engluée — ne peut pas attaquer ce tour"
+arena/ArenaLaneSlot/CreatureSlot.tsx:299:            title="En phase (Éclipse) — intouchable ce tour, n'attaque pas"
+arena/ArenaLaneSlot/CreatureSlot.tsx:441:          <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-400/95 text-black font-black tracking-wider shadow leading-none" title="Étouffe — annule la Provocation des Pierres adverses">
+arena/ArenaLaneSlot/CreatureSlot.tsx:446:          <span className="text-[9px] px-1 py-0.5 rounded bg-rose-400/95 text-black font-black tracking-wider shadow leading-none" title="Tranchant — ignore les boucliers adverses au combat">
+arena/ArenaLaneSlot/CreatureSlot.tsx:451:          <span className="text-[9px] px-1 py-0.5 rounded bg-sky-400/95 text-black font-black tracking-wider shadow leading-none" title="Esquive — la prochaine blessure est ignorée">
+arena/ArenaLaneSlot/CreatureSlot.tsx:456:          <span className="text-[9px] px-1 py-0.5 rounded bg-violet-400/95 text-black font-black tracking-wider shadow leading-none" title="Logique — immunisé aux sorts adverses">
+arena/ArenaLaneSlot/CreatureSlot.tsx:461:        {creature.divineShield && <span className="text-[10px]" title="Aegis (sort) — prochaine attaque absorbée">🛡️</span>}
+arena/ArenaLaneSlot/CreatureSlot.tsx:462:        {creature.anchored && <span className="text-[10px]" title="Ancré (sort) — immun aux sorts opp ce tour">⚓</span>}
+arena/ArenaLaneSlot/CreatureSlot.tsx:463:        {creature.ripostePrimed && <span className="text-[10px]" title="Riposte (sort) — si tué en combat, son tueur meurt aussi">⚔️</span>}
+arena/ArenaLaneSlot/EmptySlot.tsx:15:  onClick?: () => void;
+arena/ArenaLaneSlot/EmptySlot.tsx:22:      <span className="text-[9px] uppercase tracking-[0.2em] text-zinc-600 font-bold">vide</span>
+arena/ArenaLaneSlot/PlannedSlot.tsx:15:  onClick?: () => void;
+arena/ArenaLaneSlot/PlannedSlot.tsx:16:  onRemoveSummon?: () => void;
+arena/ArenaLaneSlot/PlannedSlot.tsx:33:      <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded bg-black/70 flex items-center gap-0.5" aria-label="en attente">
+arena/ArenaLaneSlot/PlannedSlot.tsx:59:      aria-label="Annuler l'invocation"
+arena/ArenaPlanPhase/ArenaHandFanout.tsx:32:  setActivePos: (n: number | null) => void;
+arena/ArenaPlanPhase/ArenaHandFanout.tsx:34:  setPressedPos: (n: number | null) => void;
+arena/ArenaPlanPhase/ArenaHandFanout.tsx:35:  startPress: (id: CardId, x: number) => void;
+arena/ArenaPlanPhase/ArenaHandFanout.tsx:36:  endPress: (id: CardId, fire: boolean) => void;
+arena/ArenaPlanPhase/ArenaHandFanout.tsx:237:                    title="Fusion possible — tape la Forge !"
+arena/ArenaPlanPhase/ArenaHandFanout.tsx:252:                    title="Fusionnable : tu as le partenaire en main — dépose une carte sur la Forge puis fusionne"
+arena/ArenaPlanPhase/ArenaHandFanout.tsx:260:                    title="Tu es à pleine vie — la carte sera dépensée sans effet"
+arena/ArenaPlanPhase/ArenaHandFanout.tsx:279:                    <span className="text-[10px] leading-none">▸</span>Retape = jouer
+arena/ArenaPlanPhase/ArenaHandFanout.tsx:282:                    <FuseGlyph className="w-2.5 h-2.5" />ou Forge
+arena/ArenaPlanPhase/ArenaLockButton.tsx:13:  setTargeting: (t: ArenaTargeting) => void;
+arena/ArenaPlanPhase/ArenaLockButton.tsx:14:  onLock: () => void;
+arena/ArenaPlanPhase/ArenaLockButton.tsx:54:        <span className="text-[12px] font-black tracking-wider leading-none">FIN</span>
+arena/ArenaPlanPhase/ArenaLockButton.tsx:55:        <span className="text-[8px] font-bold uppercase tracking-wider opacity-80 leading-none mt-0.5">de tour</span>
+arena/ArenaPlanPhase/ArenaMovePicker.tsx:21:  pickMoveToSummon: (mv: Move) => void;
+arena/ArenaPlanPhase/ArenaMovePicker.tsx:22:  setInspecting: (id: CardId | null) => void;
+arena/ArenaPlanPhase/ArenaMovePicker.tsx:23:  setTargeting: (t: ArenaTargeting) => void;
+arena/ArenaPlanPhase/ArenaMovePicker.tsx:24:  commitDragDrop: (point: { x: number; y: number }, current: ArenaTargeting) => boolean;
+arena/ArenaPlanPhase/ArenaMovePicker.tsx:33:        const isPlannedSummon = intent.summons.some((s) => s.move === mv);
+arena/ArenaPlanPhase/ArenaPlanPhase.tsx:67:  onSetTargeting: (t: ArenaTargeting) => void;
+arena/ArenaPlanPhase/ArenaPlanPhase.tsx:68:  onAddSpell: (spell: PlayedSpell) => void;
+arena/ArenaPlanPhase/ArenaPlanPhase.tsx:69:  onRemoveSpell: (idx: number) => void;
+arena/ArenaPlanPhase/ArenaPlanPhase.tsx:70:  onAddSummon: (summon: PlannedSummon) => void;
+arena/ArenaPlanPhase/ArenaPlanPhase.tsx:71:  onRemoveSummon: (lane: LaneIndex) => void;
+arena/ArenaPlanPhase/ArenaPlanPhase.tsx:72:  onLock: () => void;
+arena/ArenaPlanPhase/ArenaPlanPhase.tsx:75:  onForgeTap?: () => void;
+arena/ArenaPlanPhase/ArenaPlanPhase.tsx:78:  onForgeDeposit?: (id: CardId) => void;
+arena/ArenaPlanPhase/ArenaPlanPhase.tsx:134:      const id = window.setTimeout(() => setDeckDrop(null), 2100);
+arena/ArenaPlanPhase/ArenaPlanPhase.tsx:135:      return () => window.clearTimeout(id);
+arena/ArenaPlanPhase/ArenaPlanPhase.tsx:356:              <div className="text-[8px] uppercase tracking-[0.32em] font-black text-amber-200/60">Phase 1</div>
+arena/ArenaPlanPhase/arenaPlanDrag.ts:24:  onAddSummon: (summon: PlannedSummon) => void;
+arena/ArenaPlanPhase/arenaPlanDrag.ts:25:  onAddSpell: (spell: PlayedSpell) => void;
+arena/ArenaPlanPhase/arenaPlanDrag.ts:26:  setTargeting: (t: ArenaTargeting) => void;
+arena/ArenaPlanPhase/arenaPlanDrag.ts:27:  onForgeTap?: () => void;
+arena/ArenaHeroStrip.tsx:55:  onRemoveUtility?: (localIdx: number) => void;
+arena/ArenaHeroStrip.tsx:58:  onInspectCard?: (id: CardId) => void;
+arena/ArenaHeroStrip.tsx:73:    inspectTimer.current = window.setTimeout(() => onInspectCard(id), 420);
+arena/ArenaHeroStrip.tsx:96:    const id = window.setTimeout(() => setBloodDrip(null), 1500);
+arena/ArenaHeroStrip.tsx:97:    return () => window.clearTimeout(id);
+arena/ArenaHeroStrip.tsx:108:    const id = window.setTimeout(() => setDmgPop(null), 1100);
+arena/ArenaHeroStrip.tsx:109:    return () => window.clearTimeout(id);
+arena/ArenaHeroStrip.tsx:113:    const id = window.setTimeout(() => setHealPop(null), 1100);
+arena/ArenaHeroStrip.tsx:114:    return () => window.clearTimeout(id);
+arena/ArenaHeroStrip.tsx:401:            title="Opp regarde ta main (Augur)"
+arena/ArenaHeroStrip.tsx:426:          aria-label="Sorts utility planifiés"
+arena/ArenaHeroStrip.tsx:480:        <span className="absolute -bottom-0.5 -right-0.5 text-[10px]" title="Bouclier divin">🛡️</span>
+arena/ArenaCardInspect.tsx:25:  t: (key: string) => string;
+arena/ArenaCardInspect.tsx:26:  onCommit: () => void;
+arena/ArenaCardInspect.tsx:27:  onClose: () => void;
+arena/ArenaCardInspect.tsx:34:  onForge?: () => void;
+arena/ArenaCardInspect.tsx:95:            aria-label="Fermer"
+arena/arenaTypes/targeting.ts:247:  return intent.spells.reduce((sum, s) => sum + (MANA_GRANTS[s.id] ?? 0), 0);

@@ -20,6 +20,7 @@
 
 import { damageHero, healHero } from "./arenaRules/heroCreature";
 import { BALANCE } from "./arenaBalance";
+import { tNow } from "../i18n/core";
 import type { Move } from "../engine/game";
 import type { BoardState, HeroState, Side } from "./arenaTypes";
 
@@ -198,20 +199,17 @@ export function engineGauge(hero: HeroState): { value: number; max: number; acti
   const field = engineField(hero.affinity);
   if (!field) return null;
   const value = (hero[field] as number | undefined) ?? 0;
-  const labels: Record<string, string> = {
-    rockStack: "Montagne", seveStack: "Forêt", trancheStack: "Tranchant", mirageStack: "Mirage", cosmosCount: "Cosmos",
-  };
-  return { value, max: BALANCE.engine.cap, active: value >= BALANCE.engine.cap, label: labels[field] };
+  return { value, max: BALANCE.engine.cap, active: value >= BALANCE.engine.cap, label: tNow(`arena.engine.label.${field}`) };
 }
 
 /** Phrase d'effet pour le CUE de montée (« ce que ça fait »). */
 export function engineEffectText(affinity: Move | undefined): string {
   switch (affinity) {
-    case "rock":     return "tes Pierres se renforcent";
-    case "paper":    return "ton héros se régénère plus fort";
-    case "scissors": return "tes créatures en jeu frappent plus fort";
-    case "lizard":   return "tes Lézards insaisissables frappent plus fort";
-    case "spock":    return "l'inévitable ronge le héros adverse";
+    case "rock":     return tNow("arena.engine.effect.rock");
+    case "paper":    return tNow("arena.engine.effect.paper");
+    case "scissors": return tNow("arena.engine.effect.scissors");
+    case "lizard":   return tNow("arena.engine.effect.lizard");
+    case "spock":    return tNow("arena.engine.effect.spock");
     default: return "";
   }
 }
