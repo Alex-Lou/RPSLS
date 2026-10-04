@@ -247,10 +247,15 @@ async fn ws_handler(
         .on_upgrade(move |sock| handle_socket(sock, state, client_ip))
 }
 
+/// Intervalle des pings WS envoyés par le serveur.
+const PING_EVERY: std::time::Duration = std::time::Duration::from_secs(25);
+/// Silence total au-delà duquel la connexion est fermée (≈ 3 pings sans Pong).
+const IDLE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(80);
+
 async fn handle_socket(socket: WebSocket, state: Arc<AppState>, peer_ip: std::net::IpAddr) {
     let session_id = Uuid::new_v4().to_string();
     let (mut sink, mut stream) = socket.split();
-    let (tx, mut rx) = mpsc::unbounded_channel::<ServerMessage>();
+    let (tx, mut rx) = mpsc::channel::<ServerMessage>(crate::session::OUTGOING_CAPACITY);
 
     // Per-session message rate limit. Lives on the stack so it's dropped
     // when the connection closes — zero cleanup work elsewhere.
@@ -270,23 +275,41 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, peer_ip: std::ne
     // Forward server-side messages to the WebSocket sink.
     let outgoing_session_id = session_id.clone();
     let outgoing = tokio::spawn(async move {
-        while let Some(msg) = rx.recv().await {
-            let json = match serde_json::to_string(&msg) {
-                Ok(s) => s,
-                Err(e) => {
-                    warn!(?e, "failed to serialize outgoing message");
-                    continue;
+        // Ping WS serveur régulier : le navigateur y répond seul (Pong), ce qui
+        // fait vivre la boucle de réception ; une connexion morte (TCP à moitié
+        // ouvert) ne répond plus → coupée par IDLE_TIMEOUT au lieu de rester
+        // fantôme (et appariable) indéfiniment.
+        let mut ping = tokio::time::interval(PING_EVERY);
+        ping.tick().await; // le 1er tick est immédiat
+        loop {
+            tokio::select! {
+                msg = rx.recv() => {
+                    let Some(msg) = msg else { break };
+                    let json = match serde_json::to_string(&msg) {
+                        Ok(s) => s,
+                        Err(e) => {
+                            warn!(?e, "failed to serialize outgoing message");
+                            continue;
+                        }
+                    };
+                    if sink.send(Message::Text(json)).await.is_err() {
+                        break;
+                    }
                 }
-            };
-            if sink.send(Message::Text(json)).await.is_err() {
-                break;
+                _ = ping.tick() => {
+                    if sink.send(Message::Ping(Vec::new())).await.is_err() {
+                        break;
+                    }
+                }
             }
         }
         info!(session_id = %outgoing_session_id, "outgoing task ended");
     });
 
     // Incoming loop.
-    while let Some(Ok(msg)) = stream.next().await {
+    // Rien reçu (ni message, ni Pong de nos pings) pendant IDLE_TIMEOUT →
+    // connexion considérée morte.
+    while let Ok(Some(Ok(msg))) = tokio::time::timeout(IDLE_TIMEOUT, stream.next()).await {
         match msg {
             Message::Text(text) => {
                 // Per-session WS message throttle. Past 30 msg/s the peer
@@ -309,7 +332,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, peer_ip: std::ne
             }
             Message::Close(_) => break,
             Message::Ping(b) => {
-                let _ = tx.send(ServerMessage::Pong);
+                let _ = tx.try_send(ServerMessage::Pong);
                 // axum auto-handles pong frames at the WS level — we keep app-level too.
                 let _ = b;
             }
@@ -331,6 +354,8 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, peer_ip: std::ne
     if let Some((_, (ccg_tx, slot))) = state.in_ccg.remove(&session_id) {
         let _ = ccg_tx.send(CcgCommand::Leave { slot });
     }
-    drop(outgoing);
+    // abort (et non drop) : un JoinHandle lâché laisse la tâche tourner tant
+    // qu'un clone du Tx vit encore (ex. dans une tâche de match).
+    outgoing.abort();
     info!(%session_id, "socket closed");
 }

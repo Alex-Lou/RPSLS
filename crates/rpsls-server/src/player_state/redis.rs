@@ -19,7 +19,15 @@ fn config() -> Option<&'static (String, String)> {
 
 fn http() -> &'static reqwest::Client {
     static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
-    CLIENT.get_or_init(reqwest::Client::new)
+    // Délais BORNÉS : sans eux, un Upstash lent gardait indéfiniment les tâches
+    // (et les verrous du portefeuille) → accumulation sous charge.
+    CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(3))
+            .timeout(std::time::Duration::from_secs(8))
+            .build()
+            .unwrap_or_default()
+    })
 }
 
 pub fn enabled() -> bool {
@@ -188,11 +196,42 @@ pub fn touch_seen(player_id: &str) {
 
 /// Dernière activité connue : `Ok(None)` si jamais vue (joueur antérieur à ce
 /// marquage), `Err` sur erreur backend (l'appelant ne supprime alors rien).
+#[cfg(test)]
 pub async fn read_seen(player_id: &str) -> Result<Option<u64>, ()> {
     match get_opt(&format!("{SEEN_PREFIX}{player_id}")).await? {
         None => Ok(None),
         Some(s) => s.parse().map(Some).map_err(|_| ()),
     }
+}
+
+/// `seen:{pid}` de PLUSIEURS joueurs en UNE commande MGET (janitor : une
+/// requête par page de SCAN au lieu d'une par joueur — Upstash facture à la
+/// commande). Même sémantique que `read_seen` par élément ; `Err(())` si le
+/// backend échoue ou si la réponse est illisible (le janitor saute la page).
+pub async fn read_seen_many(player_ids: &[&str]) -> Result<Vec<Option<u64>>, ()> {
+    if player_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut cmd = Vec::with_capacity(player_ids.len() + 1);
+    cmd.push("MGET".to_string());
+    cmd.extend(player_ids.iter().map(|p| format!("{SEEN_PREFIX}{p}")));
+    let resp = match pipeline_send(&[cmd]).await {
+        Some(Ok(resp)) if resp.status().is_success() => resp,
+        _ => return Err(()),
+    };
+    let body: serde_json::Value = resp.json().await.map_err(|_| ())?;
+    let values = body.as_array().and_then(|a| a.first()).and_then(|r| r.get("result")).and_then(|r| r.as_array()).ok_or(())?;
+    if values.len() != player_ids.len() {
+        return Err(());
+    }
+    values
+        .iter()
+        .map(|v| match v {
+            serde_json::Value::Null => Ok(None),
+            serde_json::Value::String(s) => s.parse().map(Some).map_err(|_| ()),
+            _ => Err(()),
+        })
+        .collect()
 }
 
 /// Pose `seen:{pid}` à `ms` (janitor : premier passage sur un joueur ancien).
@@ -398,5 +437,17 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;
         let ts = read_seen("just-seen").await.unwrap().expect("seen stamp written");
         assert!(ts.abs_diff(now_ms()) < 60_000);
+    }
+
+    /// Lecture groupée (janitor) : même résultat que `read_seen`, dans l'ordre.
+    #[tokio::test]
+    async fn seen_many_matches_single_reads() {
+        crate::test_upstash::ensure();
+        set_seen("many-a", 111).await.unwrap();
+        set_seen("many-c", 333).await.unwrap();
+        assert_eq!(read_seen_many(&["many-a", "many-b", "many-c"]).await, Ok(vec![Some(111), None, Some(333)]));
+        assert_eq!(read_seen_many(&[]).await, Ok(vec![]));
+        crate::test_upstash::put("seen:many-bad", "pas-un-nombre");
+        assert!(read_seen_many(&["many-a", "many-bad"]).await.is_err(), "valeur illisible → erreur, jamais « absent »");
     }
 }

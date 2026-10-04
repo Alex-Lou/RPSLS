@@ -413,7 +413,7 @@ mod tests {
     use super::*;
 
     fn session(id: &str) -> Arc<Session> {
-        let (tx, _rx) = mpsc::unbounded_channel();
+        let (tx, _rx) = mpsc::channel(crate::session::OUTGOING_CAPACITY);
         Arc::new(Session::new(id.into(), id.into(), tx, std::net::IpAddr::from([127, 0, 0, 1])))
     }
 
