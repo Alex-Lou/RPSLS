@@ -38,7 +38,7 @@ const ko: Record<string, string> = {
   "ranked.cards.conduit.name":"도관","ranked.cards.conduit.desc":"패시브: 콤보(트리플/삼위일체)가 +1 추가 지급.","ranked.cards.conduit.targetHint":"패시브 — 항상 활성.",
   "ranked.cards.trinite.name":"완벽한 삼위일체","ranked.cards.trinite.desc":"세 선택이 모두 다르고 어떤 레인도 지지 않으면 즉시 라운드 승리.","ranked.cards.trinite.targetHint":"즉시 효과.",
   "ranked.compass.none":"상대: 대상 카드 없음","ranked.compass.lane":"상대 카드 → 레인 {n}",
-  "premium.label":"프리미엄","premium.setKindLabel":"프리미엄 코스메틱 세트","premium.priceLabel":"가격","premium.youHave":"✦ {n} 보유","premium.buy":"세트 잠금 해제","premium.notEnough":"✦ 스타 부족","premium.alreadyOwned":"✓ 이미 소유","premium.devGrant":"+1000 ✦ (테스트 전용)","premium.close":"닫기","premium.unlocked":"해제됨!",
+  "premium.label":"프리미엄","premium.setKindLabel":"프리미엄 코스메틱 세트","premium.priceLabel":"가격","premium.youHave":"✦ {n} 보유","premium.buy":"세트 잠금 해제","premium.notEnough":"✦ 스타 부족","premium.alreadyOwned":"✓ 이미 소유","premium.close":"닫기","premium.unlocked":"해제됨!",
   "crash.title":"문제가 발생했습니다","crash.body":"앱에 예상치 못한 오류가 발생했습니다. 진행 상황은 안전합니다. 아래를 탭하여 다시 시도하세요.","crash.details":"세부사항","crash.retry":"다시 시도",
   "premium.quartz.name":"쿼츠","premium.quartz.tagline":"프리즘 빛을 굴절시키는 결정 파편 — 부드러운 빙하 세계.",
   "ranked.bonus.combo":"콤보","ranked.bonus.favoured":"유리","ranked.bonus.surge":"서지","ranked.bonus.tide":"조류","ranked.bonus.aegisSaved":"이지스가 레인 구출",
