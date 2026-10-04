@@ -66,6 +66,18 @@ pub async fn try_link_player(player_id: &str, email_norm: &str) -> Result<bool, 
     player_state::set_nx(&key, email_norm).await
 }
 
+/// True si ce player_id appartient à un COMPTE (e-mail ou Google) : lien
+/// `account_pid:` (e-mail) ou marque `welcomed:` (posée à toute inscription,
+/// e-mail comme Google ; jamais pour un invité). Err = panne backend.
+pub async fn is_account_holder(player_id: &str) -> Result<bool, ()> {
+    for prefix in [ACCOUNT_PID_PREFIX, WELCOMED_PREFIX] {
+        if player_state::get_opt(&format!("{prefix}{player_id}")).await?.is_some() {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 /// Annule (best-effort) le lien identité→compte posé par `try_link_player`,
 /// quand l'étape de création de la ligne compte échoue ENSUITE. Garde l'identité
 /// réutilisable pour une nouvelle tentative d'inscription.

@@ -11,10 +11,40 @@ use tracing::{debug, info, warn};
 use crate::player_state;
 use crate::AppState;
 
-/// Inactive-user sweeper: every 24h, SCAN `player:*`, read each row's
-/// `updatedAt`, and DELETE both `player:{id}` and `claim:{id}` when the row is
-/// older than INACTIVE_TTL_DAYS. Idempotent (a row already deleted last sweep
-/// just isn't there next sweep). Bounded: we sleep between SCAN pages so a
+/// Sort d'un joueur au passage du janitor des inactifs.
+#[derive(Debug, PartialEq, Eq)]
+enum Verdict {
+    Keep,
+    /// Joueur antérieur au marquage `seen:` : on démarre son délai maintenant
+    /// (il ne pourra être supprimé que dans INACTIVE_TTL_DAYS, s'il ne revient pas).
+    StampNow,
+    Delete,
+}
+
+/// Décision PURE. Ne supprime jamais : un compte (e-mail/Google), un joueur qui
+/// détient du contenu payant, un joueur actif récemment.
+fn verdict(account_holder: bool, paid: bool, seen: Option<u64>, cutoff_ms: u64) -> Verdict {
+    if account_holder || paid {
+        return Verdict::Keep;
+    }
+    match seen {
+        None => Verdict::StampNow,
+        Some(ts) if ts >= cutoff_ms => Verdict::Keep,
+        Some(_) => Verdict::Delete,
+    }
+}
+
+/// Contenu payant dans le portefeuille : étoiles au-delà du bonus de bienvenue,
+/// ou un set premium. (Aucun paiement réel aujourd'hui ; garde-fou pour l'IAP.)
+fn holds_paid_content(w: &crate::wallet::Wallet) -> bool {
+    w.stars > crate::economy::welcome_stars() || !w.owned_premium_sets.is_empty()
+}
+
+/// Inactive-user sweeper: every 24h, SCAN `player:*` and delete the GUESTS
+/// inactive for INACTIVE_TTL_DAYS. Activity = `seen:{pid}`, stamped by the
+/// SERVER at each authenticated session (the old `updatedAt` was written by the
+/// client — a bogus value could erase a live account). Any backend error on a
+/// player → skipped, never deleted. Bounded: we sleep between SCAN pages so a
 /// sudden 100k-key sweep can't burn through the Upstash request budget.
 pub fn spawn_inactive_user_sweeper() {
     tokio::spawn(async move {
@@ -31,33 +61,44 @@ pub fn spawn_inactive_user_sweeper() {
             if !player_state::enabled() {
                 continue;
             }
-            let now_ms = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_millis() as u64)
-                .unwrap_or(0);
+            let now_ms = crate::wallet::store::now_ms();
             let cutoff_ms = now_ms.saturating_sub(ttl_ms);
             let mut cursor = "0".to_string();
-            let mut deleted = 0u32;
-            let mut scanned = 0u32;
+            let (mut deleted, mut scanned, mut stamped) = (0u32, 0u32, 0u32);
             loop {
                 let Some((next, keys)) = player_state::scan_player_keys(&cursor, SCAN_PAGE).await else {
                     break;
                 };
                 scanned += keys.len() as u32;
                 for key in &keys {
-                    let updated = player_state::read_updated_at(key).await;
-                    let Some(ts) = updated else { continue };
-                    if ts >= cutoff_ms { continue }
                     let Some(pid) = player_state::player_id_from_key(key) else { continue };
-                    if player_state::delete_player(pid).await {
-                        deleted += 1;
+                    let (Ok(holder), Ok(wallet), Ok(seen)) = (
+                        crate::account::is_account_holder(pid).await,
+                        crate::wallet::store::get(pid).await,
+                        player_state::read_seen(pid).await,
+                    ) else {
+                        continue; // erreur backend → on ne touche à rien
+                    };
+                    let paid = wallet.as_ref().is_some_and(holds_paid_content);
+                    match verdict(holder, paid, seen, cutoff_ms) {
+                        Verdict::Keep => {}
+                        Verdict::StampNow => {
+                            if player_state::set_seen(pid, now_ms).await.is_ok() {
+                                stamped += 1;
+                            }
+                        }
+                        Verdict::Delete => {
+                            if player_state::delete_player(pid).await {
+                                deleted += 1;
+                            }
+                        }
                     }
                 }
                 cursor = next;
                 if cursor == "0" { break }
                 tokio::time::sleep(Duration::from_millis(PAGE_PAUSE_MS)).await;
             }
-            info!(scanned, deleted, days = INACTIVE_TTL_DAYS, "inactive-user sweep done");
+            info!(scanned, deleted, stamped, days = INACTIVE_TTL_DAYS, "inactive-user sweep done");
         }
     });
 }
@@ -128,4 +169,35 @@ pub fn spawn_dead_match_sweeper(state: Arc<AppState>) {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const CUTOFF: u64 = 1_000;
+
+    #[test]
+    fn accounts_and_paid_players_are_never_deleted() {
+        assert_eq!(verdict(true, false, Some(0), CUTOFF), Verdict::Keep);
+        assert_eq!(verdict(false, true, Some(0), CUTOFF), Verdict::Keep);
+        assert_eq!(verdict(true, false, None, CUTOFF), Verdict::Keep);
+    }
+
+    #[test]
+    fn guests_follow_server_activity() {
+        assert_eq!(verdict(false, false, Some(CUTOFF), CUTOFF), Verdict::Keep);
+        assert_eq!(verdict(false, false, Some(CUTOFF - 1), CUTOFF), Verdict::Delete);
+        // Jamais vu (antérieur au marquage) : délai démarré, pas supprimé.
+        assert_eq!(verdict(false, false, None, CUTOFF), Verdict::StampNow);
+    }
+
+    #[test]
+    fn paid_content_detection() {
+        use crate::wallet::Wallet;
+        let welcome = crate::economy::welcome_stars();
+        assert!(!holds_paid_content(&Wallet { stars: welcome, ..Default::default() }));
+        assert!(holds_paid_content(&Wallet { stars: welcome + 1, ..Default::default() }));
+        assert!(holds_paid_content(&Wallet { owned_premium_sets: vec!["quartz".into()], ..Default::default() }));
+    }
 }
