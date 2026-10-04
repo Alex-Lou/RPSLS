@@ -43,6 +43,8 @@ import type {
 import { ArenaMovePicker } from "./ArenaMovePicker";
 import { ArenaHandFanout } from "./ArenaHandFanout";
 import { ArenaLockButton } from "./ArenaLockButton";
+import { ArenaCardPeek } from "./ArenaCardPeek";
+import { useCardPress } from "./useCardPress";
 import { commitDragDrop as commitDragDropImpl } from "./arenaPlanDrag";
 
 /** Spell target shape needed by a given card — drives the targeting UI. */
@@ -211,31 +213,8 @@ export function ArenaPlanPhase({
   const commitDragDrop = (point: { x: number; y: number }, current: ArenaTargeting): boolean =>
     commitDragDropImpl(point, current, { board, onAddSummon, onAddSpell, setTargeting, onForgeTap });
 
-  /** Long-press detection — single tap = commit, hold ~750ms = open the
-   *  inspect modal. Reduced again (1050 → 750ms) per Alex's "encore réduire
-   *  le temps". Still ENOUGH delay to filter out accidental holds but
-   *  noticeably snappier mid-turn. */
-  const pressTimerRef = useRef<number | null>(null);
-  const longPressedRef = useRef(false);
-  const LONG_PRESS_MS = 750;
-  function startPress(id: CardId) {
-    longPressedRef.current = false;
-    if (pressTimerRef.current) window.clearTimeout(pressTimerRef.current);
-    pressTimerRef.current = window.setTimeout(() => {
-      longPressedRef.current = true;
-      hapticTap();
-      setInspecting(id);
-    }, LONG_PRESS_MS);
-  }
-  function endPress(id: CardId, fire: boolean) {
-    if (pressTimerRef.current) {
-      window.clearTimeout(pressTimerRef.current);
-      pressTimerRef.current = null;
-    }
-    if (fire && !longPressedRef.current) {
-      commitCard(id);
-    }
-  }
+  // Tap = jouer ; appui 350 ms = aperçu agrandi puis fiche (cf. useCardPress).
+  const { peek, startPress, endPress } = useCardPress(commitCard, setInspecting);
 
   // pickLaneTarget lives in ArenaGame now (handleBoardLaneTap) — lifted
   // along with the targeting state so the BOARD's lane slots can commit
@@ -266,6 +245,10 @@ export function ArenaPlanPhase({
        *  height. Zero reflow on the board, fixes Alex's "Arena se resize
        *  quand je choisis une carte" complaint. */}
       <AnimatePresence>
+        {peek && <ArenaCardPeek key={peek.id} id={peek.id} anchorX={peek.x} />}
+      </AnimatePresence>
+      {/* Portail body : au-dessus de tout le plateau (et du coach du tuto, z-80). */}
+      {createPortal(<AnimatePresence>
         {inspecting && (
           <ArenaCardInspect
             id={inspecting}
@@ -287,7 +270,7 @@ export function ArenaPlanPhase({
             }))}
           />
         )}
-      </AnimatePresence>
+      </AnimatePresence>, document.body)}
 
       {/* Mana summary déplacé SOUS le bouton FIN DE TOUR (Alex 2026-06-11). */}
 

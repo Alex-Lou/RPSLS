@@ -1,3 +1,4 @@
+import { useCallback, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { CARDS } from "../../ranked/cards";
 import { CardImage } from "../../ranked/CardImage";
@@ -9,7 +10,7 @@ import { isFusible, findFusionResult, fusionPartnersOf } from "../arenaFusionCar
 import { CARD_TARGET_KIND, type ArenaTargeting, type BoardState, type TurnIntent } from "../arenaTypes";
 import { CardFanGlyph, FuseGlyph, WarnGlyph } from "../../icons";
 
-/** Hand strip — tap = commit/target, hold 1.4s = inspect modal, DRAG =
+/** Hand strip — tap = commit/target, appui 350 ms = aperçu puis fiche, DRAG =
  *  one-gesture commit to a lane. É2 : éventail COURBE (rotate/y par index,
  *  carte active remontée ×1.16) — transform-only, GPU.
  *  h-[96px] (Alex 2026-06-12 #4) : +8px pour l'éventail ET les noms — le pad
@@ -31,12 +32,30 @@ export function ArenaHandFanout({
   setActivePos: (n: number | null) => void;
   pressedPos: number | null;
   setPressedPos: (n: number | null) => void;
-  startPress: (id: CardId) => void;
+  startPress: (id: CardId, x: number) => void;
   endPress: (id: CardId, fire: boolean) => void;
 }) {
   const t = useT();
+  // Largeur RÉELLEMENT disponible (mesurée) → le recouvrement s'adapte à l'écran :
+  // l'éventail ne déborde jamais sur le bouton FIN ni hors de l'écran.
+  // Ref callback (l'éventail est démonté quand toutes les cartes sont jouées,
+  // puis remonté) : l'observateur suit toujours le nœud courant.
+  const [fit, setFit] = useState<{ avail: number; cardW: number }>({ avail: 0, cardW: 60 });
+  const roRef = useRef<ResizeObserver | null>(null);
+  const fanRef = useCallback((el: HTMLDivElement | null) => {
+    roRef.current?.disconnect();
+    roRef.current = null;
+    if (!el) return;
+    const measure = () => {
+      const cardW = (el.querySelector("button") as HTMLElement | null)?.offsetWidth || 60;
+      setFit((f) => (f.avail === el.clientWidth && f.cardW === cardW ? f : { avail: el.clientWidth, cardW }));
+    };
+    measure();
+    roRef.current = new ResizeObserver(measure);
+    roRef.current.observe(el);
+  }, []);
   return (
-    <div className="h-[96px] landscape:h-[68px] flex-1 landscape:flex-none min-w-0 flex items-end justify-center relative z-30">
+    <div className="h-[118px] landscape:h-[68px] flex-1 landscape:flex-none min-w-0 flex items-end justify-center relative z-30">
       {(() => {
         // Filtre visuel (Alex 2026-06-11) : les cartes mises dans l'intent
         // sont DIRECTEMENT retirées de la main affichée → sentiment CCG net.
@@ -78,6 +97,7 @@ export function ArenaHandFanout({
           // largeur par design (max 8 cartes overlappées ≈ 300px) → pas
           // besoin de scroll ; la carte levée peut déborder librement
           // au-dessus (z-30 > picker, elle passe DEVANT, façon Hearthstone).
+          ref={fanRef}
           className="h-full flex items-end justify-center gap-0.5 px-1 pb-0.5 w-full"
         >
           <AnimatePresence>
@@ -110,7 +130,15 @@ export function ArenaHandFanout({
             // plus elles se SERRENT → l'éventail ne déborde plus sur le bouton
             // FIN DE TOUR (à droite de la rangée). Le drag des cartes est retiré
             // → tap fiable malgré le chevauchement (cf. bouton nu + pressedPos).
-            const overlap = n > 6 ? 12 : n > 4 ? 8 : 5;
+            // Cartes 60 px (Alex 2026-10 « cartes plus grandes ») : recouvrement
+            // minimal par nombre de cartes, augmenté si la largeur mesurée ne suffit
+            // pas (marge 16 px pour l'inclinaison de l'éventail). Plafonné pour
+            // qu'un bout de chaque carte reste touchable.
+            const minOverlap = n > 6 ? 12 : n > 4 ? 8 : 5;
+            const needed = n > 1 && fit.avail > 0
+              ? Math.ceil((n * fit.cardW + 16 - fit.avail) / (n - 1))
+              : 0;
+            const overlap = Math.min(Math.max(minOverlap, needed), fit.cardW - 16);
             return (
               <motion.div
                 key={key}
@@ -125,11 +153,11 @@ export function ArenaHandFanout({
                   // se redressait/remontait sous le doigt → l'extrémité « fuyait »
                   // le toucher → sélection partielle/instable). On ne fait que la
                   // passer DEVANT (zIndex). Elle reste EXACTEMENT sous le doigt.
-                  scale: fanActive ? 1.16 : 1,
+                  scale: fanActive ? 1.1 : 1,
                   opacity: 1,
                   x: 0,
                   rotate: fanActive ? 0 : fanAngle,
-                  y: fanActive ? -12 : fanY,
+                  y: fanActive ? -14 : fanY,
                 }}
                 exit={{ scale: 0.5, opacity: 0, y: -16 }}
                 // Réarrangement QUASI-INSTANTANÉ (Alex 2026-06-11) : layout +
@@ -155,7 +183,7 @@ export function ArenaHandFanout({
                   // touchAction:none empêche en plus le WebView de lire ce micro-
                   // mouvement comme un scroll/zoom (le picker RPSLS fait déjà ça).
                   try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ }
-                  setActivePos(pos); setPressedPos(pos); startPress(id);
+                  setActivePos(pos); setPressedPos(pos); startPress(id, e.clientX);
                 }}
                 onPointerUp={() => { setPressedPos(null); endPress(id, true); }}
                 onPointerLeave={() => { setPressedPos(null); endPress(id, false); }}
@@ -163,7 +191,7 @@ export function ArenaHandFanout({
                 disabled={!supported || cannotAfford || disabled}
                 style={{ touchAction: "none" }}
                 className={
-                  "relative w-[44px] h-[60px] sm:w-[48px] sm:h-[66px] rounded-lg overflow-hidden bg-surface-raised transition " +
+                  "relative w-[60px] h-[82px] landscape:w-[48px] landscape:h-[66px] rounded-lg overflow-hidden bg-surface-raised transition " +
                   // É2 : plus de scale-110 interne — l'emphase (×1.16 + remontée)
                   // est portée par l'enveloppe éventail.
                   "ring-2 " + (
@@ -175,17 +203,17 @@ export function ArenaHandFanout({
                 }
                 title={supported ? undefined : "Carte pas encore disponible en Arena"}
               >
-                <CardImage id={id} glyphSize="text-xl" />
+                <CardImage id={id} glyphSize="text-2xl" />
 
                 <div className="absolute top-0.5 left-0.5 z-10 inline-flex items-center justify-center gap-0.5 px-1 py-0.5 rounded-full bg-black/75">
                   {Array.from({ length: card.cost }, (_, k) => (
-                    <span key={k} className="w-1 h-1 rounded-full bg-sky-300" />
+                    <span key={k} className="w-1.5 h-1.5 landscape:w-1 landscape:h-1 rounded-full bg-sky-300" />
                   ))}
                 </div>
-                <div className="absolute bottom-0 left-0 right-0 bg-black/65 py-0.5">
-                  <div className="text-[6px] sm:text-[7px] font-bold uppercase text-center text-white/90 truncate px-0.5">
-                    {/* Resolve via i18n on caller's side — we just show the id-derived label */}
-                    {card.glyph}
+                <div className="absolute bottom-0 left-0 right-0 bg-black/70 py-0.5">
+                  {/* NOM de la carte (lisible à 60 px) — remplace le glyphe seul. */}
+                  <div className="text-[7.5px] landscape:text-[6.5px] font-bold uppercase text-center text-white/95 truncate px-0.5 leading-tight">
+                    {t(card.nameKey)}
                   </div>
                 </div>
                 {!supported && (
@@ -205,7 +233,7 @@ export function ArenaHandFanout({
                  *  montre plus que le signal actionnable (OR pulsant). */}
                 {board.forgeA && isFusible(id) && findFusionResult(id, board.forgeA) && (
                   <div
-                    className="absolute bottom-4 right-0.5 z-10 w-5 h-5 rounded-full flex items-center justify-center text-[11px] leading-none shadow bg-amber-400 text-zinc-900 animate-pulse ring-1 ring-amber-200"
+                    className="absolute bottom-5 right-0.5 z-10 w-5 h-5 rounded-full flex items-center justify-center text-[11px] leading-none shadow bg-amber-400 text-zinc-900 animate-pulse ring-1 ring-amber-200"
                     title="Fusion possible — tape la Forge !"
                   >
                     <FuseGlyph className="w-3 h-3" />
@@ -220,7 +248,7 @@ export function ArenaHandFanout({
                   return p === id ? me.hand.filter((h) => h === id).length >= 2 : me.hand.includes(p);
                 }) && (
                   <div
-                    className="absolute bottom-4 right-0.5 z-10 w-5 h-5 rounded-full flex items-center justify-center text-[11px] leading-none shadow bg-fuchsia-500 text-white ring-1 ring-fuchsia-300"
+                    className="absolute bottom-5 right-0.5 z-10 w-5 h-5 rounded-full flex items-center justify-center text-[11px] leading-none shadow bg-fuchsia-500 text-white ring-1 ring-fuchsia-300"
                     title="Fusionnable : tu as le partenaire en main — dépose une carte sur la Forge puis fusionne"
                   >
                     <FuseGlyph className="w-3 h-3" />
@@ -277,7 +305,7 @@ export function ArenaHandFanout({
         </div>
       ) : (
         <div className="flex flex-col items-center gap-1.5 opacity-65">
-          <div className="w-[44px] h-[60px] sm:w-[48px] sm:h-[66px] rounded-lg border-2 border-dashed border-hairline bg-black/15 flex items-center justify-center">
+          <div className="w-[60px] h-[82px] landscape:w-[48px] landscape:h-[66px] rounded-lg border-2 border-dashed border-hairline bg-black/15 flex items-center justify-center">
             <CardFanGlyph className="w-7 h-7 text-ink-faint" />
           </div>
           <span className="text-[10px] text-ink-faint italic">
