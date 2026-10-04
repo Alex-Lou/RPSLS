@@ -122,6 +122,15 @@ export interface Player {
    *  per-set, not per-piece — owning "quartz" unlocks the background, pad,
    *  and HUD palette together. Server-replicated like the rest of progress. */
   ownedPremiumSets?: string[];
+  /** Économie serveur-autoritaire (§9-B) : true dès que le serveur a confirmé
+   *  le portefeuille (`wallet_update`). Les soldes, la collection, les sets
+   *  premium, le codex et la saison deviennent alors un CACHE du serveur
+   *  (cf. online/wallet.ts). */
+  walletActive?: boolean;
+  /** Réclamations en attente d'envoi au serveur (portefeuille actif) : gains
+   *  de matchs vs CPU et cartes de déblocage. Rejouées à chaque passage serveur
+   *  (`flushWallet`), retirées une fois traitées. */
+  pendingEco?: PendingEco;
   /** Collection-completion thresholds the player has already claimed
    *  (5 / 10 / 15 cards). Each threshold can be claimed at most once. */
   codexClaimed?: number[];
@@ -263,6 +272,12 @@ export const PAD_META: Record<PadId, { label: string; emoji: string; tagline: st
   bloom:      { label: "Bloom",         emoji: "🌸", tagline: "Jardin infini, pétales en spirale, lucioles, fleurs qui s'ouvrent.", category: "styled", premiumSetId: "bloom" },
   custom:     { label: "Mon image",      emoji: "🖼️", tagline: "Ton propre tapis (paysage 3:2, ex. 1500×1000).",     category: "img" },
 };
+
+/** Cf. `Player.pendingEco`. `mode` : un mode de `ECLATS_PER_WIN`, ou "arena". */
+export interface PendingEco {
+  cpu: { id: string; mode: string; outcome: "win" | "loss" | "draw" }[];
+  unlocks: string[];
+}
 
 export type Opponent =
   | { kind: "cpu"; mood: AiMood }

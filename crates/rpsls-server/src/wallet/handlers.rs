@@ -10,7 +10,7 @@ use tracing::warn;
 use super::store::{self, now_ms, StoreError};
 use super::{PackResult, Wallet, WalletError};
 use crate::player_state::{self, PlayerProgress};
-use crate::protocol::{PlayerSlot, ServerMessage};
+use crate::protocol::{CpuReward, PlayerSlot, ServerMessage};
 use crate::session::Session;
 
 /// Opération demandée par le client.
@@ -20,7 +20,7 @@ pub enum WalletOp {
     Craft(String),
     BuyPremiumSet(String),
     ClaimCodex(u32),
-    ClaimCpuReward { mode: String, outcome: String },
+    ClaimCpuRewards(Vec<CpuReward>),
     ClaimUnlocks(Vec<String>),
     ClaimSeason,
 }
@@ -33,7 +33,7 @@ impl WalletOp {
             Self::Craft(_) => "craft",
             Self::BuyPremiumSet(_) => "buy_premium_set",
             Self::ClaimCodex(_) => "claim_codex",
-            Self::ClaimCpuReward { .. } => "claim_cpu_reward",
+            Self::ClaimCpuRewards(_) => "claim_cpu_rewards",
             Self::ClaimUnlocks(_) => "claim_unlocks",
             Self::ClaimSeason => "claim_season",
         }
@@ -100,10 +100,19 @@ async fn run(pid: &str, op: WalletOp) -> Result<(Outcome, Wallet), StoreError> {
         WalletOp::ClaimCodex(t) => store::update(pid, |w| w.claim_codex(t))
             .await
             .map(|((), w)| (Outcome::default(), w)),
-        WalletOp::ClaimCpuReward { mode, outcome } => {
-            store::update(pid, |w| w.claim_cpu_reward(&mode, &outcome, now))
-                .await
-                .map(|(granted, w)| (Outcome { eclats: Some(granted), ..Default::default() }, w))
+        WalletOp::ClaimCpuRewards(rewards) => {
+            // Une entrée invalide est ignorée (pas de refus du lot entier : le
+            // client la retire de sa file comme les autres).
+            let rewards: Vec<CpuReward> = rewards.into_iter().take(50).collect();
+            store::update(pid, |w| {
+                let granted = rewards
+                    .iter()
+                    .filter_map(|r| w.claim_cpu_reward(&r.mode, &r.outcome, now).ok())
+                    .sum::<u64>();
+                Ok::<_, WalletError>(granted)
+            })
+            .await
+            .map(|(granted, w)| (Outcome { eclats: Some(granted), ..Default::default() }, w))
         }
         WalletOp::ClaimUnlocks(ids) => {
             let ids: Vec<String> = ids.into_iter().take(64).collect();

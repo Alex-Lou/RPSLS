@@ -1,10 +1,18 @@
 import type { Move } from "../engine/game";
 import type { MatchRecord, Player, Outcome } from "../types";
 import type { Locale } from "../i18n";
-import type { PackResult, SeasonReward } from "../engine/economy";
+import type { SeasonReward } from "../engine/economy";
 import type { CardId } from "../ranked/rankedTypes";
 
 export type ServerMode = "cloud" | "lan";
+
+/** Écran de fin de saison : palier versé + soft reset du LP. */
+export interface SeasonRolloverInfo {
+  fromSeason: number;
+  reward: SeasonReward;
+  lpBefore: number;
+  lpAfter: number;
+}
 
 export interface ServerConfig {
   mode: ServerMode;
@@ -52,26 +60,13 @@ export interface AppState {
    *  the change to the cloud via the existing playerSync pipeline. */
   recordArenaMatch: (
     outcome: "win" | "loss" | "draw",
-    meta?: { playerVoie?: Move; oppVoie?: Move; forfeit?: boolean },
+    meta?: { playerVoie?: Move; oppVoie?: Move; forfeit?: boolean; online?: boolean },
   ) => void;
   /** Remplace l'historique local (restauration cloud sur install fraîche —
    *  appelé UNIQUEMENT quand le local est vide, donc jamais d'écrasement). */
   restoreHistory: (h: MatchRecord[]) => void;
   /** Set the player's chosen Voie / affinity (Constellation Pro v2). */
   setArenaAffinity: (affinity: Move) => void;
-  /** Spend {@link PACK_COST} éclats to open a pack of 3 cards. Duplicates
-   *  are auto-converted to poussière. Returns the result, or `null` when
-   *  the player cannot afford the pack. */
-  openPack: () => PackResult | null;
-  /** Spend poussière to add the locked card to the collection. Returns
-   *  `true` on success, `false` if the player can't afford it or already
-   *  owns the card. */
-  craftCard: (id: CardId) => boolean;
-  /** Codex completion tier — grants the éclats/poussière bonus tied to
-   *  {@link import("../engine/economy").CODEX_TIERS}. Returns `false` if
-   *  the player hasn't unlocked enough cards yet, or has already claimed
-   *  this tier. */
-  claimCodexTier: (threshold: number) => boolean;
   /** Award per-card mastery XP for every card listed (typically the deck
    *  contents at match end). Cosmetic — no balance impact. */
   awardCardMasteryXp: (cards: CardId[], outcome: Outcome) => void;
@@ -79,7 +74,12 @@ export interface AppState {
    *  tier-based reward, soft-reset LP, bump the season number. Returns
    *  the rollover payload so the caller (App boot) can show a modal,
    *  or null when no rollover is due yet. */
-  rolloverSeasonIfDue: () => { fromSeason: number; reward: SeasonReward; lpBefore: number; lpAfter: number } | null;
+  rolloverSeasonIfDue: () => SeasonRolloverInfo | null;
+  /** Écran de fin de saison à afficher (App.tsx). Posé par le flux local
+   *  (ancien) ou par le serveur (portefeuille actif, cf. online/wallet.ts).
+   *  Non persisté. */
+  seasonRollover: SeasonRolloverInfo | null;
+  setSeasonRollover: (r: SeasonRolloverInfo | null) => void;
   /** Apply a server-synced progression patch to the local player. Used by
    *  bootSync and the state_loaded handler to merge server-saved data. */
   applyServerSync: (patch: Partial<Player>) => void;
@@ -87,11 +87,6 @@ export interface AppState {
    *  and break the durable anchor so the next boot doesn't restore the account.
    *  The account's cloud data is untouched — logging back in restores it. */
   logout: () => void;
-  /** SIMULATE a premium-set purchase (no real money). Debits the cost in
-   *  stars and adds the set to ownedPremiumSets. Returns `false` if the
-   *  player can't afford it or already owns the set. Production swap-in
-   *  will be a server call that verifies the IAP receipt before granting. */
-  simulatePremiumPurchase: (setId: string, costStars: number) => boolean;
   /** Dev / test helper: credit stars directly. Wired only to the dev modal
    *  ("+1000 ✦ test"), never exposed to players. */
   grantStars: (n: number) => void;

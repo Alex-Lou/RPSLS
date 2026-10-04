@@ -406,7 +406,7 @@ export function ArenaGame({
     if (matchEndedRef.current) { onQuit(); return; }
     matchEndedRef.current = true;
     hapticMatchLoss();
-    recordArenaMatch("loss", { playerVoie: board[mySide].affinity, oppVoie: board[oppSide].affinity, forfeit: true });
+    recordArenaMatch("loss", { playerVoie: board[mySide].affinity, oppVoie: board[oppSide].affinity, forfeit: true, online: !!online });
     onQuit();
   }
 
@@ -537,7 +537,7 @@ export function ArenaGame({
     online?.reportResult(outcome, hashBoard(board));
     // VOIE jouée (joueur + adversaire) journalisée dans l'historique (Alex
     // 2026-06-13). me/opp.affinity = la Voie choisie par chaque camp.
-    recordArenaMatch(outcome, { playerVoie: me.affinity, oppVoie: opp.affinity });
+    recordArenaMatch(outcome, { playerVoie: me.affinity, oppVoie: opp.affinity, online: !!online });
     // Télémétrie Watcher (Arena Pro vs CPU) — fail-soft, inerte si non configuré.
     if (me.affinity) {
       // Filet : fige le dernier tour si le settle ne l'a pas déjà fait (no-op

@@ -319,9 +319,7 @@ pub(crate) async fn handle_client_message(
         ClientMessage::CraftCard { card_id } => wallet::handle(session, WalletOp::Craft(card_id)),
         ClientMessage::BuyPremiumSet { set_id } => wallet::handle(session, WalletOp::BuyPremiumSet(set_id)),
         ClientMessage::ClaimCodex { threshold } => wallet::handle(session, WalletOp::ClaimCodex(threshold)),
-        ClientMessage::ClaimCpuReward { mode, outcome } => {
-            wallet::handle(session, WalletOp::ClaimCpuReward { mode, outcome })
-        }
+        ClientMessage::ClaimCpuRewards { rewards } => wallet::handle(session, WalletOp::ClaimCpuRewards(rewards)),
         ClientMessage::ClaimUnlocks { card_ids } => wallet::handle(session, WalletOp::ClaimUnlocks(card_ids)),
         ClientMessage::ClaimSeason => wallet::handle(session, WalletOp::ClaimSeason),
     }

@@ -1,15 +1,10 @@
 /**
  * PremiumPurchaseModal — test-only purchase flow for ✦ Étoiles cosmetics.
  *
- * Status: SIMULATION. The "Acheter" button calls store.simulatePremiumPurchase
- * which never touches a real payment provider. Production swap-in is a server
- * call that verifies the IAP receipt before granting the set — wiring stays
- * the same on the client (debit ✦, push ownedPremiumSets), only the gate
- * moves server-side.
- *
- * Dev affordance: "+1000 ✦ TEST" credits stars locally so you can iterate on
- * the modal without grinding receipts. Hidden on release builds via the
- * `__DEV_PREMIUM__` flag at the top of the file.
+ * L'achat est validé par le SERVEUR (online/wallet.ts : débit ✦ + set accordé).
+ * Pas encore de vrai paiement : les ✦ ne viennent que du bonus de bienvenue.
+ * Dev : « +1000 ✦ TEST » ne crédite que l'affichage local (le serveur refuse
+ * l'achat ensuite) ; absent des releases (`__DEV_PREMIUM__`).
  */
 
 import { useEffect, useState } from "react";
@@ -19,6 +14,7 @@ import { useStore } from "../store/store";
 import { formatNumber } from "../i18n/format";
 import { PremiumBadge } from "./PremiumBadge";
 import { useT } from "../i18n";
+import { walletBuyPremiumSet, walletErrorKey } from "../online/wallet";
 import { hapticMatchStart, hapticMatchWin, hapticTap } from "../haptic";
 
 // Le bouton de test « +1000 ✦ » n'existe qu'en `pnpm dev` et dans les builds
@@ -49,14 +45,15 @@ export function PremiumPurchaseModal({
 }) {
   const stars = useStore((s) => s.player.stars ?? 0);
   const owned = useStore((s) => (s.player.ownedPremiumSets ?? []).includes(set?.id ?? ""));
-  const buy = useStore((s) => s.simulatePremiumPurchase);
   const grant = useStore((s) => s.grantStars);
   const t = useT();
   /** Three phases:
    *   idle        — preview + buttons (normal)
    *   celebrating — gold burst + "✦ DÉBLOQUÉ" pulse, auto-closes ~2.2s later
    *   The closing handoff back to onClose is the parent's responsibility. */
-  const [phase, setPhase] = useState<"idle" | "celebrating">("idle");
+  const [phase, setPhase] = useState<"idle" | "pending" | "celebrating">("idle");
+  // Refus du serveur (solde, hors ligne…) — l'achat est validé côté serveur (§9-B).
+  const [error, setError] = useState<string | null>(null);
 
   // Reset to idle ONLY when a different set opens. This effect must NOT
   // depend on `onClose` — the parent passes a fresh inline onClose on every
@@ -72,21 +69,23 @@ export function PremiumPurchaseModal({
   if (!set) return null;
   const affordable = stars >= set.cost;
 
-  const handleBuy = () => {
+  const handleBuy = async () => {
     if (owned || phase !== "idle") return;
-    // Affordability pre-check so we can start the animation BEFORE the heavy
-    // store mutation. The buy() call below triggers Zustand persist, which
-    // serialises the whole player state to localStorage synchronously — if
-    // that runs on the same tick as setPhase, it janks the celebration's
-    // first frame (the freeze Alex saw). We start the burst first, then defer
-    // buy() by two animation frames so the opening frames render smoothly.
     if (stars < set.cost) { hapticTap(); return; }
+    // Le SERVEUR débite et accorde le set (le store est mis à jour par sa
+    // réponse, AVANT la célébration : pas de persist sur la 1re frame).
+    hapticTap();
+    setPhase("pending");
+    setError(null);
+    const r = await walletBuyPremiumSet(set.id);
+    if (!r.ok) {
+      setPhase("idle");
+      setError(t(walletErrorKey(r.code)));
+      return;
+    }
     hapticMatchStart();
     setPhase("celebrating");
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      buy(set.id, set.cost);
-      window.setTimeout(() => hapticMatchWin(), 60);
-    }));
+    window.setTimeout(() => hapticMatchWin(), 60);
     window.setTimeout(() => onClose(), 2200);
   };
 
@@ -152,7 +151,7 @@ export function PremiumPurchaseModal({
             ) : (
               <button
                 onClick={handleBuy}
-                disabled={!affordable}
+                disabled={!affordable || phase !== "idle"}
                 className={
                   "py-2.5 rounded-xl font-black text-sm uppercase tracking-wider transition " +
                   (affordable
@@ -160,9 +159,10 @@ export function PremiumPurchaseModal({
                     : "bg-hairline text-ink-faint cursor-not-allowed")
                 }
               >
-                {affordable ? t("premium.buy") : t("premium.notEnough")}
+                {phase === "pending" ? t("wallet.connecting") : affordable ? t("premium.buy") : t("premium.notEnough")}
               </button>
             )}
+            {error && <div role="alert" className="text-center text-[12px] font-bold text-rose-300">{error}</div>}
             {__DEV_PREMIUM__ && !owned && (
               <button
                 onClick={() => { hapticTap(); grant(1000); }}

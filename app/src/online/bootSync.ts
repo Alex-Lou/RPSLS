@@ -156,7 +156,10 @@ function runBootSyncImmediate(player: { id: string; nickname: string; claimToken
         const newId = crypto.randomUUID();
         // eslint-disable-next-line no-console
         console.warn("[bootSync] claim-mismatch + no anchor — regenerating player.id (true fresh start).", { oldId: player.id, newId });
-        store.applyServerSync({ id: newId, claimToken: undefined });
+        // Nouvel identifiant → pas de portefeuille serveur : sans ce reset, la
+        // fusion « serveur gagne » remettrait l'éco locale à zéro ; la prochaine
+        // init reprendra la ligne poussée ci-dessous (cf. online/wallet.ts).
+        store.applyServerSync({ id: newId, claimToken: undefined, walletActive: false, pendingEco: { cpu: [], unlocks: [] } });
         try {
           ws.send(JSON.stringify(helloFrame({ id: newId, nickname: player.nickname, claimToken: "" })));
           (player as { id: string }).id = newId;

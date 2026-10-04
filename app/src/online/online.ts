@@ -155,7 +155,34 @@ export type ClientMessage =
   // `intent` = payload OPAQUE (le serveur ne le lit pas) ; `state_hash` = empreinte
   // de l'état vu par ce client (anti-triche Phase 4, comparée par le serveur).
   | { type: "ccg_turn"; round_no: number; intent: unknown; state_hash: string }
-  | { type: "ccg_result"; winner: PlayerSlot | null; state_hash: string };
+  | { type: "ccg_result"; winner: PlayerSlot | null; state_hash: string }
+  // Économie serveur-autoritaire (mirror protocol.rs, module `wallet`).
+  | WalletRequest;
+
+/** Opérations de portefeuille (le serveur valide, débite, crédite). */
+export type WalletRequest =
+  | { type: "wallet_init" }
+  | { type: "open_pack" }
+  | { type: "craft_card"; card_id: string }
+  | { type: "buy_premium_set"; set_id: string }
+  | { type: "claim_codex"; threshold: number }
+  | { type: "claim_cpu_rewards"; rewards: { mode: string; outcome: string }[] }
+  | { type: "claim_unlocks"; card_ids: string[] }
+  | { type: "claim_season" };
+
+/** Portefeuille tel que renvoyé par le serveur (`wallet:{pid}`). */
+export interface Wallet {
+  eclats: number;
+  dust: number;
+  stars: number;
+  cardCollection: string[];
+  ownedPremiumSets: string[];
+  codexClaimed: number[];
+  cpuDay: number;
+  cpuEclatsToday: number;
+  seasonNumber: number;
+  seasonStartedAt: number;
+}
 
 /* Server → Client */
 export type ServerMessage =
@@ -239,7 +266,20 @@ export type ServerMessage =
   | { type: "ccg_turn_relay"; from: PlayerSlot; round_no: number; intent: unknown }
   // `desync` = match ANNULÉ par le serveur (hash d'état ou résultats divergents →
   // triche/bug détecté) : aucun résultat crédité (anti-triche Phase 4).
-  | { type: "ccg_match_end"; winner: PlayerSlot | null; forfeit: boolean; desync: boolean };
+  | { type: "ccg_match_end"; winner: PlayerSlot | null; forfeit: boolean; desync: boolean }
+  // Portefeuille à jour après une opération (`op` = son nom côté serveur, ou
+  // "match_reward" pour un gain de match en ligne crédité par le serveur).
+  | {
+      type: "wallet_update";
+      op: string;
+      wallet: Wallet;
+      pack?: { cards: string[]; isNew: boolean[]; dustGained: number };
+      eclats?: number;
+      dust?: number;
+      cards?: string[];
+    }
+  // Opération refusée, rien n'a changé (code stable, cf. protocol.rs).
+  | { type: "wallet_error"; op: string; code: string };
 
 /* ──────────── URL helpers ──────────── */
 
@@ -266,6 +306,15 @@ export function normalizeServerUrl(input: string): string {
 /* ──────────── Minimal WS client ──────────── */
 
 export type Listener = (msg: ServerMessage) => void;
+
+/** Écouteurs appelés pour CHAQUE message de CHAQUE client (en plus des
+ *  écouteurs propres à l'instance). Sert au portefeuille : un gain de match en
+ *  ligne (`wallet_update`) arrive sur la socket du match, quelle qu'elle soit. */
+const globalListeners = new Set<Listener>();
+export function addGlobalListener(fn: Listener): () => void {
+  globalListeners.add(fn);
+  return () => { globalListeners.delete(fn); };
+}
 
 /** Backoff schedule (ms) for reconnection attempts after an unexpected drop.
  *  Three fast retries cover transient drops, then four longer ones cover the
@@ -398,6 +447,7 @@ export class OnlineClient {
             return;
           }
           this.listeners.forEach((l) => l(parsed!));
+          globalListeners.forEach((l) => l(parsed!));
         };
       } catch (e) {
         this.setStatus("error");
