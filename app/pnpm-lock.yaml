@@ -17,9 +17,6 @@ importers:
       '@fontsource/bebas-neue':
         specifier: ^5.2.7
         version: 5.2.7
-      '@fontsource/bevan':
-        specifier: ^5.2.7
-        version: 5.2.7
       '@fontsource/cinzel':
         specifier: ^5.2.8
         version: 5.2.8
@@ -45,9 +42,6 @@ importers:
         specifier: ^5.2.8
         version: 5.2.8
       '@fontsource/jetbrains-mono':
-        specifier: ^5.2.8
-        version: 5.2.8
-      '@fontsource/medievalsharp':
         specifier: ^5.2.8
         version: 5.2.8
       '@fontsource/orbitron':
@@ -77,9 +71,6 @@ importers:
       '@tauri-apps/plugin-haptics':
         specifier: ^2.3.2
         version: 2.3.2
-      '@tauri-apps/plugin-opener':
-        specifier: ^2
-        version: 2.5.4
       '@tauri-apps/plugin-store':
         specifier: ^2.4.3
         version: 2.4.3
@@ -92,9 +83,6 @@ importers:
       react-dom:
         specifier: ^19.1.0
         version: 19.2.6(react@19.2.6)
-      react-icons:
-        specifier: ^5.6.0
-        version: 5.6.0(react@19.2.6)
       zustand:
         specifier: ^5.0.13
         version: 5.0.13(@types/react@19.2.14)(react@19.2.6)
@@ -383,9 +371,6 @@ packages:
   '@fontsource/bebas-neue@5.2.7':
     resolution: {integrity: sha512-DsmBrmq55d9BCU0mt4DT4RZDdH8vhWRKEUOfbuNB1EEjMuwbtFvM8N+3gIlkYSFbsb10P8Q19BV5OdpMu2h0fA==}
 
-  '@fontsource/bevan@5.2.7':
-    resolution: {integrity: sha512-fJYcvVGlKE6lQZSn76pqTQJ0uIT4XVlWG55g8C7PfdC2W4MfN4Y5AcNMlzYI0hJNAJmvNvw4BkqyfS6/2uaz9Q==}
-
   '@fontsource/cinzel@5.2.8':
     resolution: {integrity: sha512-B9WeF/jPlOJOrcXfX96cy4KfM+s1QcU2C9W2hE3azBOBzPvzFkNpBovT5JmhAeicE/s4HZWKF9LF5hmEcqlbsw==}
 
@@ -412,9 +397,6 @@ packages:
 
   '@fontsource/jetbrains-mono@5.2.8':
     resolution: {integrity: sha512-6w8/SG4kqvIMu7xd7wt6x3idn1Qux3p9N62s6G3rfldOUYHpWcc2FKrqf+Vo44jRvqWj2oAtTHrZXEP23oSKwQ==}
-
-  '@fontsource/medievalsharp@5.2.8':
-    resolution: {integrity: sha512-KD4nShnTLAdnjsQspINuk3EJ5O2WdmFKe5H7L4EqVIOmcoxsjGKWgLfEPWsxUJ8GRinM1dkin8e4xsWZvj2r9A==}
 
   '@fontsource/orbitron@5.2.8':
     resolution: {integrity: sha512-ruzrDl5vnqNykk5DZWY0Ezj4aeFZSbCnwJTc/98ojNJHSsHhlhT2r7rwQrA5sptmF8JtB8TQTAvlfRvcV28RPw==}
@@ -912,9 +894,6 @@ packages:
   '@tauri-apps/plugin-haptics@2.3.2':
     resolution: {integrity: sha512-TqvBR5JoPodDQWPXsNymmyqp37dOpunZOdVVbx5xOAxki7rVwiCMvoEPdtJQNIrU+dQDfkQYZ2oDBVOu4hf+ig==}
 
-  '@tauri-apps/plugin-opener@2.5.4':
-    resolution: {integrity: sha512-1HnPkb+AmgO29HBazm4uPLKB+r7zzcTBW1d0fyYp1uP+jwtpoiNDGKMMzz58SFp49nOIrxdE3aUJtT57lfO9CQ==}
-
   '@tauri-apps/plugin-store@2.4.3':
     resolution: {integrity: sha512-9LWPj9yMphRi9czEtUv87XHbl1b6xgd9EXpPrUnq6nG7+nbtoF84d4Kwz9xhAv/Hf30sr58pq7EOlyI936y8qw==}
 
@@ -1169,11 +1148,6 @@ packages:
     resolution: {integrity: sha512-0prMI+hvBbPjsWnxDLxlCGyM8PN6UuWjEUCYmZhO67xIV9Xasa/r/vDnq+Xyq4Lo27g8QSbO5YzARu0D1Sps3g==}
     peerDependencies:
       react: ^19.2.6
-
-  react-icons@5.6.0:
-    resolution: {integrity: sha512-RH93p5ki6LfOiIt0UtDyNg/cee+HLVR6cHHtW3wALfo+eOHTp8RnU2kRkI6E+H19zMIs03DyxUG/GfZMOGvmiA==}
-    peerDependencies:
-      react: '*'
 
   react-refresh@0.17.0:
     resolution: {integrity: sha512-z6F7K9bV85EfseRCp2bzrpyQ0Gkw1uLoCel9XBVWPg/TjRj94SkJzUTGfOa4bs7iJvBWtQG0Wq7wnI0syw3EBQ==}
@@ -1511,8 +1485,6 @@ snapshots:
 
   '@fontsource/bebas-neue@5.2.7': {}
 
-  '@fontsource/bevan@5.2.7': {}
-
   '@fontsource/cinzel@5.2.8': {}
 
   '@fontsource/cormorant-garamond@5.2.11': {}
@@ -1530,8 +1502,6 @@ snapshots:
   '@fontsource/inter@5.2.8': {}
 
   '@fontsource/jetbrains-mono@5.2.8': {}
-
-  '@fontsource/medievalsharp@5.2.8': {}
 
   '@fontsource/orbitron@5.2.8': {}
 
@@ -1892,10 +1862,6 @@ snapshots:
     dependencies:
       '@tauri-apps/api': 2.11.0
 
-  '@tauri-apps/plugin-opener@2.5.4':
-    dependencies:
-      '@tauri-apps/api': 2.11.0
-
   '@tauri-apps/plugin-store@2.4.3':
     dependencies:
       '@tauri-apps/api': 2.11.0
@@ -2122,10 +2088,6 @@ snapshots:
     dependencies:
       react: 19.2.6
       scheduler: 0.27.0
-
-  react-icons@5.6.0(react@19.2.6):
-    dependencies:
-      react: 19.2.6
 
   react-refresh@0.17.0: {}
 
