@@ -10,29 +10,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../../store/store";
-import { ALL_CARD_IDS, CARDS, isPassiveCard, RARITY_ORDER, STARTER_COLLECTION } from "../cards";
-import { ARENA_LEGENDARY_CAP, isDeckable, resolveArenaDeckSource } from "../../arena/arenaDecks";
-import { SIGNATURE_DECK, VOIE_DEF } from "../../arena/arenaVoies";
-import type { Move } from "../../engine/game";
-
-/** Filtre de collection par Voie en Arène (Alex 2026-06-22 « un filtre pour
- *  chaque voie ») : "myvoie" = ta Voie active + neutres ; un Move = cette Voie ;
- *  "neutral" = cartes neutres ; "all" = tout. */
-type VoieFilter = "myvoie" | "neutral" | "all" | Move;
-/** Symboles RPSLS des chips de Voie (décoratifs). */
-const VOIE_CHIP_ICON: Record<Move, string> = {
-  rock: "⛰", paper: "🌿", scissors: "⚔", lizard: "🦎", spock: "🖖",
-};
+import { ALL_CARD_IDS, CARDS, STARTER_COLLECTION } from "../cards";
+import { ARENA_LEGENDARY_CAP, resolveArenaDeckSource } from "../../arena/arenaDecks";
+import { SIGNATURE_DECK } from "../../arena/arenaVoies";
 import type { CardId, CardRarity } from "../rankedTypes";
 import { useT } from "../../i18n";
 import { useNoMenuFx } from "../../fx/menuFx";
 import { CurrencyBadges } from "../CurrencyBadges";
-import { hapticTap } from "../../haptic";
 import { useTopBar } from "../../nav/topBarStore";
-import { SLOTS_BY_MODE, RARITY_TAB_KEY, RARITY_DOT, RARITY_RING } from "./deckManagerConstants";
+import { SLOTS_BY_MODE, type VoieFilter } from "./deckManagerConstants";
 import { DeckSlot } from "./DeckSlot";
 import { CardDetailModal } from "./CardDetailModal";
-import { RarityTab, FilterChip } from "./collectionFilters";
+import { CollectionFilterBar } from "./CollectionFilterBar";
+import { CollectionHeader } from "./CollectionHeader";
+import { countOwnedByRarity, groupCollectionByMana } from "./collectionGrouping";
+import { DeckToast } from "./DeckToast";
 import { ManaGroup } from "./ManaGroup";
 import { EmptyState } from "./EmptyState";
 
@@ -205,77 +197,15 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
 
   /** Count owned cards per rarity — shown in the rarity tab pills so the
    *  player knows at a glance "how much of each tier I've collected". */
-  const ownedByRarity = useMemo(() => {
-    const counts: Record<CardRarity, { owned: number; total: number }> = {
-      common: { owned: 0, total: 0 },
-      rare: { owned: 0, total: 0 },
-      epic: { owned: 0, total: 0 },
-      legendary: { owned: 0, total: 0 },
-    };
-    for (const id of ALL_CARD_IDS) {
-      const r = CARDS[id].rarity;
-      counts[r].total += 1;
-      if (collection.includes(id)) counts[r].owned += 1;
-    }
-    return counts;
-  }, [collection]);
+  const ownedByRarity = useMemo(() => countOwnedByRarity(collection), [collection]);
 
   /** Filtered + grouped collection. Grouping is by mana cost within the
    *  active rarity filter — gives the player a natural curve view inside
    *  each tab without forcing them to scan a flat 46-card grid. */
-  const groupedByMana = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    const filtered = ALL_CARD_IDS.filter((id) => {
-      const card = CARDS[id];
-      // ARÈNE : ne montrer que les cartes réellement équipables (isDeckable =
-      // source unique, cf. arenaDecks). Masque les cartes sans effet Arène
-      // (no-op Classé : gambit, boussole…) et les Finishers (injectés à jauge
-      // pleine, non draftables) — sinon le builder les laissait équiper puis
-      // buildPlayerDeck les retirait au match (UX trompeuse). Le Classé reste
-      // inchangé (montre toute la collection).
-      if (mode === "arena" && !isDeckable(id)) return false;
-      if (rarityFilter !== "all" && card.rarity !== rarityFilter) return false;
-      if (ownedOnly && !collection.includes(id)) return false;
-      if (inDeckOnly && !usedInDeck.has(id)) return false;
-      if (passiveOnly && !isPassiveCard(id)) return false;
-      // VOIE (arène) : masque les cartes d'une AUTRE Voie ; garde tes signatures
-      // (voie===affinity) + les neutres (voie absente).
-      if (mode === "arena") {
-        const cv = card.voie;
-        if (voieFilter === "myvoie") {
-          if (arenaAffinity && cv !== undefined && cv !== arenaAffinity) return false;
-        } else if (voieFilter === "neutral") {
-          if (cv !== undefined) return false;
-        } else if (voieFilter !== "all") {
-          if (cv !== voieFilter) return false;
-        }
-      }
-      if (q) {
-        const name = t(card.nameKey).toLowerCase();
-        if (!name.includes(q) && !id.toLowerCase().includes(q)) return false;
-      }
-      return true;
-    });
-    // Group by mana cost (1/2/3/4) so the player sees their curve.
-    const groups: Record<number, CardId[]> = {};
-    for (const id of filtered) {
-      const cost = CARDS[id].cost;
-      (groups[cost] ??= []).push(id);
-    }
-    // Within each cost bucket: rarity asc, then alphabetical name — the
-    // resulting order matches how a deck-builder mentally scans cards.
-    for (const cost of Object.keys(groups)) {
-      groups[+cost].sort((a, b) => {
-        const ra = RARITY_ORDER.indexOf(CARDS[a].rarity);
-        const rb = RARITY_ORDER.indexOf(CARDS[b].rarity);
-        if (ra !== rb) return ra - rb;
-        return t(CARDS[a].nameKey).localeCompare(t(CARDS[b].nameKey));
-      });
-    }
-    return [1, 2, 3, 4]
-      .filter((c) => groups[c]?.length)
-      .map((c) => ({ cost: c, ids: groups[c] }));
-  }, [rarityFilter, ownedOnly, inDeckOnly, passiveOnly, voieFilter, arenaAffinity, mode, searchQuery, collection, usedInDeck, t]);
+  const groupedByMana = useMemo(() => groupCollectionByMana({
+    searchQuery, mode, rarityFilter, ownedOnly, inDeckOnly, passiveOnly,
+    voieFilter, arenaAffinity, collection, usedInDeck, t,
+  }), [rarityFilter, ownedOnly, inDeckOnly, passiveOnly, voieFilter, arenaAffinity, mode, searchQuery, collection, usedInDeck, t]);
 
   const totalShown = groupedByMana.reduce((sum, g) => sum + g.ids.length, 0);
   const anyFilterActive = rarityFilter !== "all" || ownedOnly || inDeckOnly || passiveOnly || searchQuery.length > 0;
@@ -337,27 +267,12 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
             input cut the visible set down to 6–12 cards, and a mana-cost
             divider inside each tab gives the player a deck-builder's curve view. */}
         <div className="flex flex-col gap-2">
-          <button
-            onClick={() => { hapticTap(); setCollectionOpen((o) => !o); }}
-            className="w-full flex items-center justify-between gap-2 group"
-          >
-            <span className="flex items-center gap-2">
-              <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-ink-muted">
-                {t("deck.collection")}
-              </span>
-              <span className="text-[9px] font-black tabular-nums px-1.5 py-0.5 rounded-full bg-hairline text-ink-muted">
-                {ownedCount}/{ALL_CARD_IDS.length}
-              </span>
-              {/* Soft progress bar — at-a-glance "how complete is my collection". */}
-              <span className="hidden sm:inline-flex h-1.5 w-20 rounded-full bg-hairline overflow-hidden">
-                <span
-                  className="h-full bg-themed transition-all duration-500"
-                  style={{ width: `${Math.round((ownedCount / ALL_CARD_IDS.length) * 100)}%` }}
-                />
-              </span>
-            </span>
-            <span className={"text-ink-faint text-xs transition-transform duration-200 " + (collectionOpen ? "rotate-180" : "")}>▾</span>
-          </button>
+          <CollectionHeader
+            ownedCount={ownedCount} totalCount={ALL_CARD_IDS.length}
+            collectionOpen={collectionOpen}
+            onToggle={() => setCollectionOpen((o) => !o)}
+            t={t}
+          />
 
           <AnimatePresence initial={false}>
             {collectionOpen && (
@@ -370,116 +285,18 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
                 className="overflow-hidden"
               >
                 <div className="flex flex-col gap-2 pt-1">
-                  {/* Search box — compact, with a clear (✕) when active. */}
-                  <div className="relative">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint text-xs pointer-events-none">🔍</span>
-                    <input
-                      type="text"
-                      inputMode="search"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder={t("deck.searchPlaceholder")}
-                      className="w-full pl-8 pr-8 py-1.5 text-xs rounded-lg bg-surface-raised border border-hairline focus:border-white/40 focus:outline-none text-white placeholder:text-ink-faint transition"
-                    />
-                    {searchQuery && (
-                      <button
-                        onClick={() => setSearchQuery("")}
-                        aria-label={t("deck.clearSearch")}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-hairline text-ink-muted hover:text-white text-[10px] flex items-center justify-center"
-                      >✕</button>
-                    )}
-                  </div>
-
-                  {/* Rarity tabs — horizontal pills with owned/total per rarity.
-                      Vertical padding (py-1.5) prevents the active pill's ring
-                      from clipping against the overflow container's edges. */}
-                  <div className="flex items-center gap-1.5 overflow-x-auto py-1.5 px-1 no-scrollbar">
-                    <RarityTab
-                      active={rarityFilter === "all"}
-                      onClick={() => { hapticTap(); setRarityFilter("all"); }}
-                      label={t("deck.filter.all")}
-                      count={`${ownedCount}/${ALL_CARD_IDS.length}`}
-                      dotClass="bg-white/70"
-                    />
-                    {RARITY_ORDER.map((r) => (
-                      <RarityTab
-                        key={r}
-                        active={rarityFilter === r}
-                        onClick={() => { hapticTap(); setRarityFilter(r); }}
-                        label={t(RARITY_TAB_KEY[r])}
-                        count={`${ownedByRarity[r].owned}/${ownedByRarity[r].total}`}
-                        dotClass={RARITY_DOT[r]}
-                        activeRingClass={RARITY_RING[r]}
-                      />
-                    ))}
-                  </div>
-
-                  {/* FILTRE PAR VOIE (arène, Alex 2026-06-22) — voir CHAQUE Voie
-                      distinctement (fini « tout est mélangé »). Single-select. */}
-                  {mode === "arena" && (
-                    <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-1 no-scrollbar">
-                      <FilterChip
-                        active={voieFilter === "myvoie"}
-                        onClick={() => { hapticTap(); setVoieFilter("myvoie"); }}
-                        icon="✦"
-                        label={t("deck.filter.myPath")}
-                      />
-                      {(["rock", "paper", "scissors", "lizard", "spock"] as const).map((m) => (
-                        <FilterChip
-                          key={m}
-                          active={voieFilter === m}
-                          onClick={() => { hapticTap(); setVoieFilter(m); }}
-                          icon={VOIE_CHIP_ICON[m]}
-                          label={VOIE_DEF[m].shortLabel}
-                        />
-                      ))}
-                      <FilterChip
-                        active={voieFilter === "neutral"}
-                        onClick={() => { hapticTap(); setVoieFilter("neutral"); }}
-                        icon="○"
-                        label={t("deck.filter.neutral")}
-                      />
-                      <FilterChip
-                        active={voieFilter === "all"}
-                        onClick={() => { hapticTap(); setVoieFilter("all"); }}
-                        icon="∗"
-                        label={t("deck.filter.all")}
-                      />
-                    </div>
-                  )}
-
-                  {/* Filter chips — multi-select toggles. Reset button appears
-                      only when at least one filter is active so the bar stays
-                      clean in the default state. py-0.5 keeps the active ring
-                      from clipping at the top edge. */}
-                  <div className="flex items-center gap-1.5 flex-wrap py-0.5">
-                    <FilterChip
-                      active={ownedOnly}
-                      onClick={() => { hapticTap(); setOwnedOnly((v) => !v); }}
-                      icon="📥"
-                      label={t("deck.filter.owned")}
-                    />
-                    <FilterChip
-                      active={inDeckOnly}
-                      onClick={() => { hapticTap(); setInDeckOnly((v) => !v); }}
-                      icon="✓"
-                      label={t("deck.filter.inDeck")}
-                    />
-                    <FilterChip
-                      active={passiveOnly}
-                      onClick={() => { hapticTap(); setPassiveOnly((v) => !v); }}
-                      icon="∞"
-                      label={t("deck.filter.passive")}
-                    />
-                    {anyFilterActive && (
-                      <button
-                        onClick={() => { hapticTap(); clearAllFilters(); }}
-                        className="ml-auto text-[10px] uppercase tracking-wider text-ink-muted hover:text-white px-2 py-1 transition"
-                      >
-                        {t("deck.reset")}
-                      </button>
-                    )}
-                  </div>
+                  <CollectionFilterBar
+                    searchQuery={searchQuery} setSearchQuery={setSearchQuery}
+                    rarityFilter={rarityFilter} setRarityFilter={setRarityFilter}
+                    ownedCount={ownedCount} totalCount={ALL_CARD_IDS.length}
+                    ownedByRarity={ownedByRarity} mode={mode}
+                    voieFilter={voieFilter} setVoieFilter={setVoieFilter}
+                    ownedOnly={ownedOnly} setOwnedOnly={setOwnedOnly}
+                    inDeckOnly={inDeckOnly} setInDeckOnly={setInDeckOnly}
+                    passiveOnly={passiveOnly} setPassiveOnly={setPassiveOnly}
+                    anyFilterActive={anyFilterActive} clearAllFilters={clearAllFilters}
+                    t={t}
+                  />
 
                   {/* Grouped grid — one section per mana cost present in the
                       filtered set. AnimatePresence on the wrapper smooths the
@@ -547,29 +364,7 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
 
       {/* Toast (Alex 2026-06-13) — message d'ajout/retrait/refus, TOUJOURS
        *  visible (fixed, sous l'en-tête) : plus besoin de remonter le deck. */}
-      <AnimatePresence>
-        {deckMsg && (
-          <motion.div
-            key={deckMsg.key}
-            initial={{ opacity: 0, y: -14, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ type: "spring", stiffness: 320, damping: 24 }}
-            className={
-              "fixed left-1/2 -translate-x-1/2 z-[9998] px-4 py-2 rounded-2xl text-[12.5px] font-bold shadow-2xl backdrop-blur border whitespace-nowrap max-w-[90vw] truncate " +
-              (deckMsg.tone === "good"
-                ? "bg-emerald-500/25 border-emerald-400/60 text-emerald-100"
-                : deckMsg.tone === "warn"
-                ? "bg-amber-500/25 border-amber-400/60 text-amber-100"
-                : "bg-zinc-700/60 border-zinc-500/60 text-zinc-100")
-            }
-            style={{ top: "calc(var(--sai-top) + 3.5rem)" }}
-          >
-            {deckMsg.tone === "good" ? "✓ " : deckMsg.tone === "warn" ? "⚠ " : "↺ "}
-            {deckMsg.text}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <DeckToast deckMsg={deckMsg} />
     </motion.div>
   );
 }
