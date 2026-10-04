@@ -25,6 +25,9 @@ import type { Move } from "../engine/game";
 import { CREATURE_PASSIVES, CREATURE_STATS } from "./arenaTypes";
 import { ArenaHowItWorks } from "./ArenaHowItWorks";
 import { VOIE_EMBLEM } from "./voieEmblem";
+import { TutorialOfferModal } from "./tutorial/TutorialOfferModal";
+import { skipArenaTutorial } from "./tutorial/tutorialProgress";
+import { useT } from "../i18n";
 
 const VOIES: Move[] = ["rock", "paper", "scissors", "lizard", "spock"];
 const VOIE_BONUS: Record<Move, string> = {
@@ -91,6 +94,7 @@ export function ArenaLobby({
   onManageDeck,
   onGoShop,
   onBack,
+  onTutorial,
 }: {
   /** Launch a Training match vs CPU (goes to ArenaPrepScreen → ArenaGame). */
   onTraining: () => void;
@@ -102,7 +106,10 @@ export function ArenaLobby({
   onGoShop?: () => void;
   /** Back to the PlayMenu. */
   onBack?: () => void;
+  /** Lance le tutoriel guidé (proposé d'office à la 1re visite). */
+  onTutorial?: () => void;
 }) {
+  const t = useT();
   const player = useStore((s) => s.player);
   const setArenaAffinity = useStore((s) => s.setArenaAffinity);
   const affinity: Move = player.arenaAffinity ?? "rock";
@@ -192,7 +199,7 @@ export function ArenaLobby({
         </motion.button>
       }
       secondary={
-        <div className="grid grid-cols-3 gap-2">
+        <div className={"grid gap-2 " + (onTutorial ? "grid-cols-4" : "grid-cols-3")}>
           <button
             onClick={onGoOnline}
             disabled={!onGoOnline}
@@ -218,6 +225,18 @@ export function ArenaLobby({
             <span className="font-bold text-[10px] text-ink">Règles</span>
             <span className="text-[8px] uppercase tracking-wider text-ink-faint">+ symboles</span>
           </button>
+          {onTutorial && (
+            <button
+              onClick={onTutorial}
+              className="bg-surface rounded-2xl px-2 py-2 flex flex-col items-center gap-0.5 border border-hairline hover:bg-hairline transition"
+            >
+              <span className="w-7 h-7 flex items-center justify-center text-[22px] leading-none" aria-hidden>🎓</span>
+              <span className="font-bold text-[10px] text-ink">{t("tut.lobby.title")}</span>
+              <span className="text-[8px] uppercase tracking-wider" style={{ color: player.arenaTutorial === "done" ? "#6ee7b7" : "var(--theme-secondary)" }}>
+                {player.arenaTutorial === "done" ? t("tut.lobby.done") : t("tut.lobby.sub")}
+              </span>
+            </button>
+          )}
         </div>
       }
     >
@@ -356,6 +375,13 @@ export function ArenaLobby({
       {/* CTA Entraînement + rangée secondaire (Match rapide / Tournoi /
        *  Règles) : déplacés dans les props cta/secondary du shell — DOCKÉS
        *  en bas, toujours visibles sans scroller. */}
+
+      {/* Tuto proposé à la 1re visite (« Plus tard » = plus jamais d'office). */}
+      <AnimatePresence>
+        {onTutorial && !player.arenaTutorial && (
+          <TutorialOfferModal key="tut-offer" onStart={onTutorial} onLater={skipArenaTutorial} />
+        )}
+      </AnimatePresence>
 
       {/* HowItWorks modal */}
       <AnimatePresence>

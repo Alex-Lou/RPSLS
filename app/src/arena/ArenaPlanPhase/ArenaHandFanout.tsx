@@ -144,6 +144,7 @@ export function ArenaHandFanout({
                *  un setup pointer framer qui « volait » certains taps (Second
                *  Souffle obligeait à rester appuyé). Bouton NU = tap fiable. */}
               <button
+                data-tut={`card-${id}`}
                 onPointerDown={(e) => {
                   // 🎯 Pointer CAPTURE (Alex 2026-06-13 « le toucher des cartes aux
                   // EXTRÉMITÉS craint, le milieu ça va ») : aux bords le pouce

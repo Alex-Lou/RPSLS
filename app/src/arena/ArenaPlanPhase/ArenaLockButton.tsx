@@ -26,6 +26,7 @@ export function ArenaLockButton({
       )}
       <button
         type="button"
+        data-tut="lock"
         onClick={() => {
           if (targeting) setTargeting(null);
           if (canLock) {

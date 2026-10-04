@@ -138,7 +138,7 @@ export function ArenaHeroStrip({
   // de motif d'aura). `< 1` couvre le frame courant, `!voieSeen` la persistance.
   const voieConcealed = side === "opp" && !voieSeen && engineVal < 1;
   return (
-    <div className={"relative flex items-center gap-1 " + (side === "you" ? "pl-0 pr-1" : "px-1")}>
+    <div data-tut={`hero-${side}`} className={"relative flex items-center gap-1 " + (side === "you" ? "pl-0 pr-1" : "px-1")}>
       {/* 🎨 Identité visuelle PERSO de la Voie — calque animé derrière le HUD,
        *  UNIQUEMENT côté joueur (jamais l'adversaire). z-0 ; le contenu passe
        *  en relative z-10 pour rester au-dessus. (Alex 2026-06-12) */}
