@@ -6,16 +6,18 @@ import type { ModeCardId } from "./menuShared";
 export type SandboxMode = "classic" | "lanes" | "cards";
 
 // Same icons + names as the main menu tiles, so the sandbox feels consistent.
-export const SANDBOX_MODES: { id: SandboxMode; icon: ModeCardId; label: string; tag: string }[] = [
-  { id: "classic", icon: "ranked",               label: "Classique",            tag: "Duel 1 v 1 — premier à la majorité des manches." },
-  { id: "lanes",   icon: "constellation",        label: "Constellation",        tag: "3 couloirs joués en parallèle contre l'IA." },
-  { id: "cards",   icon: "ranked_constellation", label: "Constellation Ranked", tag: "Mana, deck & cartes bonus. Ouvre le lobby + tournoi." },
+// Libellés = clés i18n (traduites au rendu via t()).
+export const SANDBOX_MODES: { id: SandboxMode; icon: ModeCardId; labelKey: string; tagKey: string }[] = [
+  { id: "classic", icon: "ranked",               labelKey: "sandbox.mode.classic",      tagKey: "sandbox.mode.classic.tag" },
+  { id: "lanes",   icon: "constellation",        labelKey: "mode.constellation",        tagKey: "sandbox.mode.lanes.tag" },
+  { id: "cards",   icon: "ranked_constellation", labelKey: "mode.ranked_constellation", tagKey: "sandbox.mode.cards.tag" },
 ];
 
-export const DIFFS_META: { id: Difficulty; label: string; hint: string }[] = [
-  { id: "easy",   label: "Facile",    hint: "L'IA joue souvent dans ton jeu — pour s'échauffer." },
-  { id: "normal", label: "Normal",    hint: "Aléatoire pondéré selon l'humeur — combat équitable." },
-  { id: "hard",   label: "Difficile", hint: "L'IA lit tes derniers coups et contre tes habitudes." },
+/** Difficultés : libellé `diff.<id>`, aide `diff.<id>.desc`. */
+export const DIFFS_META: { id: Difficulty }[] = [
+  { id: "easy" },
+  { id: "normal" },
+  { id: "hard" },
 ];
 
 export const MAX_WIN_TO = 9;

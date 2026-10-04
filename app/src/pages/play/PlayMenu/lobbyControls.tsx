@@ -15,7 +15,7 @@ export function DifficultyPicker() {
   const updateProfile = useStore((s) => s.updateProfile);
   const cur = DIFFS_META.find((d) => d.id === difficulty) ?? DIFFS_META[1];
   return (
-    <LobbySection label={t("lobby.difficulty")} hint={cur.hint}>
+    <LobbySection label={t("lobby.difficulty")} hint={t("diff." + cur.id + ".desc")}>
       <div className="grid grid-cols-3 gap-2">
         {DIFFS_META.map((d) => {
           const on = difficulty === d.id;
@@ -26,7 +26,7 @@ export function DifficultyPicker() {
               className={"rounded-xl py-2.5 text-sm font-bold transition " + (on ? "text-white" : "text-ink-muted bg-hairline border border-hairline hover:bg-hairline")}
               style={on ? { background: FILL } : undefined}
             >
-              {d.label}
+              {t("diff." + d.id)}
             </button>
           );
         })}

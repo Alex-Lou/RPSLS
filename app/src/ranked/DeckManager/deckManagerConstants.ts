@@ -5,12 +5,20 @@ import type { CardId, CardRarity } from "../rankedTypes";
 // l'autre. Calculée dans le composant à partir de la prop `mode`.
 export const SLOTS_BY_MODE = { ranked: 6, arena: 10 } as const;
 
-/** Compact French labels per rarity for the filter tabs. */
-export const RARITY_FR: Record<CardRarity, string> = {
-  common: "Communes",
-  rare: "Rares",
-  epic: "Épiques",
-  legendary: "Légendaires",
+/** i18n keys of the singular rarity labels (card chips, detail sheet). */
+export const RARITY_KEY: Record<CardRarity, string> = {
+  common: "ranked.rarity.common",
+  rare: "ranked.rarity.rare",
+  epic: "ranked.rarity.epic",
+  legendary: "ranked.rarity.legendary",
+};
+
+/** i18n keys of the compact (plural) rarity labels for the filter tabs. */
+export const RARITY_TAB_KEY: Record<CardRarity, string> = {
+  common: "deck.rarityTab.common",
+  rare: "deck.rarityTab.rare",
+  epic: "deck.rarityTab.epic",
+  legendary: "deck.rarityTab.legendary",
 };
 
 /** Dot color per rarity — used in tab pills and section dividers. */
@@ -29,47 +37,48 @@ export const RARITY_RING: Record<CardRarity, string> = {
   legendary: "ring-amber-400/60 bg-amber-400/15 text-amber-100",
 };
 
+/** i18n keys of the unlock hints shown on locked cards. */
 export const UNLOCK_HINTS: Partial<Record<CardId, string>> = {
-  mirror: "Gagne 3 matchs en mode classé",
-  riposte: "Gagne 5 matchs en mode classé",
-  curse: "Gagne 10 matchs en mode classé",
-  gambit: "Atteins 1200 LP",
-  heist: "Atteins le rang Silver",
-  tide: "Gagne un tournoi",
-  oracle: "Atteins le rang Gold",
-  vortex: "Fais 3 sweeps (3-0) en mode classé",
-  supernova: "Atteins le rang Platinum",
+  mirror: "deck.unlock.win3",
+  riposte: "deck.unlock.win5",
+  curse: "deck.unlock.win10",
+  gambit: "deck.unlock.lp1200",
+  heist: "deck.unlock.silver",
+  tide: "deck.unlock.tournament",
+  oracle: "deck.unlock.gold",
+  vortex: "deck.unlock.sweeps3",
+  supernova: "deck.unlock.platinum",
   // Bonus cards — obtained through the boutique (packs / forge).
-  prescience: "Ouvre des packs à la boutique",
-  cadence: "Ouvre des packs à la boutique",
-  mascarade: "Ouvre des packs à la boutique",
-  boussole: "Ouvre des packs à la boutique",
-  sangsue: "Ouvre des packs ou forge-la",
-  rempart: "Ouvre des packs ou forge-la",
-  pillage: "Ouvre des packs ou forge-la",
-  "trou-noir": "Ouvre des packs ou forge-la",
-  prophetie: "Ouvre des packs ou forge-la",
-  conduit: "Ouvre des packs ou forge-la",
-  trinite: "Pack rare ou forge légendaire",
+  prescience: "deck.unlock.packs",
+  cadence: "deck.unlock.packs",
+  mascarade: "deck.unlock.packs",
+  boussole: "deck.unlock.packs",
+  sangsue: "deck.unlock.packsOrForge",
+  rempart: "deck.unlock.packsOrForge",
+  pillage: "deck.unlock.packsOrForge",
+  "trou-noir": "deck.unlock.packsOrForge",
+  prophetie: "deck.unlock.packsOrForge",
+  conduit: "deck.unlock.packsOrForge",
+  trinite: "deck.unlock.rarePackOrForge",
   // V3 bonus cards — same pack/forge economy as Lot 1.
-  sablier: "Ouvre des packs à la boutique",
-  remanence: "Ouvre des packs à la boutique",
-  offre: "Ouvre des packs à la boutique",
-  braise: "Ouvre des packs à la boutique",
-  echappee: "Ouvre des packs à la boutique",
-  "oracle-inverse": "Ouvre des packs ou forge-la",
-  fardeau: "Ouvre des packs ou forge-la",
-  crepuscule: "Ouvre des packs ou forge-la",
-  cascade: "Ouvre des packs ou forge-la",
-  "echo-temporel": "Ouvre des packs ou forge-la",
-  "ancre-temporelle": "Ouvre des packs ou forge-la",
-  metamorphose: "Ouvre des packs ou forge-la",
-  gaia: "Ouvre des packs ou forge-la",
-  "marchand-ames": "Ouvre des packs ou forge-la",
-  telepathie: "Ouvre des packs ou forge-la",
-  paradoxe: "Ouvre des packs ou forge-la",
-  benediction: "Ouvre des packs ou forge-la",
-  schrodinger: "Pack rare ou forge légendaire",
-  juge: "Pack rare ou forge légendaire",
-  genese: "Pack rare ou forge légendaire",
+  sablier: "deck.unlock.packs",
+  remanence: "deck.unlock.packs",
+  offre: "deck.unlock.packs",
+  braise: "deck.unlock.packs",
+  echappee: "deck.unlock.packs",
+  "oracle-inverse": "deck.unlock.packsOrForge",
+  fardeau: "deck.unlock.packsOrForge",
+  crepuscule: "deck.unlock.packsOrForge",
+  cascade: "deck.unlock.packsOrForge",
+  "echo-temporel": "deck.unlock.packsOrForge",
+  "ancre-temporelle": "deck.unlock.packsOrForge",
+  metamorphose: "deck.unlock.packsOrForge",
+  gaia: "deck.unlock.packsOrForge",
+  "marchand-ames": "deck.unlock.packsOrForge",
+  telepathie: "deck.unlock.packsOrForge",
+  paradoxe: "deck.unlock.packsOrForge",
+  benediction: "deck.unlock.packsOrForge",
+  schrodinger: "deck.unlock.rarePackOrForge",
+  juge: "deck.unlock.rarePackOrForge",
+  genese: "deck.unlock.rarePackOrForge",
 };

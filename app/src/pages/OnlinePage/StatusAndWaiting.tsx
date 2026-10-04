@@ -1,5 +1,6 @@
 import { motion } from "motion/react";
 import type { ConnStatus } from "./types";
+import { useT } from "../../i18n";
 
 export function ServerStatusBadge({
   mode,
@@ -14,6 +15,7 @@ export function ServerStatusBadge({
   latencyMs: number | null;
   onRefresh: () => void;
 }) {
+  const t = useT();
   const palette: Record<ConnStatus, { dot: string; text: string; bg: string }> = {
     idle:     { dot: "bg-zinc-500",   text: "text-zinc-400",   bg: "bg-white/5 border-white/10" },
     checking: { dot: "bg-sky-400",    text: "text-sky-200",    bg: "bg-sky-500/10 border-sky-500/30" },
@@ -25,13 +27,13 @@ export function ServerStatusBadge({
 
   const label = (() => {
     switch (status) {
-      case "idle":     return "Idle";
-      case "checking": return "Pinging…";
+      case "idle":     return t("online.status.idle");
+      case "checking": return t("online.status.checking");
       case "waking":   return mode === "cloud"
-        ? "Waking up free instance (up to ~90s on first ping)…"
-        : "Connecting…";
-      case "online":   return latencyMs != null ? `Online · ${latencyMs} ms` : "Online";
-      case "offline":  return "Unreachable";
+        ? t("online.status.waking")
+        : t("online.connecting");
+      case "online":   return latencyMs != null ? t("online.status.onlineMs", { n: latencyMs }) : t("online.status.online");
+      case "offline":  return t("online.status.offline");
     }
   })();
 
@@ -62,7 +64,7 @@ export function ServerStatusBadge({
       </span>
       <button
         onClick={onRefresh}
-        title="Ping again"
+        title={t("online.status.ping")}
         className="ml-1 px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-zinc-300 text-[10px] transition"
       >
         ↻
@@ -72,6 +74,7 @@ export function ServerStatusBadge({
 }
 
 export function Waiting({ label, onCancel }: { label: string; onCancel: () => void }) {
+  const t = useT();
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -85,7 +88,7 @@ export function Waiting({ label, onCancel }: { label: string; onCancel: () => vo
         onClick={onCancel}
         className="mt-4 px-5 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-200 text-sm transition"
       >
-        Cancel
+        {t("online.cancel")}
       </button>
     </motion.div>
   );

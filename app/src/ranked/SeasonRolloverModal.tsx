@@ -9,6 +9,7 @@
 import { motion } from "motion/react";
 import { ModalShell } from "../ui/ModalShell";
 import type { SeasonReward } from "../engine/economy";
+import { useT } from "../i18n";
 
 interface Props {
   fromSeason: number;
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export function SeasonRolloverModal({ fromSeason, reward, lpBefore, lpAfter, onClose }: Props) {
+  const t = useT();
   return (
     <ModalShell onClose={onClose} z="z-50" padding="p-4" backdrop="bg-black/80" overlayTransition={{ duration: 0.2 }}>
       <motion.div
@@ -32,17 +34,16 @@ export function SeasonRolloverModal({ fromSeason, reward, lpBefore, lpAfter, onC
         <div>
           <div className="text-4xl mb-2">🏁</div>
           <h2 className="text-xl font-black bg-gradient-to-br from-amber-300 to-orange-400 bg-clip-text text-transparent">
-            Saison {fromSeason} terminée
+            {t("season.over", { n: fromSeason })}
           </h2>
           <p className="text-[12px] text-ink-muted mt-1">
-            Tu as fini en <b className="text-ink">{reward.tier}</b>. Une nouvelle saison
-            commence — ton rang se rafraîchit.
+            {t("season.finishedIn")} <b className="text-ink">{reward.tier}</b>. {t("season.newSeason")}
           </p>
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-left">
           <div className="rounded-xl p-3 bg-cyan-500/10 border border-cyan-400/40">
-            <div className="text-[10px] uppercase tracking-wider font-bold text-cyan-300">Récompense</div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-cyan-300">{t("season.reward")}</div>
             <div className="mt-1 flex flex-col gap-0.5 text-sm font-black tabular-nums">
               <span className="text-cyan-200">+{reward.eclats} 💎</span>
               {reward.dust > 0 && <span className="text-violet-200">+{reward.dust} ✨</span>}
@@ -50,7 +51,7 @@ export function SeasonRolloverModal({ fromSeason, reward, lpBefore, lpAfter, onC
             </div>
           </div>
           <div className="rounded-xl p-3 bg-amber-500/10 border border-amber-400/30">
-            <div className="text-[10px] uppercase tracking-wider font-bold text-amber-300">LP</div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-amber-300">{t("ranked.lp.unit")}</div>
             <div className="mt-1 flex flex-col gap-0.5 text-sm tabular-nums">
               <span className="text-ink-muted line-through">{lpBefore}</span>
               <span className="text-amber-200 font-black">{lpAfter}</span>
@@ -63,7 +64,7 @@ export function SeasonRolloverModal({ fromSeason, reward, lpBefore, lpAfter, onC
           onClick={onClose}
           className="mt-2 w-full py-3 rounded-2xl font-bold text-white bg-themed shadow-lg"
         >
-          Lancer la saison
+          {t("season.start")}
         </motion.button>
       </motion.div>
     </ModalShell>

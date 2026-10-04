@@ -17,7 +17,7 @@ export function ManaGroup({
   /** Affiche le badge ⚗ fusion (mode Arena seulement — la fusion n'existe
    *  pas en Classé). Alex 2026-06-13. */
   showFusion: boolean;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -28,7 +28,7 @@ export function ManaGroup({
           ))}
         </div>
         <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-ink-muted">
-          {cost} mana
+          {t("ranked.manaCost", { n: cost })}
         </span>
         <span className="text-[9px] font-black tabular-nums text-ink-faint">
           ({ids.length})

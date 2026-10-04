@@ -4,6 +4,8 @@
  * tuned around the 1000 LP starting point so a fresh player sits at the bottom
  * of Bronze and the "reach 1100 LP" quest lands them in Silver.
  */
+import { tNow } from "../i18n/core";
+
 export interface RankTier {
   id: "bronze" | "silver" | "gold" | "platinum" | "diamond";
   label: string;
@@ -16,12 +18,17 @@ export interface RankTier {
   ceil: number;
 }
 
+/** Nom du palier traduit dans la langue COURANTE (clé `match.tier.<id>`).
+ *  `label` est un getter relu à chaque accès ; les objets restent littéraux
+ *  (`id:` / `floor:`) car scripts/gen-economy-meta.mjs les lit par regex. */
+const tierLabel = (id: RankTier["id"]) => tNow(`match.tier.${id}`);
+
 export const RANK_TIERS: Omit<RankTier, "ceil">[] = [
-  { id: "bronze",   label: "Bronze",   emoji: "🥉", gradient: "from-amber-700 to-orange-500",  floor: 0 },
-  { id: "silver",   label: "Silver",   emoji: "🥈", gradient: "from-zinc-400 to-slate-200",    floor: 1100 },
-  { id: "gold",     label: "Gold",     emoji: "🥇", gradient: "from-yellow-400 to-amber-300",  floor: 1300 },
-  { id: "platinum", label: "Platinum", emoji: "💎", gradient: "from-cyan-300 to-teal-200",     floor: 1500 },
-  { id: "diamond",  label: "Diamond",  emoji: "💠", gradient: "from-sky-300 to-indigo-300",    floor: 1750 },
+  { id: "bronze",   get label() { return tierLabel("bronze"); },   emoji: "🥉", gradient: "from-amber-700 to-orange-500",  floor: 0 },
+  { id: "silver",   get label() { return tierLabel("silver"); },   emoji: "🥈", gradient: "from-zinc-400 to-slate-200",    floor: 1100 },
+  { id: "gold",     get label() { return tierLabel("gold"); },     emoji: "🥇", gradient: "from-yellow-400 to-amber-300",  floor: 1300 },
+  { id: "platinum", get label() { return tierLabel("platinum"); }, emoji: "💎", gradient: "from-cyan-300 to-teal-200",     floor: 1500 },
+  { id: "diamond",  get label() { return tierLabel("diamond"); },  emoji: "💠", gradient: "from-sky-300 to-indigo-300",    floor: 1750 },
 ];
 
 /** Resolve the tier a given LP total falls into, with its LP window. */

@@ -176,13 +176,13 @@ export function Game({
       const reroll = aiMove(mood, difficulty, match.history.map((r) => r.move_a));
       round = await resolveRound(phase.aMove, reroll);
       setUsedAtouts((u) => [...u, "contre"]);
-      atoutNote = "🔁 Contre — nouveau tirage adverse";
+      atoutNote = t("atout.note.contre");
     }
     // 🛡️ Garde — turn a still-lost round into a draw.
     if (round.outcome.kind === "b_wins" && chosenAtouts.includes("garde") && !usedAtouts.includes("garde")) {
       round = { ...round, outcome: { kind: "draw" } };
       setUsedAtouts((u) => [...u, "garde"]);
-      atoutNote = "🛡️ Garde — défaite annulée";
+      atoutNote = t("atout.note.garde");
     }
 
     let next = applyRound(match, round);
@@ -190,7 +190,7 @@ export function Game({
     if (vabanqueArmed) {
       if (round.outcome.kind === "a_wins") next = { ...next, scoreA: next.scoreA + 1 };
       else if (round.outcome.kind === "b_wins") next = { ...next, scoreB: next.scoreB + 1 };
-      if (round.outcome.kind !== "draw") atoutNote = "⚡ Va-banque — manche à 2 points";
+      if (round.outcome.kind !== "draw") atoutNote = t("atout.note.vabanque");
       setVabanqueArmed(false);
     }
     setMatch(next);

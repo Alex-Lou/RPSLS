@@ -37,6 +37,7 @@ const PODIUM_STYLE: Record<number, { medal: string; grad: string; bar: string; h
 };
 
 function PodiumBlock({ s, you }: { s: Standing; you: boolean }) {
+  const t = useT();
   const st = PODIUM_STYLE[s.place];
   const champ = s.place === 1;
   return (
@@ -68,9 +69,9 @@ function PodiumBlock({ s, you }: { s: Standing; you: boolean }) {
       </div>
       <div className="text-xl leading-none">{st.medal}</div>
       <div className={"text-sm sm:text-base font-bold truncate max-w-[10rem] text-center " + (you ? "text-white" : "text-ink")}>
-        {s.player.name}{you ? " (toi)" : ""}
+        {s.player.name}{you ? t("tournament.youSuffix") : ""}
       </div>
-      <div className="text-xs text-ink-faint">Niv. {s.player.level}</div>
+      <div className="text-xs text-ink-faint">{t("tournament.level", { n: s.player.level })}</div>
       <div className="text-sm font-black text-emerald-300">+{s.reward} XP</div>
       {/* Pedestal bar — wider + taller per the bumped PODIUM_STYLE heights. */}
       <motion.div
@@ -123,12 +124,12 @@ export function TournamentPodium({
       {onReplay && <FloatingNewRunButton onClick={onReplay} />}
 
       <div className="text-center shrink-0 w-full">
-        <div className="text-xs sm:text-sm uppercase tracking-[0.35em] text-ink-faint">Tournoi terminé</div>
+        <div className="text-xs sm:text-sm uppercase tracking-[0.35em] text-ink-faint">{t("tournament.over")}</div>
         <h1
           className="text-3xl sm:text-4xl md:text-5xl font-black text-themed leading-tight mt-1"
           style={{ fontFamily: "var(--font-headline)" }}
         >
-          {you?.place === 1 ? "🏆 Tu es Champion !" : `${tournament.champion?.name ?? "—"} remporte le tournoi`}
+          {you?.place === 1 ? t("tournament.youChampion") : t("tournament.championWins", { name: tournament.champion?.name ?? "—" })}
         </h1>
       </div>
 
@@ -150,9 +151,9 @@ export function TournamentPodium({
               <span className="w-8 text-center text-base font-bold text-ink-faint tabular-nums">{s.place}</span>
               <Avatar avatar={s.player.avatar} size={36} />
               <span className={"flex-1 min-w-0 truncate text-base " + (s.player.isYou ? "text-white font-semibold" : "text-ink-muted")}>
-                {s.player.name}{s.player.isYou ? " (toi)" : ""}
+                {s.player.name}{s.player.isYou ? t("tournament.youSuffix") : ""}
               </span>
-              <span className="text-xs text-ink-faint">Niv. {s.player.level}</span>
+              <span className="text-xs text-ink-faint">{t("tournament.level", { n: s.player.level })}</span>
               <span className="text-sm font-bold text-emerald-300/90">+{s.reward}</span>
             </div>
           ))}
@@ -185,11 +186,12 @@ export function TournamentPodium({
  *    orbitron for Storm, etc.)
  */
 function FloatingNewRunButton({ onClick }: { onClick: () => void }) {
+  const t = useT();
   return createPortal(
     <button
       onClick={onClick}
-      aria-label="Lancer un nouveau tournoi"
-      title="Lancer un nouveau tournoi"
+      aria-label={t("tournament.newRunAria")}
+      title={t("tournament.newRunAria")}
       className="
         fixed z-30 group
         top-[max(var(--sai-top),32px)]
@@ -241,7 +243,7 @@ function FloatingNewRunButton({ onClick }: { onClick: () => void }) {
       >
         <path d="M12 2l2.39 5.79L20 8.7l-4.5 3.9L17 18.5 12 15.27 7 18.5l1.5-5.9L4 8.7l5.61-.91L12 2z" />
       </svg>
-      <span className="relative">Nouveau tournoi</span>
+      <span className="relative">{t("bracket.newTournament")}</span>
     </button>,
     document.body,
   );

@@ -180,22 +180,22 @@ export function MatchPrepScreen({
           className="text-xl sm:text-2xl landscape:text-lg font-extrabold text-themed leading-tight"
           style={{ fontFamily: "var(--font-headline)" }}
         >
-          Préparation du duel
+          {t("lobby.prep.title")}
         </h1>
       </div>
 
       {/* VS — you vs opponent, each with avatar + theme swatch. */}
       <div className="flex items-stretch gap-2">
-        <FighterCard name={youName} avatar={youAvatar} theme={youTheme} tag="Toi" highlight={winner === "you"} />
+        <FighterCard name={youName} avatar={youAvatar} theme={youTheme} tag={t("prep.you")} highlight={winner === "you"} />
         <div className="shrink-0 flex items-center text-lg font-black text-ink-faint">VS</div>
-        <FighterCard name={oppName} avatar={oppAvatar} theme={oppTheme} tag="Adv." highlight={winner === "opp"} />
+        <FighterCard name={oppName} avatar={oppAvatar} theme={oppTheme} tag={t("prep.oppShort")} highlight={winner === "opp"} />
       </div>
 
       {/* Coin flip — the centrepiece. En paysage : padding/gap resserrés pour
        *  que la colonne (titre + VS + pièce + actions) rentre sans déborder. */}
       <div className="rounded-2xl bg-surface-raised border border-hairline p-3 landscape:py-2 flex flex-col items-center gap-2.5 landscape:gap-1.5">
         <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-ink-muted text-center">
-          À qui le terrain ?
+          {t("prep.whoseArena")}
         </div>
 
         {/* Pièce TAPPABLE comme en Constellation Pro (Alex 2026-07) : en local on
@@ -207,7 +207,7 @@ export function MatchPrepScreen({
           <button
             onClick={flip}
             disabled={phase !== "idle"}
-            aria-label="Lancer la pièce"
+            aria-label={t("prep.flipCoin")}
             className="shrink-0 bg-transparent border-0 p-0 disabled:cursor-default"
           >
             <Coin phase={phase} winner={winner} youTheme={youTheme} oppTheme={oppTheme} />
@@ -223,17 +223,17 @@ export function MatchPrepScreen({
               className="text-center"
             >
               <div className="text-sm font-black" style={{ color: winner === "you" ? "var(--theme-primary)" : oppTheme.primary }}>
-                {winner === "you" ? "Ton terrain l'emporte" : `Terrain de ${oppName}`}
+                {winner === "you" ? t("prep.yourArenaWins") : t("prep.oppArena", { name: oppName })}
               </div>
               <div className="text-[11px] text-ink-faint mt-0.5">
                 {winner === "you"
-                  ? "Tes couleurs et ton pad habillent le duel."
-                  : "Tu joues sur le terrain adverse — adapte-toi."}
+                  ? t("prep.yourArenaSub")
+                  : t("prep.oppArenaSub")}
               </div>
               {/* Local mode: the "AI" is implicitly ready; online mode: we
                   already know the opponent confirmed (otherwise the coin
                   wouldn't have flipped). Either way, a discreet ✓ line. */}
-              <div className="text-[10px] text-emerald-300 font-bold mt-1">✓ {oppName} est prêt</div>
+              <div className="text-[10px] text-emerald-300 font-bold mt-1">✓ {t("prep.oppReady", { name: oppName })}</div>
             </motion.div>
           ) : isOnline ? (
             // Online prep idle/flipping hint: explain the gate to the user
@@ -241,18 +241,18 @@ export function MatchPrepScreen({
             <div key="online-hint" className="text-center">
               <p className="text-[11px] text-ink-faint max-w-xs">
                 {phase === "flipping"
-                  ? "La pièce tourne…"
+                  ? t("prep.coinSpinning")
                   : !online!.connectionAlive
-                    ? "Connexion perdue — reprise en cours…"
+                    ? t("prep.connectionLost")
                     : online!.youReady && !online!.oppReady
-                      ? `En attente de ${oppName}…`
+                      ? t("prep.waitingFor", { name: oppName })
                       : online!.oppReady && !online!.youReady
-                        ? `${oppName} est prêt — confirme pour lancer la pièce.`
-                        : "Confirmez tous les deux pour lancer la pièce du terrain."}
+                        ? t("prep.oppReadyConfirm", { name: oppName })
+                        : t("prep.bothConfirm")}
               </p>
               {/* 0/2 → 1/2 → 2/2 — the actual "double confirm" UI. */}
               <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/30 border border-white/10">
-                <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-ink-muted">Prêts</span>
+                <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-ink-muted">{t("prep.readyCount")}</span>
                 <span
                   className="text-[12px] font-black tabular-nums"
                   style={{ color: readyCount === 2 ? "var(--theme-primary)" : undefined }}
@@ -260,7 +260,7 @@ export function MatchPrepScreen({
                   {readyCount}/2
                 </span>
                 <span className="flex items-center gap-1 ml-0.5">
-                  <ReadyDot on={online!.youReady} label="Toi" />
+                  <ReadyDot on={online!.youReady} label={t("prep.you")} />
                   <ReadyDot on={online!.oppReady} label={oppName} />
                 </span>
               </div>
@@ -282,8 +282,8 @@ export function MatchPrepScreen({
           ) : (
             <p key="hint" className="text-[11px] text-ink-faint text-center max-w-xs">
               {phase === "flipping"
-                ? "La pièce tourne…"
-                : "🪙 Touche la pièce — elle décide quel thème + pad habille le plateau."}
+                ? t("prep.coinSpinning")
+                : t("prep.tapCoin")}
             </p>
           )}
         </AnimatePresence>
@@ -308,12 +308,12 @@ export function MatchPrepScreen({
                 style={{ fontFamily: "var(--font-headline)", letterSpacing: "0.04em" }}
               >
                 {phase === "flipping"
-                  ? "La pièce tourne…"
+                  ? t("prep.coinSpinning")
                   : !online!.connectionAlive
-                    ? "⏳ Reconnexion…"
+                    ? t("prep.reconnecting")
                     : online!.youReady
-                      ? "✓ Prêt — en attente de l'adversaire"
-                      : "Je suis prêt"}
+                      ? t("prep.readyWaiting")
+                      : t("prep.imReady")}
               </motion.button>
             </div>
           ) : (
@@ -325,7 +325,7 @@ export function MatchPrepScreen({
               animate={{ opacity: 1, y: 0 }}
               className="text-[11px] font-bold text-ink-muted text-center"
             >
-              Le duel commence…
+              {t("prep.duelStarting")}
             </motion.div>
           )
         ) : (
@@ -353,14 +353,14 @@ export function MatchPrepScreen({
                 boxShadow: "0 4px 18px -4px color-mix(in oklab, var(--theme-primary) 60%, transparent)",
               } : undefined}
             >
-              ✓ COMMENCER LE MATCH
+              {t("prep.startMatch")}
             </button>
             {phase === "idle" && (
               <button
                 onClick={concede}
                 className="text-[11px] font-bold text-ink-muted hover:text-white transition"
               >
-                Céder le terrain à l'adversaire
+                {t("prep.concede")}
               </button>
             )}
           </div>

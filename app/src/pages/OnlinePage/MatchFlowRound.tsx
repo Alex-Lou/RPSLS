@@ -83,13 +83,14 @@ export function PickStage({
   deadlineMs: number;
   onPick: (mv: Move) => void;
 }) {
+  const t = useT();
   return (
     <div className="w-full flex flex-col items-center gap-5">
       <div className="relative w-[220px] h-[220px] flex items-center justify-center">
         <TimerRing startedAt={startedAt} durationMs={deadlineMs} size={220} />
       </div>
       <div className="text-center">
-        <div className="text-xs uppercase tracking-[0.3em] text-zinc-500">Pick your move</div>
+        <div className="text-xs uppercase tracking-[0.3em] text-zinc-500">{t("online.pick.title")}</div>
       </div>
       <div className="grid grid-cols-5 gap-2 sm:gap-3 w-full">
         {MOVES.map((mv, i) => {
@@ -103,7 +104,7 @@ export function PickStage({
               transition={{ delay: 0.05 * i }}
               whileHover={{ y: -4, scale: 1.04 }}
               whileTap={{ scale: 0.92 }}
-              aria-label={`Pick ${mv}`}
+              aria-label={t("online.pick.aria", { move: t(`element.${mv}`) })}
               className="aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 text-white transition"
               // Dark glass + theme-blended rim — consistent with ranked +
               // casual lanes pickers.
@@ -112,10 +113,10 @@ export function PickStage({
                 border: `2px solid ${moveRim(pal.hex)}`,
                 boxShadow: `0 0 14px -2px ${moveGlow(pal.hex)}, inset 0 1px 0 rgba(255,255,255,0.08)`,
               }}
-              title={mv}
+              title={t(`element.${mv}`)}
             >
               <MoveGlyph move={mv} className="w-10 h-10 sm:w-12 sm:h-12" />
-              <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-bold" style={{ color: moveRim(pal.hex) }}>{mv}</span>
+              <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-bold" style={{ color: moveRim(pal.hex) }}>{t(`element.${mv}`)}</span>
             </motion.button>
           );
         })}
@@ -125,6 +126,7 @@ export function PickStage({
 }
 
 export function LockedStage({ move }: { move: Move }) {
+  const t = useT();
   return (
     <motion.div
       key="locked"
@@ -133,7 +135,7 @@ export function LockedStage({ move }: { move: Move }) {
       className="flex flex-col items-center gap-4"
     >
       <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-300">
-        Locked in
+        {t("online.locked")}
       </div>
       <motion.div
         animate={{ y: [0, -4, 0] }}
@@ -142,7 +144,7 @@ export function LockedStage({ move }: { move: Move }) {
         <Hand move={move} size="xl" />
       </motion.div>
       <div className="text-sm text-zinc-300 font-medium">
-        Waiting for opponent…
+        {t("online.waitingOpp")}
       </div>
       <DotPulse />
     </motion.div>
@@ -261,7 +263,7 @@ export function RevealStage({
           transition={{ delay: 0.05, type: "spring", stiffness: 280, damping: 12 }}
           className="text-2xl sm:text-3xl font-black text-zinc-600 shrink-0 px-1"
         >
-          VS
+          {t("match.vs")}
         </motion.div>
 
         {/* Opponent hand — mirrored */}

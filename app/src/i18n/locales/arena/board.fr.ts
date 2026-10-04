@@ -65,7 +65,7 @@ const strings: Record<string, string> = {
   "arena.plan.phase1": "Phase 1",
   "arena.plan.cardsInTurns": "Cartes dans {n} tours",
   "arena.plan.cardsInTurn": "Cartes dans {n} tour",
-  "arena.inspect.target.lane": "🎯 Touche une LANE après confirmation",
+  "arena.inspect.target.lane": "🎯 Touche un COULOIR après confirmation",
   "arena.inspect.target.self": "🎯 Cible : ton héros (auto)",
   "arena.inspect.target.hero": "🎯 Cible : héros adverse (auto)",
   "arena.inspect.target.global": "🎯 Effet global — pas de cible à choisir",

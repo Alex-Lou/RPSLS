@@ -9,6 +9,8 @@
  * Visual components live in BracketUI.tsx. Page view in BracketPage.tsx.
  */
 
+import { tNow } from "../i18n/core";
+
 /* ──────────── Types ──────────── */
 
 export type TournamentSize = 4 | 8 | 16;
@@ -317,11 +319,11 @@ export function resolvePlayerMatch(t: TournamentState, playerWon: boolean): Tour
 export function roundLabel(roundIdx: number, total: number): string {
   const dist = total - 1 - roundIdx;
   switch (dist) {
-    case 0: return "Finale";
-    case 1: return "Demis";
-    case 2: return "Quarts";
-    case 3: return "8es";
-    case 4: return "16es";
-    default: return `Tour ${roundIdx + 1}`;
+    case 0: return tNow("bracket.round.final");
+    case 1: return tNow("bracket.round.semis");
+    case 2: return tNow("bracket.round.quarters");
+    case 3: return tNow("bracket.round.r16");
+    case 4: return tNow("bracket.round.r32");
+    default: return tNow("bracket.round.n", { n: roundIdx + 1 });
   }
 }

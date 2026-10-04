@@ -17,6 +17,7 @@ import { type AiMood, type Move } from "../engine/game";
 import { eclatsReward } from "../engine/economy";
 import { shuffleLaneIdentities } from "../engine/lanesCombos";
 import { useStore } from "../store/store";
+import { useT } from "../i18n";
 import {
   battleStatus,
   cpuLanesPicks,
@@ -49,6 +50,7 @@ export function LocalLanesGame({
   winTo: number;
   onQuit: () => void;
 }) {
+  const t = useT();
   const profileNickname = useStore((s) => s.player.nickname);
   const difficulty = useStore((s) => s.player.difficulty);
   const recordMatch = useStore((s) => s.recordMatch);
@@ -56,7 +58,7 @@ export function LocalLanesGame({
   // Match info — set once at start, persists through the run.
   const matchInfo: LanesMatchInfo = {
     matchId: "local",
-    opponent: "CPU",
+    opponent: t("match.cpu"),
     youAre: "a" as PlayerSlot, // human is always slot A locally
     lanes: LANE_COUNT,
     winTo,

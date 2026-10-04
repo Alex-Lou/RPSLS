@@ -45,8 +45,8 @@ export function SandboxView({
   const curDiff = DIFFS_META.find((d) => d.id === difficulty) ?? DIFFS_META[1];
   const recap =
     mode === "cards"
-      ? cur.label + " · " + curDiff.label + " · " + t("lobby.recapTournament")
-      : cur.label + " · " + curDiff.label + " · " + t("lobby.firstToShort", { n: winTo });
+      ? t(cur.labelKey) + " · " + t("diff." + curDiff.id) + " · " + t("lobby.recapTournament")
+      : t(cur.labelKey) + " · " + t("diff." + curDiff.id) + " · " + t("lobby.firstToShort", { n: winTo });
   const roundsHint =
     t(winTo > 1 ? "lobby.firstToWins" : "lobby.firstToWin", { n: winTo }) +
     (mode !== "lanes" ? " · " + t("lobby.bestOf", { n: winTo * 2 - 1 }) : "");
@@ -83,7 +83,7 @@ export function SandboxView({
       }
     >
       {/* Type de jeu — mêmes icônes/noms que le menu principal. */}
-      <LobbySection label={t("lobby.gameType")} hint={cur.tag}>
+      <LobbySection label={t("lobby.gameType")} hint={t(cur.tagKey)}>
         <div className="grid grid-cols-3 gap-2">
           {SANDBOX_MODES.map((m) => {
             const on = mode === m.id;
@@ -99,7 +99,7 @@ export function SandboxView({
                 }}
               >
                 <ModeIcon mode={m.icon} />
-                <span className={"text-[11px] font-bold leading-tight " + (on ? "text-white" : "text-ink-muted")}>{m.label}</span>
+                <span className={"text-[11px] font-bold leading-tight " + (on ? "text-white" : "text-ink-muted")}>{t(m.labelKey)}</span>
               </motion.button>
             );
           })}
@@ -109,7 +109,7 @@ export function SandboxView({
       <DifficultyPicker />
 
       {mode !== "cards" && (
-        <RoundsStepper value={winTo} onChange={setWinTo} lanes={mode === "lanes"} hint={roundsHint} />
+        <RoundsStepper value={winTo} onChange={setWinTo} hint={roundsHint} />
       )}
     </ModeLobbyShell>
   );

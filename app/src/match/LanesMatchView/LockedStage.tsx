@@ -41,7 +41,7 @@ export function LockedStage({
                            flex flex-col items-center justify-center gap-1 ring-2 ring-emerald-400/30"
               >
                 <Hand move={mv} size="md" />
-                <span className="text-[9px] uppercase tracking-wider text-emerald-200/90">L{i + 1}</span>
+                <span className="text-[9px] uppercase tracking-wider text-emerald-200/90">{t("lanes.laneShort", { n: i + 1 })}</span>
               </motion.div>
             ))}
           </div>
@@ -63,7 +63,7 @@ export function RevealCountdown() {
     >
       <div className="text-[10px] uppercase tracking-[0.4em] text-ink-faint">{tCount("lanes.reveal")}</div>
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xl sm:text-3xl font-black leading-tight">
-        {[tCount("online.reveal.rock"), tCount("online.reveal.paper"), tCount("online.reveal.scissors"), tCount("online.reveal.lizard"), tCount("online.reveal.spock")].map((w, i) => (
+        {(["rock", "paper", "scissors", "lizard", "spock"] as const).map((m) => tCount("element." + m)).map((w, i) => (
           <motion.span
             key={i}
             initial={{ opacity: 0, y: 8 }}

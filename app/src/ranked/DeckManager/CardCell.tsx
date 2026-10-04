@@ -4,7 +4,7 @@ import { isFusible } from "../../arena/arenaFusionCards";
 import { isCastOnDraw } from "../../arena/arenaCastOnDraw";
 import { CardImage } from "../CardImage";
 import type { CardId } from "../rankedTypes";
-import { RARITY_DOT, UNLOCK_HINTS } from "./deckManagerConstants";
+import { RARITY_DOT, RARITY_KEY, UNLOCK_HINTS } from "./deckManagerConstants";
 import { FuseGlyph, BoltGlyph } from "../../icons";
 
 /** Single card cell — the entire visual was extracted from the old inline
@@ -63,14 +63,14 @@ export function CardCell({
       {fusible ? (
         <div
           className="absolute top-0.5 right-0.5 z-10 px-1 h-3.5 rounded-full bg-amber-400/95 flex items-center justify-center shadow ring-1 ring-amber-200/60"
-          title="Fusionnable sur la Forge (Arena)"
+          title={t("deck.fusibleTitle")}
         >
           <FuseGlyph className="w-2 h-2 text-zinc-900" />
         </div>
       ) : castDraw ? (
         <div
           className="absolute top-0.5 right-0.5 z-10 px-1 h-3.5 rounded-full bg-sky-400/95 flex items-center justify-center shadow ring-1 ring-sky-200/70"
-          title="Se déclenche À LA PIOCHE (Cast When Drawn)"
+          title={t("deck.castOnDrawTitle")}
         >
           <BoltGlyph className="w-2 h-2 text-zinc-900" />
         </div>
@@ -88,13 +88,13 @@ export function CardCell({
           {t(card.nameKey)}
         </span>
         <span className={"text-[7px] font-bold leading-none " + RARITY_COLOR[card.rarity]}>
-          {isPassiveCard(id) ? "passive" : card.rarity}
+          {isPassiveCard(id) ? t("ranked.passive") : t(RARITY_KEY[card.rarity])}
         </span>
       </div>
       {!unlocked && (
         <div className="absolute inset-0 bg-black/70 flex items-center justify-center p-1 z-20">
           <span className="text-[8px] text-ink-muted text-center leading-tight">
-            🔒 {UNLOCK_HINTS[id] ?? "Bientôt"}
+            🔒 {t(UNLOCK_HINTS[id] ?? "deck.unlock.soon")}
           </span>
         </div>
       )}

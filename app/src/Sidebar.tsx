@@ -273,6 +273,7 @@ export function MobileShell({
    *  ou dans l'écran lui-même (menu principal). */
   floatingTrigger: boolean;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   // Callback de sortie d'un match en cours (Alex 2026-06-11) : rendu EN HAUT
   // du drawer pour intégrer la sortie au burger plutôt qu'avoir un 2e bouton
@@ -309,7 +310,7 @@ export function MobileShell({
       {/* Hamburger flottant (mobile) — réservé aux matchs immersifs. */}
       {floatingTrigger && (
         <button
-          aria-label="Open menu"
+          aria-label={t("nav.menu.open")}
           data-no-touchfx
           onClick={() => setOpen(true)}
           // Position via Tailwind (not inline) so the short-viewport overrides
@@ -362,7 +363,7 @@ export function MobileShell({
               {/* Close button */}
               <button
                 onClick={() => setOpen(false)}
-                aria-label="Close menu"
+                aria-label={t("nav.menu.close")}
                 className="absolute right-3 w-9 h-9 rounded-xl bg-hairline hover:bg-hairline border border-hairline flex items-center justify-center text-ink-muted"
                 style={{ top: "max(var(--sai-top), 32px)" }}
               >

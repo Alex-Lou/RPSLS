@@ -2,6 +2,7 @@ import { motion } from "motion/react";
 import { useStore } from "../store/store";
 import { ModalShell } from "../ui/ModalShell";
 import { activeAbandonCount, abandonPenaltyLp } from "./forfeit";
+import { useT } from "../i18n";
 
 /**
  * QuitConfirmModal — one reusable, themed "leave the match?" dialog.
@@ -21,6 +22,7 @@ export function QuitConfirmModal({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const t = useT();
   const abandons = useStore((s) => s.player.abandons);
   // Preview the penalty the NEXT forfeit would add (pure read, no mutation).
   const prior = activeAbandonCount(abandons, Date.now());
@@ -38,16 +40,16 @@ export function QuitConfirmModal({
       >
         <div className="text-4xl mb-2 text-center" aria-hidden>🏳️</div>
         <h3 className="text-lg sm:text-xl font-bold text-white text-center mb-1.5">
-          Quitter le match ?
+          {t("match.quitConfirm")}
         </h3>
         <p className="text-sm text-ink-muted leading-relaxed text-center mb-2">
-          Tu vas perdre la manche en cours. Ce sera compté comme une défaite.
+          {t("match.quit.body")}
         </p>
 
         {/* Recidive penalty warning — only competitive + only when it bites. */}
         {extra < 0 && (
           <p className="text-[13px] font-semibold text-rose-300 text-center mb-4">
-            ⚠️ Abandons répétés : <span className="font-black">{extra} LP</span> supplémentaires.
+            {t("match.quit.penaltyLabel")} <span className="font-black">{t("match.quit.penaltyValue", { n: extra })}</span>
           </p>
         )}
         {extra === 0 && <div className="mb-4" />}
@@ -57,13 +59,13 @@ export function QuitConfirmModal({
             onClick={onCancel}
             className="flex-1 py-2.5 rounded-xl font-bold text-sm text-ink bg-hairline hover:bg-hairline border border-hairline transition"
           >
-            Continuer
+            {t("match.quit.continue")}
           </button>
           <button
             onClick={onConfirm}
             className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white bg-rose-600/80 hover:bg-rose-600 border border-rose-400/40 transition"
           >
-            Forfait
+            {t("match.quit.forfeit")}
           </button>
         </div>
       </motion.div>

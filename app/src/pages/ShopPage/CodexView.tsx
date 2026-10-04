@@ -30,7 +30,7 @@ export function CodexView({
       <section className="rounded-2xl p-4 bg-surface-raised border border-hairline">
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-ink-muted">
-            Collection
+            {t("shop.codex.collection")}
           </span>
           <span className="font-black tabular-nums text-ink">
             {ownedCount} / {total}
@@ -45,11 +45,11 @@ export function CodexView({
           />
         </div>
         <p className="text-[11px] text-ink-muted mt-2 leading-snug">
-          Débloque toutes les cartes pour empocher les paliers de complétion.
+          {t("shop.codex.hint")}
           {masteredCount > 0 && (
             <>
-              {" "}<span className="text-amber-300 font-bold">⭐ {masteredCount}</span> carte
-              {masteredCount > 1 ? "s" : ""} maîtrisée{masteredCount > 1 ? "s" : ""}.
+              {" "}<span className="text-amber-300 font-bold">⭐ {masteredCount}</span>{" "}
+              {t(masteredCount > 1 ? "shop.codex.mastered.many" : "shop.codex.mastered.one")}
             </>
           )}
         </p>
@@ -58,7 +58,7 @@ export function CodexView({
       {/* Tier rewards */}
       <section className="flex flex-col gap-2">
         <h3 className="text-[10px] uppercase tracking-[0.25em] font-bold text-ink-muted px-1">
-          Paliers de complétion
+          {t("shop.codex.tiers")}
         </h3>
         {CODEX_TIERS.map((tier) => {
           const claimed = codexClaimed.includes(tier.threshold);
@@ -80,7 +80,7 @@ export function CodexView({
               </span>
               <div className="flex-1 min-w-0">
                 <div className="font-bold text-sm">
-                  {tier.threshold} / {total} cartes
+                  {t("shop.codex.tierCards", { n: tier.threshold, total })}
                 </div>
                 <div className="text-[11px] text-ink-muted">
                   +{tier.eclats} 💎{tier.dust > 0 ? ` · +${tier.dust} ✨` : ""}
@@ -99,7 +99,7 @@ export function CodexView({
                     : "bg-hairline text-ink-faint border border-hairline cursor-not-allowed")
                 }
               >
-                {claimed ? "Récupéré" : ready ? "Récupérer" : `−${tier.threshold - ownedCount}`}
+                {claimed ? t("shop.codex.claimed") : ready ? t("quests.btn.claim") : `−${tier.threshold - ownedCount}`}
               </motion.button>
             </div>
           );
@@ -109,7 +109,7 @@ export function CodexView({
       {/* Grid of all cards — owned vs locked at a glance. */}
       <section>
         <h3 className="text-[10px] uppercase tracking-[0.25em] font-bold text-ink-muted px-1 mb-2">
-          Toutes les cartes
+          {t("shop.codex.allCards")}
         </h3>
         <div className="grid grid-cols-5 gap-2">
           {ALL_CARD_IDS.map((id) => {
@@ -128,13 +128,13 @@ export function CodexView({
                     ? "ring-1 ring-white/15"
                     : "ring-1 ring-white/5 grayscale opacity-30")
                 }
-                title={t(card.nameKey) + (owned && lvl > 1 ? ` · Niv ${lvl}` : "")}
+                title={t(card.nameKey) + (owned && lvl > 1 ? ` · ${t("shop.codex.lvl", { n: lvl })}` : "")}
               >
                 <CardImage id={id} glyphSize="text-lg" />
                 <div className="relative z-10 flex flex-col items-center p-0.5">
                   <span className="text-lg">{card.glyph}</span>
                   <span className={"text-[7px] font-bold uppercase " + RARITY_COLOR[card.rarity]}>
-                    {card.rarity}
+                    {t(`ranked.rarity.${card.rarity}`)}
                   </span>
                 </div>
                 {!owned && (
@@ -151,7 +151,7 @@ export function CodexView({
                         : "bg-white/15 text-white border border-white/20")
                     }
                   >
-                    {mastered ? "⭐" : `Niv${lvl}`}
+                    {mastered ? "⭐" : t("shop.codex.lvl", { n: lvl })}
                   </span>
                 )}
               </div>

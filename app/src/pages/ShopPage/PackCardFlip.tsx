@@ -111,7 +111,7 @@ export function PackCardFlip({
             {t(card.nameKey)}
           </span>
           <span className={"text-[8px] font-bold " + RARITY_COLOR[card.rarity]}>
-            {card.rarity}
+            {t(`ranked.rarity.${card.rarity}`)}
           </span>
         </div>
         <motion.div
@@ -122,7 +122,7 @@ export function PackCardFlip({
         >
           {isNew ? (
             <span className="text-[8px] font-black uppercase tracking-wider bg-emerald-400 text-zinc-900 px-1.5 py-0.5 rounded-full">
-              NEW
+              {t("shop.pack.new")}
             </span>
           ) : (
             <span className="text-[8px] font-black uppercase tracking-wider bg-violet-400/90 text-zinc-900 px-1.5 py-0.5 rounded-full">

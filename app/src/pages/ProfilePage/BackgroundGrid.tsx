@@ -4,6 +4,7 @@ import { BACKGROUNDS } from "../../theme/themes";
 import { PremiumBadge } from "../../ui/PremiumBadge";
 import { OwnedBadgeLongPress } from "../../ui/OwnedBadgeLongPress";
 import { AppearanceThumb } from "./AppearanceThumb";
+import { bgLabel } from "./padText";
 import { ActiveChip, LiveChip } from "./StyleBadges";
 
 /** Grille des apparences — une tuile par fond enregistré. La logique de
@@ -20,7 +21,7 @@ export function BackgroundGrid({ onSelect }: { onSelect: (bg: (typeof BACKGROUND
       {BACKGROUNDS.map((bg) => {
         const active = (player.backgroundId ?? "default") === bg.id;
         const animated = !!(bg.scene || bg.premiumScene);
-        const label = bg.custom ? t("profile.style.myImage") : bg.label;
+        const label = bgLabel(t, bg);
         return (
           <button
             key={bg.id}

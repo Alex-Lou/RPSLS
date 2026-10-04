@@ -18,3 +18,12 @@ export function padTagline(t: TFn, id: PadId): string {
   const v = t(k);
   return v === k ? PAD_META[id].tagline : v;
 }
+
+/** Nom localisé d'un fond : « Mon image » pour le fond importé, clé `profile.bg.<id>`
+ *  si elle existe, sinon le libellé du catalogue (noms propres des sets). */
+export function bgLabel(t: TFn, bg: { id: string; label: string; custom?: boolean }): string {
+  if (bg.custom) return t("profile.style.myImage");
+  const k = `profile.bg.${bg.id}`;
+  const v = t(k);
+  return v === k ? bg.label : v;
+}
