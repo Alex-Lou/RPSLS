@@ -145,19 +145,26 @@ function VoieMotif({ affinity }: { affinity: Move }) {
       return (
         <>
           {[0, 1].map((i) => (
+            // Balayage en `x` d'un calque pleine largeur (le % de `x` = largeur
+            // du calque = largeur de l'aura) au lieu d'animer `left` : même
+            // trajet, mais plus de recalcul de mise en page à chaque image.
             <motion.div
               key={i}
-              className="absolute -inset-y-2 w-10"
-              style={{
-                left: "-20%",
-                background:
-                  "linear-gradient(100deg, transparent 0%, rgba(255,255,255,0.55) 45%, rgba(244,63,94,0.7) 55%, transparent 100%)",
-                transform: "skewX(-22deg)",
-                mixBlendMode: "screen",
-              }}
-              animate={{ left: ["-25%", "120%"], opacity: [0, 0.9, 0] }}
+              className="absolute -inset-y-2 inset-x-0 pointer-events-none"
+              style={{ mixBlendMode: "screen" }}
+              initial={{ x: "-25%", opacity: 0 }}
+              animate={{ x: ["-25%", "120%"], opacity: [0, 0.9, 0] }}
               transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 2.4, ease: "easeIn", delay: i * 1.9 }}
-            />
+            >
+              <div
+                className="absolute inset-y-0 left-0 w-10"
+                style={{
+                  background:
+                    "linear-gradient(100deg, transparent 0%, rgba(255,255,255,0.55) 45%, rgba(244,63,94,0.7) 55%, transparent 100%)",
+                  transform: "skewX(-22deg)",
+                }}
+              />
+            </motion.div>
           ))}
         </>
       );

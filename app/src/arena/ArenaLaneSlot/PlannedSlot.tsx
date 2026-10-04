@@ -30,7 +30,7 @@ export function PlannedSlot({
         boxShadow: `0 0 10px -3px ${moveGlow(pal.hex)}80`,
       }}
     >
-      <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded bg-black/55 backdrop-blur-sm flex items-center gap-0.5" aria-label="en attente">
+      <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded bg-black/70 flex items-center gap-0.5" aria-label="en attente">
         {[0, 1, 2].map((i) => (
           <span
             key={i}

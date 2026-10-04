@@ -558,16 +558,15 @@ function CreatureSlotInner({
           aria-label={clickableLabel}
           className="absolute inset-0 z-20 flex items-end justify-center focus:outline-none"
         >
+          {/* PERF : box-shadow STATIQUE + pulse d'opacité seul (composité GPU),
+           *  comme le halo Provocation — avant, l'ombre animée était re-rastérisée
+           *  à chaque image sur chaque créature ciblable. */}
           <motion.div
-            animate={{
-              boxShadow: [
-                "0 0 0 0 rgba(252,211,77,0)",
-                "inset 0 0 0 3px rgba(252,211,77,0.9), 0 0 18px 2px rgba(252,211,77,0.6)",
-                "0 0 0 0 rgba(252,211,77,0)",
-              ],
-            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 1, 0] }}
             transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
             className="absolute inset-0 rounded-xl pointer-events-none"
+            style={{ boxShadow: "inset 0 0 0 3px rgba(252,211,77,0.9), 0 0 18px 2px rgba(252,211,77,0.6)" }}
           />
           <span className="relative mb-1 px-1.5 py-0.5 rounded bg-amber-400/90 text-black text-[9px] uppercase tracking-wider font-black shadow-lg">
             {clickableLabel}
