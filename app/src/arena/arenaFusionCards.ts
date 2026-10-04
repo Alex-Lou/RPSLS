@@ -68,7 +68,7 @@ export const FUSION_RECIPES: FusionRecipe[] = [
   { a: "rempart",     b: "anchor",       result: "bastion" },         // bouclier+ancre+provoc (FIX 2026-06-30 : aegis→rempart, aegis hors deck rock = recette injouable en Montagne, même bug que Cosmos)
   { a: "jet-caillou", b: "jet-caillou",  result: "avalanche" },       // 3 dmg ×2 créatures
   { a: "seve",        b: "second-wind",  result: "source-vitale" },   // +3 créature ET +3 héros
-  { a: "oracle",      b: "augur",        result: "omniscience" },     // pioche 3 + main révélée (FIX 2026-06-28 : augur NEUTRE au lieu de coup-oeil voie:spock = recette était injouable)
+  { a: "oracle",      b: "oracle-inverse", result: "omniscience" },   // pioche 3 + main révélée (FIX 2026-10 : augur, exclu du Pro depuis 2026-07-01, rendait la recette injouable → oracle-inverse, info neutre deckable)
   { a: "toile-gluante", b: "curse",      result: "cocon" },           // n'attaque pas + −2 ATK
   { a: "supernova",   b: "singularite",  result: "apocalypse" },      // 4 dmg all + 4 héros (FIX 2026-06-28 : singularité NEUTRE au lieu de gravité voie:spock = recette était injouable)
   { a: "heist",       b: "mascarade",    result: "imposteur" },       // vol + main révélée

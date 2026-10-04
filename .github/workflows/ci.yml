@@ -50,9 +50,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec tsc --noEmit -p tsconfig.json
       - run: pnpm exec vite build
-      - name: Contrôles lockstep (Pro online)
+      - name: Contrôles cartes Pro + lockstep (Pro online)
         run: |
-          for s in determinism-check arena-lockstep-check arena-session-check arena-online-check arena-net-check; do
+          for s in cards-consistency-check determinism-check arena-lockstep-check arena-session-check arena-online-check arena-net-check; do
             echo "== $s"
             npx --yes tsx "scripts/$s.ts"
           done
