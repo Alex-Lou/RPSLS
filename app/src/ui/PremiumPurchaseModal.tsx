@@ -3,8 +3,6 @@
  *
  * L'achat est validé par le SERVEUR (online/wallet.ts : débit ✦ + set accordé).
  * Pas encore de vrai paiement : les ✦ ne viennent que du bonus de bienvenue.
- * Dev : « +1000 ✦ TEST » ne crédite que l'affichage local (le serveur refuse
- * l'achat ensuite) ; absent des releases (`__DEV_PREMIUM__`).
  */
 
 import { useEffect, useState } from "react";
@@ -16,11 +14,6 @@ import { PremiumBadge } from "./PremiumBadge";
 import { useT } from "../i18n";
 import { walletBuyPremiumSet, walletErrorKey } from "../online/wallet";
 import { hapticMatchStart, hapticMatchWin, hapticTap } from "../haptic";
-
-// Le bouton de test « +1000 ✦ » n'existe qu'en `pnpm dev` et dans les builds
-// debug device (`__DEV_TOOLS__`, fail-closed) : absent de toute release.
-// Alex 2026-06-20 : « virer le test dev en PUBLIC », mais le garder en debug.
-const __DEV_PREMIUM__ = __DEV_TOOLS__;
 
 export interface PremiumSet {
   id: string;
@@ -45,7 +38,6 @@ export function PremiumPurchaseModal({
 }) {
   const stars = useStore((s) => s.player.stars ?? 0);
   const owned = useStore((s) => (s.player.ownedPremiumSets ?? []).includes(set?.id ?? ""));
-  const grant = useStore((s) => s.grantStars);
   const t = useT();
   /** Three phases:
    *   idle        — preview + buttons (normal)
@@ -163,14 +155,6 @@ export function PremiumPurchaseModal({
               </button>
             )}
             {error && <div role="alert" className="text-center text-[12px] font-bold text-rose-300">{error}</div>}
-            {__DEV_PREMIUM__ && !owned && (
-              <button
-                onClick={() => { hapticTap(); grant(1000); }}
-                className="text-[11px] uppercase tracking-wider font-bold text-amber-300 py-2 rounded-lg border border-amber-300/40 bg-amber-300/5 hover:bg-amber-300/15 transition"
-              >
-                ✦ +1000 TEST (dev)
-              </button>
-            )}
             <button
               onClick={onClose}
               className="text-xs text-ink-muted py-1.5 hover:text-ink transition"
