@@ -15,7 +15,7 @@
 import { motion } from "motion/react";
 import { useStore } from "../store/store";
 import { useT } from "../i18n";
-import { ARENA_ECLATS } from "../engine/economy";
+import { ARENA_ECLATS, ARENA_XP } from "../engine/economy";
 import type { BoardState, Side } from "./arenaTypes";
 
 export interface ArenaMatchEndProps {
@@ -50,6 +50,7 @@ export function ArenaMatchEnd({ board, mySide, onQuit, onRematch }: ArenaMatchEn
     : t("arena.end.subLoss");
 
   const reward = ARENA_ECLATS[outcome];
+  const xpGained = ARENA_XP[outcome];
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-4 px-4 relative overflow-hidden">
@@ -129,6 +130,9 @@ export function ArenaMatchEnd({ board, mySide, onQuit, onRematch }: ArenaMatchEn
         <span className="text-xl">💎</span>
         <span className="text-cyan-100 font-black text-sm tabular-nums">+{reward}</span>
         <span className="text-[10px] text-cyan-200 uppercase tracking-wider">{t("arena.end.eclats")}</span>
+        <span className="text-cyan-200/40">·</span>
+        <span className="text-amber-200 font-black text-sm tabular-nums">+{xpGained}</span>
+        <span className="text-[10px] text-amber-200 uppercase tracking-wider">XP</span>
       </motion.div>
 
       {/* CTAs */}

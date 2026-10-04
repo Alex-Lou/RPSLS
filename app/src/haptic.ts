@@ -73,8 +73,12 @@ export function vibrate(pattern: Pattern): void {
  *  Bumped from 10 ms to 22 ms so it's actually felt through a phone case. */
 export const hapticTap = () => vibrate(22);
 
-/** Lock / important confirmation. */
-export const hapticLock = () => vibrate(20);
+/** Lock / important confirmation — un cran AU-DESSUS du tap (était 20 ms, donc
+ *  plus faible que le simple tap à 22 ms). Palette : tap < lock < coup reçu. */
+export const hapticLock = () => vibrate(30);
+
+/** Ton héros encaisse un coup (Arena). Avant : aucun retour physique en combat. */
+export const hapticHeroHit = () => vibrate(45);
 
 /** Match found — short attention double-tap. */
 export const hapticMatchStart = () => vibrate([30, 40, 30]);

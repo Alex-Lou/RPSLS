@@ -184,6 +184,25 @@ export const QUESTS: QuestDef[] = [
     xpReward: 100,
     progress: (_p, h) => (hasUsedAll5InAnyMatch(h) ? 1 : 0),
   },
+  // Constellation Pro (Arena) : le mode le plus profond n'avait AUCUNE quête.
+  {
+    id: "arena-initiate",
+    emoji: "⚔️",
+    title: "Arena initiate",
+    desc: "Win a Constellation Pro match.",
+    target: 1,
+    xpReward: 75,
+    progress: (p) => Math.min(p.arenaStats?.wins ?? 0, 1),
+  },
+  {
+    id: "arena-champion",
+    emoji: "👑",
+    title: "Arena champion",
+    desc: "Win 10 Constellation Pro matches.",
+    target: 10,
+    xpReward: 200,
+    progress: (p) => Math.min(p.arenaStats?.wins ?? 0, 10),
+  },
 ];
 
 export interface QuestState {
