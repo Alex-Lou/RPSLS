@@ -13,6 +13,7 @@ import { makeInitialBoard } from "../../arena/arenaRules/boardInit";
 import { buildCpuSignatureDeck } from "../../arena/arenaDecks";
 import { cpuArenaDecision } from "../../arena/arenaAI";
 import { resolveTurn } from "../../arena/arenaRules/resolver";
+import { prepareResolveStart } from "../../arena/ArenaGame/arenaResolvePrep";
 import { advanceToNextTurn, matchResult } from "../../arena/arenaRules/lifecycle";
 import { TURN_HARD_CAP } from "../../arena/arenaTypes/constants";
 import type { Move } from "../../engine/game";
@@ -46,7 +47,11 @@ export function runMatch(voieA: Move, voieB: Move, diff: Diff, seed: number): Ma
     while (board.phase === "planning" && board.turn <= TURN_HARD_CAP && guard++ < 200) {
       const ia = cpuArenaDecision(board, "a", diff);
       const ib = cpuArenaDecision(board, "b", diff);
-      board = resolveTurn(board, ia, ib);
+      // Même pré-calcul que le flux LIVE (ArenaGame.resolveWith) : troncature aux
+      // caps, cartes jouées retirées de la main → défausse, légendaires/fusions
+      // EXILÉES. Sans lui le Lab simulait un autre jeu (cartes jamais dépensées).
+      const p = prepareResolveStart(board, ia, ib, "a");
+      board = resolveTurn(p.startBoard, p.safeIntent, p.safeCpuIntent);
       if (board.phase === "match-end") break;
       board = advanceToNextTurn(board);
       hpA.push(board.a.hp);
