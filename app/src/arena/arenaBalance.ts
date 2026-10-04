@@ -60,6 +60,7 @@ export interface ArenaBalance {
     intricationCap: number; // cap des dégâts d'Intrication Quantique
     calculDiscount: number; // réduction de coût de TOUS les sorts (Calcul)
     tempoDiscount: number; // jauge VIVANTE : −coût des sorts à cosmosCount≥2 (0 = off)
+    entropyHealReduction: number; // ENTROPIE : −PV sur CHAQUE soin du héros adverse (plancher 1 PV/soin ; 0 = off)
   };
 }
 
@@ -133,14 +134,31 @@ export interface ArenaBalance {
  *  RESTE Forêt>Cosmos ~77 % : STRUCTUREL. Il ne baisse qu'en coupant le sustain Forêt
  *  (Second Souffle / Drain / Sève), ce qui effondre la Forêt contre TOUTES les Voies
  *  (écart global → 8-25 pts). Passer ≤ 70 % demande une règle (anti-soin côté Cosmos,
- *  ou contre-jeu Spock vs Feuille), hors périmètre « chiffres seuls ». */
+ *  ou contre-jeu Spock vs Feuille), hors périmètre « chiffres seuls ».
+ *
+ *  PASSE ANTI-SOIN 2026-10 (Alex : vraie RÈGLE côté Cosmos, « juste et réglo »).
+ *  Mesurée par scripts/voie-matrix.ts (IA hard vs hard, 1000 parties/sens × 4
+ *  graines 1337/2024/777/4242). Règle ENTROPIE (passif de Voie Cosmos, cf.
+ *  arenaRules/entropy.ts) : face au Cosmos, chaque soin reçu par le héros adverse
+ *  perd entropyHealReduction PV, sans jamais descendre sous 1 PV par soin.
+ *   - Sans plancher (−1, min 0) : Forêt>Cosmos 77 %→13 % (la Forêt vit de soins
+ *     de 1 PV) = injuste dans l'autre sens. Plafond 1 PV/tour : 27 %. Soins ≥3
+ *     seuls : inerte. Plancher 1 PV : Forêt>Cosmos ~68 % = le bon dosage.
+ *   - Cosmos : intricationCap 2→1. L'Entropie rend ~3 pts à Cosmos (Forêt, et
+ *     Veine de Gaïa rognée vs Montagne) ; on reprend ce surplus sur le burst
+ *     « par Spock » qui punit surtout Tranchant/Montagne (Cosmos 54,8→53 %).
+ *   - Montagne : forteresseAtk 4→5 (compense Veine de Gaïa rognée : Cosmos>
+ *     Montagne 70,4→69,7 %).
+ *  Avant : Forêt>Cosmos 76,7 %, Cosmos>Montagne 70,4 %, écart 4,5 pts. Après :
+ *  Forêt>Cosmos ~69 %, Cosmos>Montagne ~70 %, Montagne>Mirage ~70 %, tous les
+ *  duels ≤ 70 %, écart ~5,7 pts (47–53 %). Forêt vs les 3 autres : ±1 pt. */
 export const DEFAULT_BALANCE: ArenaBalance = {
   engine: { cap: 3, risePerCounterWin: 1, voieAtkBonus: 1, trancheAtkPerStack: 2 },
-  montagne: { strateAtk: 1, strateHp: 1, forteresseAtk: 4, voieProvocationCharges: 3, eboulisPerRock: 2, eboulisCap: 10, grondementCap: 4 },
+  montagne: { strateAtk: 1, strateHp: 1, forteresseAtk: 5, voieProvocationCharges: 3, eboulisPerRock: 2, eboulisCap: 10, grondementCap: 4 },
   foret: { seveHealActive: 1, seveHealVerger: 1, drainAmount: 2, secondWindHeal: 1, photosyntheseHeal: 2, sangsueCap: 2 },
   tranchant: { voieScissorsHp: 3, acuiteAtkCap: 2 },
   mirage: { dodgeCapOnSummon: 2, dodgeSpellCap: 2, coupDansLombreCap: 1, voieLizardDodge: 1, dodgeGrowAtk: 1, dodgeGrowAtkCap: 2, dodgeRiposte: 0.5, dodgeCumulativeCap: 2 },
-  cosmos: { chipCap: 0, convergenceDmgCap: 7, intricationCap: 2, calculDiscount: 1, tempoDiscount: 2 },
+  cosmos: { chipCap: 0, convergenceDmgCap: 7, intricationCap: 1, calculDiscount: 1, tempoDiscount: 2, entropyHealReduction: 1 },
 };
 function clone(b: ArenaBalance): ArenaBalance {
   return {

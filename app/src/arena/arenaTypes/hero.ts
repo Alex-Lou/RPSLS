@@ -95,6 +95,13 @@ export interface HeroState {
    *  par seveHealAmount en endOfTurnCleanup, reset juste après. Perce le mur de
    *  régen Forêt (talon Montagne #2). */
   healLockedThisTurn?: boolean;
+  /** ENTROPIE (Cosmos, PASSE ANTI-SOIN 2026-10) — ce héros fait face à un héros
+   *  Cosmos : chacun de ses soins perd BALANCE.cosmos.entropyHealReduction PV
+   *  (jamais sous 1 PV par soin). Posé au boardInit (markEntropy), lu par healHero. Match-local. */
+  entropyMarked?: boolean;
+  /** Total des PV de soin annulés par l'Entropie depuis le début du match
+   *  (monotone). Lu par l'UI : chaque hausse = popup « Entropie −N ». */
+  entropyHealCut?: number;
   /** GRONDEMENT (Montagne, 2026-06-30) — aura PERSISTANTE : chaque fin de tour, le
    *  héros adverse subit des dégâts = mes Strates en jeu (cap grondementCap). Posé
    *  au cast, lu en endOfTurnCleanup (applyEnginesEndOfTurn), JAMAIS reset (aura

@@ -13,6 +13,7 @@ import { CARDS } from "../../ranked/cards";
 import type { CardId } from "../../ranked/rankedTypes";
 import type { Move } from "../../engine/game";
 import { randomPair, type Rng, type RngPair } from "../../engine/rng";
+import { markEntropy } from "./entropy";
 
 /* ───────────────────────── Board init ───────────────────────── */
 
@@ -113,7 +114,8 @@ export function makeInitialBoard(
   rng?: RngPair,
 ): BoardState {
   const r = rng ?? randomPair();
-  return {
+  // ENTROPIE (Cosmos) : marque le héros qui fait face à un Cosmos (pur, sans RNG).
+  return markEntropy({
     a: makeHero(deckA, affinityA, undefined, r.a),
     b: makeHero(deckB, affinityB, cpuPersonaB, r.b),
     lanes: [makeEmptyLane(), makeEmptyLane(), makeEmptyLane()],
@@ -123,7 +125,7 @@ export function makeInitialBoard(
     augurRevealedB: [],
     forgeA: null,
     forgeB: null,
-  };
+  });
 }
 
 function makeEmptyLane(): LaneState { return { a: null, b: null }; }

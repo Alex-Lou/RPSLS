@@ -76,6 +76,7 @@ const strings: Record<string, string> = {
   "arena.strip.holdToInspect": "Maintiens pour la fiche",
   "arena.strip.augurWatching": "Opp regarde ta main (Augur)",
   "arena.strip.augurRead": "👁 Lue",
+  "arena.strip.entropyCut": "Entropie −{k}",
   "arena.strip.plannedUtility": "Sorts utility planifiés",
   "arena.strip.divineShield": "Bouclier divin",
 };

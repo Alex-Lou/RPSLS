@@ -57,6 +57,7 @@ export function voieTextParams(m: Move): VoieTextParams {
         hp: CREATURE_STATS.spock.hp,
         calcul: BALANCE.cosmos.calculDiscount,
         tempo: BALANCE.cosmos.tempoDiscount,
+        entropy: BALANCE.cosmos.entropyHealReduction, // ENTROPIE : −PV par soin adverse (plancher 1)
       };
   }
 }

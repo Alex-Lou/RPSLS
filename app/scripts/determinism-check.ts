@@ -32,7 +32,8 @@ import { buildCpuSignatureDeck } from "../src/arena/arenaDecks";
 import { cpuArenaDecision } from "../src/arena/arenaAI";
 import { TURN_HARD_CAP } from "../src/arena/arenaTypes/constants";
 import { makeRngPair } from "../src/engine/rng";
-import { makeCreature } from "../src/arena/arenaRules/heroCreature";
+import { healHero, makeCreature } from "../src/arena/arenaRules/heroCreature";
+import { BALANCE } from "../src/arena/arenaBalance";
 import type { Move } from "../src/engine/game";
 import type { BoardState, CpuPersona, TurnIntent } from "../src/arena/arenaTypes";
 
@@ -219,6 +220,35 @@ try {
     const good = c.expect(r1) && JSON.stringify(r1) === JSON.stringify(r2);
     if (!good) failures++;
     console.log(`${good ? "✓" : "✗"} fatigue double KO — ${c.label} (phase=${r1.phase}, reason=${r1.endReason}, a=${r1.a.hp}, b=${r1.b.hp})`);
+  }
+}
+
+// ENTROPIE (Cosmos, PASSE ANTI-SOIN 2026-10) : face au Cosmos, chaque soin héros
+// perd entropyHealReduction PV, plancher 1 PV/soin (min 0 de RÉDUCTION, jamais
+// d'annulation). Pur, sans RNG, marqué au boardInit seedé → lockstep-safe.
+{
+  const pair = makeRngPair(4242);
+  const base = withTrap(() => makeInitialBoard(
+    buildCpuSignatureDeck("paper"), buildCpuSignatureDeck("spock"), "paper", "spock", undefined, pair));
+  const red = BALANCE.cosmos.entropyHealReduction;
+  const forest = { ...base.a, hp: 10 };
+  const cosmos = { ...base.b, hp: 10 };
+  const checks: { label: string; ok: boolean }[] = [
+    { label: "marquage : la Forêt face au Cosmos est marquée, pas le Cosmos", ok: !!base.a.entropyMarked && !base.b.entropyMarked },
+    { label: `soin 3 face au Cosmos → +${Math.max(1, 3 - red)} PV`, ok: healHero(forest, 3).hp === 10 + Math.max(1, 3 - red) },
+    { label: "soin 1 face au Cosmos → +1 PV (plancher, jamais annulé)", ok: healHero(forest, 1).hp === 11 },
+    { label: "soin 0 → aucun effet (min 0)", ok: healHero(forest, 0) === forest },
+    { label: "le Cosmos lui-même n'est pas affecté (soin 3 → +3)", ok: healHero(cosmos, 3).hp === 13 },
+    { label: "PV pleins : pas de faux compteur Entropie", ok: (healHero({ ...forest, hp: forest.maxHp }, 3).entropyHealCut ?? 0) === 0 },
+    { label: "compteur entropyHealCut = PV réellement retirés", ok: (healHero(forest, 3).entropyHealCut ?? 0) === Math.min(red, 2) },
+    { label: "miroir Cosmos vs Cosmos : les deux marqués", ok: (() => {
+      const m = withTrap(() => makeInitialBoard(buildCpuSignatureDeck("spock"), buildCpuSignatureDeck("spock"), "spock", "spock", undefined, makeRngPair(1)));
+      return !!m.a.entropyMarked && !!m.b.entropyMarked;
+    })() },
+  ];
+  for (const c of checks) {
+    if (!c.ok) failures++;
+    console.log(`${c.ok ? "✓" : "✗"} entropie — ${c.label}`);
   }
 }
 

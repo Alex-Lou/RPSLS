@@ -96,7 +96,8 @@ export function applyCoupDansLombre(board: BoardState, side: Side): BoardState {
 }
 
 /** Intrication Quantique (Cosmos) — 1 dégât au héros adverse par Spock que JE
- *  contrôle (+1 si j'en ai ≥2), plafond BALANCE.cosmos.intricationCap. Inévitabilité du board
+ *  contrôle (+1 si j'en ai ≥2), plafond BALANCE.cosmos.intricationCap (1 depuis la
+ *  passe anti-soin : 1 dégât dès 1 Spock ; texte de carte à revoir si le plafond change). Inévitabilité du board
  *  Cosmos (distinct de Singularité qui compte les 2 camps, et de Convergence = mana). */
 export function applyIntricationQuantique(board: BoardState, side: Side): BoardState {
   const oppS = oppSide(side);
