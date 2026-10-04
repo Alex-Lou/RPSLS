@@ -131,6 +131,13 @@ export const CARD_TARGET_KIND: Partial<Record<CardId, SpellTargetKind>> = {
   "galerie-des-glaces":   "global",
   "mascarade-souveraine": "lane",
   "apotheose-spectrale":  "global",
+  // ── Finishers (Lot D) — explicites (avant : absents → repli "global" au lookup ;
+  //    même valeur → comportement de jeu inchangé, auto-cast sans cible) ──
+  "finisher-forteresse":   "global",
+  "finisher-verger":       "global",
+  "finisher-lame":         "global",
+  "finisher-metamorphose": "global",
+  "finisher-calcul":       "global",
 };
 
 /** Active targeting state shared across the board + plan phase so that
@@ -161,7 +168,7 @@ export const LANE_SPELL_TARGET_SIDE: Partial<Record<CardId, LaneTargetSide>> = {
   echappee:   "my-creature",
   mascarade:  "my-creature",
   curse:      "opp-creature",
-  sangsue:    "opp-creature",
+  sangsue:    "my-creature", // lit l'ATK de TA créature (applySangsue)
   "trou-noir": "opp-creature",
   mirror:     "my-empty-opp-occupied",
   // ── Voie Montagne (2026-06-22) ──
@@ -225,6 +232,12 @@ export const LANE_TARGET_MOVE: Partial<Record<CardId, Move>> = {
   derobade:           "lizard",
   "frappe-spectrale": "lizard",
   eclipse:            "lizard",
+  // ── Voie Tranchant — Ciseau-only (l'effet fizzle sur un autre symbole) ──
+  estafilade:       "scissors",
+  "coup-de-taille": "scissors",
+  acuite:           "scissors",
+  // ── Voie Forêt — Bosquet Épineux cible « ta Feuille » (texte de carte) ──
+  "bosquet-epineux": "paper",
 };
 
 /** Clé i18n du libellé court d'un symbole, pour les labels de ciblage (« Cible ta Pierre »). */
@@ -237,8 +250,11 @@ const MOVE_LABEL_KEY: Record<Move, string> = {
  *  Hearthstone) — Alex 2026-06-13. Disponible pour la PLANIFICATION du même
  *  tour (sinon Sablier ne servait à rien : son +2 atterrissait à la résolution
  *  PUIS était écrasé par le refill du tour suivant). */
+// Crédité D'AVANCE par le moteur (creditManaGrants, AVANT invocations et sorts)
+// → budget UI = réalité moteur ; les handlers ne re-donnent plus ce mana.
 export const MANA_GRANTS: Partial<Record<CardId, number>> = {
   sablier: 2,
+  chronomancien: 3,
   offre: 2, // (+ monte aussi maxMana de façon permanente, géré à la résolution)
   "dilatation-temporelle": 1, // (+ monte maxMana de +1, permanent, géré à la résolution)
 };
@@ -249,6 +265,31 @@ export function intentManaGrant(intent: TurnIntent): number {
   return intent.spells.reduce((sum, s) => sum + (MANA_GRANTS[s.id] ?? 0), 0);
 }
 
+/** Buffs alliés IGNORÉS par Spock (Détaché) — miroir EXACT des handlers qui
+ *  testent `move === "spock"` (applyAegis/Anchor/Riposte/Precision/Surge/
+ *  Surcharge/DoubleMot, applyFrappeParfaite/Bastion). Ciblage : pas d'indicateur
+ *  sur un Spock allié pour ces cartes (l'effet y fizzlerait). */
+const SPOCK_DETACHED_BUFFS: ReadonlySet<CardId> = new Set<CardId>([
+  "aegis", "anchor", "riposte", "precision", "surge", "surcharge", "double-mot",
+  "frappe-parfaite", "bastion",
+]);
+
+/** Sorts ennemis ciblés qui FIZZLENT TOTALEMENT sur une cible à Logique
+ *  (spellImmune, Spock) — miroir des handlers. PAS Éboulement (la cible immunisée
+ *  est sautée mais les voisines prennent 1) ni Effacement (le reste du board est
+ *  figé quand même) ni Miroir (copie, n'affecte pas la cible). */
+const LOGIQUE_BLOCKED_SPELLS: ReadonlySet<CardId> = new Set<CardId>([
+  "curse", "jet-caillou", "toile-gluante", "loi-de-causalite", "cocon",
+  "faux-semblant", "trou-noir", "toxine", "rappel", "permutation",
+  "mascarade-souveraine",
+]);
+
+/** Logique (immunité aux sorts) d'une créature telle que vue par le ciblage.
+ *  `spellImmune` si fourni, sinon dérivé du symbole (Logique = inné à Spock). */
+function hasLogique(c: { move: Move; spellImmune?: boolean }): boolean {
+  return c.spellImmune ?? c.move === "spock";
+}
+
 /** Returns whether `lane` on `side` is a valid drop target for the active
  *  ArenaTargeting. Used by ArenaLaneSlot's clickable + label so each card
  *  highlights ONLY the slots it can actually target. */
@@ -256,7 +297,7 @@ export function isValidLaneTarget(
   targeting: ArenaTargeting,
   side: Side,
   lane: LaneIndex,
-  lanes: { a: { move: Move } | null; b: { move: Move } | null }[],
+  lanes: { a: { move: Move; spellImmune?: boolean } | null; b: { move: Move; spellImmune?: boolean } | null }[],
   playerSide: Side,
 ): boolean {
   if (!targeting) return false;
@@ -277,11 +318,15 @@ export function isValidLaneTarget(
     // que la créature du bon symbole, pour COLLER à l'effet (qui fizzle sinon).
     const reqMove = LANE_TARGET_MOVE[targeting.id];
     const moveOk = (c: { move: Move } | null): boolean => !reqMove || (!!c && c.move === reqMove);
-    if (tgtSide === "my-creature") return isPlayerRow && !!mine && moveOk(mine);
-    if (tgtSide === "opp-creature") return !isPlayerRow && !!opp && moveOk(opp);
+    // Cibles où l'effet fizzlerait (règle moteur) : buff allié sur un Spock
+    // Détaché, sort ennemi sur une créature à Logique → pas d'indicateur.
+    const mineOk = !!mine && !(SPOCK_DETACHED_BUFFS.has(targeting.id) && mine.move === "spock");
+    const oppOk = !!opp && !(LOGIQUE_BLOCKED_SPELLS.has(targeting.id) && hasLogique(opp));
+    if (tgtSide === "my-creature") return isPlayerRow && mineOk && moveOk(mine);
+    if (tgtSide === "opp-creature") return !isPlayerRow && oppOk && moveOk(opp);
     if (tgtSide === "my-empty-opp-occupied") return isPlayerRow && !mine && !!opp;
     if (tgtSide === "my-empty") return isPlayerRow && !mine;
-    if (tgtSide === "both-occupied") return isPlayerRow && !!mine && !!opp;
+    if (tgtSide === "both-occupied") return isPlayerRow && mineOk && oppOk;
   }
   return false;
 }

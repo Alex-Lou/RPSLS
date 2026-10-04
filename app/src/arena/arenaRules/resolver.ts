@@ -13,8 +13,10 @@ import {
   spellPriority,
   type ArenaSpellContext,
 } from "../arenaCardEffects";
-import { arenaSpellCost } from "../arenaSpellHelpers";
+import { arenaSpellCost, isReplayableSpell } from "../arenaSpellHelpers";
 import {
+  MANA_GRANTS,
+  intentManaGrant,
   MAX_SPELLS_PER_TURN,
   UTILITY_SPELLS_PER_TURN,
   type BoardState,
@@ -52,6 +54,11 @@ export function resolveTurn(
   rng?: RngPair,
 ): BoardState {
   let b = board;
+
+  // ─── 0. Mana « tempo » (Sablier, Offre, Dilatation, Chronomancien) crédité
+  //     D'AVANCE — même budget que la planification (intentManaGrant). Miroité
+  //     dans runResolverFlow. ───
+  b = creditManaGrants(b, intentA, intentB);
 
   // ─── 1. Summon phase ─── (Alex 2026-06-29 : invocations AVANT les sorts → un
   //     sort de zone comme Éboulement touche les voisines TOUT JUSTE invoquées,
@@ -95,6 +102,27 @@ export function truncateIntentByCaps(intent: TurnIntent): TurnIntent {
     kept.push(s);
   }
   return kept.length === intent.spells.length ? intent : { ...intent, spells: kept };
+}
+
+/** Crédite D'AVANCE (avant invocations et sorts) le mana « tempo » des cartes
+ *  MANA_GRANTS planifiées (après troncature aux caps, comme applyAllSpells).
+ *  Avant, le +mana tombait à la priorité du sort : les invocations et les sorts
+ *  plus prioritaires étaient payés AVANT → la carte de mana elle-même pouvait
+ *  être sautée faute de mana et brûlée en silence, alors que l'UI l'avait
+ *  budgétée (manaBudget = mana + intentManaGrant). Non plafonné à MANA_CAP :
+ *  c'est EXACTEMENT le budget de l'UI. Si la carte est finalement sautée
+ *  (mana insuffisant), applyAllSpells reprend le crédit. */
+export function creditManaGrants(board: BoardState, intentA: TurnIntent, intentB: TurnIntent): BoardState {
+  const grantA = intentManaGrant(truncateIntentByCaps(intentA));
+  const grantB = intentManaGrant(truncateIntentByCaps(intentB));
+  if (grantA === 0 && grantB === 0) return board;
+  if (grantA > 0) alog("spell", `a MANA TEMPO +${grantA} crédité d'avance (${board.a.mana}→${board.a.mana + grantA})`);
+  if (grantB > 0) alog("spell", `b MANA TEMPO +${grantB} crédité d'avance (${board.b.mana}→${board.b.mana + grantB})`);
+  return {
+    ...board,
+    a: grantA > 0 ? { ...board.a, mana: board.a.mana + grantA } : board.a,
+    b: grantB > 0 ? { ...board.b, mana: board.b.mana + grantB } : board.b,
+  };
 }
 
 /** Apply BOTH sides' spells, INTERCALATED by priority — fixes the audit
@@ -143,7 +171,13 @@ export function applyAllSpells(board: BoardState, intentA: TurnIntent, intentB: 
     // Lot D — CALCUL QUANTIQUE : source unique arenaSpellCost (partagée avec
     // l'UI plan/intent et l'IA, sinon le discount n'était dépensable nulle part).
     const effectiveCost = arenaSpellCost(hero, spell.id as CardId);
-    if (hero.mana < effectiveCost) continue;
+    if (hero.mana < effectiveCost) {
+      // Carte de mana « tempo » sautée : on reprend le crédit avancé par
+      // creditManaGrants (sinon mana gratuit sans payer la carte).
+      const grant = MANA_GRANTS[spell.id] ?? 0;
+      if (grant > 0) b = { ...b, [side]: { ...hero, mana: Math.max(0, hero.mana - grant) } } as BoardState;
+      continue;
+    }
     b = {
       ...b,
       [side]: { ...hero, mana: hero.mana - effectiveCost },
@@ -154,10 +188,11 @@ export function applyAllSpells(board: BoardState, intentA: TurnIntent, intentB: 
     // pioche de SON flux, pas de celui du lanceur — invariant « un flux par camp »).
     const ctx: ArenaSpellContext = { board: b, side, spell, rng: side === "a" ? r.a : r.b, rngPair: r };
     b = applyArenaSpell(ctx);
-    // Réverbération (2026-06-12) : on mémorise le dernier sort NON-réverbération
-    // appliqué par CE côté ce tour, pour que Réverbération (priorité plus tardive)
-    // puisse le rejouer sur sa cible d'origine.
-    if (spell.id !== "reverberation") {
+    // Réverbération (2026-06-12) : on mémorise le dernier sort REJOUABLE appliqué
+    // par CE côté ce tour (ni Réverbération, ni Finisher/Légendaire/Fusion — cf.
+    // isReplayableSpell), pour que Réverbération (résolue en DERNIER) puisse le
+    // rejouer sur sa cible d'origine.
+    if (isReplayableSpell(spell.id)) {
       b = side === "a" ? { ...b, lastSpellAppliedA: spell } : { ...b, lastSpellAppliedB: spell };
     }
   }

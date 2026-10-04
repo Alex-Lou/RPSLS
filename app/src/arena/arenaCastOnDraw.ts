@@ -22,6 +22,8 @@
  */
 
 import { MANA_CAP, type CastFxKind, type CastOnDrawEvent, type HeroState } from "./arenaTypes";
+import { healHero } from "./arenaRules/heroCreature";
+import { isFinisherOrFusion } from "./arenaSpellHelpers";
 import type { CardId } from "../ranked/rankedTypes";
 import type { Rng } from "../engine/rng";
 import { tNow } from "../i18n/core";
@@ -73,15 +75,18 @@ export function isCastOnDraw(id: CardId): boolean {
 
 /** Défausse `n` cartes au hasard de `hand`. Retourne le nombre réellement
  *  défaussé (0 si main vide). Deterministe seulement par le RNG du moteur
- *  (même shuffle que arenaRules) — acceptable côté app (pas un workflow). */
+ *  (même shuffle que arenaRules) — acceptable côté app (pas un workflow).
+ *  Jamais un Finisher ni une carte de fusion (perdus pour de bon sinon). */
 function discardRandom(
   hand: CardId[], discard: CardId[], n: number, rng: Rng,
 ): { hand: CardId[]; discard: CardId[]; count: number } {
   const h = hand.slice();
   const d = discard.slice();
   let count = 0;
-  for (let k = 0; k < n && h.length > 0; k++) {
-    const j = Math.floor(rng() * h.length);
+  for (let k = 0; k < n; k++) {
+    const pool = h.map((_, i) => i).filter((i) => !isFinisherOrFusion(h[i]));
+    if (pool.length === 0) break;
+    const j = pool[Math.floor(rng() * pool.length)];
     d.push(h[j]);
     h.splice(j, 1);
     count++;
@@ -114,12 +119,12 @@ export function resolveCastOnDraw(
     parts.push(`+${spec.maxManaUp} MANA MAX`);
   }
   if (spec.heal) {
-    h = { ...h, hp: Math.min(h.maxHp, h.hp + spec.heal) };
+    h = healHero(h, spec.heal); // respecte le verrou de soin (Écrasement)
     parts.push(`+${spec.heal} PV`);
   }
   if (spec.clutchHeal) {
     const amt = h.hp <= spec.clutchHeal.threshold ? spec.clutchHeal.low : spec.clutchHeal.high;
-    h = { ...h, hp: Math.min(h.maxHp, h.hp + amt) };
+    h = healHero(h, amt);
     parts.push(`+${amt} PV`);
   }
   if (spec.selfDamage) {

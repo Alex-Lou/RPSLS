@@ -12,8 +12,10 @@ import { drawCards, damageHero, healHero, damageCreature, makeCreature } from ".
 import {
   getMyCreatureOnLane, getOppCreatureOnLane,
   withMyCreatureOnLane, withOppCreatureOnLane, withSideHero, oppSide,
+  isFinisherOrFusion, isSpellProtected,
 } from "./arenaSpellHelpers";
-import { CREATURE_STATS, MANA_CAP, type BoardState, type Creature, type LaneState, type PlayedSpell, type Side } from "./arenaTypes";
+import { CARDS } from "../ranked/cards";
+import { CREATURE_STATS, type BoardState, type Creature, type LaneState, type PlayedSpell, type Side } from "./arenaTypes";
 import { BALANCE } from "./arenaBalance";
 import { alog } from "./arenaLog";
 import type { Rng } from "../engine/rng";
@@ -119,8 +121,9 @@ export function applyPrescience(board: BoardState, side: Side, rng: Rng): BoardS
   return withSideHero(board, side, drawCards(hero, 2, rng));
 }
 
-/** Augur — reveal the opp's hand to the casting side. (Stored on the board
- *  so the UI can render the peek for two turns — Alex 2026-06-11). */
+/** Augur — reveal the opp's hand to the casting side. (Stored on the board ;
+ *  turns=2 car advanceToNextTurn décrémente aussitôt → visible jusqu'à TA
+ *  prochaine planification incluse, pas « 2 tours ».) */
 export function applyAugur(board: BoardState, side: Side): BoardState {
   const opp = side === "a" ? board.b : board.a;
   if (side === "a") return { ...board, augurRevealedB: opp.hand.slice(0, 4), augurTurnsLeftB: 2 };
@@ -169,12 +172,14 @@ export function applyMirror(board: BoardState, side: Side, spell: PlayedSpell): 
 export function applyHeist(board: BoardState, side: Side, rng: Rng): BoardState {
   const oppS = oppSide(side);
   const oppHero = oppS === "a" ? board.a : board.b;
-  if (oppHero.hand.length === 0) {
-    alog("spell", `${side} LARCIN → main adverse vide, fallback 3 dmg hero ${oppS}`);
+  // Finisher / carte de fusion adverses INVOLABLES (perdues pour de bon sinon).
+  const pool = oppHero.hand.map((_, i) => i).filter((i) => !isFinisherOrFusion(oppHero.hand[i]));
+  if (pool.length === 0) {
+    alog("spell", `${side} LARCIN → main adverse vide (ou rien de volable), fallback 3 dmg hero ${oppS}`);
     return withSideHero(board, oppS, damageHero(oppHero, 3));
   }
-  // Pige aléatoire dans la main adverse.
-  const idx = Math.floor(rng() * oppHero.hand.length);
+  // Pige aléatoire dans la main adverse (cartes volables).
+  const idx = pool[Math.floor(rng() * pool.length)];
   const stolen = oppHero.hand[idx];
   const newOppHand = [...oppHero.hand.slice(0, idx), ...oppHero.hand.slice(idx + 1)];
   let after = withSideHero(board, oppS, { ...oppHero, hand: newOppHand });
@@ -220,25 +225,34 @@ export function applySurcharge(board: BoardState, side: Side, spell: PlayedSpell
   return withMyCreatureOnLane(board, side, spell.lane, { ...c, atkBuff: c.atkBuff + 4, hp });
 }
 
-/** Toxine — frappe toxique : −3 PV ET −2 ATK à une créature ennemie (tue si ≤0). */
+/** Toxine — frappe toxique : −3 PV ET −2 ATK à une créature ennemie (tue si ≤0).
+ *  Bloquée par Ancre/Logique/Éclipse (comme Jet de Caillou) ; les −3 PV passent
+ *  par damageCreature (Esquive / Bouclier divin absorbent). */
 export function applyToxine(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   if (spell.kind !== "lane") return board;
   const opp = getOppCreatureOnLane(board, side, spell.lane);
-  if (!opp) return board;
-  const hp = opp.hp - 3;
-  if (hp <= 0) {
+  if (!opp || isSpellProtected(opp)) {
+    alog("spell", `💤 ${side} Toxine L${spell.lane} ne fait rien : cible vide, ancrée, immunisée (Spock) ou en phase (Éclipse).`);
+    return board;
+  }
+  const hit = damageCreature(opp, 3);
+  if (!hit) {
     alog("spell", `${side} TOXINE L${spell.lane} : créature ennemie empoisonnée à mort`);
     return withOppCreatureOnLane(board, side, spell.lane, null);
   }
-  alog("spell", `${side} TOXINE L${spell.lane} : ${opp.hp}→${hp} PV, −2 ATK`);
-  return withOppCreatureOnLane(board, side, spell.lane, { ...opp, hp, atkBuff: opp.atkBuff - 2 });
+  alog("spell", `${side} TOXINE L${spell.lane} : ${opp.hp}→${hit.hp} PV, −2 ATK`);
+  return withOppCreatureOnLane(board, side, spell.lane, { ...hit, atkBuff: hit.atkBuff - 2 });
 }
 
-/** Rappel — retire (rappelle du champ) une créature ennemie. */
+/** Rappel — retire (rappelle du champ) une créature ennemie. Bloqué par
+ *  Ancre/Logique/Éclipse (cf. isSpellProtected). */
 export function applyRappel(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   if (spell.kind !== "lane") return board;
   const opp = getOppCreatureOnLane(board, side, spell.lane);
-  if (!opp) return board;
+  if (!opp || isSpellProtected(opp)) {
+    alog("spell", `💤 ${side} Rappel L${spell.lane} ne fait rien : cible vide, ancrée, immunisée (Spock) ou en phase (Éclipse).`);
+    return board;
+  }
   alog("spell", `${side} RAPPEL L${spell.lane} : créature ennemie ${opp.move} rappelée (retirée)`);
   return withOppCreatureOnLane(board, side, spell.lane, null);
 }
@@ -254,42 +268,33 @@ export function applyDoubleMot(board: BoardState, side: Side, spell: PlayedSpell
   return withMyCreatureOnLane(board, side, spell.lane, { ...c, atkBuff: c.atkBuff + eff });
 }
 
-/** Echo — duplique une carte AU HASARD de ta main (résonance). */
+/** Echo — duplique une carte AU HASARD de ta main (résonance). Jamais une
+ *  Légendaire / Fusion / Finisher (cartes 1 usage par partie). */
 export function applyEcho(board: BoardState, side: Side, rng: Rng): BoardState {
   const me = side === "a" ? board.a : board.b;
-  if (me.hand.length === 0) return board;
-  const idx = Math.floor(rng() * me.hand.length);
-  const copy = me.hand[idx];
+  const pool = me.hand.filter((id) => !isFinisherOrFusion(id) && CARDS[id]?.rarity !== "legendary");
+  if (pool.length === 0) return board;
+  const copy = pool[Math.floor(rng() * pool.length)];
   alog("spell", `${side} ECHO : duplique [${copy}] en main`);
   return withSideHero(board, side, { ...me, hand: [...me.hand, copy] });
 }
 
-/** Chronomancien — accélération temporelle : +3 mana ce tour (clampé MANA_CAP). */
+/** Chronomancien — accélération temporelle : +3 mana ce tour. Le mana est
+ *  crédité D'AVANCE (MANA_GRANTS → creditManaGrants, utilisable dès la
+ *  planification) ; le handler ne fait plus que tracer le cast. */
 export function applyChronomancien(board: BoardState, side: Side): BoardState {
-  const me = side === "a" ? board.a : board.b;
-  const mana = Math.min(MANA_CAP, me.mana + 3);
-  alog("spell", `${side} CHRONOMANCIEN : ${me.mana}→${mana} mana`);
-  return withSideHero(board, side, { ...me, mana });
+  alog("spell", `${side} CHRONOMANCIEN : +3 mana (crédité d'avance)`);
+  return board;
 }
 
-/** Supernova — 6 damage to a target (lane creature OR opp hero). */
+/** Supernova — 6 damage to the opp hero (ciblage figé à "hero", cf.
+ *  CARD_TARGET_KIND ; l'ancienne branche lane était morte). */
 export function applySupernova(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   if (spell.kind === "hero") {
     const oppS = oppSide(side);
     const oppHero = oppS === "a" ? board.a : board.b;
     alog("spell", `${side} SUPERNOVA → 6 dmg hero ${oppS}`);
     return withSideHero(board, oppS, damageHero(oppHero, 6));
-  }
-  if (spell.kind === "lane") {
-    const opp = getOppCreatureOnLane(board, side, spell.lane);
-    // Spock's Logique fizzle hostile spells, just like Anchor.
-    if (!opp || opp.anchored || opp.spellImmune) {
-      alog("spell", `💤 ${side} Supernova L${spell.lane} ne fait rien : aucune créature adverse, ou elle est ancrée/immunisée (Spock).`);
-      return board;
-    }
-    alog("spell", `${side} SUPERNOVA L${spell.lane} → 6 dmg creature opp`);
-    const damaged = damageCreature(opp, 6);
-    return withOppCreatureOnLane(board, side, spell.lane, damaged);
   }
   return board;
 }

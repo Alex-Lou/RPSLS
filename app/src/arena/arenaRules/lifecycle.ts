@@ -94,9 +94,12 @@ export function advanceToNextTurn(board: BoardState, rng?: RngPair): BoardState 
   // Filet de sécurité (Alex 2026-06-11) : si après la pioche la main est VIDE,
   // on pioche 1 de plus — MAIS seulement HORS ouverture (capNext>0), sinon le
   // filet forcerait une carte pendant les T1-3 « invocations seulement ».
-  const drawnA = drawCards(heroAVerger, drawA, r.a);
+  // REFRESH du mana AVANT la pioche : une carte « à la pioche » qui donne du mana
+  // (Coup de Bol, Caféine, Pile-ou-Face) l'ajoute au mana du NOUVEAU tour au lieu
+  // d'être écrasée par le refill (mana = maxMana) appliqué après coup.
+  const drawnA = drawCards(refreshHero(heroAVerger), drawA, r.a);
   const safeA = capNext > 0 && drawnA.hand.length === 0 ? drawCards(drawnA, 1, r.a) : drawnA;
-  const drawnB = drawCards(heroBVerger, drawB, r.b);
+  const drawnB = drawCards(refreshHero(heroBVerger), drawB, r.b);
   const safeB = capNext > 0 && drawnB.hand.length === 0 ? drawCards(drawnB, 1, r.b) : drawnB;
   // FATIGUE (Alex 2026-06-17 rethink Phase 1) : si le deck est SEC (vide) au
   // moment de piocher, le héros prend des dégâts CROISSANTS (1, 2, 3…) → le
@@ -110,10 +113,11 @@ export function advanceToNextTurn(board: BoardState, rng?: RngPair): BoardState 
     alog("turn", `FATIGUE ${tag} stack ${stacks} → -${stacks} PV (deck sec, hp ${h.hp}→${Math.max(0, h.hp - stacks)})`);
     return { ...h, fatigueStacks: stacks, hp: Math.max(0, h.hp - stacks) };
   };
-  const a = refreshHero(fatigueOf(safeA, "a"));
-  const b = refreshHero(fatigueOf(safeB, "b"));
-  // Augur / Oracle Inverse : durée 2 tours (Alex 2026-06-11). Decrement à
-  // chaque advance, clear cards quand reach 0.
+  const a = fatigueOf(safeA, "a");
+  const b = fatigueOf(safeB, "b");
+  // Augur / Oracle Inverse : compteur posé à 2, décrémenté à CHAQUE advance (dont
+  // celle qui suit aussitôt le cast) → révélé jusqu'à la prochaine planification
+  // du lanceur incluse ; cards effacées quand il atteint 0.
   const nextATurns = Math.max(0, (board.augurTurnsLeftA ?? 0) - 1);
   const nextBTurns = Math.max(0, (board.augurTurnsLeftB ?? 0) - 1);
   // Si la FATIGUE met un héros à 0 PV en début de tour, la partie FINIT ici

@@ -14,6 +14,9 @@ export function damageHero(hero: HeroState, dmg: number): HeroState {
 
 export function healHero(hero: HeroState, amount: number): HeroState {
   if (amount <= 0) return hero;
+  // ÉCRASEMENT / CATACLYSME (Montagne) : « ne peut pas être soigné ce tour » →
+  // TOUT soin héros (sorts, Sève, cartes à la pioche) passe par ici et est coupé.
+  if (hero.healLockedThisTurn) return hero;
   return { ...hero, hp: Math.min(hero.maxHp, hero.hp + amount) };
 }
 
@@ -101,7 +104,9 @@ export function dodgeSave(c: Creature): Creature {
   if (c.move !== "lizard" || BALANCE.mirage.dodgeGrowAtk <= 0) return { ...c, dodgeCharges };
   // Le grandit est PLAFONNÉ (dodgeGrowAtkCap) — fini l'ATK exponentielle d'un
   // Lézard qui esquive 9× (audit 2026-06-28).
-  const voieAtkBonus = Math.min(BALANCE.mirage.dodgeGrowAtkCap, c.voieAtkBonus + BALANCE.mirage.dodgeGrowAtk);
+  // max(cur, …) : un Lézard déjà au-dessus du plafond (bonus de Voie + Mirage) ne
+  // PERD pas d'ATK en esquivant.
+  const voieAtkBonus = Math.max(c.voieAtkBonus, Math.min(BALANCE.mirage.dodgeGrowAtkCap, c.voieAtkBonus + BALANCE.mirage.dodgeGrowAtk));
   return { ...c, dodgeCharges, voieAtkBonus };
 }
 
@@ -158,7 +163,8 @@ export function gainStrateIfHeld(c: Creature, ownerAffinity: Move | undefined, w
   // menace ET en durabilité). Le +PV est plafonné en lockstep avec STRATE_CAP
   // (early-return ci-dessus) → max +3 PV. Rend la Montagne réellement increvable
   // à la défense (sim : sans ça elle finissait à 6 PV et fondait vs heal/chip).
-  return { ...c, voieAtkBonus: c.voieAtkBonus + BALANCE.montagne.strateAtk, hp: c.hp + BALANCE.montagne.strateHp };
+  // Gain clampé STRATE_CAP (strateAtk=2 faisait 0→2→4 : au-dessus du cap).
+  return { ...c, voieAtkBonus: Math.min(STRATE_CAP, c.voieAtkBonus + BALANCE.montagne.strateAtk), hp: c.hp + BALANCE.montagne.strateHp };
 }
 
 export function endOfTurnReset(c: Creature, vergerActive = false, trancheBonus = 0): Creature {
