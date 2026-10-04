@@ -21,6 +21,7 @@ import { CardImage } from "../../ranked/CardImage";
 import type { CardId } from "../../ranked/rankedTypes";
 import { CurrencyBadges } from "../../ranked/CurrencyBadges";
 import { PACK_COST, type PackResult, craftCost } from "../../engine/economy";
+import { walletClaimCodex, walletCraft, walletErrorKey, walletOpenPack } from "../../online/wallet";
 import { hapticTap, hapticMatchWin } from "../../haptic";
 import { useNoMenuFx } from "../../fx/menuFx";
 import { ShopTabButton } from "./ShopTabButton";
@@ -34,9 +35,6 @@ export function ShopPage() {
   useNoMenuFx();
   const t = useT();
   const player = useStore((s) => s.player);
-  const openPack = useStore((s) => s.openPack);
-  const craftCardAction = useStore((s) => s.craftCard);
-  const claimCodexTier = useStore((s) => s.claimCodexTier);
   const eclats = player.eclats ?? 0;
   const dust = player.dust ?? 0;
   const collection = player.cardCollection ?? [];
@@ -44,31 +42,43 @@ export function ShopPage() {
   const [tab, setTab] = useState<Tab>("shop");
   const [packResult, setPackResult] = useState<PackResult | null>(null);
   const [justCrafted, setJustCrafted] = useState<CardId | null>(null);
+  // Économie serveur (§9-B) : chaque achat est validé par le serveur. `busy`
+  // bloque les boutons pendant l'aller-retour ; `error` affiche son refus.
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const lockedCards = ALL_CARD_IDS.filter((id) => !collection.includes(id));
-  const canBuyPack = eclats >= PACK_COST;
+  const canBuyPack = eclats >= PACK_COST && !busy;
 
-  function handleOpenPack() {
+  async function serverAction<T>(call: () => Promise<{ ok: true; update: T } | { ok: false; code: string }>) {
+    if (busy) return null;
     hapticTap();
-    const r = openPack();
-    if (!r) return;
-    hapticMatchWin();
-    setPackResult(r);
+    setBusy(true);
+    setError(null);
+    const r = await call();
+    setBusy(false);
+    if (r.ok) return r.update;
+    setError(t(walletErrorKey(r.code)));
+    window.setTimeout(() => setError(null), 3500);
+    return null;
   }
 
-  function handleCraft(id: CardId) {
-    hapticTap();
-    const ok = craftCardAction(id);
-    if (!ok) return;
+  async function handleOpenPack() {
+    const u = await serverAction(walletOpenPack);
+    if (!u?.pack) return;
+    hapticMatchWin();
+    setPackResult(u.pack as PackResult);
+  }
+
+  async function handleCraft(id: CardId) {
+    if (!(await serverAction(() => walletCraft(id)))) return;
     hapticMatchWin();
     setJustCrafted(id);
     window.setTimeout(() => setJustCrafted((cur) => (cur === id ? null : cur)), 1800);
   }
 
-  function handleClaimTier(threshold: number) {
-    hapticTap();
-    const ok = claimCodexTier(threshold);
-    if (ok) hapticMatchWin();
+  async function handleClaimTier(threshold: number) {
+    if (await serverAction(() => walletClaimCodex(threshold))) hapticMatchWin();
   }
 
   return (
@@ -126,9 +136,11 @@ export function ShopPage() {
               (canBuyPack ? "bg-themed hover:scale-[1.01]" : "bg-hairline text-ink-faint cursor-not-allowed")
             }
           >
-            {canBuyPack
-              ? `Ouvrir un pack · ${PACK_COST} 💎`
-              : `Il manque ${formatNumber(PACK_COST - eclats)} 💎`}
+            {busy
+              ? t("wallet.connecting")
+              : canBuyPack
+                ? `Ouvrir un pack · ${PACK_COST} 💎`
+                : `Il manque ${formatNumber(PACK_COST - eclats)} 💎`}
           </motion.button>
         </section>
 
@@ -153,7 +165,7 @@ export function ShopPage() {
               {lockedCards.map((id) => {
                 const card = CARDS[id];
                 const cost = craftCost(id);
-                const canCraft = dust >= cost;
+                const canCraft = dust >= cost && !busy;
                 const wasJustCrafted = justCrafted === id;
                 return (
                   <motion.div
@@ -216,6 +228,18 @@ export function ShopPage() {
         {/* Justified-craft notice — a brief floating badge confirms the action
             on the freshly-forged tile (alongside the scale pulse above). */}
         <AnimatePresence>
+          {error && (
+            <motion.div
+              key="shop-error"
+              role="alert"
+              initial={{ y: 16, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 8, opacity: 0 }}
+              className="fixed left-1/2 -translate-x-1/2 bottom-6 z-40 max-w-[90vw] px-4 py-2 rounded-2xl bg-rose-600/95 text-white shadow-xl text-sm font-bold text-center"
+            >
+              {error}
+            </motion.div>
+          )}
           {justCrafted && (
             <motion.div
               initial={{ y: 16, opacity: 0 }}

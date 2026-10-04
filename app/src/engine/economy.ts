@@ -5,12 +5,13 @@
  * consolation on a loss). They spend éclats at the boutique to open a pack
  * of {@link PACK_SIZE} cards. Duplicates inside a pack are auto-converted to
  * POUSSIÈRE — a craft resource the player can then spend to forge a specific
- * locked card. The whole loop stays local (no server, no auth).
+ * locked card. Barèmes ici (source unique, exportés vers le serveur par
+ * scripts/gen-economy-meta.mjs) ; les opérations elles-mêmes (tirage, débit,
+ * crédit) sont faites par le SERVEUR (online/wallet.ts, §9-B).
  */
 
 import type { CardId, CardRarity } from "../ranked/rankedTypes";
-import { CARDS, ALL_CARD_IDS, RARITY_ORDER } from "../ranked/cards";
-import { isFinisherCard } from "../arena/arenaFinishers";
+import { CARDS } from "../ranked/cards";
 import { RANK_TIERS, type RankTier } from "./rank";
 import type { Outcome, RecordMode } from "../types";
 
@@ -82,31 +83,6 @@ export function eclatsReward(mode: RecordMode, outcome: Outcome): number {
   if (outcome === "win") return ECLATS_PER_WIN[mode] ?? 0;
   if (outcome === "loss") return ECLATS_PER_LOSS;
   return 0;
-}
-
-/** Cartes tirables en pack. Les Finishers Pro sont exclus : injectés à 3⭐ en
- *  match, jamais deckables (cf. arenaDecks.isDeckable) → une carte morte. */
-const PACKABLE_IDS: CardId[] = ALL_CARD_IDS.filter((id) => !isFinisherCard(id));
-
-function rollOneCard(): CardId {
-  const total = (Object.values(PACK_WEIGHTS) as number[]).reduce((a, b) => a + b, 0);
-  let r = Math.random() * total;
-  let pickedRarity: CardRarity = "common";
-  for (const rarity of RARITY_ORDER) {
-    r -= PACK_WEIGHTS[rarity];
-    if (r <= 0) { pickedRarity = rarity; break; }
-  }
-  const pool = PACKABLE_IDS.filter((id) => CARDS[id].rarity === pickedRarity);
-  if (pool.length === 0) {
-    const commons = PACKABLE_IDS.filter((id) => CARDS[id].rarity === "common");
-    return commons[Math.floor(Math.random() * commons.length)];
-  }
-  return pool[Math.floor(Math.random() * pool.length)];
-}
-
-/** Roll one full pack — PACK_SIZE independent card draws. */
-export function rollPack(): CardId[] {
-  return Array.from({ length: PACK_SIZE }, () => rollOneCard());
 }
 
 export function dustForDuplicate(id: CardId): number {

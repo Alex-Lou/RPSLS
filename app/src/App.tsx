@@ -27,6 +27,7 @@ import { setHapticSettings } from "./haptic";
 import { initSentry, shutdownSentry } from "./monitoring/sentry";
 import { startSyncSubscriber } from "./online/playerSync";
 import { runBootSync, restoreAnchorIntoStore } from "./online/bootSync";
+import { flushWallet, startWalletListener } from "./online/wallet";
 import { AuthGate } from "./auth/AuthGate";
 
 // Code-split heavy pages — each becomes its own JS chunk that Vite ships
@@ -134,12 +135,16 @@ export default function App() {
   // Season rollover (B5) — fires the soft-LP-reset + tier reward when the
   // 30-day window has elapsed. We run it once on mount: a session crossing
   // midnight stays on the current season until the next launch (acceptable).
+  // Portefeuille actif : la saison est versée par le serveur (online/wallet.ts),
+  // qui pose `seasonRollover` dans le store — même écran dans les deux cas.
   const rolloverSeasonIfDue = useStore((s) => s.rolloverSeasonIfDue);
-  const [seasonRollover, setSeasonRollover] = useState<ReturnType<typeof rolloverSeasonIfDue>>(null);
+  const seasonRollover = useStore((s) => s.seasonRollover);
+  const setSeasonRollover = useStore((s) => s.setSeasonRollover);
   useEffect(() => {
     const r = rolloverSeasonIfDue();
     if (r) setSeasonRollover(r);
     startSyncSubscriber();
+    startWalletListener();
     // Restore the durable anchor FIRST (Tauri plugin-store JSON), THEN
     // start the boot sync — so a freshly wiped localStorage (post-reinstall)
     // gets seeded with the previous player.id + claimToken before any
@@ -147,6 +152,10 @@ export default function App() {
     // freshly-generated UUID and lose the account.
     void restoreAnchorIntoStore().finally(() => {
       runBootSync();
+      // Économie serveur (§9-B) : active/confirme le portefeuille et rejoue les
+      // gains en attente. Après le bootSync (jitter 0-8 s) pour ne pas doubler
+      // la charge au démarrage ; silencieux, sans effet hors ligne.
+      window.setTimeout(() => { void flushWallet(); }, 10_000 + Math.floor(Math.random() * 5_000));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

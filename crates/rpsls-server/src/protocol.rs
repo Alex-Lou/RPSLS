@@ -141,12 +141,20 @@ pub enum ClientMessage {
     CraftCard { card_id: String },
     BuyPremiumSet { set_id: String },
     ClaimCodex { threshold: u32 },
-    /// Gain d'un match vs CPU (barème serveur, plafond quotidien).
-    ClaimCpuReward { mode: String, outcome: String },
+    /// Gains de matchs vs CPU, groupés (barème serveur, plafond quotidien).
+    /// Traités en UNE opération atomique ; au plus 50 par message.
+    ClaimCpuRewards { rewards: Vec<CpuReward> },
     /// Cartes de déblocage de progression (liste bornée côté serveur).
     ClaimUnlocks { card_ids: Vec<String> },
     /// Fin de saison (horloge serveur).
     ClaimSeason,
+}
+
+/// Un gain de match vs CPU à réclamer (`mode` : mode de `eclats_per_win`, ou "arena").
+#[derive(Debug, Clone, Deserialize)]
+pub struct CpuReward {
+    pub mode: String,
+    pub outcome: String,
 }
 
 /* ──────────── Server → Client ──────────── */

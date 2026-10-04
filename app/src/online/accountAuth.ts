@@ -18,6 +18,7 @@ import { type PlayerProgress } from "./online";
 import { resolveWsUrl, helloFrame } from "./transientSession";
 import { applyAuthState } from "./playerSync";
 import { saveAnchor } from "./playerAnchor";
+import { flushWallet } from "./wallet";
 
 export type AuthMode = "signup" | "login";
 export type AuthResult = { ok: true } | { ok: false; code: string };
@@ -228,4 +229,6 @@ function applyAuthOk(
   if (msg.player_id && finalToken) {
     void saveAnchor(msg.player_id, finalToken);
   }
+  // Nouvelle identité (ou bonus de bienvenue) : (re)confirme son portefeuille.
+  void flushWallet();
 }

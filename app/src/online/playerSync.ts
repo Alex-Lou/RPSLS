@@ -78,6 +78,19 @@ export function buildProgressFromPlayer(player: Player): PlayerProgress {
   };
 }
 
+/** Champs d'éco tels que le serveur les détient (portefeuille). */
+function ecoFromServer(server: PlayerProgress): Partial<Player> {
+  return {
+    eclats: server.eclats,
+    dust: server.dust,
+    stars: server.stars ?? 0,
+    cardCollection: server.cardCollection ?? [],
+    ownedPremiumSets: server.ownedPremiumSets ?? [],
+    codexClaimed: server.codexClaimed ?? [],
+    season: { number: server.seasonNumber || 1, startedAt: server.seasonStartedAt || Date.now() },
+  };
+}
+
 /** Merge server state INTO local, taking the higher/newer value for each field.
  *  Returns the merged player patch to apply to the store. */
 export function mergeServerState(
@@ -306,6 +319,11 @@ export function mergeServerState(
     if (server.padChosen) patch.padChosen = true;
   }
 
+  // Économie serveur-autoritaire (§9-B) : portefeuille actif → le serveur GAGNE
+  // sur l'éco, valeur exacte (fini le max/union, qui rendait toute triche
+  // locale permanente). `state_loaded` porte le portefeuille (cf. wallet.ts).
+  if (local.walletActive) Object.assign(patch, ecoFromServer(server));
+
   return patch;
 }
 
@@ -361,6 +379,10 @@ function adoptServerState(server: PlayerProgress): Partial<Player> {
     // Mark this install as synced to the account so the fresh-install restore
     // gates in mergeServerState don't re-fire on the next boot.
     syncedAt: server.updatedAt || Date.now(),
+    // Autre identité → autre portefeuille : la prochaine session serveur
+    // (re)confirme le sien ; les réclamations de l'invité ne passent pas au compte.
+    walletActive: false,
+    pendingEco: { cpu: [], unlocks: [] },
   };
   // Loadout + look: adopt only when the account has a real value.
   if (server.rankedDeck && server.rankedDeck.length > 0) patch.rankedDeck = server.rankedDeck;

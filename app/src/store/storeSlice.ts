@@ -8,21 +8,16 @@ import { abandonPenaltyLp, activeAbandonCount, nextAbandon } from "../match/forf
 import { nextStreak, streakBonusXp } from "../match/streak";
 import {
   ARENA_ECLATS,
-  PACK_COST,
   SEASON_DURATION_MS,
-  codexTier,
-  craftCost,
-  dustForDuplicate,
   eclatsReward,
   masteryXpForMatch,
-  rollPack,
   seasonRewardForLp,
   softResetLp,
 } from "../engine/economy";
 import type { AppState } from "./storeTypes";
 import { defaultPlayer, detectLocale, defaultServerConfig, HISTORY_LIMIT } from "./storeDefaults";
 import { applyRankedUnlocks } from "./rankedUnlocks";
-import { useStore } from "./store";
+import { enqueueCpuReward, enqueueUnlocks } from "../online/wallet";
 
 export const createSlice: StateCreator<AppState> = (set, get) => ({
   player: defaultPlayer(),
@@ -39,7 +34,8 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
   updateProfile: (patch) =>
     set((s) => ({ player: { ...s.player, ...patch } })),
 
-  recordMatch: (m) =>
+  recordMatch: (m) => {
+    const before = get().player.cardCollection ?? [];
     set((s) => {
       const p = structuredClone(s.player);
       // Win-streak momentum: roll the streak, then top up the win XP with
@@ -91,7 +87,17 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
         player: p,
         history: newHistory,
       };
-    }),
+    });
+    // Portefeuille actif : le gain local ci-dessus n'est qu'un affichage
+    // optimiste. Un match arbitré par le serveur (vs humain en ligne) est crédité
+    // par le serveur lui-même ; tout le reste (CPU, hotseat) est RÉCLAMÉ au
+    // serveur, qui applique barème + plafond quotidien.
+    const serverRefereed = m.opponent.kind === "human" && m.mode !== "hotseat";
+    if (!serverRefereed && !m.forfeit && eclatsReward(m.mode, m.outcome) > 0) {
+      enqueueCpuReward(m.mode, m.outcome);
+    }
+    enqueueUnlocks((get().player.cardCollection ?? []).filter((id) => !before.includes(id)));
+  },
 
   // Ladder Classé SEUL (classeLp + classeStats), sans toucher rankLp/xp/history —
   // le match online correspondant est déjà enregistré (mode "online", rankLp
@@ -175,53 +181,60 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
     if (col.includes(id)) return s;
     return { player: { ...s.player, cardCollection: [...col, id] } };
   }),
-  recordArenaMatch: (outcome, meta) => set((s) => {
-    const cur = s.player.arenaStats ?? { wins: 0, losses: 0, draws: 0 };
-    const next = {
-      wins:   cur.wins + (outcome === "win" ? 1 : 0),
-      losses: cur.losses + (outcome === "loss" ? 1 : 0),
-      draws:  cur.draws + (outcome === "draw" ? 1 : 0),
-    };
-    // Éclats reward — mirrors the existing eclatsReward(mode, outcome)
-    // scale for casual modes. Constellation Pro is higher-effort (longer
-    // matches, deeper strategy) so it pays slightly above Constellation
-    // Ranked: win 20, draw 10, loss 5.
-    const reward = ARENA_ECLATS[outcome];
-    // HISTORIQUE (Alex 2026-06-13 « voies jouées dans l'historique ») : on
-    // journalise AUSSI le match vs-CPU (avant : SEULS les compteurs
-    // arenaStats, aucune entrée dans `history` → log vide + voie perdue). La
-    // VOIE jouée (joueur + adversaire) est conservée → consultable ET
-    // synchronisable au cloud (cf. buildProgressFromPlayer).
-    const rec: MatchRecord = {
-      id: `arena-${Date.now()}`,
-      mode: "constellation",
-      bestOf: 1,
-      opponent: { kind: "cpu", mood: "logical" },
-      scorePlayer: outcome === "win" ? 1 : 0,
-      scoreOpponent: outcome === "loss" ? 1 : 0,
-      outcome,
-      rounds: [],
-      xpDelta: 0,
-      lpDelta: 0,
-      timestamp: Date.now(),
-      forfeit: meta?.forfeit || undefined,
-      playerVoie: meta?.playerVoie,
-      oppVoie: meta?.oppVoie,
-    };
-    const newHistory = [rec, ...s.history].slice(0, HISTORY_LIMIT);
-    // Débloque les cartes Arena selon constellWins : l'history vs-CPU compte
-    // ENFIN (avant, ces victoires n'étaient pas journalisées → 0 unlock).
-    const cardCollection = applyRankedUnlocks(s.player.cardCollection ?? [], s.player.rankLp, newHistory);
-    return {
-      player: {
-        ...s.player,
-        arenaStats: next,
-        eclats: (s.player.eclats ?? 0) + reward,
-        cardCollection,
-      },
-      history: newHistory,
-    };
-  }),
+  recordArenaMatch: (outcome, meta) => {
+    const before = get().player.cardCollection ?? [];
+    set((s) => {
+      const cur = s.player.arenaStats ?? { wins: 0, losses: 0, draws: 0 };
+      const next = {
+        wins:   cur.wins + (outcome === "win" ? 1 : 0),
+        losses: cur.losses + (outcome === "loss" ? 1 : 0),
+        draws:  cur.draws + (outcome === "draw" ? 1 : 0),
+      };
+      // Éclats reward — mirrors the existing eclatsReward(mode, outcome)
+      // scale for casual modes. Constellation Pro is higher-effort (longer
+      // matches, deeper strategy) so it pays slightly above Constellation
+      // Ranked: win 20, draw 10, loss 5.
+      const reward = ARENA_ECLATS[outcome];
+      // HISTORIQUE (Alex 2026-06-13 « voies jouées dans l'historique ») : on
+      // journalise AUSSI le match vs-CPU (avant : SEULS les compteurs
+      // arenaStats, aucune entrée dans `history` → log vide + voie perdue). La
+      // VOIE jouée (joueur + adversaire) est conservée → consultable ET
+      // synchronisable au cloud (cf. buildProgressFromPlayer).
+      const rec: MatchRecord = {
+        id: `arena-${Date.now()}`,
+        mode: "constellation",
+        bestOf: 1,
+        opponent: { kind: "cpu", mood: "logical" },
+        scorePlayer: outcome === "win" ? 1 : 0,
+        scoreOpponent: outcome === "loss" ? 1 : 0,
+        outcome,
+        rounds: [],
+        xpDelta: 0,
+        lpDelta: 0,
+        timestamp: Date.now(),
+        forfeit: meta?.forfeit || undefined,
+        playerVoie: meta?.playerVoie,
+        oppVoie: meta?.oppVoie,
+      };
+      const newHistory = [rec, ...s.history].slice(0, HISTORY_LIMIT);
+      // Débloque les cartes Arena selon constellWins : l'history vs-CPU compte
+      // ENFIN (avant, ces victoires n'étaient pas journalisées → 0 unlock).
+      const cardCollection = applyRankedUnlocks(s.player.cardCollection ?? [], s.player.rankLp, newHistory);
+      return {
+        player: {
+          ...s.player,
+          arenaStats: next,
+          eclats: (s.player.eclats ?? 0) + reward,
+          cardCollection,
+        },
+        history: newHistory,
+      };
+    });
+    // Portefeuille actif : un match Arena EN LIGNE est crédité par le serveur
+    // (fin de match ccg) ; contre le CPU, le gain est réclamé (cf. recordMatch).
+    if (!meta?.online) enqueueCpuReward("arena", outcome);
+    enqueueUnlocks((get().player.cardCollection ?? []).filter((id) => !before.includes(id)));
+  },
 
   restoreHistory: (h) => set({ history: h }),
   // Editing a deck stamps `syncedAt`: it marks this install as "no longer a
@@ -245,66 +258,6 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
     player: { ...s.player, arenaAffinity: affinity },
   })),
 
-  openPack: () => {
-    const player = get().player;
-    if ((player.eclats ?? 0) < PACK_COST) return null;
-    const owned = new Set(player.cardCollection ?? []);
-    const cards = rollPack();
-    const isNew = cards.map((id) => {
-      if (owned.has(id)) return false;
-      owned.add(id);
-      return true;
-    });
-    const dustGained = cards.reduce(
-      (sum, id, i) => (isNew[i] ? sum : sum + dustForDuplicate(id)),
-      0,
-    );
-    set((s) => ({
-      player: {
-        ...s.player,
-        eclats: (s.player.eclats ?? 0) - PACK_COST,
-        dust: (s.player.dust ?? 0) + dustGained,
-        cardCollection: Array.from(owned),
-      },
-    }));
-    return { cards, isNew, dustGained };
-  },
-
-  craftCard: (id) => {
-    const player = get().player;
-    const owned = new Set(player.cardCollection ?? []);
-    if (owned.has(id)) return false;
-    const cost = craftCost(id);
-    if ((player.dust ?? 0) < cost) return false;
-    set((s) => ({
-      player: {
-        ...s.player,
-        dust: (s.player.dust ?? 0) - cost,
-        cardCollection: [...(s.player.cardCollection ?? []), id],
-      },
-    }));
-    return true;
-  },
-
-  claimCodexTier: (threshold) => {
-    const tier = codexTier(threshold);
-    if (!tier) return false;
-    const player = get().player;
-    const collection = player.cardCollection ?? [];
-    if (collection.length < threshold) return false;
-    const claimed = player.codexClaimed ?? [];
-    if (claimed.includes(threshold)) return false;
-    set((s) => ({
-      player: {
-        ...s.player,
-        eclats: (s.player.eclats ?? 0) + tier.eclats,
-        dust: (s.player.dust ?? 0) + tier.dust,
-        codexClaimed: [...claimed, threshold],
-      },
-    }));
-    return true;
-  },
-
   awardCardMasteryXp: (cards, outcome) => {
     const xp = masteryXpForMatch(outcome);
     if (xp <= 0 || cards.length === 0) return;
@@ -317,6 +270,9 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
 
   rolloverSeasonIfDue: () => {
     const player = get().player;
+    // Portefeuille actif : la saison est cadencée et versée par le SERVEUR
+    // (horloge serveur) — cf. online/wallet.ts, qui pose `seasonRollover`.
+    if (player.walletActive) return null;
     const now = Date.now();
     const season = player.season ?? { number: 1, startedAt: now };
     // If we just initialised, persist that and report no rollover.
@@ -340,6 +296,9 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
     return { fromSeason: season.number, reward, lpBefore, lpAfter };
   },
 
+  seasonRollover: null,
+  setSeasonRollover: (r) => set({ seasonRollover: r }),
+
   applyServerSync: (patch) =>
     set((s) => ({ player: { ...s.player, ...patch } })),
   logout: () => {
@@ -348,21 +307,6 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
     // (under its own player_id) — logging back in restores everything.
     void clearAnchor();
     set({ player: defaultPlayer(), history: [] });
-  },
-  simulatePremiumPurchase: (setId, costStars) => {
-    const p = useStore.getState().player;
-    const owned = p.ownedPremiumSets ?? [];
-    if (owned.includes(setId)) return false;
-    const stars = p.stars ?? 0;
-    if (stars < costStars) return false;
-    set((s) => ({
-      player: {
-        ...s.player,
-        stars: (s.player.stars ?? 0) - costStars,
-        ownedPremiumSets: [...(s.player.ownedPremiumSets ?? []), setId],
-      },
-    }));
-    return true;
   },
   grantStars: (n) =>
     set((s) => ({ player: { ...s.player, stars: Math.max(0, (s.player.stars ?? 0) + Math.round(n)) } })),
