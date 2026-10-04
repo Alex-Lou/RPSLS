@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence } from "motion/react";
 import { useStore } from "../store/store";
 import { GameMode } from "../types";
 import { type DailyChallenge } from "../engine/daily";
@@ -27,6 +27,7 @@ import { ModeSelect, SandboxView, ConstellationLobby, ClasseLobby } from "./play
 import { setOnlineIntent } from "../online/onlineIntent";
 import { consumePlayReturnView } from "../online/playReturnView";
 import { backPromptActive } from "../match/sharedMatchUI/androidBack";
+import { MatchStage } from "../nav/MatchStage";
 
 type View =
   | { kind: "select" }
@@ -169,48 +170,29 @@ export function PlayPage({
             onTraining={() => setView({ kind: "arena_pro" })}
             onGoOnline={() => setView({ kind: "arena_online" })}
             onManageDeck={() => setView({ kind: "ranked_deck", from: "arena" })}
-            onGoShop={() => setView({ kind: "ranked_lobby" })}
             onBack={() => setView({ kind: "select" })}
             onTutorial={() => setView({ kind: "arena_tutorial" })}
           />
         )}
         {view.kind === "arena_tutorial" && (
-          <motion.div
-            key="arena_tutorial"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            className="flex flex-col flex-1 min-h-0"
-          >
+          <MatchStage key="arena_tutorial">
             <ArenaTutorialPage
               // Quitter en cours de route = tuto « passé » (plus proposé d'office) ;
               // sans effet s'il est déjà réussi.
               onBack={() => { skipArenaTutorial(); setView({ kind: "arena_lobby" }); }}
               onPlayReal={() => setView({ kind: "arena_pro" })}
             />
-          </motion.div>
+          </MatchStage>
         )}
         {view.kind === "arena_online" && (
-          <motion.div
-            key="arena_online"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            className="flex flex-col flex-1 min-h-0"
-          >
+          <MatchStage key="arena_online">
             <ArenaOnlineGame onBack={() => setView({ kind: "arena_lobby" })} />
-          </motion.div>
+          </MatchStage>
         )}
         {view.kind === "arena_pro" && (
-          <motion.div
-            key="arena_pro"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            className="flex flex-col flex-1 min-h-0"
-          >
+          <MatchStage key="arena_pro">
             <ArenaPage onBack={() => setView({ kind: "arena_lobby" })} />
-          </motion.div>
+          </MatchStage>
         )}
         {view.kind === "constellation_prep" && (
           <ConstellationLobby
@@ -229,30 +211,24 @@ export function PlayPage({
           />
         )}
         {view.kind === "game" && (
-          <Game
-            key={`${view.mode}-${view.bestOf}-${view.daily?.date ?? ""}-${viewNonce}`}
-            mode={view.mode}
-            bestOf={view.bestOf}
-            daily={view.daily}
-            questCtx={view.questCtx}
-            withAtouts={view.atouts}
-            onQuit={() => setView({ kind: "select" })}
-          />
+          <MatchStage key={`${view.mode}-${view.bestOf}-${view.daily?.date ?? ""}-${viewNonce}`}>
+            <Game
+              mode={view.mode}
+              bestOf={view.bestOf}
+              daily={view.daily}
+              questCtx={view.questCtx}
+              withAtouts={view.atouts}
+              onQuit={() => setView({ kind: "select" })}
+            />
+          </MatchStage>
         )}
         {view.kind === "lanes_cpu" && (
-          <motion.div
-            key={`lanes-cpu-${view.winTo}-${viewNonce}`}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            transition={{ duration: 0.25 }}
-            className="flex-1 flex flex-col min-h-0"
-          >
+          <MatchStage key={`lanes-cpu-${view.winTo}-${viewNonce}`}>
             <LocalLanesGame
               winTo={view.winTo}
               onQuit={() => setView({ kind: "select" })}
             />
-          </motion.div>
+          </MatchStage>
         )}
         {view.kind === "ranked_lobby" && (
           <RankedLobby
@@ -274,7 +250,6 @@ export function PlayPage({
               setView({ kind: "ranked_bracket" });
             }}
             onManageDeck={() => setView({ kind: "ranked_deck", from: "ranked" })}
-            onGoShop={onNavigate ? () => onNavigate("shop") : undefined}
           />
         )}
         {view.kind === "ranked_deck" && (
@@ -318,14 +293,7 @@ export function PlayPage({
           );
         })()}
         {view.kind === "ranked_match" && (
-          <motion.div
-            key={`ranked-match-${view.oppName}`}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            transition={{ duration: 0.25 }}
-            className="flex-1 flex flex-col min-h-0"
-          >
+          <MatchStage key={`ranked-match-${view.oppName}`}>
             {/* The arena pad override (if the coin gave the duel to the
                 opponent's pad) is supplied via context; null = player's pad. */}
             <ArenaPadProvider value={view.arena?.side === "opp" ? view.arena.padId : null}>
@@ -342,7 +310,7 @@ export function PlayPage({
                 }}
               />
             </ArenaPadProvider>
-          </motion.div>
+          </MatchStage>
         )}
 
         {/* ─── Classé (classic 1v1) hub ─── */}
@@ -377,17 +345,18 @@ export function PlayPage({
           />
         )}
         {view.kind === "classe_match" && (
-          <Game
-            key={`classe-match-${view.oppName}-${viewNonce}`}
-            mode="ranked"
-            bestOf={5}
-            withAtouts
-            onQuit={() => setView({ kind: "classe_bracket" })}
-            onMatchResult={(won) => {
-              setClasseTournament((t) => resolvePlayerMatch(t, won));
-              setView({ kind: "classe_bracket" });
-            }}
-          />
+          <MatchStage key={`classe-match-${view.oppName}-${viewNonce}`}>
+            <Game
+              mode="ranked"
+              bestOf={5}
+              withAtouts
+              onQuit={() => setView({ kind: "classe_bracket" })}
+              onMatchResult={(won) => {
+                setClasseTournament((t) => resolvePlayerMatch(t, won));
+                setView({ kind: "classe_bracket" });
+              }}
+            />
+          </MatchStage>
         )}
       </AnimatePresence>
     </div>

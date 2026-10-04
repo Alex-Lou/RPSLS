@@ -195,7 +195,10 @@ export function LanesMatchView({
           />
         )}
         {phase === "match_end" && end && (
-          <MatchEndScene end={end} onBack={onLeave} onRematch={onRematch} />
+          <MatchEndScene
+            end={end} onBack={onLeave} onRematch={onRematch}
+            youName={nickname || t("end.you")} oppName={match.opponent || t("end.opponent")} winTo={match.winTo}
+          />
         )}
         </div>
       </ScaleToFit>

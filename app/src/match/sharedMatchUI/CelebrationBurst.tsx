@@ -64,23 +64,3 @@ export function CelebrationBurst({ variant = "default" }: { variant?: "default" 
     </div>
   );
 }
-
-/** Counts a number up from 0 → `to` (handles negatives) over ~0.7s. */
-export function CountUp({ to, durationMs = 700 }: { to: number; durationMs?: number }) {
-  const [n, setN] = useState(0);
-  const sign = to < 0 ? -1 : 1;
-  const target = Math.abs(to);
-  useEffect(() => {
-    let raf = 0;
-    let start: number | null = null;
-    const step = (ts: number) => {
-      if (start == null) start = ts;
-      const p = Math.min(1, (ts - start) / durationMs);
-      setN(Math.round(p * target));
-      if (p < 1) raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [target, durationMs]);
-  return <>{sign < 0 ? -n : n}</>;
-}

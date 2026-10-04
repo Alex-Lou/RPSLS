@@ -1,30 +1,28 @@
 /**
- * ModeLobbyShell — TEMPLATE de cadrage commun aux lobbies de mode (Pro,
- * Classé, Constellation, En ligne…). Alex 2026-06-12 : "un véritable design
- * de cadrage qui pourra parfaitement aller aussi dans le mode constellation
- * normale et classé comme template — on évite les redondances".
+ * ModeLobbyShell — TEMPLATE UNIQUE des lobbies de mode (Entraînement,
+ * Constellation, Classé, Constellation Classée, Pro, En ligne).
  *
- * Plein écran, SANS scroll de page :
- *   ┌ [☰ themed]   TITRE + tagline   [← retour] ┐  header symétrique (40px)
- *   ├ identité compacte 1 ligne (optionnelle)   ┤  LobbyIdentityRow
- *   ├ CONTENU flex-1 min-h-0                    ┤  sections du mode ;
- *   │   (scroll interne UNIQUEMENT si déborde)  │  jamais le viewport
- *   ├ CTA principal docké — toujours visible    ┤
- *   └ rangée secondaire (grid) — optionnelle    ┘
+ *   Portrait                         Paysage
+ *   ┌ barre du haut (AppTopBar) ┐    ┌ barre du haut ─────────────────┐
+ *   ├ HÉROS du mode (élastique) ┤    ├ HÉROS      │ réglages (scroll) │
+ *   ├ réglages (scroll si besoin)┤   │ (colonne)  │ CTA docké         │
+ *   ├ CTA principal docké        ┤   └────────────┴───────────────────┘
+ *   └ rangée secondaire          ┘
  *
- * Le burger flottant global est masqué tant que le shell est monté : le
- * burger themed INLINE du header (même style que le menu principal) ouvre
- * le même drawer. Le retour vit à droite (symétrie) — plus de
- * FloatingMatchBackButton par-dessus le contenu.
+ * Le titre + le retour vivent dans la barre du haut (useTopBar) : retour
+ * TOUJOURS à gauche, plus de bouton flottant sur le contenu. Le héros absorbe
+ * la hauteur libre → plus de grand vide noir avant « Jouer » ; sur petit écran
+ * il se compacte et seuls les réglages défilent, le CTA reste à portée de
+ * pouce. Sur tablette très haute (héros plafonné) le bloc se centre.
  */
 
-import { useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { motion } from "motion/react";
-import { openMobileMenu, setBurgerHidden } from "../Sidebar";
-import { avatarImgStyle } from "../theme/avatar";
+import { openMobileMenu } from "../Sidebar";
+import { useTopBar } from "../nav/topBarStore";
 
-/** Burger themed inline — PARTAGÉ menu principal + lobbies (zéro redondance).
- *  Style color-mix sur var(--theme-*) : suit le thème équipé (OK WebView). */
+/** Burger themed inline — PARTAGÉ barre du haut + menu principal + HUD de
+ *  match. Style color-mix sur var(--theme-*) : suit le thème équipé. */
 export function InlineBurger({ className = "w-10 h-10" }: { className?: string }) {
   return (
     <motion.button
@@ -49,45 +47,7 @@ export function InlineBurger({ className = "w-10 h-10" }: { className?: string }
   );
 }
 
-/** Identité compacte 1 LIGNE : avatar + nom + chips à droite. Toutes les
- *  surfaces lobby utilisent la même (cohérence + pas de gros pavé profil). */
-export function LobbyIdentityRow({
-  avatar, name, chips, onTap,
-}: {
-  avatar: string;
-  name: string;
-  /** Chips compacts à droite (Lv, WR%, badge mode…). */
-  chips?: ReactNode;
-  onTap?: () => void;
-}) {
-  const isImage = /^(data:|\/|https?:)/.test(avatar);
-  const Tag = onTap ? "button" : "div";
-  return (
-    <Tag
-      {...(onTap ? { onClick: onTap, type: "button" as const } : {})}
-      className="shrink-0 w-full flex items-center gap-2.5 rounded-2xl border border-hairline bg-surface-raised backdrop-blur px-3 py-2.5 text-left"
-    >
-      <div
-        className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center text-xl shrink-0 ring-1 ring-white/15"
-        style={{
-          background:
-            "linear-gradient(135deg, color-mix(in oklab, var(--theme-primary) 32%, transparent), color-mix(in oklab, var(--theme-secondary) 32%, transparent))",
-        }}
-      >
-        {isImage ? <img src={avatar} alt="" className="w-full h-full object-cover" style={avatarImgStyle(avatar)} /> : avatar}
-      </div>
-      {/* Nom sur SA ligne (pleine largeur → s'affiche en entier), chips sur la
-       *  ligne JUSTE en dessous (Alex 2026-06-27 « le nom était coupé par les
-       *  chips sur la même ligne »). */}
-      <div className="flex-1 min-w-0 flex flex-col gap-1">
-        <span className="font-bold text-sm truncate">{name}</span>
-        {chips && <div className="flex items-center gap-1.5 flex-wrap">{chips}</div>}
-      </div>
-    </Tag>
-  );
-}
-
-/** Chip uniforme pour la rangée identité / stats des lobbies. */
+/** Chip uniforme pour les stats des lobbies. */
 export function LobbyChip({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "accent" | "good" }) {
   const cls =
     tone === "accent" ? "bg-fuchsia-500/25 text-fuchsia-100 border-fuchsia-400/40" :
@@ -100,97 +60,123 @@ export function LobbyChip({ children, tone = "neutral" }: { children: ReactNode;
   );
 }
 
+/** Section de réglages : petit intitulé en capitales + contenu + aide optionnelle. */
+export function LobbySection({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="shrink-0">
+      <div className="text-[10px] uppercase tracking-[0.2em] text-ink-muted font-bold mb-2">{label}</div>
+      {children}
+      {hint && <p className="text-[11px] text-ink-muted mt-2 text-center leading-snug">{hint}</p>}
+    </section>
+  );
+}
+
+/** CTA principal des lobbies (gros bouton themed docké en bas). */
+export function LobbyPrimaryButton({ onClick, children, className = "" }: { onClick: () => void; children: ReactNode; className?: string }) {
+  return (
+    <motion.button
+      whileTap={{ scale: 0.97 }}
+      onClick={onClick}
+      className={"w-full rounded-2xl px-5 py-3.5 font-bold text-white shadow-lg transition hover:brightness-110 bg-themed-br " + className}
+      style={{
+        boxShadow: "0 10px 28px -6px color-mix(in oklab, var(--theme-primary) 55%, transparent), 0 0 22px color-mix(in oklab, var(--theme-secondary) 28%, transparent)",
+        fontFamily: "var(--font-headline)",
+        letterSpacing: "0.04em",
+      }}
+    >
+      {children}
+    </motion.button>
+  );
+}
+
+/** Héros du mode : icône (image ou emoji) qui grandit avec la place dispo
+ *  (unités de conteneur cqh), accroche, et un slot libre (stats, statut…). */
+function LobbyHero({ icon, tagline, accent, extra }: { icon: ReactNode; tagline?: string; accent: string; extra?: ReactNode }) {
+  const iconNode = typeof icon === "string" && /^(\/|data:|https?:)/.test(icon)
+    ? <img src={icon} alt="" draggable={false} className="w-full h-full object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.55)]" />
+    : <span className="leading-none" style={{ fontSize: "clamp(36px, 26cqh, 88px)" }}>{icon}</span>;
+  return (
+    <div
+      className="relative overflow-hidden rounded-3xl border flex flex-col items-center justify-center gap-1.5 px-4 py-3 text-center
+        flex-1 min-h-[132px] max-h-[440px] landscape:max-h-none landscape:min-h-0 landscape:flex-none landscape:w-[38%] landscape:self-stretch"
+      style={{
+        containerType: "size",
+        borderColor: `color-mix(in oklab, ${accent} 38%, transparent)`,
+        background:
+          `radial-gradient(120% 90% at 50% 38%, color-mix(in oklab, ${accent} 30%, transparent) 0%, transparent 62%),` +
+          "linear-gradient(180deg, color-mix(in oklab, var(--theme-primary) 10%, rgba(10,12,20,0.78)), rgba(8,10,16,0.86))",
+        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.06), 0 10px 30px -18px ${accent}`,
+      }}
+    >
+      <motion.div
+        aria-hidden
+        animate={{ y: [0, -4, 0] }}
+        transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
+        className="relative flex items-center justify-center shrink-0"
+        style={{ width: "clamp(52px, 46cqh, 184px)", height: "clamp(52px, 46cqh, 184px)" }}
+      >
+        {/* Halo qui respire derrière l'icône (opacité seule → coût GPU nul). */}
+        <motion.span
+          className="absolute inset-[8%] rounded-full blur-2xl"
+          style={{ background: `radial-gradient(circle, color-mix(in oklab, ${accent} 55%, transparent), transparent 70%)` }}
+          animate={{ opacity: [0.45, 0.85, 0.45] }}
+          transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <span className="relative w-full h-full flex items-center justify-center">{iconNode}</span>
+      </motion.div>
+      {tagline && <p className="text-[12.5px] sm:text-[13px] text-ink leading-snug max-w-xs shrink-0 opacity-80">{tagline}</p>}
+      {extra && <div className="shrink-0 flex flex-wrap items-center justify-center gap-1.5 w-full">{extra}</div>}
+    </div>
+  );
+}
+
 export function ModeLobbyShell({
-  title, tagline, titleGradient = "from-fuchsia-300 to-violet-300",
-  onBack, identity, children, cta, secondary, dockCta = true,
+  title, tagline, icon, accent = "var(--theme-primary)", heroExtra,
+  onBack, right, children, cta, secondary, dockCta = true,
 }: {
+  /** Titre affiché dans la barre du haut. */
   title: string;
-  /** 1 ligne max — l'esprit du mode. */
+  /** Accroche du mode (héros) — peut tenir sur 2 lignes. */
   tagline?: string;
-  /** Classes tailwind du gradient de titre (par mode). */
-  titleGradient?: string;
+  /** Icône du héros : chemin d'image ou emoji. */
+  icon: ReactNode;
+  /** Couleur d'identité du mode (lueur du héros). */
+  accent?: string;
+  /** Contenu libre sous l'accroche (chips de stats, statut serveur…). */
+  heroExtra?: ReactNode;
+  /** Retour (barre du haut, à gauche). */
   onBack?: () => void;
-  /** Rangée identité (LobbyIdentityRow) — omise si l'écran n'en veut pas. */
-  identity?: ReactNode;
-  /** Sections du mode — zone flex-1, scroll interne seulement si déborde. */
+  /** Actions compactes à droite de la barre du haut. */
+  right?: ReactNode;
+  /** Réglages du mode — défilent seuls si la place manque. */
   children: ReactNode;
-  /** CTA principal docké en bas — TOUJOURS visible, jamais sous le fold. */
+  /** CTA principal docké en bas — toujours visible. */
   cta?: ReactNode;
-  /** Rangée secondaire sous le CTA (grid de petits boutons). */
+  /** Rangée secondaire sous le CTA. */
   secondary?: ReactNode;
-  /** Docker le CTA en bas (défaut) OU le laisser couler DANS la zone scroll
-   *  (dockCta=false) — utile quand une section dépliable doit POUSSER le CTA
-   *  vers le bas et défiler pour le lire, sans recentrer le haut de l'écran
-   *  (Alex 2026-06-13, fiche Voie Pro). */
+  /** false = le CTA coule DANS la zone de défilement (une section dépliée le
+   *  pousse vers le bas au lieu de comprimer l'écran — fiche Voie du Pro). */
   dockCta?: boolean;
 }) {
-  // Burger flottant global OFF tant qu'un lobby est monté (le header a le
-  // burger inline). Même mécanique que le menu principal.
-  useEffect(() => {
-    setBurgerHidden(true);
-    return () => setBurgerHidden(false);
-  }, []);
+  useTopBar({ title, onBack, right });
   return (
     <motion.div
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -14 }}
       transition={{ duration: 0.25 }}
-      className="flex flex-col flex-1 min-h-0 w-full max-w-lg landscape:max-w-2xl mx-auto px-1 pb-1 gap-2"
+      className="flex flex-col landscape:flex-row justify-center flex-1 min-h-0 w-full max-w-lg landscape:max-w-4xl mx-auto px-1 pb-1 gap-3"
     >
-      {/* Header — burger | titre centré | retour. Symétrique : les deux
-       *  boutons font 40px, le titre est VRAIMENT centré.
-       *  SAFE-AREA (Alex 2026-06-24, « items qui chevauchent la barre du haut
-       *  Android ») : le -2.5rem récupère l'espace mort du pt-12 global (burger
-       *  flottant masqué), MAIS on l'offsette par --sai-top → le header ne passe
-       *  jamais sous la barre de statut/notch. Fallback 32px si le pont natif
-       *  Kotlin n'injecte pas --sai-top (≈ hauteur d'une barre de statut). */}
-      <div
-        className="shrink-0 flex items-center gap-2"
-        style={{ marginTop: "calc(var(--sai-top, 32px) - 3.5rem)" }}
-      >
-        <InlineBurger />
-        <div className="flex-1 min-w-0 text-center">
-          <h1
-            className={"text-lg sm:text-2xl font-extrabold tracking-tight leading-tight bg-gradient-to-br bg-clip-text text-transparent truncate " + titleGradient}
-            style={{ fontFamily: "var(--font-headline)" }}
-          >
-            {title}
-          </h1>
-          {tagline && (
-            <p className="text-[10px] sm:text-xs text-ink-muted leading-tight truncate">{tagline}</p>
-          )}
+      <LobbyHero icon={icon} tagline={tagline} accent={accent} extra={heroExtra} />
+      <div className="flex flex-col gap-2.5 min-h-0 shrink landscape:flex-1">
+        <div className="min-h-0 shrink landscape:flex-1 overflow-y-auto overscroll-contain flex flex-col gap-3 px-0.5 pb-0.5">
+          {children}
+          {!dockCta && cta && <div className="shrink-0">{cta}</div>}
+          {!dockCta && secondary && <div className="shrink-0">{secondary}</div>}
         </div>
-        {onBack ? (
-          <motion.button
-            whileTap={{ scale: 0.92 }}
-            onClick={onBack}
-            aria-label="Retour"
-            data-no-touchfx
-            className="shrink-0 w-10 h-10 rounded-xl border border-hairline bg-black/45 backdrop-blur flex items-center justify-center text-ink active:scale-95 transition"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 6l-6 6 6 6" />
-            </svg>
-          </motion.button>
-        ) : (
-          <div className="shrink-0 w-10 h-10" aria-hidden />
-        )}
+        {dockCta && cta && <div className="shrink-0">{cta}</div>}
+        {dockCta && secondary && <div className="shrink-0">{secondary}</div>}
       </div>
-
-      {identity}
-
-      {/* Zone contenu — flex-1, scroll INTERNE seulement si ça déborde. Le CTA
-       *  reste docké (défaut) OU coule ici en bas (dockCta=false) → poussé vers
-       *  le bas par une section dépliée, atteignable au scroll. */}
-      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2">
-        {children}
-        {!dockCta && cta && <div className="shrink-0">{cta}</div>}
-        {!dockCta && secondary && <div className="shrink-0">{secondary}</div>}
-      </div>
-
-      {dockCta && cta && <div className="shrink-0">{cta}</div>}
-      {dockCta && secondary && <div className="shrink-0">{secondary}</div>}
     </motion.div>
   );
 }
