@@ -1,6 +1,7 @@
 import { useStore } from "../../store/store";
 import { hapticTap } from "../../haptic";
 import { AUTO_LEVEL, type GraphicsLevel } from "../../graphics/graphicsQuality";
+import { useT } from "../../i18n";
 
 const LEVEL_LABEL: Record<GraphicsLevel, string> = { low: "Bas", medium: "Moyen", high: "Haut" };
 
@@ -13,6 +14,8 @@ export function GraphicsSection() {
   const quality = useStore((s) => s.player.graphicsQuality);
   const measured = useStore((s) => s.player.graphicsMeasured);
   const updateProfile = useStore((s) => s.updateProfile);
+  const fastCombat = useStore((s) => !!s.player.fastCombat);
+  const t = useT();
   const effective = quality ?? measured ?? AUTO_LEVEL;
 
   const opts: Array<{ label: string; value: GraphicsLevel | undefined; hint: string }> = [
@@ -52,6 +55,24 @@ export function GraphicsSection() {
         Palier actif : <span className="text-ink-muted font-semibold">{LEVEL_LABEL[effective]}</span>
         {quality === undefined && (measured ? " (auto · mesuré)" : " (auto)")}
       </p>
+      {/* Combat rapide : pauses de lecture raccourcies (Arena, Classé). */}
+      <button
+        role="switch"
+        aria-checked={fastCombat}
+        onClick={() => { hapticTap(); updateProfile({ fastCombat: !fastCombat }); }}
+        className="mt-4 w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-hairline bg-hairline text-left"
+      >
+        <span className="flex flex-col">
+          <span className="text-sm font-bold text-white">{t("settings.fastCombat")}</span>
+          <span className="text-[11px] text-ink-faint">{t("settings.fastCombatHint")}</span>
+        </span>
+        <span
+          aria-hidden
+          className={"relative shrink-0 w-11 h-6 rounded-full transition-colors " + (fastCombat ? "bg-emerald-500" : "bg-zinc-600")}
+        >
+          <span className={"absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all " + (fastCombat ? "left-[22px]" : "left-0.5")} />
+        </span>
+      </button>
     </section>
   );
 }

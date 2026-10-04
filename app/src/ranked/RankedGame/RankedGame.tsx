@@ -129,6 +129,10 @@ export function RankedGame({
   // d'AVANT la résolution (closure périmée) puis l'écrasait → la carte jouée
   // revenait en main, la défausse s'annulait, le reset de Genèse / du rematch
   // était perdu.
+  // Réglage « combat rapide » (Profil) : pause post-manche raccourcie (lue au
+  // moment où chaque délai est programmé).
+  const fastCombat = useStore((s) => s.player.fastCombat);
+  const roundPauseMs = fastCombat ? Math.round(ROUND_PAUSE_MS * 0.6) : ROUND_PAUSE_MS;
   const battleRef = useRef(battle);
   battleRef.current = battle;
   // Issue déjà enregistrée pour CE match (victoire/défaite), en attendant
@@ -813,7 +817,7 @@ export function RankedGame({
             discard: snap.discard,
             usedOneShotCards: snap.usedOneShotCards,
           }));
-        }, ROUND_PAUSE_MS - 200);
+        }, roundPauseMs - 200);
       }
     }
     // Cascade post-resolve: WIN refills hand for free next round, LOSS dumps it.
@@ -828,7 +832,7 @@ export function RankedGame({
             usedOneShotCards: [...b.usedOneShotCards, ...b.hand.filter((c) => CARDS[c].rarity === "epic" || CARDS[c].rarity === "legendary")],
             hand: [],
           }));
-        }, ROUND_PAUSE_MS - 200);
+        }, roundPauseMs - 200);
       }
     }
 
@@ -1017,11 +1021,11 @@ export function RankedGame({
           youCardsPlayed: youCardsPlayedRef.current.slice(),
           oppCardsPlayed: oppCardsPlayedRef.current.slice(),
         });
-      }, ROUND_PAUSE_MS);
+      }, roundPauseMs);
     } else if (riposteWillFire) {
       window.setTimeout(() => {
         setRiposteData({ lane: myRiposteLane as LaneTarget, phase: "pick" });
-      }, ROUND_PAUSE_MS);
+      }, roundPauseMs);
     } else if (
       finalWinner === "draw" && !timedOut &&
       nextRoundWinsA === winTo - 1 && nextRoundWinsB === winTo - 1
@@ -1034,7 +1038,7 @@ export function RankedGame({
         setSuddenDeathData({ phase: "pick", round: roundNoRef.current });
       }, SUDDEN_DEATH_PRE_MS);
     } else {
-      window.setTimeout(() => startNextRound(), ROUND_PAUSE_MS);
+      window.setTimeout(() => startNextRound(), roundPauseMs);
     }
   }
 
@@ -1126,7 +1130,7 @@ export function RankedGame({
       if (playerWonRematch) hapticWin(); else if (bBeatsA) hapticLoss(); else hapticTap();
     }, REVEAL_SUSPENSE_MS);
     // After a short pause, apply the flip and proceed.
-    window.setTimeout(() => applyRiposteOutcome(playerWonRematch), ROUND_PAUSE_MS);
+    window.setTimeout(() => applyRiposteOutcome(playerWonRematch), roundPauseMs);
   }
 
   /** Apply the lane flip (if the rematch was won), recompute the round
@@ -1192,7 +1196,7 @@ export function RankedGame({
     if (nextWinsA >= winTo || nextWinsB >= winTo) {
       finalizeMatch(nextWinsA, nextWinsB);
     } else {
-      window.setTimeout(() => startNextRound(), ROUND_PAUSE_MS / 2);
+      window.setTimeout(() => startNextRound(), roundPauseMs / 2);
     }
   }
 
@@ -1242,7 +1246,7 @@ export function RankedGame({
     if (nextWinsA >= winTo || nextWinsB >= winTo) {
       finalizeMatch(nextWinsA, nextWinsB);
     } else {
-      window.setTimeout(() => startNextRound(), ROUND_PAUSE_MS / 2);
+      window.setTimeout(() => startNextRound(), roundPauseMs / 2);
     }
   }
 
@@ -1279,7 +1283,7 @@ export function RankedGame({
         youCardsPlayed: youCardsPlayedRef.current.slice(),
         oppCardsPlayed: oppCardsPlayedRef.current.slice(),
       });
-    }, ROUND_PAUSE_MS);
+    }, roundPauseMs);
   }
 
   // Explicit leave. A mid-match leave (no `end` yet) is a forfeit: record the
