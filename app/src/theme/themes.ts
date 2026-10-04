@@ -307,7 +307,7 @@ export const BACKGROUNDS: BackgroundDef[] = [
   // Player's OWN image — uploaded in Profile, stored as a data URL. The
   // recommended format is shown in the picker (portrait 9:16, cover-fit).
   {
-    id: "custom",    label: "Mon image",      emoji: "🖼️",
+    id: "custom",    label: "My image",       emoji: "🖼️",
     src: null, custom: true,                  defaultPadId: null,
     skin: { fontHeadline: "inter",        fontBody: "inter",        fontMono: "jetbrains"  },
     miniature: null,

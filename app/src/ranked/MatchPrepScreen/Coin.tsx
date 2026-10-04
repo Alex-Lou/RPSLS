@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from "motion/react";
+import { useT } from "../../i18n";
 
 /* ─────────── The coin ─────────── */
 
@@ -19,6 +20,7 @@ export function Coin({
    *  passes a smaller value so the rich coin fits its compact VS trio. */
   size?: number;
 }) {
+  const t = useT();
   const COIN = size;
   // 4 spins is still plenty of "wow" inside 1.6s — the previous 8 spins felt
   // dragged out (and cost 2880° of GPU compositing).
@@ -125,8 +127,8 @@ export function Coin({
           style={{ transformStyle: "preserve-3d", width: COIN, height: COIN, willChange: "transform" }}
           className="relative"
         >
-          <CoinFace theme={youTheme} label="TOI" rotate={0} size={COIN} />
-          <CoinFace theme={oppTheme} label="ADV" rotate={180} size={COIN} />
+          <CoinFace theme={youTheme} label={t("prep.coinYou")} rotate={0} size={COIN} />
+          <CoinFace theme={oppTheme} label={t("prep.coinOpp")} rotate={180} size={COIN} />
         </motion.div>
       </motion.div>
     </div>

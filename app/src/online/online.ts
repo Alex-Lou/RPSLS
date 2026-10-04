@@ -3,6 +3,7 @@
 
 import type { Move, Outcome } from "../engine/game";
 import type { MatchRecord } from "../types";
+import { tNow } from "../i18n/core";
 
 /* ──────────── Wire types ──────────── */
 
@@ -409,7 +410,7 @@ export class OnlineClient {
         const normalized = normalizeServerUrl(url);
         if (!normalized) {
           this.setStatus("error");
-          reject(new Error("empty server URL"));
+          reject(new Error(tNow("online.err.emptyUrl")));
           return;
         }
         const wsUrl = normalized.replace(/\/+$/, "") + "/ws";
@@ -421,7 +422,7 @@ export class OnlineClient {
           settled = true;
           try { ws.close(); } catch { /* ignore */ }
           this.setStatus("error");
-          reject(new Error(`connect timeout (${openTimeoutMs / 1000}s)`));
+          reject(new Error(tNow("online.err.timeout", { n: openTimeoutMs / 1000 })));
         }, openTimeoutMs);
         ws.onopen = () => {
           if (settled) return;
@@ -446,7 +447,7 @@ export class OnlineClient {
           settled = true;
           clearTimeout(guard);
           this.setStatus("error");
-          reject(new Error("WebSocket error (server unreachable, firewall, or wrong URL)"));
+          reject(new Error(tNow("online.err.ws")));
         };
         ws.onclose = () => {
           if (this.pingTimer) {

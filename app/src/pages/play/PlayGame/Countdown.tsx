@@ -28,7 +28,7 @@ export function Countdown({
   }, [beat, onDone]);
 
   const id = COUNTDOWN_IDS[Math.min(beat, COUNTDOWN_IDS.length - 1)];
-  const label = tr("element." + id) + "!";
+  const label = tr("play.countdownBeat", { move: tr("element." + id) });
 
   const shakeVariant = {
     animate: {

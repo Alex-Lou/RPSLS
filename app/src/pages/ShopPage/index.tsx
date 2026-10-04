@@ -95,10 +95,10 @@ export function ShopPage() {
         <header className="flex items-start justify-between gap-3">
           <div>
             <h1 className="font-headline text-3xl sm:text-4xl font-extrabold tracking-tight text-themed">
-              🎁 Boutique
+              🎁 {t("nav.shop")}
             </h1>
             <p className="text-[11px] text-ink-faint mt-1">
-              Gagne des éclats à chaque match · ouvre des packs · forge les cartes qui te manquent.
+              {t("shop.subtitle")}
             </p>
           </div>
         </header>
@@ -112,8 +112,8 @@ export function ShopPage() {
         {/* Tab switcher — keeps the boutique and the collection codex side
             by side so toggling between "spend" and "track" is one tap. */}
         <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-surface border border-hairline">
-          <ShopTabButton on={tab === "shop"} onClick={() => setTab("shop")}>Boutique</ShopTabButton>
-          <ShopTabButton on={tab === "codex"} onClick={() => setTab("codex")}>Codex</ShopTabButton>
+          <ShopTabButton on={tab === "shop"} onClick={() => setTab("shop")}>{t("nav.shop")}</ShopTabButton>
+          <ShopTabButton on={tab === "codex"} onClick={() => setTab("codex")}>{t("shop.tab.codex")}</ShopTabButton>
         </div>
 
         {tab === "shop" && <>
@@ -122,10 +122,9 @@ export function ShopPage() {
           <div className="flex items-center gap-3">
             <span className="text-3xl">🎁</span>
             <div className="flex-1 min-w-0">
-              <h2 className="font-bold text-base">Pack à 3 cartes</h2>
+              <h2 className="font-bold text-base">{t("shop.pack.title")}</h2>
               <p className="text-[11px] text-ink-muted leading-snug">
-                Tirage aléatoire (60 % commune · 30 % rare · 9 % épique · 1 % légendaire).
-                Les doublons sont convertis en poussière.
+                {t("shop.pack.desc")}
               </p>
             </div>
           </div>
@@ -141,8 +140,8 @@ export function ShopPage() {
             {busy
               ? t("wallet.connecting")
               : canBuyPack
-                ? `Ouvrir un pack · ${PACK_COST} 💎`
-                : `Il manque ${formatNumber(PACK_COST - eclats)} 💎`}
+                ? t("shop.pack.buy", { n: PACK_COST })
+                : t("shop.pack.missing", { n: formatNumber(PACK_COST - eclats) })}
           </motion.button>
         </section>
 
@@ -151,16 +150,16 @@ export function ShopPage() {
           <div className="flex items-center gap-3">
             <span className="text-3xl">⚒️</span>
             <div className="flex-1 min-w-0">
-              <h2 className="font-bold text-base">Forger une carte</h2>
+              <h2 className="font-bold text-base">{t("shop.craft.title")}</h2>
               <p className="text-[11px] text-ink-muted leading-snug">
-                Paie en poussière pour ajouter une carte verrouillée précise à ta collection.
+                {t("shop.craft.desc")}
               </p>
             </div>
           </div>
 
           {lockedCards.length === 0 ? (
             <p className="text-sm text-ink-muted text-center py-6">
-              🎉 Toutes les cartes sont déjà dans ta collection.
+              {t("shop.craft.allOwned")}
             </p>
           ) : (
             <div className="grid grid-cols-1 gap-2">
@@ -193,7 +192,7 @@ export function ShopPage() {
                     <div className="flex-1 min-w-0">
                       <div className="font-bold text-sm truncate">{t(card.nameKey)}</div>
                       <div className={"text-[10px] uppercase tracking-wider font-bold " + RARITY_COLOR[card.rarity]}>
-                        {card.rarity} · {card.cost} mana
+                        {t(`ranked.rarity.${card.rarity}`)} · {t("shop.manaCost", { n: card.cost })}
                       </div>
                     </div>
                     <motion.button
@@ -249,7 +248,7 @@ export function ShopPage() {
               exit={{ y: 8, opacity: 0 }}
               className="fixed left-1/2 -translate-x-1/2 bottom-6 z-40 px-4 py-2 rounded-full bg-violet-500/95 text-white shadow-xl shadow-violet-900/40 text-sm font-bold"
             >
-              ⚒️ {t(CARDS[justCrafted].nameKey)} forgée
+              {t("shop.craft.done", { card: t(CARDS[justCrafted].nameKey) })}
             </motion.div>
           )}
         </AnimatePresence>

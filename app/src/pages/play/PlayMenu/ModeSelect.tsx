@@ -149,7 +149,7 @@ export function ModeSelect({
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="font-semibold text-sm sm:text-base">{t("mode.online")}</span>
                     <span className="text-[9px] uppercase tracking-wider text-violet-200 bg-violet-500/25 px-1 rounded-full">
-                      LIVE
+                      {t("play.badge.live")}
                     </span>
                   </div>
                   <p className="text-[10px] sm:text-xs text-ink-muted mt-0.5 line-clamp-2">{t("mode.online.tag")}</p>
@@ -178,13 +178,13 @@ export function ModeSelect({
                 <ModeIcon mode="constellation" />
                 <div className="min-w-0 w-full">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-semibold text-sm sm:text-base">Constellation</span>
+                    <span className="font-semibold text-sm sm:text-base">{t("mode.constellation")}</span>
                     <span className="text-[9px] uppercase tracking-wider text-fuchsia-200 bg-fuchsia-500/25 px-1 rounded-full">
-                      NEW
+                      {t("play.badge.new")}
                     </span>
                   </div>
                   <p className="text-[10px] sm:text-xs text-ink-muted mt-0.5 line-clamp-2">
-                    RPSLS pur · 3 lanes vs IA · sans cartes
+                    {t("mode.constellation.tag")}
                   </p>
                 </div>
               </motion.button>
@@ -213,7 +213,7 @@ export function ModeSelect({
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="font-semibold text-xs sm:text-sm">{t("mode.ranked_constellation")}</span>
                     <span className="text-[9px] uppercase tracking-wider text-amber-200 bg-amber-500/30 px-1 rounded-full">
-                      NEW · CARDS
+                      {t("play.badge.newCards")}
                     </span>
                   </div>
                   <p className="text-[10px] sm:text-xs text-ink-muted mt-0.5 line-clamp-2">
@@ -246,7 +246,7 @@ export function ModeSelect({
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="font-semibold text-xs sm:text-sm">{t("mode.arena_pro")}</span>
                     <span className="text-[9px] uppercase tracking-wider text-fuchsia-200 bg-fuchsia-500/30 px-1 rounded-full">
-                      BETA
+                      {t("play.badge.beta")}
                     </span>
                   </div>
                   <p className="text-[10px] sm:text-xs text-ink-muted mt-0.5 line-clamp-2">
@@ -291,7 +291,7 @@ export function ModeSelect({
                   <span className="font-semibold text-sm sm:text-base">{t("mode." + m)}</span>
                   {rewards.lpWin > 0 && (
                     <span className="text-[9px] uppercase tracking-wider text-rose-300 bg-rose-500/15 px-1 rounded-full">
-                      LP
+                      {t("play.rp")}
                     </span>
                   )}
                   {rewards.xpWin > 0 && (

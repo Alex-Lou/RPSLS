@@ -145,7 +145,7 @@ export function DailyChallengesPanel({
                         </span>
                         {q.scope === "online" && (
                           <span className="text-[9px] text-cyan-300 bg-cyan-500/15 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                            online
+                            {t("daily.badge.online")}
                           </span>
                         )}
                       </div>

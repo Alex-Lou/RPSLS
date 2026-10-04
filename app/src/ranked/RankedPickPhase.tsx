@@ -259,25 +259,25 @@ export function RankedPickPhase({
             </span>
           ))}
           {braiseStacks > 0 && (
-            <EffectChip icon="🔥" tone="ember" label={`Braise −${braiseStacks} mana sur la prochaine carte`} />
+            <EffectChip icon="🔥" tone="ember" label={t("ranked.effect.braise", { n: braiseStacks })} />
           )}
           {activeEffects?.bonusManaNext ? (
-            <EffectChip icon="⏱️" tone="sand" label={`+${activeEffects.bonusManaNext} mana au prochain round`} />
+            <EffectChip icon="⏱️" tone="sand" label={t("ranked.effect.bonusMana", { n: activeEffects.bonusManaNext })} />
           ) : null}
           {activeEffects?.mascaradePoison && (
-            <EffectChip icon="🎭" tone="indigo" label="Désinformation armée — l'IA jouera à l'aveugle" />
+            <EffectChip icon="🎭" tone="indigo" label={t("ranked.effect.mascarade")} />
           )}
           {activeEffects?.cascadeArmed && (
-            <EffectChip icon="💧" tone="sky" label="Cascade armée — win = main pleine, lose = main vide" />
+            <EffectChip icon="💧" tone="sky" label={t("ranked.effect.cascade")} />
           )}
           {activeEffects?.echoActive && (
-            <EffectChip icon="🕐" tone="violet" label="Écho actif — défaite annulée + carte refundée" />
+            <EffectChip icon="🕐" tone="violet" label={t("ranked.effect.echo")} />
           )}
           {activeEffects && activeEffects.anchorRoundsLeft > 0 && (
-            <EffectChip icon="⚓" tone="cyan" label={`Ancre ${activeEffects.anchorRoundsLeft}/2 rounds restants`} />
+            <EffectChip icon="⚓" tone="cyan" label={t("ranked.effect.anchor", { n: activeEffects.anchorRoundsLeft })} />
           )}
           {activeEffects?.gaiaCharged && (
-            <EffectChip icon="🛡️" tone="emerald" label="Bouclier de Gaïa chargé — 1 défaite absorbée" />
+            <EffectChip icon="🛡️" tone="emerald" label={t("ranked.effect.gaia")} />
           )}
         </div>
       </div>
@@ -339,7 +339,7 @@ function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void
   const t = useT();
   const [shockMove, setShockMove] = useState<Move | null>(null);
   return (
-    <div className="grid grid-cols-5 gap-1.5 sm:gap-3 w-full max-w-md" role="group" aria-label="Move picker">
+    <div className="grid grid-cols-5 gap-1.5 sm:gap-3 w-full max-w-md" role="group" aria-label={t("ranked.movePicker")}>
       {MOVES.map((mv, i) => {
         const pal = MOVE_PALETTE[mv];
         return (
@@ -351,7 +351,7 @@ function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void
               setTimeout(() => setShockMove((cur) => (cur === mv ? null : cur)), 450);
               onPickInNextEmpty(mv);
             }}
-            aria-label={`Pick ${t("element." + mv)}`}
+            aria-label={t("ranked.pickMove", { move: t("element." + mv) })}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 * i }}
@@ -373,7 +373,7 @@ function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void
             {/* Symboles PLUS GRANDS + label resserré (tracking-tight) qui rentre
                 sans être coupé, même « SCISSORS » (Alex 2026-07). */}
             <MoveGlyph move={mv} className="w-[40px] h-[40px] sm:w-[44px] sm:h-[44px]" />
-            <span className="w-full text-center text-[10px] sm:text-[11px] uppercase tracking-tight font-bold leading-none" style={{ color: moveRim(pal.hex) }}>{mv}</span>
+            <span className="w-full text-center text-[10px] sm:text-[11px] uppercase tracking-tight font-bold leading-none" style={{ color: moveRim(pal.hex) }}>{t(`element.${mv}`)}</span>
           </motion.button>
         );
       })}

@@ -94,7 +94,7 @@ export function ContactPage() {
             animate={{ opacity: 1, y: 0 }}
             className="text-xs text-emerald-300 text-center"
           >
-            ✓ Email client opened. Send when you're ready.
+            {t("contact.sent")}
           </motion.p>
         )}
       </div>

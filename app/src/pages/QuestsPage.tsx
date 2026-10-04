@@ -166,7 +166,7 @@ function QuestRow({
           </span>
           {q.lpReward !== undefined && q.lpReward > 0 && (
             <span className="text-[10px] text-rose-300 bg-rose-500/15 px-1.5 py-0.5 rounded-full font-bold">
-              +{q.lpReward} LP
+              +{q.lpReward} {t("sidebar.lp")}
             </span>
           )}
         </div>
@@ -260,6 +260,7 @@ function RewardBurst({
   secondary: string;
   onDone: () => void;
 }) {
+  const t = useT();
   const parts = Array.from({ length: 12 }, (_, i) => {
     const ang = (i / 12) * Math.PI * 2 + (i % 2) * 0.3;
     const dist = 34 + (i % 4) * 12;
@@ -291,7 +292,7 @@ function RewardBurst({
         className="absolute right-0 whitespace-nowrap font-black text-sm drop-shadow-[0_2px_6px_rgba(0,0,0,0.7)]"
       >
         <span className="text-emerald-300">+{xp} XP</span>
-        {lp !== undefined && lp > 0 && <span className="text-rose-300 ml-1.5">+{lp} LP</span>}
+        {lp !== undefined && lp > 0 && <span className="text-rose-300 ml-1.5">+{lp} {t("sidebar.lp")}</span>}
         <span className="ml-1">✨</span>
       </motion.div>
     </div>

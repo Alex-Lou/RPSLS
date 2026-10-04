@@ -76,7 +76,7 @@ export function RevealPanel({
             className="flex flex-col items-center"
           >
             <span className="text-ink-muted uppercase tracking-[0.4em] text-sm sm:text-base font-bold">
-              vs
+              {t("match.vs")}
             </span>
             <span className="block w-8 h-px bg-zinc-500 mt-1.5" />
           </motion.div>

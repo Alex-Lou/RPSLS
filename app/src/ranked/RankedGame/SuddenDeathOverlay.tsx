@@ -2,6 +2,7 @@ import { motion } from "motion/react";
 import { MoveGlyph, MOVE_PALETTE } from "../../icons";
 import type { Move } from "../../engine/game";
 import { RANKED_MOVES } from "./rankedOverlayShared";
+import { useT } from "../../i18n";
 
 /* ──────────── Sudden-death sub-phase UI ──────────── */
 
@@ -12,6 +13,7 @@ export function SuddenDeathOverlay({
   data: { phase: "pick" | "reveal"; round: number; playerMove?: Move; cpuMove?: Move; winner?: "a" | "b" | null };
   onPick: (mv: Move) => void;
 }) {
+  const t = useT();
   const verdict = data.phase === "reveal"
     ? data.winner === "a" ? "win" : data.winner === "b" ? "loss" : "draw"
     : null;
@@ -68,7 +70,7 @@ export function SuddenDeathOverlay({
         className="relative text-4xl sm:text-6xl font-black tracking-[0.14em] mb-1.5 text-center bg-gradient-to-br from-amber-300 via-rose-400 to-fuchsia-400 bg-clip-text text-transparent"
         style={{ filter: "drop-shadow(0 2px 22px rgba(244,63,94,0.75))" }}
       >
-        ⚡ MORT SUBITE ⚡
+        {t("ranked.sudden.title")}
       </motion.div>
       <motion.div
         initial={{ opacity: 0, y: 6 }}
@@ -76,7 +78,7 @@ export function SuddenDeathOverlay({
         transition={{ delay: 0.45, duration: 0.3 }}
         className="relative text-xs sm:text-sm text-amber-200/90 mb-6 max-w-xs text-center font-bold tracking-wider"
       >
-        Match point des deux côtés — un seul coup décide tout.
+        {t("ranked.sudden.sub")}
       </motion.div>
       {data.phase === "pick" && (
         <motion.div
@@ -101,7 +103,7 @@ export function SuddenDeathOverlay({
                 }
               >
                 <MoveGlyph move={mv} className="w-7 h-7" />
-                <span className="text-[8px] uppercase tracking-wider font-bold leading-none">{mv}</span>
+                <span className="text-[8px] uppercase tracking-wider font-bold leading-none">{t(`element.${mv}`)}</span>
               </motion.button>
             );
           })}
@@ -116,7 +118,7 @@ export function SuddenDeathOverlay({
               transition={{ duration: 0.25 }}
               className="flex flex-col items-center gap-1"
             >
-              <span className="text-[10px] uppercase tracking-wider text-emerald-300">Toi</span>
+              <span className="text-[10px] uppercase tracking-wider text-emerald-300">{t("ranked.tag.you")}</span>
               <div className={"w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br " +
                 MOVE_PALETTE[data.playerMove].from + " " + MOVE_PALETTE[data.playerMove].to +
                 " ring-2 " + MOVE_PALETTE[data.playerMove].ring}>
@@ -137,7 +139,7 @@ export function SuddenDeathOverlay({
               transition={{ duration: 0.25 }}
               className="flex flex-col items-center gap-1"
             >
-              <span className="text-[10px] uppercase tracking-wider text-rose-300">CPU</span>
+              <span className="text-[10px] uppercase tracking-wider text-rose-300">{t("ranked.tag.cpu")}</span>
               <div className={"w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br " +
                 MOVE_PALETTE[data.cpuMove].from + " " + MOVE_PALETTE[data.cpuMove].to +
                 " ring-2 " + MOVE_PALETTE[data.cpuMove].ring}>
@@ -171,9 +173,9 @@ export function SuddenDeathOverlay({
                 : undefined
             }
           >
-            {verdict === "win" ? "Tu remportes la manche !"
-              : verdict === "loss" ? "Manche perdue en mort subite."
-              : "Encore égalité — on rejoue !"}
+            {verdict === "win" ? t("ranked.sudden.win")
+              : verdict === "loss" ? t("ranked.sudden.loss")
+              : t("ranked.sudden.draw")}
           </motion.div>
         </div>
       )}

@@ -1,5 +1,6 @@
 import { motion } from "motion/react";
 import { MatchScoreBar } from "../../match/sharedMatchUI";
+import { useT } from "../../i18n";
 
 /* ──────────── Cinematic match flow components ──────────── */
 
@@ -14,6 +15,7 @@ export function MatchFoundSplash({
   bestOf: number;
   isBot?: boolean;
 }) {
+  const t = useT();
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -28,7 +30,7 @@ export function MatchFoundSplash({
         transition={{ delay: 0.1, type: "spring", stiffness: 240, damping: 16 }}
         className="text-xs tracking-[0.5em] text-violet-300/80 uppercase mb-3"
       >
-        {isBot ? "🤖 Practice match" : "Match found"}
+        {isBot ? t("online.splash.practice") : t("online.splash.found")}
       </motion.div>
       <motion.div
         initial={{ scale: 0.4, opacity: 0 }}
@@ -42,7 +44,7 @@ export function MatchFoundSplash({
           transition={{ duration: 0.9, delay: 0.4 }}
           className="text-5xl sm:text-7xl font-black bg-gradient-to-br from-amber-300 to-rose-400 bg-clip-text text-transparent drop-shadow-[0_4px_24px_rgba(251,191,36,0.4)]"
         >
-          VS
+          {t("match.vs")}
         </motion.div>
         <NameTag name={opponentName} accent="rose" align="left" />
       </motion.div>
@@ -52,7 +54,7 @@ export function MatchFoundSplash({
         transition={{ delay: 0.9, duration: 0.4 }}
         className="mt-8 text-sm uppercase tracking-[0.3em] text-zinc-400"
       >
-        Best of {bestOf}
+        {t("lobby.bestOf", { n: bestOf })}
       </motion.div>
       <motion.div
         initial={{ opacity: 0 }}
@@ -60,7 +62,7 @@ export function MatchFoundSplash({
         transition={{ delay: 1.6, duration: 0.4 }}
         className="mt-12 text-xs text-zinc-500"
       >
-        Get ready…
+        {t("online.splash.getReady")}
       </motion.div>
     </motion.div>
   );
@@ -75,6 +77,7 @@ function NameTag({
   accent: "emerald" | "rose";
   align: "left" | "right";
 }) {
+  const t = useT();
   const grad =
     accent === "emerald"
       ? "from-emerald-300 to-teal-400"
@@ -82,7 +85,7 @@ function NameTag({
   return (
     <div className={"flex flex-col " + (align === "right" ? "items-end" : "items-start")}>
       <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">
-        {accent === "emerald" ? "You" : "Opponent"}
+        {accent === "emerald" ? t("online.you") : t("online.opponent")}
       </div>
       <div
         className={
@@ -91,7 +94,7 @@ function NameTag({
           " bg-clip-text text-transparent"
         }
       >
-        {name || "Anonymous"}
+        {name || t("online.anonymous")}
       </div>
     </div>
   );
@@ -119,15 +122,16 @@ export function ScoreHeader({
   target: number;
   bestOf: number;
 }) {
+  const t = useT();
   return (
     <MatchScoreBar
       youName={youName}
       oppName={opponentName || "—"}
       youScore={youScore}
       oppScore={oppScore}
-      youTag="You"
-      oppTag="Opponent"
-      caption={`Round ${round} · Best of ${bestOf} · First to ${target}`}
+      youTag={t("online.you")}
+      oppTag={t("online.opponent")}
+      caption={t("online.score.caption", { round, bestOf, target })}
     />
   );
 }

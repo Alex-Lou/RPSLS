@@ -37,19 +37,19 @@ export function AtoutBar({
                  : "border-hairline bg-hairline text-ink-muted")}
             >
               <span>{a.glyph}</span>
-              <span>{a.label}</span>
-              {!manual && !isUsed && <span className="text-[8px] uppercase tracking-wider opacity-60">auto</span>}
+              <span>{t(`atout.${id}.name`)}</span>
+              {!manual && !isUsed && <span className="text-[8px] uppercase tracking-wider opacity-60">{t("atout.kind.auto")}</span>}
             </button>
           );
         })}
       </div>
       {lectureMove && (
         <div className="text-center text-[11px] text-amber-300 font-bold">
-          🔮 L'adversaire va jouer : {t("element." + lectureMove)}
+          {t("atout.lecture.reveal", { move: t("element." + lectureMove) })}
         </div>
       )}
       {vabanqueArmed && (
-        <div className="text-center text-[11px] text-amber-300 font-bold">⚡ Va-banque armé — manche à 2 points</div>
+        <div className="text-center text-[11px] text-amber-300 font-bold">{t("atout.vabanque.armed")}</div>
       )}
     </div>
   );

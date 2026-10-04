@@ -15,6 +15,7 @@ import { motion } from "motion/react";
 import { useStore } from "../store/store";
 import { PACK_COST } from "../engine/economy";
 import { formatCompact, formatNumber } from "../i18n/format";
+import { useT } from "../i18n";
 
 interface Props {
   /** Click handler — usually a navigation to the shop. When undefined the
@@ -34,6 +35,7 @@ interface Props {
 }
 
 export function CurrencyBadges({ onClick, size = "compact", inert, showStars }: Props) {
+  const t = useT();
   const eclats = useStore((s) => s.player.eclats ?? 0);
   const dust = useStore((s) => s.player.dust ?? 0);
   const stars = useStore((s) => s.player.stars ?? 0);
@@ -55,7 +57,7 @@ export function CurrencyBadges({ onClick, size = "compact", inert, showStars }: 
         inert={inert}
         onClick={onClick}
         accent={canBuyPack ? "ready" : "none"}
-        label="Éclats"
+        label={t("ranked.currency.shards")}
       />
       <CurrencyChip
         icon="/MenuIcons/IconConstellationPro/monnaie-poussiere.png"
@@ -68,7 +70,7 @@ export function CurrencyBadges({ onClick, size = "compact", inert, showStars }: 
         inert={inert}
         onClick={onClick}
         accent="none"
-        label="Poussière"
+        label={t("ranked.currency.dust")}
       />
       {renderStars && (
         <CurrencyChip
@@ -82,7 +84,7 @@ export function CurrencyBadges({ onClick, size = "compact", inert, showStars }: 
           inert={inert}
           onClick={onClick}
           accent="none"
-          label="Étoiles"
+          label={t("ranked.currency.stars")}
         />
       )}
     </div>
@@ -106,13 +108,14 @@ function CurrencyChip({
   accent: "ready" | "none";
   label: string;
 }) {
+  const t = useT();
   const interactive = !inert && !!onClick;
   const Tag = interactive ? motion.button : (big ? motion.div : motion.span);
   return (
     <Tag
       onClick={interactive ? onClick : undefined}
       whileTap={interactive ? { scale: 0.94 } : undefined}
-      title={`${label} : ${formatNumber(value)}`}
+      title={`${label}${t("ranked.currency.sep")}${formatNumber(value)}`}
       aria-label={`${label} ${value}`}
       className={
         // flex-1 + justify-center so the chip row fills the badge width and the

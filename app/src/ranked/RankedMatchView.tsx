@@ -368,6 +368,7 @@ export function RankedMatchView({
  *  même modal via le handle exposé ici. */
 const RankedBackGuard = forwardRef<MatchBackHandle, { onLeave: () => void; label: string }>(
   function RankedBackGuard({ onLeave, label }, ref) {
+    const t = useT();
     const handleRef = useRef<MatchBackHandle | null>(null);
     useAndroidBackPrompt(() => handleRef.current?.triggerConfirm());
     useImperativeHandle(ref, () => ({
@@ -380,10 +381,10 @@ const RankedBackGuard = forwardRef<MatchBackHandle, { onLeave: () => void; label
         onClick={onLeave}
         label={label}
         confirm={{
-          title: "Quitter le match ?",
-          body: "Tu vas perdre la manche en cours. Ce sera compté comme défaite et appliquera la pénalité de LP si applicable.",
-          confirmLabel: "Forfait",
-          cancelLabel: "Continuer",
+          title: t("match.quitConfirm"),
+          body: t("ranked.quit.body"),
+          confirmLabel: t("arena.quit.confirm"),
+          cancelLabel: t("arena.quit.cancel"),
           severity: "danger",
         }}
       />
@@ -458,7 +459,7 @@ function MatchFoundSplash({ you, opp }: { you: string; opp: string }) {
         transition={{ delay: 0.9 }}
         className="mt-8 text-sm uppercase tracking-[0.3em] text-ink-muted text-center px-4"
       >
-        Best of 5 · Mana & Cartes
+        {t("ranked.match.introSub")}
       </motion.div>
       <motion.div
         initial={{ opacity: 0 }}
@@ -489,7 +490,7 @@ function NameTag({
         (align === "right" ? "text-right " : "text-left ") +
         grad + " bg-clip-text text-transparent"
       }>
-        {name || "Anonymous"}
+        {name || t("ranked.anonymous")}
       </div>
     </div>
   );

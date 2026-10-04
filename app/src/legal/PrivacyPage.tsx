@@ -1,6 +1,7 @@
 import { motion } from "motion/react";
 import { useStore } from "../store/store";
 import { getPrivacyContent } from "./privacy";
+import { useT } from "../i18n";
 
 /**
  * PrivacyPage — full-screen reader for the privacy policy.
@@ -11,6 +12,7 @@ import { getPrivacyContent } from "./privacy";
  * hand to the Play Console listing once we publish a public mirror.
  */
 export function PrivacyPage({ onClose }: { onClose?: () => void }) {
+  const t = useT();
   const locale = useStore((s) => s.locale);
   const c = getPrivacyContent(locale);
 
@@ -33,7 +35,7 @@ export function PrivacyPage({ onClose }: { onClose?: () => void }) {
           {onClose && (
             <button
               onClick={onClose}
-              aria-label="Close"
+              aria-label={t("premium.close")}
               className="text-ink-muted hover:text-white px-3 py-1 rounded-lg bg-hairline hover:bg-hairline transition text-sm"
             >
               ✕

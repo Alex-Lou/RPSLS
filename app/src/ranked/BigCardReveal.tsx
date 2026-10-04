@@ -10,8 +10,10 @@
 import { motion } from "motion/react";
 import { CardImage } from "./CardImage";
 import type { CardId } from "./rankedTypes";
+import { useT } from "../i18n";
 
 export function BigCardReveal({ id, side }: { id: CardId; side: "opp" | "you" }) {
+  const t = useT();
   const isOpp = side === "opp";
   // Mirror of the previous version per Alex's reread: opponent lands in the
   // TOP-RIGHT (sliding in from the right edge), yours in the BOTTOM-LEFT
@@ -61,7 +63,7 @@ export function BigCardReveal({ id, side }: { id: CardId; side: "opp" | "you" })
         <CardImage id={id} glyphSize="text-3xl" />
         <div className="absolute bottom-0 left-0 right-0 bg-black/65 py-0.5">
           <div className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-center text-white">
-            {isOpp ? "Adv" : "Toi"}
+            {isOpp ? t("ranked.tag.opp") : t("ranked.tag.you")}
           </div>
         </div>
       </div>

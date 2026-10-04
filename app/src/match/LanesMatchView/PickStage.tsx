@@ -159,7 +159,7 @@ function LaneSlot({
             ? "border-emerald-400/50 bg-emerald-600/25 hover:bg-rose-500/20 hover:border-rose-400/50"
             : "border-dashed border-hairline bg-surface-2")
         }
-        title={pick ? t("lanes.clearLane", { move: pick }) : hint}
+        title={pick ? t("lanes.clearLane", { move: t("element." + pick) }) : hint}
       >
         {/* Soft halo glow when the placed move is on its favoured lane —
             a STEADY constant glow (no opacity pulse) so the board stays calm. */}
@@ -205,6 +205,7 @@ function LaneSlot({
 }
 
 function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void }) {
+  const t = useT();
   const [shockMove, setShockMove] = useState<Move | null>(null);
   return (
     <div className="grid grid-cols-5 gap-1.5 sm:gap-3 w-full max-w-md">
@@ -225,7 +226,7 @@ function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void
             transition={{ delay: 0.05 * i }}
             whileHover={{ y: -4, scale: 1.04 }}
             whileTap={{ scale: 0.86 }}
-            aria-label={`Pick ${mv}`}
+            aria-label={t("lanes.pickAria", { move: t("element." + mv) })}
             className="relative aspect-[4/5] rounded-xl flex flex-col items-center justify-center gap-0.5 py-1 text-white transition"
             // Dark glass + theme-blended rim — same treatment as the ranked
             // picker so every mode's move buttons look consistent and adapt
@@ -238,7 +239,7 @@ function PickerBar({ onPickInNextEmpty }: { onPickInNextEmpty: (m: Move) => void
           >
             <PickShock show={shockMove === mv} />
             <MoveGlyph move={mv} className="w-9 h-9 sm:w-11 sm:h-11" />
-            <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-bold leading-none" style={{ color: moveRim(pal.hex) }}>{mv}</span>
+            <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-bold leading-none" style={{ color: moveRim(pal.hex) }}>{t("element." + mv)}</span>
           </motion.button>
         );
       })}

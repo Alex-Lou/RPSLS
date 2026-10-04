@@ -14,6 +14,7 @@
 
 import { useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { useT } from "../i18n";
 
 export function InfoBubble({
   title,
@@ -30,6 +31,7 @@ export function InfoBubble({
   variant?: "round" | "minimal";
   className?: string;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const sizeClass =
     size === "sm" ? "w-4 h-4 text-[10px]" :
@@ -75,7 +77,7 @@ export function InfoBubble({
                 <h3 className="text-base sm:text-lg font-bold text-white">{title}</h3>
                 <button
                   onClick={() => setOpen(false)}
-                  aria-label="Close"
+                  aria-label={t("match.close")}
                   className="shrink-0 w-7 h-7 rounded-full bg-hairline hover:bg-hairline flex items-center justify-center text-ink-muted hover:text-white transition"
                 >
                   ✕
