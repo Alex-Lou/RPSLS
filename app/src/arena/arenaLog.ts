@@ -14,10 +14,11 @@
  * so the panel stays readable across a long match.
  */
 
+import { DEV_TOOLS } from "../devTools";
+
 // Builds dev / debug device uniquement : en release, ni buffer ni console.log.
-// `typeof` : hors Vite (scripts `npx tsx app/scripts/*-check.ts`), le define
-// n'existe pas → logs coupés au lieu d'un ReferenceError.
-const ARENA_LOG_ENABLED = typeof __DEV_TOOLS__ !== "undefined" && __DEV_TOOLS__;
+// (cf. devTools.ts : sans plantage hors Vite, ex. scripts `npx tsx`).
+const ARENA_LOG_ENABLED = DEV_TOOLS;
 const MAX_BUFFER = 250;
 
 export interface ArenaLogEntry {

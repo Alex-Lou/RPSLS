@@ -350,7 +350,7 @@ export function removeSpentCardsDetailed(hand: CardId[], intent: TurnIntent): { 
     }
   }
   if (consumed.length > 0) {
-    // Via alog : coupé en release (cf. arenaLog, __DEV_TOOLS__), comme les autres logs arena.
+    // Via alog : coupé en release (cf. arenaLog, DEV_TOOLS), comme les autres logs arena.
     alog("hand", `consumed cards=[${consumed.join(",")}] hand was=${hand.length} now=${out.length}`);
   }
   return { hand: out, spent };

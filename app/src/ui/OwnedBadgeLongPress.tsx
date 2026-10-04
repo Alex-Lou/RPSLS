@@ -22,6 +22,7 @@ import { motion } from "motion/react";
 import { PremiumBadge } from "./PremiumBadge";
 import { useStore } from "../store/store";
 import { hapticAlert, hapticMatchWin, hapticTap } from "../haptic";
+import { DEV_TOOLS } from "../devTools";
 
 const HOLD_MS = 3000;
 const HALFWAY_MS = 1500;
@@ -88,10 +89,10 @@ export function OwnedBadgeLongPress({
     <div
       onPointerDown={(e) => {
         // La RÉVOCATION par appui long (re-test du flux d'achat) n'existe qu'en
-        // dev et dans les builds debug device (`__DEV_TOOLS__`, fail-closed).
+        // dev et dans les builds debug device (`DEV_TOOLS`, fail-closed).
         // Dans toute release, le badge « ✓ OWNED » reste et le tap passe au
         // parent (sélection normale du cosmétique possédé). Alex 2026-06-20 « virer le test dev en public ».
-        if (!__DEV_TOOLS__) return;
+        if (!DEV_TOOLS) return;
         stopAll(e);
         startAt.current = performance.now();
         startPos.current = { x: e.clientX, y: e.clientY };

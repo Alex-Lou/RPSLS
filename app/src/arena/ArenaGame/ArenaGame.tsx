@@ -31,6 +31,7 @@ import {
 } from "../../match/sharedMatchUI";
 import { ArenaBoard } from "../ArenaBoard";
 import { ArenaDebugOverlay } from "../ArenaDebugOverlay";
+import { DEV_TOOLS } from "../../devTools";
 import { ArenaMatchEnd } from "../ArenaMatchEnd";
 import { ArenaMatchSplash } from "../ArenaMatchSplash";
 import { AnimatePresence, motion, useAnimationControls } from "motion/react";
@@ -882,7 +883,7 @@ export function ArenaGame({
        *  that shows live arena events. Replaces adb logcat (which
        *  dropped lines under load) with an in-app live feed. Dev / debug
        *  device builds only. */}
-      {__DEV_TOOLS__ && <ArenaDebugOverlay />}
+      {DEV_TOOLS && <ArenaDebugOverlay />}
     </motion.div>
   );
 }
