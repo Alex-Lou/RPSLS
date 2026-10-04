@@ -1,0 +1,72 @@
+# CI — vérifie chaque PR et chaque push sur main AVANT que Render ne déploie.
+# Ce que fait un contributeur à la main (HANDOFF §3), en automatique :
+#  - serveur : tests Rust (rpsls-core + rpsls-server) ;
+#  - app : typecheck, build release, scripts de contrôle lockstep (Pro online) ;
+#  - métas serveur : cards_meta.json / economy_meta.json doivent être à jour
+#    avec le code TS (sinon le serveur valide l'économie sur des barèmes faux).
+
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Serveur (cargo test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # -p : app/src-tauri (membre du workspace) exige les libs système Tauri,
+      # inutiles ici.
+      - run: cargo test -p rpsls-core -p rpsls-server
+
+  app:
+    name: App (typecheck, build, lockstep)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: app/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsc --noEmit -p tsconfig.json
+      - run: pnpm exec vite build
+      - name: Contrôles lockstep (Pro online)
+        run: |
+          for s in determinism-check arena-lockstep-check arena-session-check arena-online-check arena-net-check; do
+            echo "== $s"
+            npx --yes tsx "scripts/$s.ts"
+          done
+
+  metas:
+    name: Métas serveur à jour
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/gen-card-meta.mjs && node scripts/gen-economy-meta.mjs
+      - name: Le générateur ne doit rien changer
+        run: |
+          git diff --exit-code crates/rpsls-server/cards_meta.json crates/rpsls-server/economy_meta.json \
+            || { echo "::error::Métas serveur périmées : lancer node scripts/gen-card-meta.mjs && node scripts/gen-economy-meta.mjs et committer."; exit 1; }
