@@ -238,6 +238,10 @@ export interface Player {
    *  la pause entre deux manches en Classé. Les animations elles-mêmes gardent
    *  leur durée (rien n'est coupé). Opt-in : défaut = rythme posé (lisibilité). */
   fastCombat?: boolean;
+  /** Tutoriel Arena Pro : absent = jamais proposé (proposé à la 1re visite du
+   *  lobby), "skipped" = refusé (rejouable via le bouton), "done" = réussi
+   *  (récompense XP déjà versée, plus jamais). */
+  arenaTutorial?: "skipped" | "done";
 }
 
 /** Where a pad shows up in the Profile pad picker's 3-way sub-filter.

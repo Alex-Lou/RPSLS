@@ -79,7 +79,9 @@ export const FloatingMatchBackButton = forwardRef<
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+            // z-[95] : au-dessus du coach du tuto Arena (z-80) et du tiroir burger
+            // (z-70) — une confirmation de sortie doit toujours rester accessible.
+            className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
             onClick={() => setOpen(false)}
           >
             <motion.div

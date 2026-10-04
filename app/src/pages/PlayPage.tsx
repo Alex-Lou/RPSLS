@@ -15,6 +15,8 @@ import { MatchPrepScreen, type Arena } from "../ranked/MatchPrepScreen";
 import { ArenaPadProvider } from "../ranked/arena";
 import { ArenaPage } from "../arena/ArenaPage";
 import { ArenaLobby } from "../arena/ArenaLobby";
+import { ArenaTutorialPage } from "../arena/tutorial/ArenaTutorialPage";
+import { skipArenaTutorial } from "../arena/tutorial/tutorialProgress";
 import { ArenaOnlineGame } from "../arena/ArenaOnlineGame";
 import { useArenaOverride } from "../ranked/arenaOverride";
 import { oppPersona } from "../ranked/personaSeed";
@@ -46,6 +48,7 @@ type View =
   // Constellation Pro — solo lobby (deck + rules + entry points) then match.
   | { kind: "arena_lobby" }
   | { kind: "arena_pro" }
+  | { kind: "arena_tutorial" }
   | { kind: "arena_online" };
 
 export function PlayPage({
@@ -163,7 +166,24 @@ export function PlayPage({
             onManageDeck={() => setView({ kind: "ranked_deck", from: "arena" })}
             onGoShop={() => setView({ kind: "ranked_lobby" })}
             onBack={() => setView({ kind: "select" })}
+            onTutorial={() => setView({ kind: "arena_tutorial" })}
           />
+        )}
+        {view.kind === "arena_tutorial" && (
+          <motion.div
+            key="arena_tutorial"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            className="flex flex-col flex-1 min-h-0"
+          >
+            <ArenaTutorialPage
+              // Quitter en cours de route = tuto « passé » (plus proposé d'office) ;
+              // sans effet s'il est déjà réussi.
+              onBack={() => { skipArenaTutorial(); setView({ kind: "arena_lobby" }); }}
+              onPlayReal={() => setView({ kind: "arena_pro" })}
+            />
+          </motion.div>
         )}
         {view.kind === "arena_online" && (
           <motion.div

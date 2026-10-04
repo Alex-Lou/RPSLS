@@ -77,6 +77,9 @@ import { prepareResolveStart } from "./arenaResolvePrep";
 import { recordWatcherMatch, watcherUuid, watcherAppVersion, watcherEnabled, createTurnRecorder, buildTurnPlays, buildCardLedger, type WatcherMatchRecord, type TurnRecorder } from "../arenaTelemetry";
 import { startMatchFps, stopMatchFps } from "../../graphics/fpsSampler";
 import { useMatchSurface } from "../../fx/menuFx";
+import { makeTutorialBoard, tutorialCpuIntent, tutorialRngPair } from "../tutorial/tutorialScript";
+import { ArenaTutorialCoach } from "../tutorial/ArenaTutorialCoach";
+import { ArenaTutorialEnd } from "../tutorial/ArenaTutorialEnd";
 
 /** useRef dont la valeur initiale n'est calculée QU'AU PREMIER rendu. Avec
  *  `useRef(expr)`, `expr` est réévaluée à chaque rendu puis jetée : ArenaGame
@@ -96,7 +99,7 @@ function useLazyRef<T>(init: () => T): MutableRefObject<T> {
 const MATCH_FOUND_SPLASH_MS = 2_600;
 
 export function ArenaGame({
-  onQuit, onRematch, oppName, oppAvatar, online,
+  onQuit, onRematch, oppName, oppAvatar, online, tutorial,
 }: {
   onQuit: () => void;
   /** Called when the player taps "Rejouer" on the match-end screen.
@@ -111,6 +114,9 @@ export function ArenaGame({
    *  partagée, le deck/Voie réels de l'adversaire, et l'échange lockstep des
    *  intents/mulligan + la déclaration d'issue. Cf. arenaOnlineDriver. */
   online?: ArenaOnlineDriver;
+  /** Tutoriel guidé (cf. arena/tutorial) : partie scriptée vs le Mentor, coach
+   *  par-dessus, AUCUNE stat/historique/télémétrie, écran de fin dédié. */
+  tutorial?: { onPlayReal: () => void; onReplay: () => void };
 }) {
   useMatchSurface();
   const player = useStore((s) => s.player);
@@ -158,7 +164,7 @@ export function ArenaGame({
   // Re-tirée au soft-reset rematch (chaque match = sa graine).
   // Online : graine PARTAGÉE du serveur (les 2 clients rejouent la même partie).
   // Local : graine aléatoire par match (feeling inchangé, partie reproductible).
-  const rngPair = useLazyRef<RngPair>(() => online?.rngPair ?? makeRngPair(randomSeed()));
+  const rngPair = useLazyRef<RngPair>(() => online?.rngPair ?? (tutorial ? tutorialRngPair() : makeRngPair(randomSeed())));
 
   // Wipe the log buffer at match start so each match has a clean diagnostic
   // history (Alex flag : "tu pers tout finalement"). Called once at mount.
@@ -183,6 +189,7 @@ export function ArenaGame({
   const oppSide: Side = mySide === "a" ? "b" : "a";
 
   const [board, setBoard] = useState<BoardState>(() => {
+    if (tutorial) return makeTutorialBoard(rngPair.current);
     // Deck/Voie de l'ADVERSAIRE : online = les VRAIS (échangés au handshake) ;
     // local = deck CPU miroir + Voie aléatoire. On place MON deck sur mySide et
     // celui de l'adversaire sur oppSide → board CANONIQUE identique des 2 côtés.
@@ -206,7 +213,7 @@ export function ArenaGame({
   // Online v1 : PAS de mulligan (le mulligan par-tap ne se relaie pas à
   // l'identique ; les mains de départ sont déjà déterministes et identiques des
   // deux côtés). À câbler en relayé plus tard. Local : mulligan T1 normal.
-  const [mulliganOpen, setMulliganOpen] = useState(!online);
+  const [mulliganOpen, setMulliganOpen] = useState(!online && !tutorial);
   // Échanges restants (départ 2). Modèle IMMÉDIAT : chaque rejet remplace EN
   // PLACE (cf. ArenaMulligan) → plus de sélection multi-index.
   const [mulliganSwapsLeft, setMulliganSwapsLeft] = useState(2);
@@ -429,7 +436,7 @@ export function ArenaGame({
    *  also try to record an outcome (would double-count). */
   function handleForfeit() {
     resolverCancelRef.current?.(); // coupe net la résolution en vol (anti-fuite)
-    if (matchEndedRef.current) { onQuit(); return; }
+    if (matchEndedRef.current || tutorial) { onQuit(); return; } // tuto : sortie sans défaite
     matchEndedRef.current = true;
     hapticMatchLoss();
     recordArenaMatch("loss", { playerVoie: board[mySide].affinity, oppVoie: board[oppSide].affinity, forfeit: true, online: !!online });
@@ -557,6 +564,7 @@ export function ArenaGame({
       meDead && oppDead ? "draw" : oppDead ? "win" : "loss";
     if (outcome === "win") hapticMatchWin();
     else if (outcome === "loss") hapticMatchLoss();
+    if (tutorial) return; // tuto : ni stats, ni historique, ni télémétrie
     // Online : déclare l'issue AU SERVEUR + le hash du board final (anti-triche
     // Phase 4) — le serveur compare les DEUX déclarations (vainqueur + hash) ;
     // désaccord = drop, aucun crédit. En lockstep honnête, les deux coïncident.
@@ -641,7 +649,7 @@ export function ArenaGame({
         })
         .catch(() => { /* déconnexion/fin : gérée par les callbacks de session */ });
     } else {
-      resolveWith(safe, cpuArenaDecision(board, oppSide, difficulty));
+      resolveWith(safe, tutorial ? tutorialCpuIntent(board.turn) : cpuArenaDecision(board, oppSide, difficulty));
     }
   }
 
@@ -746,9 +754,9 @@ export function ArenaGame({
       label={t("match.quit")}
       hidden
       confirm={{
-        title: t("match.quitConfirm"),
-        body: t("arena.quit.body"),
-        confirmLabel: t("arena.quit.confirm"),
+        title: t(tutorial ? "tut.quitTitle" : "match.quitConfirm"),
+        body: t(tutorial ? "tut.quitBody" : "arena.quit.body"),
+        confirmLabel: t(tutorial ? "tut.quitConfirm" : "arena.quit.confirm"),
         cancelLabel: t("arena.quit.cancel"),
         severity: "danger",
       }}
@@ -772,6 +780,17 @@ export function ArenaGame({
         }}
       />
       </>
+    );
+  }
+
+  if (board.phase === "match-end" && tutorial) {
+    return (
+      <ArenaTutorialEnd
+        won={board[mySide].hp > 0 && board[oppSide].hp <= 0}
+        onPlay={tutorial.onPlayReal}
+        onReplay={tutorial.onReplay}
+        onQuit={onQuit}
+      />
     );
   }
 
@@ -899,6 +918,17 @@ export function ArenaGame({
         playerName={player.nickname || "Toi"}
         playerAvatar={player.avatar}
       />
+      {tutorial && (
+        <ArenaTutorialCoach
+          turn={board.turn}
+          planning={board.phase === "planning"}
+          resolving={resolving}
+          intent={intent}
+          targeting={targeting}
+          onRepairIntent={setIntent}
+          onSkip={() => backRef.current?.triggerConfirm()}
+        />
+      )}
       {/* ── MULLIGAN T1 — modale extraite (ArenaMulligan) : empilage des
        *  doublons + remplacement IMMÉDIAT en place (Alex 2026-06-13). ── */}
       <AnimatePresence>

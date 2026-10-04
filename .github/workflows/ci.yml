@@ -52,7 +52,7 @@ jobs:
       - run: pnpm exec vite build
       - name: Contrôles cartes Pro + lockstep (Pro online)
         run: |
-          for s in cards-consistency-check determinism-check arena-lockstep-check arena-session-check arena-online-check arena-net-check; do
+          for s in cards-consistency-check determinism-check arena-lockstep-check arena-session-check arena-online-check arena-net-check arena-tutorial-check; do
             echo "== $s"
             npx --yes tsx "scripts/$s.ts"
           done

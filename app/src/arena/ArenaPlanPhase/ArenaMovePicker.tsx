@@ -39,6 +39,7 @@ export function ArenaMovePicker({
           <motion.button
             key={mv}
             type="button"
+            data-tut={`move-${mv}`}
             drag={canDrag}
             dragSnapToOrigin
             dragMomentum={false}

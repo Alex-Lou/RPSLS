@@ -29,7 +29,7 @@ export interface AppState {
   locale: Locale;
   serverConfig: ServerConfig;
 
-  updateProfile: (patch: Partial<Pick<Player, "nickname" | "avatar" | "themeId" | "padId" | "difficulty" | "hapticEnabled" | "hapticIntensity" | "backgroundId" | "crashReports" | "fontScale" | "customBgUrl" | "customPadUrl" | "customBgs" | "customPads" | "padChosen" | "premiumIntensity" | "graphicsQuality" | "graphicsMeasured" | "fastCombat">>) => void;
+  updateProfile: (patch: Partial<Pick<Player, "nickname" | "avatar" | "themeId" | "padId" | "difficulty" | "hapticEnabled" | "hapticIntensity" | "backgroundId" | "crashReports" | "fontScale" | "customBgUrl" | "customPadUrl" | "customBgs" | "customPads" | "padChosen" | "premiumIntensity" | "graphicsQuality" | "graphicsMeasured" | "fastCombat" | "arenaTutorial">>) => void;
   recordMatch: (m: MatchRecord) => void;
   /** Crédite UNIQUEMENT le ladder Classé local (classeLp + classeStats) — utilisé
    *  pour un « match rapide vs joueur réel » lancé depuis le hub Classé : le match
