@@ -25,7 +25,8 @@ fn migration_keeps_balances_and_drops_junk() {
     assert_eq!((w.eclats, w.dust, w.stars), (120, 40, 30));
     // Doublon fusionné, id forgé et fusion (non collectionnable) retirés.
     assert_eq!(w.card_collection, vec!["aegis".to_string()]);
-    assert_eq!(w.owned_premium_sets, vec!["quartz".to_string()]);
+    // Sets premium jamais repris (inaccessibles honnêtement).
+    assert!(w.owned_premium_sets.is_empty());
     // 7 n'est pas un palier codex.
     assert_eq!(w.codex_claimed, vec![5]);
     assert_eq!((w.season_number, w.season_started_at), (3, 1_000));
@@ -34,6 +35,16 @@ fn migration_keeps_balances_and_drops_junk() {
     assert_eq!((fresh.season_number, fresh.season_started_at), (1, 5_000));
     let future = PlayerProgress { season_started_at: 9_999, ..Default::default() };
     assert_eq!(Wallet::from_progress(&future, 5_000).season_started_at, 5_000);
+}
+
+#[test]
+fn migration_caps_inflated_balances() {
+    let forged = PlayerProgress { eclats: 999_999, dust: 999_999, stars: 99_999, ..Default::default() };
+    let w = Wallet::from_progress(&forged, 0);
+    assert_eq!(
+        (w.eclats, w.dust, w.stars),
+        (MIGRATION_MAX_ECLATS, MIGRATION_MAX_DUST, economy::welcome_stars())
+    );
 }
 
 #[test]

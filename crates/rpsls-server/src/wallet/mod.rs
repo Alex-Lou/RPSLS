@@ -29,6 +29,15 @@ use crate::player_state::PlayerProgress;
 const MAX_COLLECTION: usize = 256;
 const MS_PER_DAY: u64 = 86_400_000;
 
+/// Plafonds de la MIGRATION (première init) : la ligne player a toujours été
+/// écrite par le client, donc un solde gonflé avant l'activation ne doit pas
+/// devenir officiel. Un joueur honnête est très en dessous.
+/// - éclats / poussière : marge large au-dessus de toute progression réelle ;
+/// - étoiles : on ne peut en gagner QUE via le bonus de bienvenue ;
+/// - sets premium : retirés (800+ ✦ chacun, inaccessibles honnêtement).
+pub const MIGRATION_MAX_ECLATS: u64 = 5_000;
+pub const MIGRATION_MAX_DUST: u64 = 2_000;
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Wallet {
@@ -92,25 +101,20 @@ pub struct PackResult {
 }
 
 impl Wallet {
-    /// Migration (choix Alex : « reprendre la ligne Redis ») : le portefeuille
-    /// part des valeurs actuellement stockées pour ce joueur, nettoyées (ids
-    /// inconnus retirés, doublons fusionnés).
+    /// Migration : le portefeuille part de la ligne Redis du joueur, nettoyée
+    /// (ids inconnus retirés, doublons fusionnés) et PLAFONNÉE (cf.
+    /// `MIGRATION_MAX_*`) — choix Alex : pas d'amnistie pour un solde gonflé.
     pub fn from_progress(p: &PlayerProgress, now_ms: u64) -> Self {
         let mut w = Wallet {
-            eclats: p.eclats,
-            dust: p.dust,
-            stars: p.stars,
+            eclats: p.eclats.min(MIGRATION_MAX_ECLATS),
+            dust: p.dust.min(MIGRATION_MAX_DUST),
+            stars: p.stars.min(economy::welcome_stars()),
             season_number: p.season_number.max(1),
             season_started_at: if p.season_started_at == 0 { now_ms } else { p.season_started_at.min(now_ms) },
             ..Default::default()
         };
         for id in &p.card_collection {
             w.add_card(id);
-        }
-        for s in &p.owned_premium_sets {
-            if economy::is_premium_set(s) && !w.owned_premium_sets.contains(s) {
-                w.owned_premium_sets.push(s.clone());
-            }
         }
         for &t in &p.codex_claimed {
             if economy::codex_tiers().iter().any(|c| c.threshold == t as usize) && !w.codex_claimed.contains(&t) {

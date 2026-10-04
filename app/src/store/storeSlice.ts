@@ -308,8 +308,6 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
     void clearAnchor();
     set({ player: defaultPlayer(), history: [] });
   },
-  grantStars: (n) =>
-    set((s) => ({ player: { ...s.player, stars: Math.max(0, (s.player.stars ?? 0) + Math.round(n)) } })),
   revokePremiumSet: (setId) =>
     set((s) => ({
       player: {
