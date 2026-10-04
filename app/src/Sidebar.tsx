@@ -8,62 +8,14 @@ import { useT } from "./i18n";
 import { LanguagePicker } from "./LanguagePicker";
 import { avatarImgStyle } from "./theme/avatar";
 import { getMatchExit, subscribeMatchExit } from "./matchExitStore";
+import { setExternalOpenDrawer } from "./burgerChrome";
+import { NAV } from "./sidebarNav";
 
 export type Page = "play" | "online" | "leaderboard" | "shop" | "quests" | "packs" | "profile" | "history" | "about" | "contact" | "privacy";
 
-/* ─────────── Chrome propre (Alex 2026-06-12, navigation unifiée) ───────────
- * Hors match, le burger vit dans la barre du haut (AppTopBar). Un écran qui
- * rend SA PROPRE chrome (menu principal : burger inline à gauche du Défi du
- * jour ; plateau Arena ; match Classé) pose setBurgerHidden(true) → ni barre
- * du haut ni burger flottant. Tous ouvrent le même drawer via openMobileMenu().
- * Pattern mini-store identique à matchExitStore (module scope +
- * useSyncExternalStore). */
-let burgerHidden = false;
-const burgerSubs = new Set<() => void>();
-let externalOpenDrawer: (() => void) | null = null;
-export function setBurgerHidden(h: boolean): void {
-  if (h === burgerHidden) return;
-  burgerHidden = h;
-  burgerSubs.forEach((f) => f());
-}
-/** Ouvre le drawer mobile depuis un bouton externe (burger inline du menu). */
-export function openMobileMenu(): void {
-  externalOpenDrawer?.();
-}
-function subscribeBurgerHidden(cb: () => void): () => void {
-  burgerSubs.add(cb);
-  return () => { burgerSubs.delete(cb); };
-}
-function getBurgerHidden(): boolean {
-  return burgerHidden;
-}
-/** Vrai quand l'écran courant rend SA PROPRE chrome (menu principal, plateau
- *  Arena, match Classé…) : ni barre du haut, ni burger flottant. */
-export function useOwnChrome(): boolean {
-  return useSyncExternalStore(subscribeBurgerHidden, getBurgerHidden, () => false);
-}
-
-interface NavItem {
-  id: Page;
-  labelKey: string;
-  /** Path to the PNG badge icon under /public/Burger Icons/. */
-  iconSrc?: string;
-  /** Emoji glyph used when there's no PNG badge. */
-  glyph?: string;
-}
-
-const NAV: NavItem[] = [
-  { id: "play",        labelKey: "nav.home",        iconSrc: "/Burger Icons/nav_accueil.png"    },
-  { id: "online",      labelKey: "nav.online",      iconSrc: "/Burger Icons/nav_en_ligne.png"   },
-  { id: "leaderboard", labelKey: "nav.leaderboard", glyph: "🏆"                                  },
-  { id: "shop",        labelKey: "nav.shop",        glyph: "🎁"                                  },
-  { id: "quests",      labelKey: "nav.quests",      iconSrc: "/Burger Icons/nav_quetes.png"     },
-  { id: "packs",   labelKey: "nav.packs",   iconSrc: "/Burger Icons/nav_variantes.png"  },
-  { id: "profile", labelKey: "nav.profile", iconSrc: "/Burger Icons/nav_profil.png"     },
-  { id: "history", labelKey: "nav.history", iconSrc: "/Burger Icons/nav_historique.png" },
-  { id: "about",   labelKey: "nav.about",   iconSrc: "/Burger Icons/nav_a_propos.png"   },
-  { id: "contact", labelKey: "nav.contact", iconSrc: "/Burger Icons/nav_contact.png"    },
-];
+// Mini-store « chrome propre » : déplacé dans burgerChrome.ts, réexporté ici
+// pour ne rien changer aux importeurs existants.
+export { setBurgerHidden, openMobileMenu, useOwnChrome } from "./burgerChrome";
 
 /* ─────────── Body shared between desktop sidebar and mobile drawer ─────────── */
 
@@ -281,8 +233,8 @@ export function MobileShell({
   const matchExit = useSyncExternalStore(subscribeMatchExit, getMatchExit, () => null);
   // Register l'ouverture externe (burger inline → même drawer).
   useEffect(() => {
-    externalOpenDrawer = () => setOpen(true);
-    return () => { externalOpenDrawer = null; };
+    setExternalOpenDrawer(() => setOpen(true));
+    return () => { setExternalOpenDrawer(null); };
   }, []);
 
   // Lock body scroll when drawer is open

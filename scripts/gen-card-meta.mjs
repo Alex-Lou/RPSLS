@@ -5,22 +5,29 @@
  * COÛT + son KIND, afin de valider l'économie côté serveur (prix de craft,
  * tirages de pack, dust de doublon…) SANS faire confiance au client. Plutôt que
  * de dupliquer la liste à la main (= dérive garantie quand Alex ajoute des
- * cartes), on l'EXTRAIT de `app/src/ranked/cards.ts` (la source de vérité TS) et
- * on émet un JSON que le serveur embarque.
+ * cartes), on l'EXTRAIT de `app/src/ranked/cards.ts` + ses tranches de catalogue
+ * `app/src/ranked/cardCatalog/*.ts` (la source de vérité TS) et on émet un JSON
+ * que le serveur embarque.
  *
  * Lancer après tout ajout/modif de carte :  node scripts/gen-card-meta.mjs
  * Sortie : crates/rpsls-server/cards_meta.json
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(ROOT, "app", "src", "ranked", "cards.ts");
+// Le catalogue CARDS est découpé en tranches (cardCatalog/*.ts) : on les lit
+// TOUTES (ordre alphabétique — sans incidence, la sortie est triée par id).
+const CATALOG_DIR = join(ROOT, "app", "src", "ranked", "cardCatalog");
+const CATALOG_FILES = readdirSync(CATALOG_DIR).filter((f) => f.endsWith(".ts")).sort();
 const OUT = join(ROOT, "crates", "rpsls-server", "cards_meta.json");
 
-const src = readFileSync(SRC, "utf8");
+const src = [SRC, ...CATALOG_FILES.map((f) => join(CATALOG_DIR, f))]
+  .map((p) => readFileSync(p, "utf8"))
+  .join("\n");
 
 // Chaque def de carte commence par :  id: "X", cost: N, rarity: "Y". Le `kind`
 // peut venir APRÈS d'autres champs (`voie: "lizard", kind: "fusion"`) : on le

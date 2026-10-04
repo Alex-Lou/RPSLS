@@ -1,52 +1,25 @@
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import { MAX_ATOUTS, type AtoutId } from "../../../ranked/atouts";
 import {
-  Move,
-  RoundResult,
-  MatchState,
-  applyRound,
-  newMatch,
-  resolveRound,
-  status,
-  target,
-  AiMood,
-  aiMove,
-  rollAiMood,
+  Move, MatchState, applyRound, newMatch, resolveRound, status, target, AiMood, aiMove, rollAiMood,
 } from "../../../engine/game";
 import { BattlePad } from "../../../BattlePad";
 import { useStore } from "../../../store/store";
-import {
-  GameMode,
-  MatchRecord,
-  Opponent,
-  Outcome,
-  REWARDS,
-} from "../../../types";
+import { GameMode, Outcome, REWARDS } from "../../../types";
 import { type DailyChallenge } from "../../../engine/daily";
 import { useT } from "../../../i18n";
 import { hapticTick } from "../../../match/sharedMatchUI";
 import { Streaks } from "./types";
 import { Header } from "./Header";
 import { MatchFacts } from "./MatchFacts";
-import { PickPanel } from "./PickPanel";
-import { PassPanel } from "./PassPanel";
-import { Countdown } from "./Countdown";
-import { RevealPanel } from "./RevealPanel";
 import { AtoutPicker } from "./AtoutPicker";
 import { AtoutBar } from "./AtoutBar";
-import { EndPanel } from "./EndPanel";
 import { useMatchSurface } from "../../../fx/menuFx";
 import { useGfxAllows } from "../../../graphics/graphicsQuality";
-
-type Phase =
-  | { kind: "atout-select" }
-  | { kind: "p1-pick" }
-  | { kind: "pass"; p1Move: Move }
-  | { kind: "p2-pick"; p1Move: Move }
-  | { kind: "countdown"; aMove: Move; bMove: Move }
-  | { kind: "reveal"; round: RoundResult; matchOver: boolean; atoutNote?: string }
-  | { kind: "match-end" };
+import type { Phase } from "./playPhase";
+import { PlayPhasePanels } from "./PlayPhasePanels";
+import { buildForfeitRecord, buildMatchEndRecord } from "./playMatchRecords";
 
 export function Game({
   mode,
@@ -233,41 +206,7 @@ export function Game({
       setPhase({ kind: "match-end" });
       return;
     }
-    const tgt = target(match);
-    const opponent: Opponent = isHotseat
-      ? { kind: "human", nickname: "Guest" }
-      : { kind: "cpu", mood };
-    const r = REWARDS[mode];
-    const rec: MatchRecord = {
-      id:
-        globalThis.crypto && "randomUUID" in globalThis.crypto
-          ? (globalThis.crypto as Crypto).randomUUID()
-          : `${Date.now()}-${Math.random()}`,
-      mode,
-      bestOf,
-      opponent,
-      scorePlayer: match.scoreA,
-      // Treat the opponent as crossing the finish line — that's what a
-      // forfeit means in the match history.
-      scoreOpponent: tgt,
-      outcome: "loss",
-      rounds: match.history.map((rd) => ({
-        playerMove: rd.move_a,
-        opponentMove: rd.move_b,
-        result:
-          rd.outcome.kind === "a_wins"
-            ? "win"
-            : rd.outcome.kind === "b_wins"
-            ? "loss"
-            : "draw",
-      })),
-      // No XP from forfeits (you don't get rewarded for bailing).
-      xpDelta: 0,
-      // Ranked still pays the loss penalty so players can't ditch to dodge LP.
-      lpDelta: r.lpLoss,
-      timestamp: Date.now(),
-      forfeit: true,
-    };
+    const rec = buildForfeitRecord({ match, mode, bestOf, mood, isHotseat });
     recordMatch(rec);
     setRecorded(true);
     // Tournoi Classé : un abandon est une DÉFAITE dans le tableau. Avant,
@@ -275,6 +214,23 @@ export function Game({
     // à 0-2 et relancer le même match.
     if (onMatchResult) onMatchResult(false);
     else onQuit();
+  };
+
+  /** « Rejouer » depuis l'écran de fin (EndPanel.onAgain). */
+  const handleAgain = () => {
+    setMatch(newMatch(bestOf));
+    setStreaks({ a: 0, b: 0, bestA: 0, bestB: 0 });
+    // After the daily match, rematches are normal play (no bonus, mood re-rolled).
+    setIsDailyActive(false);
+    setMood(rollAiMood());
+    setRecorded(false);
+    // Atouts : remis à neuf pour le nouveau match (avant, ceux déjà
+    // dépensés restaient grisés) et nouveau choix si le mode en a.
+    setUsedAtouts([]);
+    setChosenAtouts([]);
+    setLectureMove(null);
+    setVabanqueArmed(false);
+    setPhase(withAtouts ? { kind: "atout-select" } : { kind: "p1-pick" });
   };
 
   // Record match on end (once)
@@ -301,35 +257,7 @@ export function Game({
       recordDailyComplete(daily.date);
     }
 
-    const opponent: Opponent = isHotseat
-      ? { kind: "human", nickname: "Guest" }
-      : { kind: "cpu", mood };
-
-    const rec: MatchRecord = {
-      id:
-        (globalThis.crypto && "randomUUID" in globalThis.crypto
-          ? (globalThis.crypto as Crypto).randomUUID()
-          : `${Date.now()}-${Math.random()}`),
-      mode,
-      bestOf,
-      opponent,
-      scorePlayer: match.scoreA,
-      scoreOpponent: match.scoreB,
-      outcome,
-      rounds: match.history.map((r) => ({
-        playerMove: r.move_a,
-        opponentMove: r.move_b,
-        result:
-          r.outcome.kind === "a_wins"
-            ? "win"
-            : r.outcome.kind === "b_wins"
-            ? "loss"
-            : "draw",
-      })),
-      xpDelta,
-      lpDelta,
-      timestamp: Date.now(),
-    };
+    const rec = buildMatchEndRecord({ match, mode, bestOf, mood, isHotseat }, outcome, xpDelta, lpDelta);
     recordMatch(rec);
     setRecorded(true);
   }, [phase, match, mode, bestOf, isHotseat, mood, streaks.bestA, isDailyActive, daily, recordMatch, recordDailyComplete, recorded]);
@@ -414,96 +342,28 @@ export function Game({
             plateau (écran de fin sur petit téléphone) s'aligne en haut et
             défile, au lieu d'être rogné des deux côtés (trophée / pied coupés). */}
         <div className="relative w-full h-full flex items-center-safe justify-center p-3 sm:p-8 overflow-y-auto overflow-x-hidden">
-          <AnimatePresence mode="wait">
-        {phase.kind === "p1-pick" && (
-          <PickPanel
-            key="p1"
-            title={t("match.pickTitle", { name: labelA })}
-            // « 8 secondes pour verrouiller » n'a de sens qu'avec le chrono
-            // (hotseat) : vs CPU il n'y a pas de compte à rebours.
-            subtitle={isHotseat ? t("match.pickHotseat") : undefined}
-            onPick={onP1Pick}
-            onTimeout={isHotseat ? undefined : onP1Timeout}
-            // Solo vs CPU = no countdown (no move played for you). Hotseat keeps
-            // the pass-and-play timer.
-            withTimer={isHotseat}
-            recentOppMoves={
-              !isHotseat
-                ? match.history.slice(-3).map((r) => r.move_b)
-                : undefined
-            }
-          />
-        )}
-
-        {phase.kind === "pass" && (
-          <PassPanel key="pass" labelB={labelB} onContinue={continueToP2} />
-        )}
-
-        {phase.kind === "p2-pick" && (
-          <PickPanel
-            key="p2"
-            title={t("match.pickTitle", { name: labelB })}
-            subtitle={t("match.pickP2Sub")}
-            onPick={onP2Pick}
-            onTimeout={onP2Timeout}
-            withTimer
-          />
-        )}
-
-        {phase.kind === "countdown" && (
-          <Countdown
-            key="countdown"
+          <PlayPhasePanels
+            phase={phase}
             labelA={labelA}
             labelB={labelB}
-            onDone={finishCountdown}
-          />
-        )}
-
-        {phase.kind === "reveal" && (
-          <RevealPanel
-            key="reveal"
-            round={phase.round}
-            labelA={labelA}
-            labelB={labelB}
-            streakA={streaks.a}
-            streakB={streaks.b}
-            matchOver={phase.matchOver}
-            atoutNote={phase.atoutNote}
-            onNext={advance}
-          />
-        )}
-
-        {phase.kind === "match-end" && (
-          <EndPanel
-            key="end"
-            labelA={labelA}
-            labelB={labelB}
+            isHotseat={isHotseat}
             match={match}
             streaks={streaks}
-            mood={!isHotseat ? mood : null}
+            mood={mood}
             mode={mode}
-            isDaily={isDailyActive}
+            isDailyActive={isDailyActive}
             dailyBonus={daily?.xpBonus ?? 0}
-            onAgain={() => {
-              setMatch(newMatch(bestOf));
-              setStreaks({ a: 0, b: 0, bestA: 0, bestB: 0 });
-              // After the daily match, rematches are normal play (no bonus, mood re-rolled).
-              setIsDailyActive(false);
-              setMood(rollAiMood());
-              setRecorded(false);
-              // Atouts : remis à neuf pour le nouveau match (avant, ceux déjà
-              // dépensés restaient grisés) et nouveau choix si le mode en a.
-              setUsedAtouts([]);
-              setChosenAtouts([]);
-              setLectureMove(null);
-              setVabanqueArmed(false);
-              setPhase(withAtouts ? { kind: "atout-select" } : { kind: "p1-pick" });
-            }}
+            onP1Pick={onP1Pick}
+            onP1Timeout={onP1Timeout}
+            continueToP2={continueToP2}
+            onP2Pick={onP2Pick}
+            onP2Timeout={onP2Timeout}
+            finishCountdown={finishCountdown}
+            advance={advance}
+            onAgain={handleAgain}
             onQuit={onQuit}
             onMatchResult={onMatchResult}
           />
-        )}
-          </AnimatePresence>
         </div>
       </div>
 

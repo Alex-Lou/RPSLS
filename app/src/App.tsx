@@ -2,14 +2,9 @@ import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "./store/store";
 import { useArenaOverride } from "./ranked/arenaOverride";
-import { applyTheme, THEMES } from "./theme/theme";
-import { BACKGROUNDS_BY_ID, resolveFontFamily } from "./theme/themes";
+import { applyTheme } from "./theme/theme";
+import { BACKGROUNDS_BY_ID } from "./theme/themes";
 import { RTL_LOCALES } from "./i18n";
-import { SplashShader } from "./fx/SplashShader";
-import { ThemedBackdrop, ThemedBackdropStaticFallback } from "./backdrops/ThemedBackdrop";
-import { QuartzBackdropWithLayer } from "./backdrops/QuartzBackdrop";
-import { PremiumTouchLayer, isPremiumFxScene } from "./backdrops/PremiumTouchLayer";
-import { StormRain } from "./backdrops/StormRain";
 import { useBackdropPeek } from "./backdrops/previewScene";
 import { ThemeTouchFX } from "./fx/ThemeTouchFX";
 import { Sidebar, MobileShell, useOwnChrome, type Page } from "./Sidebar";
@@ -30,6 +25,12 @@ import { startSyncSubscriber } from "./online/playerSync";
 import { runBootSync, restoreAnchorIntoStore } from "./online/bootSync";
 import { flushWallet, startWalletListener } from "./online/wallet";
 import { AuthGate } from "./auth/AuthGate";
+// Sous-modules extraits d'App.tsx (verbatim) : splash, enveloppes de routes,
+// couches de fond, effets DOM du fond d'écran.
+import { Splash } from "./AppSplash";
+import { RouteFallback, PageWrap } from "./AppRouteParts";
+import { AppBackdropLayers } from "./AppBackdropLayers";
+import { useAppBackgroundVars, useAppHtmlBgFlags } from "./useAppBackgroundDom";
 
 // Code-split heavy pages — each becomes its own JS chunk that Vite ships
 // on demand the first time the user navigates there. Cuts the initial
@@ -174,50 +175,8 @@ export default function App() {
     applyTheme(themeId);
   }, [themeId]);
 
-  // Apply the chosen cosmetic background image AND skin (fonts) to <body>
-  // via CSS variables. body { font-family: var(...) } and
-  // body { background-image: var(...) } in App.css consume them. The
-  // "default" theme has src: null which clears the var so the original
-  // CSS radial-gradient default remains visible.
-  //
-  // While the splash is showing we deliberately suppress the bg image so
-  // the player never sees the theme PNG flash through behind the WebGL
-  // shader during boot or during the splash-out transition.
-  const customBgUrl = useStore((s) => s.player.customBgUrl);
-  useEffect(() => {
-    const def = BACKGROUNDS_BY_ID[backgroundId];
-    const root = document.documentElement;
-    // "custom" paints the player's own uploaded image; coded scenes paint
-    // nothing here (the WebGL canvas handles them); everything else clears.
-    const customActive = stage !== "splash" && def?.custom && !!customBgUrl;
-    const imgSrc = customActive ? customBgUrl : (stage !== "splash" ? def?.src : null);
-    if (imgSrc) {
-      root.style.setProperty("--app-bg-image", `url("${imgSrc}")`);
-    } else {
-      root.style.removeProperty("--app-bg-image");
-    }
-    // Typography precedence: a coded scene background (nebula/casino/holy…)
-    // owns a bespoke font skin harmonised with its art, so it WINS. On the
-    // plain "default" or the player's own "custom" image there is no scene
-    // identity, so the chosen HUD colour palette drives the fonts too — which
-    // gives every "Couleurs" theme its own type mood, not just colours.
-    const skin = def?.scene ? def.skin : THEMES[themeId];
-    if (skin) {
-      root.style.setProperty("--font-headline", resolveFontFamily(skin.fontHeadline));
-      root.style.setProperty("--font-body",     resolveFontFamily(skin.fontBody));
-      root.style.setProperty("--font-mono",     resolveFontFamily(skin.fontMono));
-    }
-    // Accent override — when the chosen background ships an accent palette,
-    // it WINS over the global theme. Every "primary action" surface uses
-    // var(--theme-primary)/secondary, so this single switch repaints them
-    // all (Lock, Fight, rank chips, focus rings) to match the ambience.
-    if (def?.accent) {
-      root.style.setProperty("--theme-primary",   def.accent.from);
-      root.style.setProperty("--theme-secondary", def.accent.to);
-    }
-    // Note: if def.accent is null (default bg), we leave the theme-driven
-    // values alone — they were set by applyTheme(themeId) right above.
-  }, [backgroundId, stage, customBgUrl, themeId]);
+  // Image de fond + skin typo + accent → variables CSS (cf. useAppBackgroundDom).
+  const customBgUrl = useAppBackgroundVars(backgroundId, stage, themeId);
 
   // Mirror the locale onto <html> so Tailwind / browser can pick up text
   // direction and language-aware features (forms, hyphenation, screen reader).
@@ -265,95 +224,16 @@ export default function App() {
   const isFlashyBg = activeBg?.flashy === true;
   const premiumSetId = activeBg?.premiumSetId;
 
-  // Toggle the global `theme-light` / `theme-flashy` classes and the
-  // `data-premium` attribute on <html> so App.css can:
-  //  - darken text + thicken surfaces for pastel / flashy backdrops
-  //  - apply per-set frame identity (border colour, shadow, radius,
-  //    typography) via [data-premium="…"] selectors
-  useEffect(() => {
-    const root = document.documentElement;
-    root.classList.toggle("theme-light", isLightBg);
-    root.classList.toggle("theme-flashy", isFlashyBg);
-    if (premiumSetId) {
-      root.dataset.premium = premiumSetId;
-    } else {
-      delete root.dataset.premium;
-    }
-  }, [isLightBg, isFlashyBg, premiumSetId]);
+  // Classes theme-light / theme-flashy + data-premium sur <html> (cf. useAppBackgroundDom).
+  useAppHtmlBgFlags(isLightBg, isFlashyBg, premiumSetId);
 
   return (
     <div className="h-full w-full select-none overflow-hidden">
-      {/* Backdrop stays gated on `stage !== "splash"` — Splash already mounts
-          its own ThemedBackdrop via SplashShader, doubling it would render two
-          WebGL canvases at z-0 and waste a context. */}
-      {activeScene && stage !== "splash" && stage !== "auth" && (
-        gfxThemes ? <ThemedBackdrop scene={activeScene} /> : <ThemedBackdropStaticFallback scene={activeScene} />
-      )}
-      {/* Per-theme touch/slide FX for the coded premium scenes (storm/tempus/
-          emberforge/phantom/eclipse) — each reacts in its own voice. Passive in
-          menus (taps still reach the UI), active during the full-screen peek.
-          Quartz has its own bespoke layer just below. Active from splash
-          onwards so the opening already has its theme signature (Alex: "if
-          something is meant to be shown, it must be visible from the start"). */}
-      {activeScene && isPremiumFxScene(activeScene) && (
-        <PremiumTouchLayer scene={activeScene} active />
-      )}
-      {/* Tempest = a REAL gravity-driven downpour over the storm backdrop.
-          Mounted during splash too: the rain IS the theme — hiding it on
-          opening means the splash looks dead for a beat. Performance: one
-          canvas + rAF, runs alongside the cosmic shader without contention. */}
-      {activeScene === "storm" && gfxStorm && <StormRain />}
-      {premiumScene === "quartz" && (
-        gfxQuartz ? (
-          // Interactive layer is wired ONLY during peek (full-screen preview):
-          // outside peek the regular UI taps must keep reaching their buttons.
-          // The wrapper switches `pointerEvents` inline so the same component
-          // serves both passive and active modes without duplication.
-          <div className={"fixed inset-0 z-0 " + (peek ? "" : "pointer-events-none")}>
-            <QuartzBackdropWithLayer interactive={peek} />
-          </div>
-        ) : (
-          // Palier perf bas : fallback STATIQUE prismatique (zéro SVG/SMIL).
-          <div
-            className="fixed inset-0 z-0 pointer-events-none"
-            style={{
-              background:
-                "radial-gradient(120% 85% at 50% 28%, rgba(232,210,250,0.20) 0%, transparent 52%)," +
-                "radial-gradient(85% 70% at 72% 78%, rgba(200,174,240,0.15) 0%, transparent 58%)," +
-                "linear-gradient(180deg, #141019 0%, #0a0710 100%)",
-            }}
-          />
-        )
-      )}
-      {/* Readability scrim over a player's OWN uploaded image — coded scenes
-          already ship their own vignette, but a raw photo can be bright/busy
-          enough to drown menu text. A very light dark wash keeps every page
-          legible without hiding the chosen picture. ALSO shows during peek:
-          the preview MUST match the final rendering exactly, otherwise the
-          player buys/picks a look that turns out brighter in use than what
-          they saw in the picker. */}
-      {backgroundId === "custom" && customBgUrl && (
-        <div
-          className="fixed inset-0 z-0 pointer-events-none"
-          style={{
-            background:
-              "linear-gradient(180deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.26) 28%, rgba(0,0,0,0.26) 72%, rgba(0,0,0,0.46) 100%)",
-          }}
-        />
-      )}
-      {/* Coded scenes ship their own vignette, but the flashy ones (aurora,
-          casino, grid…) can still drown menu text. A lighter top/bottom-weighted
-          wash keeps titles + nav legible while leaving the scene visible. Also
-          rendered during peek — preview = exact rendering, see comment above. */}
-      {backgroundId !== "custom" && activeScene && (
-        <div
-          className="fixed inset-0 z-0 pointer-events-none"
-          style={{
-            background:
-              "linear-gradient(180deg, rgba(0,0,0,0.46) 0%, rgba(0,0,0,0.22) 24%, rgba(0,0,0,0.22) 68%, rgba(0,0,0,0.48) 100%)",
-          }}
-        />
-      )}
+      <AppBackdropLayers
+        stage={stage} backgroundId={backgroundId} customBgUrl={customBgUrl}
+        activeScene={activeScene} premiumScene={premiumScene} peek={peek}
+        gfxThemes={gfxThemes} gfxStorm={gfxStorm} gfxQuartz={gfxQuartz}
+      />
       {/* mode="wait" — Alex wanted the sequence to read as "splash ONLY, then
           menu ONLY", never overlapping. The splash fully exits before the
           shell mounts so the player never sees the theme bg leaking through
@@ -477,195 +357,5 @@ export default function App() {
         )}
       </AnimatePresence>
     </div>
-  );
-}
-
-/** Minimal Suspense fallback for lazy-loaded routes. Renders a dark
- *  full-screen panel with a faint pulse — short enough that even on a
- *  slow chunk fetch it doesn't feel like an error state. */
-function RouteFallback() {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.15 }}
-      className="flex-1 flex items-center justify-center"
-      aria-busy
-      aria-live="polite"
-    >
-      <motion.div
-        animate={{ opacity: [0.3, 0.7, 0.3] }}
-        transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
-        className="w-2.5 h-2.5 rounded-full bg-violet-400"
-      />
-    </motion.div>
-  );
-}
-
-function PageWrap({ children }: { children: React.ReactNode }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.25 }}
-      className="flex-1 flex flex-col min-h-0"
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-/* ─────────────── Splash ─────────────── */
-
-/**
- * Splash — opening video played fullscreen behind a fade-in logo + title.
- *
- * Choreography (matches the 8s opening.mp4 duration):
- *   0.0s  Video starts dark (cosmic build-up), overlay UI hidden.
- *   1.4s  Logo PNG fades + scale-springs in.
- *   2.2s  RPSLS wordmark + subtitle fade in.
- *   3.0s  "tap to continue" hint fades in.
- *   8.0s  Video onEnded → onDone(). Safety auto-advance at 8.5s.
- *
- * Tap anywhere to skip. Video is muted + playsInline so Android WebView
- * autoplay policy lets it run without user gesture. If the video fails
- * (no codec, no asset), the dark gradient backdrop still shows and the
- * logo/title sequence still fires — graceful degradation.
- */
-function Splash({ onDone, scene, premiumScene }: {
-  onDone: () => void;
-  scene: import("./backdrops/ThemedBackdrop").BackdropScene | null;
-  premiumScene?: string | null;
-}) {
-  const t = useT();
-  const [phase, setPhase] = useState<"intro" | "logo" | "title" | "hint">("intro");
-
-  useEffect(() => {
-    // Reveal the logo → title → "tap to continue" hint on a timeline, but
-    // NEVER auto-advance: the splash waits for a real tap (Alex wants
-    // "tap or nothing", no silent fall-through into the menu).
-    const t1 = window.setTimeout(() => setPhase("logo"),  1100);
-    const t2 = window.setTimeout(() => setPhase("title"), 1800);
-    const t3 = window.setTimeout(() => setPhase("hint"),  2600);
-    return () => {
-      window.clearTimeout(t1);
-      window.clearTimeout(t2);
-      window.clearTimeout(t3);
-    };
-  }, [onDone]);
-
-  return (
-    <motion.div
-      onClick={onDone}
-      // fixed inset-0 escapes the #root safe-area padding so the splash
-      // truly fills every pixel of the screen edge-to-edge, including
-      // under the status bar and Android nav bar.
-      className="fixed inset-0 z-[80] cursor-pointer overflow-hidden bg-black"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      // Short clean fade-out — mode="wait" upstream means the shell only
-      // mounts AFTER this exit completes, so the player sees: animation
-      // only → fade to black → theme. Never both at once.
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.5, ease: [0.4, 0.0, 0.2, 1] }}
-    >
-      {/* Procedural WebGL fluid backdrop. When the player has picked a coded
-          scene, the splash uses THAT scene instead so the opening matches
-          the chosen ambience. When the player owns the Quartz premium set
-          (a SVG/SMIL scene, not a fragment shader branch), the splash uses
-          the live QuartzBackdrop instead of the shader fallback. */}
-      {premiumScene === "quartz" ? (
-        <QuartzBackdropWithLayer />
-      ) : (
-        <SplashShader scene={scene} />
-      )}
-
-      {/* Soft dark gradient overlay for legibility of the logo/title on top. */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            "linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.15) 35%, rgba(0,0,0,0.15) 65%, rgba(0,0,0,0.7) 100%)",
-        }}
-      />
-
-      <div className="relative h-full flex flex-col items-center justify-center gap-5 [@media(max-height:560px)]:gap-2 px-6 text-center">
-        {/* Logo with a glowing halo behind it. */}
-        <AnimatePresence>
-          {(phase === "logo" || phase === "title" || phase === "hint") && (
-            <motion.div
-              key="logo-wrap"
-              className="relative"
-              initial={{ opacity: 0, scale: 0.55, filter: "blur(10px)" }}
-              animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-              transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-            >
-              <motion.div
-                aria-hidden
-                initial={{ opacity: 0 }}
-                animate={{ opacity: [0, 0.55, 0.3] }}
-                transition={{ duration: 1.8, ease: "easeOut" }}
-                className="absolute -inset-12 -z-10 rounded-full blur-3xl"
-                style={{
-                  background:
-                    "radial-gradient(circle, rgba(168,85,247,0.7), rgba(45,212,191,0.4) 45%, transparent 75%)",
-                }}
-              />
-              <motion.img
-                src="/Logo-RLSPS.png"
-                alt="RPSLS"
-                className="w-40 h-40 sm:w-52 sm:h-52 md:w-60 md:h-60 [@media(max-height:560px)]:w-24 [@media(max-height:560px)]:h-24 drop-shadow-2xl"
-                animate={{ y: [0, -6, 0] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {(phase === "title" || phase === "hint") && (
-            <motion.h1
-              key="title"
-              initial={{ opacity: 0, y: 28, filter: "blur(14px)", scale: 0.92 }}
-              animate={{ opacity: 1, y: 0,  filter: "blur(0px)",  scale: 1 }}
-              transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
-              className="text-5xl sm:text-6xl [@media(max-height:560px)]:text-3xl font-black tracking-tight bg-gradient-to-br from-violet-300 via-fuchsia-400 to-teal-300 bg-clip-text text-transparent"
-              style={{ textShadow: "0 0 28px rgba(168,85,247,0.4)" }}
-            >
-              RPSLS
-            </motion.h1>
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {(phase === "title" || phase === "hint") && (
-            <motion.p
-              key="subtitle"
-              initial={{ opacity: 0, y: 14, filter: "blur(8px)" }}
-              animate={{ opacity: 0.9, y: 0, filter: "blur(0px)" }}
-              transition={{ duration: 0.9, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
-              className="text-ink text-xs sm:text-sm tracking-[0.3em] uppercase"
-            >
-              {t("splash.tagline")}
-            </motion.p>
-          )}
-        </AnimatePresence>
-      </div>
-
-      <AnimatePresence>
-        {phase === "hint" && (
-          <motion.p
-            key="hint"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.7 }}
-            transition={{ duration: 0.5 }}
-            className="absolute bottom-10 [@media(max-height:560px)]:bottom-3 left-0 right-0 text-center text-ink-muted text-xs tracking-[0.25em] uppercase pointer-events-none"
-          >
-            {t("splash.tap")}
-          </motion.p>
-        )}
-      </AnimatePresence>
-    </motion.div>
   );
 }

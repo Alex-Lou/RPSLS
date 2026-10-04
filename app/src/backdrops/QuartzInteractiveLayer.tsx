@@ -27,42 +27,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence } from "motion/react";
 import { menuFxSuppressed } from "../fx/menuFx";
-
-interface Crystal {
-  id: number;
-  /** Position in viewport %. We use % so the backdrop scales with the device. */
-  x: number;
-  y: number;
-  rot: number;
-  /** "small" = tap default, "big" = held. Mutates while held. */
-  size: "small" | "big";
-  /** Performance timestamp (ms) — used for tap-vs-existing crystal detection. */
-  born: number;
-  /** Set when the user re-taps this crystal — triggers the shatter exit. */
-  shattering?: boolean;
-}
-
-interface Bubble {
-  id: number;
-  x: number;
-  y: number;
-}
-
-// Density caps cut HARD (Alex: still too many — "limite leur nombre ET temps").
-// A handful of crystals max, a short bubble trail → tasteful sparkle, never a
-// screen full of shards even when hammering the screen.
-const MAX_CRYSTALS = 6;
-const MAX_BUBBLES = 12;
-// Mini-crystals leave quickly (was 6s) so they can't pile up — exit stays a
-// smooth fade (see CrystalMark exit), just brief.
-const CRYSTAL_TTL_MS = 2200;
-const BUBBLE_TTL_MS = 800;
-const HOLD_BLOOM_MS = 350;
-// Throttle the slide-trail harder so a fast swirl doesn't spray bubbles.
-const BUBBLE_THROTTLE_MS = 120;
-const SHATTER_HIT_RADIUS_PCT = 6;
+import {
+  MAX_CRYSTALS, MAX_BUBBLES, CRYSTAL_TTL_MS, BUBBLE_TTL_MS, HOLD_BLOOM_MS,
+  BUBBLE_THROTTLE_MS, SHATTER_HIT_RADIUS_PCT, type Crystal, type Bubble,
+} from "./quartzLayerConfig";
+import { BubbleMark, CrystalMark } from "./QuartzLayerMarks";
 
 /**
  * Three operating modes:
@@ -292,114 +263,4 @@ function QuartzInteractiveLayerInner({
   // Passive layer portals to <body> so its z-[60] isn't trapped in the
   // backdrop's z-0 stacking context (where it'd stay behind the menu).
   return mode === "passive" ? createPortal(content, document.body) : content;
-}
-
-/** Small drifting bubble — gold rim, hollow centre, drifts up + fades. */
-function BubbleMark({ x, y }: { x: number; y: number }) {
-  return (
-    <motion.span
-      aria-hidden
-      initial={{ opacity: 0, scale: 0.4 }}
-      animate={{ opacity: [0, 0.95, 0], scale: [0.4, 1, 0.9], y: [0, -22, -38] }}
-      transition={{ duration: BUBBLE_TTL_MS / 1000, ease: "easeOut" }}
-      className="absolute rounded-full"
-      style={{
-        left: `${x}%`,
-        top: `${y}%`,
-        width: 9,
-        height: 9,
-        translate: "-50% -50%",
-        border: "1.2px solid #fde9ff",
-        background:
-          "radial-gradient(circle, rgba(255,233,225,0.55) 30%, rgba(251,191,36,0.18) 70%, transparent 100%)",
-        boxShadow: "0 0 10px rgba(251,191,36,0.55)",
-      }}
-    />
-  );
-}
-
-/** A summoned crystal — same shape as the backdrop shards (hex sliver),
- *  but spawn-grown with an aura + sparkle. Mutates to "big" on hold,
- *  shatters with a gold burst when re-tapped. */
-function CrystalMark({ c }: { c: Crystal }) {
-  const big = c.size === "big";
-  const W = big ? 56 : 36;
-  const H = W * 1.55;
-  // Shatter: tilt + scale-out with a small burst overlay.
-  const variants = c.shattering
-    ? { opacity: [1, 0], scale: [big ? 1.45 : 1, 0.4], rotate: [c.rot, c.rot + 25] }
-    : {
-        opacity: [0, 1, big ? 0.95 : 0.9],
-        scale: [0.2, big ? 1.45 : 1, big ? 1.4 : 0.96],
-        rotate: [c.rot - 30, c.rot, c.rot],
-      };
-  const dur = c.shattering ? 0.55 : 0.85;
-  return (
-    <motion.span
-      aria-hidden
-      initial={{ opacity: 0, scale: 0.2 }}
-      animate={variants}
-      // Smooth-but-quick disappearance: a soft fade + slight shrink over 0.4s
-      // (was inheriting the 0.85s spawn curve) so crystals clear the screen
-      // promptly without a hard pop.
-      exit={{ opacity: 0, scale: 0.55, transition: { duration: 0.4, ease: "easeOut" } }}
-      transition={{ duration: dur, ease: c.shattering ? "easeIn" : [0.16, 1, 0.3, 1] }}
-      className="absolute pointer-events-none"
-      style={{
-        left: `${c.x}%`,
-        top: `${c.y}%`,
-        width: W,
-        height: H,
-        translate: "-50% -50%",
-        willChange: "transform, opacity",
-      }}
-    >
-      {/* Aura — soft warm halo so the spawn reads as "lit from within". */}
-      <span
-        aria-hidden
-        className="absolute inset-0 rounded-full blur-md"
-        style={{
-          background:
-            "radial-gradient(circle, rgba(251,207,128,0.65), rgba(253,233,255,0.25) 50%, transparent 75%)",
-        }}
-      />
-      {/* The shard. */}
-      <svg viewBox="-10 -16 20 32" className="absolute inset-0 w-full h-full" preserveAspectRatio="xMidYMid meet">
-        <defs>
-          <linearGradient id={`uqz-${c.id}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#fde9ff" stopOpacity="0.98" />
-            <stop offset="40%" stopColor="#dbe7ff" stopOpacity="0.85" />
-            <stop offset="80%" stopColor="#c8aef0" stopOpacity="0.7" />
-            <stop offset="100%" stopColor="#3b2c5a" stopOpacity="0.9" />
-          </linearGradient>
-        </defs>
-        <path d="M 0 -16 L 7 -6 L 6 12 L -6 12 L -7 -6 Z" fill={`url(#uqz-${c.id})`} />
-        <path d="M 0 -14 L 3 -6 L 2 10 L -2 10 L -3 -6 Z" fill="#ffffff" fillOpacity="0.5" />
-      </svg>
-      {/* Shatter burst — 8 little gold motes radiating out. */}
-      {c.shattering && (
-        <>
-          {Array.from({ length: 8 }).map((_, i) => {
-            const a = (i / 8) * Math.PI * 2;
-            return (
-              <motion.span
-                key={i}
-                aria-hidden
-                initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
-                animate={{ x: Math.cos(a) * 36, y: Math.sin(a) * 36, opacity: 0, scale: 0.2 }}
-                transition={{ duration: 0.55, ease: "easeOut" }}
-                className="absolute left-1/2 top-1/2 rounded-full"
-                style={{
-                  width: 3, height: 3,
-                  background: i % 2 ? "#fde68a" : "#fbcf80",
-                  boxShadow: "0 0 8px rgba(251,191,36,0.95)",
-                  translate: "-50% -50%",
-                }}
-              />
-            );
-          })}
-        </>
-      )}
-    </motion.span>
-  );
 }
