@@ -17,6 +17,8 @@ import {
   withMyCreatureOnLane,
   withOppCreatureOnLane,
   withSideHero,
+  isFinisherOrFusion,
+  isSpellProtected,
 } from "./arenaSpellHelpers";
 import { MANA_CAP, moveCountersMove, type BoardState, type Creature, type LaneState, type PlayedSpell, type Side } from "./arenaTypes";
 import { MOVES, type Move } from "../engine/game";
@@ -31,21 +33,21 @@ export function applyGaia(board: BoardState, side: Side): BoardState {
   return withSideHero(board, side, healHero(hero, 6));
 }
 
-/** Sablier — +2 mana THIS turn, plafonné à MANA_CAP (8). Pure tempo. Le
- *  texte de carte Arena dit explicitement "plafond 8" — pas d'over-cap. */
+/** Sablier — +2 mana THIS turn. Pure tempo. Le +2 est crédité D'AVANCE
+ *  (MANA_GRANTS → creditManaGrants, AVANT invocations et sorts) = le budget de
+ *  la planification ; le handler n'ajoute donc plus rien. */
 export function applySablier(board: BoardState, side: Side): BoardState {
-  const hero = side === "a" ? board.a : board.b;
-  return withSideHero(board, side, { ...hero, mana: Math.min(MANA_CAP, hero.mana + 2) });
+  alog("spell", `${side} SABLIER : +2 mana (crédité d'avance)`);
+  return board;
 }
 
 /** Offre — +2 to max mana permanently (cap MANA_CAP). L'illustration montre
- *  "+2" (Alex 2026-06-11), on suit l'image. Le mana courant grimpe aussi de
- *  +2 (capé au nouveau max) pour que le gain soit utilisable dès ce tour. */
+ *  "+2" (Alex 2026-06-11), on suit l'image. Le +2 mana utilisable dès ce tour
+ *  est crédité D'AVANCE (MANA_GRANTS → creditManaGrants) ; ici seul le max. */
 export function applyOffre(board: BoardState, side: Side): BoardState {
   const hero = side === "a" ? board.a : board.b;
   const newMax = Math.min(MANA_CAP, hero.maxMana + 2);
-  const newMana = Math.min(newMax, hero.mana + 2);
-  return withSideHero(board, side, { ...hero, maxMana: newMax, mana: newMana });
+  return withSideHero(board, side, { ...hero, maxMana: newMax });
 }
 
 /** Rempart — give every one of my creatures +2 max HP. Spock Détaché skipped. */
@@ -186,12 +188,12 @@ export function applyRamure(board: BoardState, side: Side): BoardState {
 }
 
 /** Dilatation Temporelle (Cosmos) — +1 mana max PERMANENT (cap MANA_CAP) ; le
- *  mana courant grimpe aussi de +1 (capé au nouveau max) pour être utilisable
- *  dès ce tour. Ramp léger bas de courbe (clone d'Offre en +1). */
+ *  +1 mana utilisable dès ce tour est crédité D'AVANCE (MANA_GRANTS →
+ *  creditManaGrants). Ramp léger bas de courbe (clone d'Offre en +1). */
 export function applyDilatation(board: BoardState, side: Side): BoardState {
   const hero = side === "a" ? board.a : board.b;
   const newMax = Math.min(MANA_CAP, hero.maxMana + 1);
-  return withSideHero(board, side, { ...hero, maxMana: newMax, mana: Math.min(newMax, hero.mana + 1) });
+  return withSideHero(board, side, { ...hero, maxMana: newMax });
 }
 
 /** Bénédiction — +1 ATK this turn to ALL my creatures. Spock Détaché skipped. */
@@ -206,19 +208,27 @@ export function applyBenediction(board: BoardState, side: Side): BoardState {
 }
 
 /** Oracle Inverse — peek FULL opp hand (Augur shows the first 4 only).
- *  Reste affichée 2 tours comme Augur (Alex 2026-06-11). */
+ *  turns=2 comme Augur : advanceToNextTurn décrémente aussitôt → visible
+ *  jusqu'à TA prochaine planification incluse. */
 export function applyOracleInverse(board: BoardState, side: Side): BoardState {
   const opp = side === "a" ? board.b : board.a;
   if (side === "a") return { ...board, augurRevealedB: opp.hand.slice(), augurTurnsLeftB: 2 };
   return { ...board, augurRevealedA: opp.hand.slice(), augurTurnsLeftA: 2 };
 }
 
+/** Défausse aléatoire : index tiré parmi les cartes DÉFAUSSABLES (jamais un
+ *  Finisher ni une carte de fusion — perdus pour de bon sinon). -1 si aucune. */
+function randomDiscardIndex(hand: CardId[], rng: Rng): number {
+  const pool = hand.map((_, i) => i).filter((i) => !isFinisherOrFusion(hand[i]));
+  return pool.length > 0 ? pool[Math.floor(rng() * pool.length)] : -1;
+}
+
 /** Cascade — draw 3 cards, then discard 1 random from hand (cycle a bad hand). */
 export function applyCascade(board: BoardState, side: Side, rng: Rng): BoardState {
   const hero = side === "a" ? board.a : board.b;
   let after = drawCards(hero, 3, rng);
-  if (after.hand.length > 0) {
-    const idx = Math.floor(rng() * after.hand.length);
+  const idx = randomDiscardIndex(after.hand, rng);
+  if (idx >= 0) {
     const droppedHand = [...after.hand.slice(0, idx), ...after.hand.slice(idx + 1)];
     after = { ...after, hand: droppedHand, discard: [...after.discard, after.hand[idx]] };
   }
@@ -230,8 +240,8 @@ export function applyCascade(board: BoardState, side: Side, rng: Rng): BoardStat
 export function applyRefletEcho(board: BoardState, side: Side, rng: Rng): BoardState {
   const hero = side === "a" ? board.a : board.b;
   let after = drawCards(hero, 1, rng);
-  if (after.hand.length > 0) {
-    const idx = Math.floor(rng() * after.hand.length);
+  const idx = randomDiscardIndex(after.hand, rng);
+  if (idx >= 0) {
     after = { ...after, hand: [...after.hand.slice(0, idx), ...after.hand.slice(idx + 1)], discard: [...after.discard, after.hand[idx]] };
   }
   return withSideHero(board, side, after);
@@ -293,18 +303,20 @@ export function applySangsue(board: BoardState, side: Side, spell: PlayedSpell):
 /** Trou Noir — destroy the opp's creature on a lane outright (ignores Anchor
  *  — this is a Singularity, not a poke). Spock's Logique IS strong enough to
  *  resist a single-target removal — the only sort that can clear Spock is
- *  combat or a board-wide (Genèse, Vortex). */
+ *  combat or a board-wide (Genèse, Vortex). Éclipse (phasedOut) aussi :
+ *  « intouchable » tient face au retrait. */
 export function applyTrouNoir(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   if (spell.kind !== "lane") return board;
   const opp = getOppCreatureOnLane(board, side, spell.lane);
-  if (opp?.spellImmune) return board;
+  if (opp && isSpellProtected(opp, true)) return board;
   return withOppCreatureOnLane(board, side, spell.lane, null);
 }
 
-/** Marchand d'Âmes — pay 2 HP, draw 3 cards. Faustian. */
+/** Marchand d'Âmes — pay 2 HP, draw 3 cards. Faustian. Plancher 1 PV (comme
+ *  Patate Chaude) : un coût payé ne peut pas te tuer tout seul. */
 export function applyMarchandAmes(board: BoardState, side: Side, rng: Rng): BoardState {
   const hero = side === "a" ? board.a : board.b;
-  const wounded = { ...hero, hp: Math.max(0, hero.hp - 2) };
+  const wounded = { ...hero, hp: Math.max(1, hero.hp - 2) };
   return withSideHero(board, side, drawCards(wounded, 3, rng));
 }
 
@@ -313,13 +325,15 @@ export function applyParadoxe(board: BoardState): BoardState {
   return { ...board, a: damageHero(board.a, 5), b: damageHero(board.b, 5) };
 }
 
-/** Le Juge — both sides discard their full hand and draw 4 fresh. */
+/** Le Juge — both sides discard their full hand and draw 4 fresh. Les Finishers
+ *  et cartes de fusion RESTENT en main (perdus pour de bon sinon). */
 // Sorts GLOBAUX (les 2 camps piochent) : chaque camp tire de SON flux (rng.a/rng.b),
 // PAS du flux du lanceur — préserve l'invariant lockstep « un flux par camp » (un
 // aléa ajouté côté A ne décale jamais la pioche de B).
 export function applyJuge(board: BoardState, rng: RngPair): BoardState {
   const reset = (h: BoardState["a"], r: Rng): BoardState["a"] => {
-    const discardAll = { ...h, discard: [...h.discard, ...h.hand], hand: [] as CardId[] };
+    const kept = h.hand.filter(isFinisherOrFusion);
+    const discardAll = { ...h, discard: [...h.discard, ...h.hand.filter((id) => !isFinisherOrFusion(id))], hand: kept };
     return drawCards(discardAll, 4, r);
   };
   return { ...board, a: reset(board.a, rng.a), b: reset(board.b, rng.b) };

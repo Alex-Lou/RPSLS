@@ -161,7 +161,7 @@ const PRIORITY_TABLE: Partial<Record<CardId, number>> = {
   permutation:     255, // manipulation de board
   "coup-oeil":     308, // pioche / info
   doppelganger:    348, // invocation utilitaire
-  reverberation:   365, // TARD : rejoue le dernier sort déjà appliqué
+  reverberation:   520, // DERNIÈRE de tous les sorts : rejoue le dernier sort (rejouable) déjà appliqué — avant, à 365, elle ne voyait que les sorts < 365
   "jet-caillou":   405, // dégât direct créature
   gravite:         408, // dégât de zone
   singularite:     414, // dégât héros (scale board)
@@ -332,9 +332,10 @@ export function applyArenaSpell(ctx: ArenaSpellContext): BoardState {
     case "phenix":        return applyPhenix(board, side);
     case "singularite":   return applySingularite(board, side);
     case "reverberation": {
-      // Rejoue le DERNIER sort non-réverbération appliqué par ce côté ce tour
-      // (tracké dans applyAllSpells) sur sa cible d'origine. Appel récursif à
-      // self — borné (le sort rejoué n'est jamais une réverbération).
+      // Rejoue le DERNIER sort REJOUABLE appliqué par ce côté ce tour (tracké
+      // dans applyAllSpells : ni Réverbération, ni Finisher/Légendaire/Fusion)
+      // sur sa cible d'origine. Appel récursif à self — borné (le sort rejoué
+      // n'est jamais une réverbération).
       const last = side === "a" ? board.lastSpellAppliedA : board.lastSpellAppliedB;
       if (!last) {
         alog("spell", `💤 ${side} Réverbération ne fait rien : aucun sort joué avant elle ce tour.`);
