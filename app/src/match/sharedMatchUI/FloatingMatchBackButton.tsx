@@ -8,6 +8,9 @@ import type { MatchBackHandle } from "./androidBack";
  * next to the mobile hamburger (or just inside the desktop sidebar gutter).
  * Pulled out of MatchScoreBar so the score header can stretch full-width on
  * its own line.
+ * Coin haut-gauche seulement quand la sidebar desktop est là (même condition
+ * que Sidebar : portrait ≥ 900 px). Avant c'était `md:` → en paysage tablette
+ * (1024×700) le burger reste affiché et la flèche se posait PAR-DESSUS.
  */
 export const FloatingMatchBackButton = forwardRef<
   MatchBackHandle,
@@ -64,8 +67,10 @@ export const FloatingMatchBackButton = forwardRef<
             hover:bg-black/70
             top-[calc(max(var(--sai-top),32px)+10px)]
             left-[calc(max(var(--sai-left),12px)+44px+8px)]
-            md:top-3
-            md:left-3
+            portrait:min-[900px]:top-3
+            portrait:min-[900px]:left-3
+            [@media(max-height:540px)]:w-8 [@media(max-height:540px)]:h-8
+            [@media(max-height:540px)]:top-1 [@media(max-height:540px)]:left-[calc(4px+32px+6px)]
           "
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">

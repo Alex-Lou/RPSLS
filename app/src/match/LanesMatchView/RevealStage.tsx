@@ -245,7 +245,7 @@ function ComboBanner({ combo }: { combo: ComboTheme }) {
 /** Single-side lane card: one Hand + lane identity + per-lane verdict from
  *  the perspective of that side. Used twice per lane (once opp, once you). */
 function SideLaneCard({
-  lane, move, verdictForSide, revealed, side,
+  lane, move, verdictForSide, revealed,
 }: {
   lane: number;
   move: Move;
@@ -255,7 +255,7 @@ function SideLaneCard({
 }) {
   const t = useT();
   const identity = laneIdentityAt(lane);
-  const idKey = IDENTITY_KEYS[lane];
+  const idKey = IDENTITY_KEYS[identity.index];
   const favoured = laneFavoursMove(lane, move);
   const isWin  = verdictForSide === "win";
   const isLoss = verdictForSide === "loss";
@@ -303,11 +303,9 @@ function SideLaneCard({
         "text-[9px] uppercase tracking-wider font-bold leading-none " +
         (isWin ? "text-emerald-300" : isLoss ? "text-rose-300" : "text-ink-faint")
       }>
-        {isWin
-          ? (side === "you" ? t("lanes.win") : t("lanes.loss"))
-          : isLoss
-          ? (side === "you" ? t("lanes.loss") : t("lanes.win"))
-          : t("lanes.drawShort")}
+        {/* verdictForSide est déjà du point de vue de CETTE rangée : le libellé
+            suit la couleur (carte gagnante adverse = « GAGNÉ » en vert). */}
+        {isWin ? t("lanes.win") : isLoss ? t("lanes.loss") : t("lanes.drawShort")}
       </span>
     </motion.div>
   );

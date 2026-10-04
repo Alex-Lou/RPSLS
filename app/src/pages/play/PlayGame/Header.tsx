@@ -35,7 +35,10 @@ export function Header({
   useAndroidBackPrompt(handleQuitClick);
 
   // Same caption shape as the Constellation ScoreHeader, classic wording.
-  const round = scoreA + scoreB + 1;
+  // Match terminé (un camp a atteint la cible) → on fige sur la dernière
+  // manche jouée au lieu d'annoncer une manche suivante qui n'existera pas.
+  const matchOver = scoreA >= target || scoreB >= target;
+  const round = matchOver ? Math.max(1, scoreA + scoreB) : scoreA + scoreB + 1;
   const caption = t("match.scoreCaption", { round, target });
 
   return (

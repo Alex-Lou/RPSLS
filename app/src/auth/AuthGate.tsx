@@ -244,7 +244,8 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
                     <button onClick={() => switchMode(mode === "signup" ? "login" : "signup")} className="text-xs text-ink-muted transition hover:text-ink">
                       {t(mode === "signup" ? "auth.switch.toLogin" : "auth.switch.toSignup")}
                     </button>
-                    <button onClick={() => { hapticTap(); onDone(); }} className="text-[11px] text-ink-faint underline underline-offset-2 transition hover:text-ink-muted">
+                    {/* Cible tactile ≥ 44 px (avant : lien 11 px quasi intouchable). */}
+                    <button onClick={() => { hapticTap(); onDone(); }} className="min-h-[44px] px-4 inline-flex items-center text-xs text-ink-muted underline underline-offset-2 transition hover:text-ink">
                       {t("auth.guest")}
                     </button>
                   </div>

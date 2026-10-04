@@ -405,7 +405,7 @@ function LaneSlot({ index, pick, favoured, verdict, cardHere, twilightMarked = f
 }) {
   const t = useT();
   const identity = laneIdentityAt(index);
-  const idKey = IDENTITY_KEYS[index];
+  const idKey = IDENTITY_KEYS[identity.index];
   const title = t(`${idKey}.title`);
   const accent = identity.accent;
   const ringIdle = accent === "amber" ? "ring-amber-400/30" : accent === "sky" ? "ring-sky-400/30" : "ring-emerald-400/30";

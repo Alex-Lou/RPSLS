@@ -74,6 +74,10 @@ export function CinematicMatchEnd({
     draw   ? "from-zinc-200 to-zinc-400"   :
              "from-rose-300 to-fuchsia-400";
 
+  // Écrans courts (≤ 800 px de haut) : variantes [@media(max-height:800px)]
+  // qui resserrent glyphe / wordmark / textes pour que les boutons restent
+  // visibles sans défiler. pt-[0.12em] sur le wordmark : l'accent de « DÉFAITE »
+  // dépasse la boîte en leading-tight et sortait du dégradé bg-clip-text.
   return (
     <motion.div
       initial={{ opacity: 0, y: 14 }}
@@ -82,7 +86,7 @@ export function CinematicMatchEnd({
       // viewport width — fixes the "screen-in-a-screen" framing Alex flagged
       // where the cinematic was capped to max-w-md and a wide blank gutter
       // showed on both sides.
-      className="relative flex flex-col items-center gap-3 py-2 w-full px-3 sm:px-6"
+      className="relative flex flex-col items-center gap-3 [@media(max-height:800px)]:gap-2 py-2 w-full px-1 sm:px-6"
     >
       {youWon && <CelebrationBurst />}
 
@@ -93,7 +97,7 @@ export function CinematicMatchEnd({
           initial={{ opacity: 0, scale: 0.4 }}
           animate={{ opacity: youWon ? [0.45, 0.85, 0.45] : 0.3, scale: [0.9, 1.15, 0.9] }}
           transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut", delay: 0.3 }}
-          className="absolute w-36 h-36 sm:w-44 sm:h-44 rounded-full blur-2xl pointer-events-none"
+          className="absolute w-36 h-36 sm:w-44 sm:h-44 [@media(max-height:800px)]:w-28 [@media(max-height:800px)]:h-28 rounded-full blur-2xl pointer-events-none"
           style={{
             background: youWon
               ? "radial-gradient(circle, rgba(52,211,153,0.75), transparent 70%)"
@@ -110,7 +114,7 @@ export function CinematicMatchEnd({
             rotate: { type: "spring", stiffness: 200, damping: 12, delay: 0.1 },
             y:      { duration: 3.2, repeat: Infinity, ease: "easeInOut", delay: 1.0 },
           }}
-          className="relative text-6xl sm:text-7xl leading-none"
+          className="relative text-6xl sm:text-7xl [@media(max-height:800px)]:text-5xl leading-none"
         >
           {glyph}
         </motion.div>
@@ -131,7 +135,7 @@ export function CinematicMatchEnd({
           scale:   { duration: 2.6, repeat: Infinity, ease: "easeInOut", delay: 1.2 },
         }}
         className={
-          "text-5xl sm:text-6xl md:text-7xl font-black bg-gradient-to-br bg-clip-text text-transparent leading-tight tracking-tight " +
+          "text-5xl sm:text-6xl md:text-7xl [@media(max-height:800px)]:text-4xl font-black bg-gradient-to-br bg-clip-text text-transparent leading-tight tracking-tight pt-[0.12em] " +
           gradient
         }
       >
@@ -161,7 +165,7 @@ export function CinematicMatchEnd({
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.95, duration: 0.4 }}
-            className="w-full max-w-2xl px-2 text-center text-base sm:text-lg text-ink-muted leading-snug"
+            className="w-full max-w-2xl px-2 text-center text-base sm:text-lg [@media(max-height:800px)]:text-sm text-ink-muted leading-snug"
           >
             {phrase}
           </motion.div>
@@ -217,7 +221,7 @@ export function CinematicMatchEnd({
         className="w-full max-w-2xl mx-auto px-2 text-center"
       >
         <div
-          className="text-base sm:text-lg italic text-ink-muted leading-snug overflow-hidden"
+          className="text-base sm:text-lg [@media(max-height:800px)]:text-sm italic text-ink-muted leading-snug overflow-hidden"
           style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}
         >
           « {t(`lanes.endQuote.${quoteIdx}.text`)} »
@@ -231,19 +235,19 @@ export function CinematicMatchEnd({
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 1.5 }}
-        className="flex flex-row gap-3 w-full max-w-2xl px-2"
+        className="flex flex-row gap-3 w-full max-w-2xl sm:px-2"
       >
         {onRematch && (
           <button
             onClick={onRematch}
-            className="flex-1 px-5 py-3 sm:py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 font-black text-white shadow-lg shadow-emerald-500/30 transition text-base uppercase tracking-wider"
+            className="flex-1 px-3 sm:px-5 py-3 sm:py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 font-black text-white shadow-lg shadow-emerald-500/30 transition text-sm sm:text-base uppercase tracking-wide sm:tracking-wider"
           >
             {rematchLabel ?? t("lanes.rematch")}
           </button>
         )}
         <button
           onClick={onBack}
-          className="flex-1 px-5 py-3 sm:py-3.5 rounded-2xl bg-hairline hover:bg-white/20 border border-hairline font-bold text-ink transition text-base uppercase tracking-wider"
+          className="flex-1 px-3 sm:px-5 py-3 sm:py-3.5 rounded-2xl bg-hairline hover:bg-white/20 border border-hairline font-bold text-ink transition text-sm sm:text-base uppercase tracking-wide sm:tracking-wider"
         >
           {backLabel ?? t("lanes.backToMenu")}
         </button>

@@ -120,7 +120,7 @@ export function ArenaPrepScreen({ onConfirm, onCancel, isTraining = true }: {
           onClick={() => { hapticTap(); onCancel(); }}
           aria-label={t("arena.prep.backAria")}
           title={t("arena.prep.backTitle")}
-          className="fixed z-30 w-11 h-11 rounded-2xl bg-amber-500/20 backdrop-blur border border-amber-400/60 text-amber-200 flex items-center justify-center active:scale-95 transition shadow-lg top-[calc(max(var(--sai-top),32px)+10px)] left-[calc(max(var(--sai-left),12px)+44px+8px)] md:top-3 md:left-3"
+          className="fixed z-30 w-11 h-11 rounded-2xl bg-amber-500/20 backdrop-blur border border-amber-400/60 text-amber-200 flex items-center justify-center active:scale-95 transition shadow-lg top-[calc(max(var(--sai-top),32px)+10px)] left-[calc(max(var(--sai-left),12px)+44px+8px)] portrait:min-[900px]:top-3 portrait:min-[900px]:left-3 [@media(max-height:540px)]:w-8 [@media(max-height:540px)]:h-8 [@media(max-height:540px)]:top-1 [@media(max-height:540px)]:left-[calc(4px+32px+6px)]"
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
             <path d="M15 18l-6-6 6-6" />

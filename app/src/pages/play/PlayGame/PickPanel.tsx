@@ -11,7 +11,7 @@ const PICK_TIMEOUT_MS = 8000;
 export function PickPanel({
   title, subtitle, onPick, onTimeout, withTimer = false, recentOppMoves,
 }: {
-  title: string; subtitle: string; onPick: (m: Move) => void;
+  title: string; subtitle?: string; onPick: (m: Move) => void;
   onTimeout?: () => void;
   withTimer?: boolean; recentOppMoves?: Move[];
 }) {
@@ -82,7 +82,7 @@ export function PickPanel({
       </AnimatePresence>
       <div className="text-center">
         <h2 className="text-lg sm:text-3xl font-bold leading-tight">{title}</h2>
-        <p className="text-ink-muted text-xs sm:text-base mt-1">{subtitle}</p>
+        {subtitle && <p className="text-ink-muted text-xs sm:text-base mt-1">{subtitle}</p>}
       </div>
 
       {recentOppMoves && recentOppMoves.length > 0 && (
