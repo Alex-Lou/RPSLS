@@ -33,6 +33,10 @@ export const ECLATS_PER_LOSS = 2;
 /** Éclats d'un match Constellation Pro (Arena) : plus long et plus exigeant,
  *  il paie un peu plus que Constellation Classé. Lu aussi par le serveur. */
 export const ARENA_ECLATS = { win: 20, draw: 10, loss: 5 } as const;
+/** XP d'un match Constellation Pro (Arena). Avant : 0 — le mode le plus long ne
+ *  faisait pas progresser le niveau. Même échelle que Constellation Ranked
+ *  (60/15), nul au milieu. Forfait : 0. */
+export const ARENA_XP = { win: 60, draw: 30, loss: 15 } as const;
 
 /** Plafond QUOTIDIEN (jour UTC) d'éclats gagnés contre le CPU. Appliqué par le
  *  serveur : un match vs CPU n'est pas vérifiable, le plafond borne la triche

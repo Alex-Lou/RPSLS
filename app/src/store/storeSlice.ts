@@ -8,6 +8,7 @@ import { abandonPenaltyLp, activeAbandonCount, nextAbandon } from "../match/forf
 import { nextStreak, streakBonusXp } from "../match/streak";
 import {
   ARENA_ECLATS,
+  ARENA_XP,
   SEASON_DURATION_MS,
   eclatsReward,
   masteryXpForMatch,
@@ -195,6 +196,7 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
       // matches, deeper strategy) so it pays slightly above Constellation
       // Ranked: win 20, draw 10, loss 5.
       const reward = ARENA_ECLATS[outcome];
+      const xpDelta = meta?.forfeit ? 0 : ARENA_XP[outcome];
       // HISTORIQUE (Alex 2026-06-13 « voies jouées dans l'historique ») : on
       // journalise AUSSI le match vs-CPU (avant : SEULS les compteurs
       // arenaStats, aucune entrée dans `history` → log vide + voie perdue). La
@@ -209,7 +211,7 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
         scoreOpponent: outcome === "loss" ? 1 : 0,
         outcome,
         rounds: [],
-        xpDelta: 0,
+        xpDelta,
         lpDelta: 0,
         timestamp: Date.now(),
         forfeit: meta?.forfeit || undefined,
@@ -224,6 +226,7 @@ export const createSlice: StateCreator<AppState> = (set, get) => ({
         player: {
           ...s.player,
           arenaStats: next,
+          xp: Math.max(0, s.player.xp + xpDelta),
           eclats: (s.player.eclats ?? 0) + reward,
           cardCollection,
         },

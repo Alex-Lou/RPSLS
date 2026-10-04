@@ -18,7 +18,7 @@
 import { type MutableRefObject, useEffect, useRef, useState } from "react";
 import {
   hapticLock, hapticMatchStart, hapticMatchWin, hapticMatchLoss,
-  hapticTap,
+  hapticTap, hapticHeroHit,
 } from "../../haptic";
 import { useStore } from "../../store/store";
 import { CARDS } from "../../ranked/cards";
@@ -38,6 +38,7 @@ import { AnimatePresence, motion, useAnimationControls } from "motion/react";
 import { ArenaImpactFX } from "../ArenaImpactFX";
 import { ArenaTraceCue, type TraceCue } from "../ArenaTraceCue";
 import { ArenaTurnRecap } from "../ArenaTurnRecap";
+import { ArenaTurnHistory, type TurnHistoryEntry } from "../ArenaTurnHistory";
 import { buildTurnRecap, type TurnRecap } from "../arenaRecap";
 import { hasDominantSpell } from "../arenaFinishers";
 import { engineGauge } from "../arenaEngines";
@@ -278,6 +279,8 @@ export function ArenaGame({
   // Alex 2026-07). Posé au settle, effacé au lock suivant + par un timer nettoyé.
   const [turnRecap, setTurnRecap] = useState<TurnRecap | null>(null);
   const recapKey = useRef(0);
+  // Historique consultable des recaps (le recap ne reste que ~3 s). Borné.
+  const [recapLog, setRecapLog] = useState<TurnHistoryEntry[]>([]);
   useEffect(() => {
     if (!turnRecap) return;
     const id = window.setTimeout(() => setTurnRecap(null), 2800);
@@ -325,6 +328,10 @@ export function ArenaGame({
    *  hero. Drives the dramatic HP-bar flash on the hit hero strip. Keyed by
    *  side + lane so consecutive hits on the same hero re-trigger the anim. */
   const [heroHit, setHeroHit] = useState<{ side: "you" | "opp"; lane: LaneIndex; key: number } | null>(null);
+  // Vibration quand MON héros prend un coup (une par impact, via la clé).
+  useEffect(() => {
+    if (heroHit?.side === "you") hapticHeroHit();
+  }, [heroHit?.key, heroHit?.side]);
   /** Taunt block: set when an undefended-lane attack is DEFLECTED by a
    *  taunt creature elsewhere. `rockLane` identifies the Pierre that ate
    *  the deflection so the UI can pull a dotted line to it. */
@@ -707,7 +714,9 @@ export function ArenaGame({
         // Recap de fin de tour (phrases + micro-stats) — delta board AVANT (`board`,
         // pré-résolution) → APRÈS (finalBoard), du point de vue local. null au coup
         // fatal (l'écran de fin prend le relais). Affiché en bas du pad.
-        setTurnRecap(buildTurnRecap(board, finalBoard, mySide, ++recapKey.current));
+        const recap = buildTurnRecap(board, finalBoard, mySide, ++recapKey.current);
+        setTurnRecap(recap);
+        if (recap) setRecapLog((l) => [...l, { turn: board.turn, recap }].slice(-40));
       },
       onAdvanceTurn: () => {
         setResolving(false);
@@ -783,6 +792,7 @@ export function ArenaGame({
           if (onRematch) { onRematch(); return; }
           matchEndedRef.current = false;
           mulliganDoneRef.current = false;
+          setRecapLog([]);
           setMulliganOpen(true);
           setMulliganSwapsLeft(2);
           rngPair.current = makeRngPair(randomSeed()); // graine FRAÎCHE par match (comme le shared_seed online)
@@ -809,6 +819,7 @@ export function ArenaGame({
       <ArenaTraceCue cue={traceCue} />
       {/* Recap de fin de tour (phrases + micro-stats) — bas du pad, Pro vs-CPU + online. */}
       <ArenaTurnRecap recap={turnRecap} />
+      <ArenaTurnHistory entries={recapLog} />
       {/* ⚡ Cartes « à la pioche » (Cast When Drawn) — éclair + carte + effet,
        *  jouées une par une (Alex 2026-06-13). One-shot, démonte via onDone. */}
       <AnimatePresence>
