@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../../store/store";
 import { useT } from "../../i18n";
 import { BACKGROUNDS, BG_DEFAULT_THEME } from "../../theme/themes";
@@ -11,11 +11,13 @@ import { hapticMatchStart } from "../../haptic";
 import { useBackdropPeek } from "../../backdrops/previewScene";
 import { ImageLibraryRow } from "./ImageLibraryRow";
 import { PremiumIntensitySlider } from "./PremiumIntensitySlider";
-import { PREMIUM_SETS } from "./premiumCatalog";
+import { localizedPremiumSet } from "./premiumCatalog";
 import { BackgroundGrid } from "./BackgroundGrid";
 import { PadGrid } from "./PadGrid";
 import { PadPreviewModal } from "./PadPreviewModal";
 import { BackdropPeekOverlay } from "./BackdropPeekOverlay";
+import { SectionCard } from "./SectionCard";
+import { StyleLegend } from "./StyleBadges";
 
 /** Personal image library cap. JPEG-encoded at quality 0.82 at MAX×MAX
  *  yields ~150-400 KB each, so 6 images stays well under localStorage's
@@ -99,6 +101,11 @@ export function StyleSection() {
       previousLookRef.current = null;
     }
   }, [setPeek, updateProfile]);
+  // Référence STABLE par set ouvert (la modale réinitialise sa phase quand
+  // `set` change d'identité) — recalculée seulement si l'id ou la langue change.
+  const locale = useStore((s) => s.locale);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const premiumSet = useMemo(() => localizedPremiumSet(t, premiumModalSetId), [premiumModalSetId, locale]);
   const currentBg = BACKGROUNDS.find((b) => b.id === (player.backgroundId ?? "default"));
 
   /** Upload a personal background: fit within 1080px (portrait-friendly),
@@ -244,25 +251,25 @@ export function StyleSection() {
 
   return (
     <>
-      <section className="bg-surface border border-hairline rounded-3xl p-5">
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-muted">Style</h2>
+      <SectionCard
+        title={t("profile.style.title")}
+        action={
           <TabPicker
-            className="ml-auto"
             value={cosmeticTab}
             onChange={setCosmeticTab}
             options={[
-              { id: "appearance", label: "Apparences" },
-              { id: "pads", label: "Pads" },
+              { id: "appearance", label: t("profile.style.appearances") },
+              { id: "pads", label: t("profile.style.pads") },
             ]}
           />
-        </div>
-
+        }
+      >
         {cosmeticTab === "appearance" && (
         <>
-        <p className="text-xs text-ink-faint mb-3">
-          Une apparence applique tout le look d'un coup : fond animé, couleurs du HUD, typo et tapis assorti. Tu pourras changer juste le tapis dans l'onglet Pads. « Mon image » importe la tienne (portrait 9:16, ex. 1080×1920). Jusqu'à {MAX_CUSTOM_IMAGES} en bibliothèque.
+        <p className="text-xs text-ink-faint leading-snug mb-3">
+          {t("profile.style.appearanceHint")}
         </p>
+        <StyleLegend />
         <input
           ref={bgFileRef}
           type="file"
@@ -271,10 +278,13 @@ export function StyleSection() {
           onChange={onUploadBg}
         />
         <BackgroundGrid onSelect={onSelectBackground} />
+        <p className="text-[11px] text-ink-faint leading-snug mt-3">
+          {t("profile.style.customHint", { n: MAX_CUSTOM_IMAGES })}
+        </p>
 
-        {/* Personal background library — newest first, "+" tile to add another. */}
+        {/* Bibliothèque perso de fonds — plus récente d'abord, tuile « + ». */}
         <ImageLibraryRow
-          title="Ma bibliothèque d'images"
+          title={t("profile.style.bgLibrary")}
           items={player.customBgs ?? []}
           activeUrl={player.backgroundId === "custom" ? player.customBgUrl : undefined}
           max={MAX_CUSTOM_IMAGES}
@@ -288,26 +298,20 @@ export function StyleSection() {
 
         {cosmeticTab === "pads" && (
         <>
-        <div className="flex items-center gap-2 mb-3 flex-wrap">
-          <p className="text-[11px] text-ink-faint flex-1 min-w-[55%] leading-snug">
-            {padTab === "styled"
-              ? "Tapis animés et thématiques, assortis à tes apparences."
-              : padTab === "svg"
-              ? "Tapis sobres et illustrés — un style à part, plus épuré."
-              : `Importe ton image (paysage 3:2, ex. 1500×1000). Jusqu'à ${MAX_CUSTOM_IMAGES} en bibliothèque.`}
-          </p>
-          <TabPicker
-            className="ml-auto shrink-0"
-            size="sm"
-            value={padTab}
-            onChange={setPadTab}
-            options={[
-              { id: "styled", label: "Stylés" },
-              { id: "svg", label: "Simples" },
-              { id: "img", label: "Images" },
-            ]}
-          />
-        </div>
+        <TabPicker
+          className="mb-2 w-fit"
+          size="sm"
+          value={padTab}
+          onChange={setPadTab}
+          options={[
+            { id: "styled", label: t("profile.pads.styled") },
+            { id: "svg", label: t("profile.pads.svg") },
+            { id: "img", label: t("profile.pads.img") },
+          ]}
+        />
+        <p className="text-[11px] text-ink-faint leading-snug mb-3">
+          {t("profile.pads.hint." + padTab, { n: MAX_CUSTOM_IMAGES })}
+        </p>
         <input
           ref={padFileRef}
           type="file"
@@ -317,10 +321,10 @@ export function StyleSection() {
         />
         <PadGrid padTab={padTab} onSelect={onSelectPad} />
 
-        {/* Personal pad library — only under the Images tab. */}
+        {/* Bibliothèque perso de tapis — onglet Images uniquement. */}
         {padTab === "img" && (
           <ImageLibraryRow
-            title="Ma bibliothèque de tapis"
+            title={t("profile.style.padLibrary")}
             items={player.customPads ?? []}
             activeUrl={player.padId === "custom" ? player.customPadUrl : undefined}
             max={MAX_CUSTOM_IMAGES}
@@ -332,7 +336,7 @@ export function StyleSection() {
         )}
         </>
         )}
-      </section>
+      </SectionCard>
 
       {/* Premium theme — FX intensity slider. Only shown when the active
           background is a premium scene the player owns. */}
@@ -357,7 +361,7 @@ export function StyleSection() {
       />
 
       <PremiumPurchaseModal
-        set={premiumModalSetId ? PREMIUM_SETS[premiumModalSetId] ?? null : null}
+        set={premiumSet}
         onClose={() => {
           // If the set was just purchased, the peek (still open behind the
           // modal) should drop its "premium pending" mode so its button bar

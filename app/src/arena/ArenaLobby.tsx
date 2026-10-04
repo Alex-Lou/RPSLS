@@ -18,8 +18,8 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../store/store";
 import { levelFromXp } from "../engine/leveling";
-import { ModeLobbyShell, LobbyIdentityRow, LobbyChip } from "../ui/ModeLobbyShell";
-import { CurrencyBadges } from "../ranked/CurrencyBadges";
+import { ModeLobbyShell, LobbyChip } from "../ui/ModeLobbyShell";
+import { MODE_ICONS } from "../pages/play/PlayMenu/menuShared";
 import { MOVE_PALETTE, moveRim } from "../icons";
 import type { Move } from "../engine/game";
 import { CREATURE_PASSIVES, CREATURE_STATS } from "./arenaTypes";
@@ -50,7 +50,6 @@ export function ArenaLobby({
   onTraining,
   onGoOnline,
   onManageDeck,
-  onGoShop,
   onBack,
   onTutorial,
 }: {
@@ -60,8 +59,6 @@ export function ArenaLobby({
   onGoOnline?: () => void;
   /** Open the deck manager (filtered by arenaSupported). */
   onManageDeck: () => void;
-  /** Jump to the boutique (eclats / packs / craft). */
-  onGoShop?: () => void;
   /** Back to the PlayMenu. */
   onBack?: () => void;
   /** Lance le tutoriel guidé (proposé d'office à la 1re visite). */
@@ -107,31 +104,27 @@ export function ArenaLobby({
     if (commit && !longPressed.current) setArenaAffinity(m);
   };
 
-  // Refonte 2026-06-12 : cadrage via le TEMPLATE ModeLobbyShell (header
-  // burger+titre+retour symétrique, identité 1 ligne, CTA docké toujours
-  // visible). Même template à déployer sur Classé / Constellation / En ligne.
+  // TEMPLATE ModeLobbyShell commun à tous les lobbies : titre + retour dans la
+  // barre du haut, héros (stats Pro), réglages, CTA docké toujours visible.
   return (
     <ModeLobbyShell
-      title="Constellation Pro"
+      title={t("mode.arena_pro")}
       tagline={t("arena.lobby.tagline")}
-      titleGradient="from-fuchsia-300 to-violet-300"
+      icon={MODE_ICONS.arena_pro}
+      accent="#e879f9"
       onBack={onBack}
       /* Fiche Voie dépliée → CTA poussé dans le scroll (vers le bas), le haut
        * (monnaie) ne bouge plus. Replié → CTA redocké, layout normal. */
       dockCta={!voieExpanded}
-      identity={
-        <LobbyIdentityRow
-          avatar={player.avatar}
-          name={player.nickname}
-          chips={
-            <>
-              <LobbyChip tone="accent">✦ Pro</LobbyChip>
-              <LobbyChip>Lv.{lvl.level}</LobbyChip>
-              <LobbyChip tone="good">{winrate}% WR</LobbyChip>
-              <LobbyChip>{t("arena.lobby.matches", { n: total })}</LobbyChip>
-            </>
-          }
-        />
+      // Stats du mode dans le héros (plus de carte joueur ni de monnaies :
+      // elles vivent sur l'accueil — doublon relevé à l'audit).
+      heroExtra={
+        <>
+          <LobbyChip tone="accent">✦ Pro</LobbyChip>
+          <LobbyChip>Lv.{lvl.level}</LobbyChip>
+          <LobbyChip tone="good">{winrate}% WR</LobbyChip>
+          <LobbyChip>{t("arena.lobby.matches", { n: total })}</LobbyChip>
+        </>
       }
       cta={
         <motion.button
@@ -199,20 +192,11 @@ export function ArenaLobby({
       }
     >
 
-      {/* Monnaies — ligne compacte. Sections PACKÉES en haut (Alex 2026-06-21
-       *  "trous verticaux sur tablette haute en portrait") : plus de my-auto
-       *  qui écartait les blocs pour remplir la hauteur → ils suivent le gap
-       *  fixe de la zone contenu et restent collés en haut. Sur petit écran,
-       *  overflow-y-auto du shell prend le relais → scroll normal. */}
-      <div className="shrink-0 flex items-center justify-center my-2">
-        <CurrencyBadges size="full" onClick={onGoShop} />
-      </div>
-
       {/* Affinité (Voie) — picker des 5 symboles RPSLS. Constellation Pro
        *  v2 Couche 1 : le symbole choisi donne un bonus passif aux créatures
        *  de ce type ET avance la constellation 3 étoiles vers le Finisher. */}
       <div
-        className="bg-surface rounded-2xl px-4 py-3.5 flex flex-col gap-2.5"
+        className="shrink-0 bg-surface rounded-2xl px-4 py-3.5 flex flex-col gap-2.5"
         style={{ border: "1px solid color-mix(in oklab, var(--theme-primary) 35%, transparent)" }}
       >
         <div className="flex items-center justify-between gap-2">
@@ -317,7 +301,7 @@ export function ArenaLobby({
       <motion.button
         whileTap={{ scale: 0.98 }}
         onClick={onManageDeck}
-        className="bg-surface rounded-2xl px-4 py-3 mt-2 flex items-center justify-between hover:bg-hairline transition"
+        className="shrink-0 bg-surface rounded-2xl px-4 py-3 flex items-center justify-between hover:bg-hairline transition"
         style={{ border: "1px solid color-mix(in oklab, var(--theme-primary) 35%, transparent)" }}
       >
         <div className="flex items-center gap-2.5">

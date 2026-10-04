@@ -152,3 +152,19 @@ export const PREMIUM_SETS: Record<string, PremiumSet> = {
     previewArt: <PremiumPreviewTile setId="bloom" />,
   },
 };
+
+/** Set premium avec nom / accroche localisés (clés `premium.<id>.name` /
+ *  `.tagline` si présentes, sinon le texte du catalogue ci-dessus). */
+export function localizedPremiumSet(
+  t: (key: string) => string,
+  id: string | null,
+): PremiumSet | null {
+  const set = id ? PREMIUM_SETS[id] : undefined;
+  if (!set) return null;
+  const pick = (k: string, fallback: string) => { const v = t(k); return v === k ? fallback : v; };
+  return {
+    ...set,
+    name: pick(`premium.${set.id}.name`, set.name),
+    tagline: pick(`premium.${set.id}.tagline`, set.tagline),
+  };
+}

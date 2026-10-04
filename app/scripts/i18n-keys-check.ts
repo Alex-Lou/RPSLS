@@ -1,6 +1,6 @@
 /**
- * i18n-keys-check — toute clé de traduction Arena / tuto utilisée dans le code
- * existe-t-elle en français ET en anglais ?
+ * i18n-keys-check — toute clé de traduction utilisée dans le code existe-t-elle
+ * en français ET en anglais ?
  *
  * Scanne src/ pour les appels littéraux `t("…")`, `tNow("…")`, `tr("…")` et
  * vérifie, pour les clés `arena.*` et `tut.*` :
@@ -18,7 +18,7 @@ import en from "../src/i18n/locales/en";
 import fr from "../src/i18n/locales/fr";
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), "../src");
-const SCOPED = /^(arena|tut)\./;
+const SCOPED = /./; // toutes les clés littérales de l'app
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
@@ -37,6 +37,8 @@ const CALL = /\b(?:t|tNow|tr)\(\s*["'`]([A-Za-z0-9_.\-]+)["'`]/g;
 for (const file of walk(SRC)) {
   const src = readFileSync(file, "utf8");
   for (const m of src.matchAll(CALL)) {
+    // Préfixe de clé construite (`t("mode." + m)`) : non vérifiable ici.
+    if (m[1].endsWith(".")) continue;
     if (SCOPED.test(m[1]) && !used.has(m[1])) used.set(m[1], file.replace(SRC + "/", ""));
   }
 }
@@ -46,7 +48,7 @@ for (const [key, file] of used) {
 }
 
 // Fragments : parité fr/en et pas de doublon avec le dictionnaire principal.
-const fragDir = join(SRC, "i18n/locales/arena");
+for (const fragDir of ["arena", "app", "shell"].map((d) => join(SRC, "i18n/locales", d))) {
 const mainSrc = { fr: readFileSync(join(SRC, "i18n/locales/fr.ts"), "utf8"), en: readFileSync(join(SRC, "i18n/locales/en.ts"), "utf8") };
 const zones = [...new Set(readdirSync(fragDir).map((f) => f.split(".")[0]))];
 for (const z of zones) {
@@ -60,7 +62,8 @@ for (const z of zones) {
     }
   }
 }
+}
 
-console.log(`${used.size} clés arena/tut utilisées vérifiées.`);
+console.log(`${used.size} clés utilisées vérifiées (fr + en).`);
 if (failures > 0) { console.error(`\n${failures} échec(s).`); process.exit(1); }
 console.log("Clés i18n OK.");

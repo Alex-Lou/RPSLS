@@ -5,6 +5,8 @@ import { BattlePad } from "../../BattlePad";
 import { PAD_META } from "../../types";
 import type { PadId } from "../../types";
 import { hapticMatchStart } from "../../haptic";
+import { useT } from "../../i18n";
+import { padLabel, padTagline } from "./padText";
 
 /** Pad preview modal (portal to body so it escapes scroll/stacking). The
  *  preview is a CARD popup, not a fullscreen swap: the user sees the pad at
@@ -12,6 +14,7 @@ import { hapticMatchStart } from "../../haptic";
 export function PadPreviewModal({ previewPad, onClose }: { previewPad: PadId | null; onClose: () => void }) {
   const player = useStore((s) => s.player);
   const updateProfile = useStore((s) => s.updateProfile);
+  const t = useT();
   return createPortal(
     <AnimatePresence>
       {previewPad && (
@@ -45,18 +48,18 @@ export function PadPreviewModal({ previewPad, onClose }: { previewPad: PadId | n
               {/* Subtle corner brackets to telegraph "game table". */}
               <div className="pointer-events-none absolute inset-3 border border-white/15 rounded-2xl" />
               <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/60 text-white/85 text-[10px] font-bold uppercase tracking-wider">
-                Aperçu tapis
+                {t("profile.padPreview.badge")}
               </span>
             </div>
             {/* Label + tagline. */}
             <div className="p-4 flex flex-col gap-1">
               <div className="flex items-center gap-2">
-                <span className="text-base font-black text-white">{PAD_META[previewPad]?.label}</span>
+                <span className="text-base font-black text-white">{padLabel(t, previewPad)}</span>
                 {PAD_META[previewPad]?.premiumSetId && (
-                  <span className="text-[9px] uppercase tracking-wider font-black text-amber-300">✦ Premium</span>
+                  <span className="text-[9px] uppercase tracking-wider font-black text-amber-300">✦ {t("premium.label")}</span>
                 )}
               </div>
-              <span className="text-xs text-ink-muted">{PAD_META[previewPad]?.tagline}</span>
+              <span className="text-xs text-ink-muted">{padTagline(t, previewPad)}</span>
             </div>
             {/* Action buttons. */}
             <div className="px-4 pb-4 flex flex-col gap-2">
@@ -74,13 +77,13 @@ export function PadPreviewModal({ previewPad, onClose }: { previewPad: PadId | n
                     : "bg-themed text-white")
                 }
               >
-                {player.padId === previewPad ? "✓ Tapis actif" : "Choisir ce tapis"}
+                {player.padId === previewPad ? t("profile.padPreview.active") : t("profile.padPreview.choose")}
               </motion.button>
               <button
                 onClick={onClose}
                 className="py-2 rounded-xl font-bold text-xs uppercase tracking-wider bg-white/10 text-ink hover:bg-white/15 transition"
               >
-                Fermer
+                {t("profile.close")}
               </button>
             </div>
           </motion.div>

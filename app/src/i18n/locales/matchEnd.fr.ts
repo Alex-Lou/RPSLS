@@ -1,0 +1,32 @@
+// Écran de fin de match COMMUN (src/match/matchEnd) — fragment fr.
+// Fusionné dans fr.ts (spread) : garder les mêmes clés que matchEnd.en.ts.
+const matchEnd_fr: Record<string, string> = {
+  "end.victory": "VICTOIRE",
+  "end.defeat": "DÉFAITE",
+  "end.draw": "ÉGALITÉ",
+  "end.forfeit": "Par forfait",
+  "end.you": "Toi",
+  "end.opponent": "Adversaire",
+  "end.oppShort": "Adv.",
+  "end.xp": "XP",
+  "end.lp": "LP",
+  "end.level": "Niveau {n}",
+  "end.xpProgress": "{a} / {b} XP",
+  "end.levelUp": "NIVEAU {n} !",
+  "end.levelUpReward": "+{e} 💎 · +{s} ✦",
+  "end.lpValue": "{lp} LP",
+  "end.lpToNext": "{n} LP avant {tier}",
+  "end.maxTier": "Rang maximal",
+  "end.tierUp": "PROMOTION : {tier}",
+  "end.tierDown": "Rétrogradé : {tier}",
+  "end.playAgain": "Rejouer",
+  "end.rematch": "Revanche",
+  "end.next": "Suivant",
+  "end.back": "Retour",
+  "end.turn": "Tour {n}",
+  "end.bestOf": "Meilleur de {bo}",
+  "end.rounds": "Manches",
+  "end.cardsUsed": "Cartes utilisées",
+  "end.noCards": "Aucune carte jouée",
+};
+export default matchEnd_fr;

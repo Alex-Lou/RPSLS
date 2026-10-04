@@ -11,13 +11,13 @@ import { getMatchExit, subscribeMatchExit } from "./matchExitStore";
 
 export type Page = "play" | "online" | "leaderboard" | "shop" | "quests" | "packs" | "profile" | "history" | "about" | "contact" | "privacy";
 
-/* ─────────── Burger inline (Alex 2026-06-12) ───────────
- * Le burger flottant top-left "foutait tout en l'air" sur le menu principal :
- * il forçait la carte joueur à se décaler/couper. Sur l'écran Choisis ton
- * combat, le burger flottant est MASQUÉ (setBurgerHidden(true) posé par
- * ModeSelect) et un burger themed INLINE (à gauche du Défi du jour) ouvre le
- * même drawer via openMobileMenu(). Pattern mini-store identique à
- * matchExitStore (module scope + useSyncExternalStore). */
+/* ─────────── Chrome propre (Alex 2026-06-12, navigation unifiée) ───────────
+ * Hors match, le burger vit dans la barre du haut (AppTopBar). Un écran qui
+ * rend SA PROPRE chrome (menu principal : burger inline à gauche du Défi du
+ * jour ; plateau Arena ; match Classé) pose setBurgerHidden(true) → ni barre
+ * du haut ni burger flottant. Tous ouvrent le même drawer via openMobileMenu().
+ * Pattern mini-store identique à matchExitStore (module scope +
+ * useSyncExternalStore). */
 let burgerHidden = false;
 const burgerSubs = new Set<() => void>();
 let externalOpenDrawer: (() => void) | null = null;
@@ -36,6 +36,11 @@ function subscribeBurgerHidden(cb: () => void): () => void {
 }
 function getBurgerHidden(): boolean {
   return burgerHidden;
+}
+/** Vrai quand l'écran courant rend SA PROPRE chrome (menu principal, plateau
+ *  Arena, match Classé…) : ni barre du haut, ni burger flottant. */
+export function useOwnChrome(): boolean {
+  return useSyncExternalStore(subscribeBurgerHidden, getBurgerHidden, () => false);
 }
 
 interface NavItem {
@@ -259,18 +264,20 @@ export function Sidebar({
 export function MobileShell({
   page,
   onNavigate,
+  floatingTrigger,
 }: {
   page: Page;
   onNavigate: (p: Page) => void;
+  /** Burger FLOTTANT : seulement sur une surface de match immersive sans chrome
+   *  propre. Partout ailleurs le burger vit dans la barre du haut (AppTopBar)
+   *  ou dans l'écran lui-même (menu principal). */
+  floatingTrigger: boolean;
 }) {
   const [open, setOpen] = useState(false);
   // Callback de sortie d'un match en cours (Alex 2026-06-11) : rendu EN HAUT
   // du drawer pour intégrer la sortie au burger plutôt qu'avoir un 2e bouton
   // HUD. ArenaGame (et autres modes match) le register au mount.
   const matchExit = useSyncExternalStore(subscribeMatchExit, getMatchExit, () => null);
-  // Burger flottant masqué quand un écran fournit son propre burger inline
-  // (menu principal — cf. setBurgerHidden ci-dessus).
-  const hideTrigger = useSyncExternalStore(subscribeBurgerHidden, getBurgerHidden, () => false);
   // Register l'ouverture externe (burger inline → même drawer).
   useEffect(() => {
     externalOpenDrawer = () => setOpen(true);
@@ -299,9 +306,8 @@ export function MobileShell({
 
   return (
     <>
-      {/* Hamburger trigger (mobile only) — masqué quand l'écran courant rend
-       *  son propre burger inline (menu principal, Alex 2026-06-12). */}
-      {!hideTrigger && (
+      {/* Hamburger flottant (mobile) — réservé aux matchs immersifs. */}
+      {floatingTrigger && (
         <button
           aria-label="Open menu"
           data-no-touchfx

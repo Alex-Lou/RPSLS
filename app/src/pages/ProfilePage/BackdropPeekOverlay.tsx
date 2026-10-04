@@ -2,6 +2,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { useStore } from "../../store/store";
 import { PeekIntensitySlider } from "./PeekIntensitySlider";
+import { useT } from "../../i18n";
 
 /** Fields read from the active background — passed in from StyleSection so
  *  this overlay stays decoupled from the BACKGROUNDS catalogue. */
@@ -23,6 +24,8 @@ export function BackdropPeekOverlay({
   onBuy: (setId: string) => void;
 }) {
   const player = useStore((s) => s.player);
+  const t = useT();
+  const bgName = currentBg?.label ?? t("profile.peek.fallback");
   return createPortal(
     <AnimatePresence>
       {peek && (
@@ -61,14 +64,14 @@ export function BackdropPeekOverlay({
               {peekPremiumPending ? (
                 <>
                   <span className="text-amber-300 text-sm font-black">✦</span>
-                  <span className="font-bold text-white text-sm drop-shadow">{currentBg?.label ?? "Fond"}</span>
-                  <span className="text-amber-300 text-[11px] font-bold uppercase tracking-wide">aperçu premium</span>
+                  <span className="font-bold text-white text-sm drop-shadow">{bgName}</span>
+                  <span className="text-amber-300 text-[11px] font-bold uppercase tracking-wide">{t("profile.peek.premiumPreview")}</span>
                 </>
               ) : (
                 <>
                   <span className="text-emerald-400 text-sm font-black">✓</span>
-                  <span className="font-bold text-white text-sm drop-shadow">{currentBg?.label ?? "Fond"}</span>
-                  <span className="text-cyan-300 text-[11px] font-bold uppercase tracking-wide">appliqué</span>
+                  <span className="font-bold text-white text-sm drop-shadow">{bgName}</span>
+                  <span className="text-cyan-300 text-[11px] font-bold uppercase tracking-wide">{t("profile.peek.applied")}</span>
                 </>
               )}
             </div>
@@ -85,7 +88,7 @@ export function BackdropPeekOverlay({
                   }}
                   className="w-full py-3 rounded-2xl font-black text-base uppercase tracking-wider shadow-xl bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 text-zinc-900"
                 >
-                  ✦ Acheter ce thème
+                  {t("profile.peek.buy")}
                 </motion.button>
                 <div className="grid grid-cols-2 gap-2">
                   <motion.button
@@ -93,14 +96,14 @@ export function BackdropPeekOverlay({
                     onClick={onConfirm}
                     className="py-2.5 rounded-xl font-bold text-sm bg-white/10 border border-white/20 text-white"
                   >
-                    Garder l'aperçu
+                    {t("profile.peek.keep")}
                   </motion.button>
                   <motion.button
                     whileTap={{ scale: 0.96 }}
                     onClick={onClose}
                     className="py-2.5 rounded-xl font-bold text-sm bg-white/5 border border-white/15 text-white/85"
                   >
-                    Fermer
+                    {t("profile.close")}
                   </motion.button>
                 </div>
               </div>
@@ -111,18 +114,18 @@ export function BackdropPeekOverlay({
                   onClick={onConfirm}
                   className="py-3 rounded-2xl font-black text-sm uppercase tracking-wider shadow-xl bg-themed text-white"
                 >
-                  ✓ Choisir ce thème
+                  {t("profile.peek.choose")}
                 </motion.button>
                 <motion.button
                   whileTap={{ scale: 0.96 }}
                   onClick={onClose}
                   className="py-3 rounded-2xl font-bold text-sm uppercase tracking-wider bg-white/10 border border-white/20 text-white"
                 >
-                  Fermer
+                  {t("profile.close")}
                 </motion.button>
               </div>
             )}
-            <span className="text-white/55 text-[11px]">Touche / glisse le fond pour jouer · les boutons valident</span>
+            <span className="text-white/55 text-[11px]">{t("profile.peek.hint")}</span>
           </div>
         </motion.div>
       )}

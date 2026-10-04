@@ -194,6 +194,14 @@ const strings: Record<string, string> = {
   // ── Splash d’intro ──
   "arena.splash.goal": "Premier héros à **0 ❤** perd. Invoque, lance des sorts, joue intelligent.",
   "arena.splash.go": "GO !",
+  // Écran de fin commun : raison de la fin (board.endReason).
+  "arena.endReason.ko": "K.O. — un héros est tombé à 0 ❤",
+  "arena.endReason.cap-hp": "Tour limite atteint : le plus de ❤ l’emporte",
+  "arena.endReason.tiebreak-start-hp": "Départage : ❤ en début de tour",
+  "arena.endReason.tiebreak-board": "Départage : créatures sur le plateau",
+  "arena.endReason.sudden-death": "Décidé en mort subite",
+  "arena.endReason.draw": "Égalité parfaite",
+  "arena.endReason.fatigue": "Fatigue : un héros n’avait plus de cartes à piocher",
 };
 
 export default strings;

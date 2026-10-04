@@ -131,6 +131,8 @@ export function advanceToNextTurn(board: BoardState, rng?: RngPair): BoardState 
     lanes: lanesAfterFinishers,
     turn: nextTurn,
     phase: fatiguePhase,
+    // Raison affichée sur l'écran de fin (sinon une mort de fatigue n'en avait pas).
+    ...(fatiguePhase === "match-end" ? { endReason: "fatigue" as const } : {}),
     a, b,
     augurRevealedA: nextATurns > 0 ? board.augurRevealedA : [],
     augurRevealedB: nextBTurns > 0 ? board.augurRevealedB : [],

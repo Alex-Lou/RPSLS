@@ -28,7 +28,7 @@ import { useT } from "../../i18n";
 import { useNoMenuFx } from "../../fx/menuFx";
 import { CurrencyBadges } from "../CurrencyBadges";
 import { hapticTap } from "../../haptic";
-import { setBurgerHidden } from "../../Sidebar";
+import { useTopBar } from "../../nav/topBarStore";
 import { SLOTS_BY_MODE, RARITY_FR, RARITY_DOT, RARITY_RING } from "./deckManagerConstants";
 import { DeckSlot } from "./DeckSlot";
 import { CardDetailModal } from "./CardDetailModal";
@@ -39,16 +39,9 @@ import { EmptyState } from "./EmptyState";
 export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void; mode?: "ranked" | "arena" }) {
   useNoMenuFx(); // deck editor → no menu touch particles
   const TOTAL = SLOTS_BY_MODE[mode];
-  // Burger flottant MASQUÉ (Alex 2026-06-13) : le DeckManager a sa propre
-  // flèche Retour dans l'en-tête → le burger top-left chevauchait + laissait
-  // un vide. On le cache tant que l'éditeur est ouvert (Arena ET Classé, vu
-  // que le composant est partagé → la "jolie mise en forme" bénéficie aux
-  // deux modes d'un seul coup). Restauré au unmount.
-  useEffect(() => {
-    setBurgerHidden(true);
-    return () => setBurgerHidden(false);
-  }, []);
   const t = useT();
+  // Titre + retour dans la barre du haut unifiée (plus d'en-tête maison).
+  useTopBar({ title: t("lobby.deck.title"), onBack: onClose });
   const player = useStore((s) => s.player);
   const setRankedDeck = useStore((s) => s.setRankedDeck);
   const setArenaDeck = useStore((s) => s.setArenaDeck);
@@ -303,41 +296,15 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
       // Root no longer scrolls: a fixed header + a scroll region + a docked
       // Save footer means the Save button is ALWAYS visible (the player no
       // longer has to discover a hidden scroll to find it).
-      // -mt-10 (Alex 2026-06-13) : remonte le panneau dans l'espace mort
-      // laissé par le pt-12 global (burger maintenant masqué) → la nav
-      // respire en haut au lieu de flotter sous un vide.
-      className="flex flex-col flex-1 min-h-0 -mt-10 pt-1 pb-2 px-2 max-w-lg mx-auto w-full"
+      className="flex flex-col flex-1 min-h-0 pb-2 px-2 max-w-lg mx-auto w-full"
     >
-      {/* Header — cadrage TEMPLATE Pro (Alex 2026-06-13) : retour 40px à
-          gauche, titre gradient centré, spacer symétrique à droite. Monnaies
-          en ligne compacte dessous. */}
+      {/* Sous-titre + monnaies (titre et retour : barre du haut). */}
       <div className="shrink-0 flex flex-col gap-2 pb-2">
-        <div className="flex items-center gap-2">
-          <motion.button
-            whileTap={{ scale: 0.92 }}
-            onClick={onClose}
-            aria-label="Retour"
-            className="shrink-0 w-10 h-10 rounded-xl border border-hairline bg-black/45 backdrop-blur flex items-center justify-center text-ink active:scale-95 transition"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 6l-6 6 6 6" />
-            </svg>
-          </motion.button>
-          <div className="flex-1 min-w-0 text-center">
-            <h1
-              className="text-lg sm:text-2xl font-extrabold tracking-tight leading-tight bg-gradient-to-br from-fuchsia-300 to-violet-300 bg-clip-text text-transparent truncate"
-              style={{ fontFamily: "var(--font-headline)" }}
-            >
-              Mon Deck
-            </h1>
-            <p className="text-[10px] text-ink-muted leading-tight">
-              {mode === "arena"
-                ? "8 cartes · chaque choix devient 3/2/2/1 copies selon la rareté"
-                : "6 cartes · Constellation Classée"}
-            </p>
-          </div>
-          <div className="shrink-0 w-10 h-10" aria-hidden />
-        </div>
+        <p className="text-[11px] text-ink-muted leading-tight text-center">
+          {mode === "arena"
+            ? "8 cartes · chaque choix devient 3/2/2/1 copies selon la rareté"
+            : "6 cartes · Constellation Classée"}
+        </p>
         <div className="flex items-center justify-center">
           <CurrencyBadges inert />
         </div>

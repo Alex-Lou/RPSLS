@@ -14,7 +14,7 @@
  *
  * (* comeback is approximated for now from the final score; an exact
  *    "trailed at halfway" check would need historical scores threaded
- *    through CinematicMatchEnd — kept simple.)
+ *    through MatchEndScreen — kept simple.)
  *
  * Helpers return i18n keys; i18n.ts holds the EN/FR strings.
  */

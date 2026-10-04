@@ -6,17 +6,14 @@ import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { useStore } from "../store/store";
-import { rankProgress } from "../engine/rank";
-import { LpBar } from "./LpBar";
-import { levelFromXp } from "../engine/leveling";
 import { ALL_CARD_IDS, CARDS, RARITY_COLOR, RARITY_ORDER } from "./cards";
 import { CRAFT_COST } from "../engine/economy";
 import { CardImage } from "./CardImage";
 import { useT } from "../i18n";
 import { InfoBubble } from "../flavor/InfoBubble";
-import { CurrencyBadges } from "./CurrencyBadges";
-import { avatarImgStyle } from "../theme/avatar";
-import { ModeLobbyShell, LobbyChip } from "../ui/ModeLobbyShell";
+import { ModeLobbyShell } from "../ui/ModeLobbyShell";
+import { LobbyRankCard } from "../ui/LobbyRankCard";
+import { MODE_ICONS } from "../pages/play/PlayMenu/menuShared";
 // Tournament state now lives in PlayPage
 
 /** Custom illustrated icons for the "Comment ça marche ?" section (replace
@@ -28,24 +25,19 @@ const HIW_ICONS = {
   cartes:   "/IconesMenu CommentCaMarche/Cartes icone.png",
 };
 
-export function RankedLobby({ onQuickMatch, onViewBracket, onManageDeck, onBack, onGoShop }: { onQuickMatch: () => void; onViewBracket: () => void; onManageDeck: () => void; onBack?: () => void; onGoShop?: () => void }) {
+export function RankedLobby({ onQuickMatch, onViewBracket, onManageDeck, onBack }: { onQuickMatch: () => void; onViewBracket: () => void; onManageDeck: () => void; onBack?: () => void }) {
   const t = useT();
   const player = useStore((s) => s.player);
-  const { tier, progress: lpProgress } = rankProgress(player.rankLp);
-  const lvl = levelFromXp(player.xp);
-  const totalGames = player.stats.wins + player.stats.losses + player.stats.draws;
-  const winrate = player.stats.wins + player.stats.losses > 0
-    ? Math.round((player.stats.wins / (player.stats.wins + player.stats.losses)) * 100)
-    : 0;
   const [rulesOpen, setRulesOpen] = useState(false);
   const [cardsOpen, setCardsOpen] = useState(false);
   const countdown = useCountdown(30);
 
   return (
     <ModeLobbyShell
-      title="Constellation Classée"
-      tagline="3 lanes · Best of 5 · Mana & Cartes · LP & récompenses"
-      titleGradient="from-amber-300 to-violet-300"
+      title={t("mode.ranked_constellation")}
+      tagline={t("lobby.ranked.tagline")}
+      icon={MODE_ICONS.ranked_constellation}
+      accent="#fbbf24"
       onBack={onBack}
       cta={
         // DEUX entrées (Alex 2026-07 « pas forcément que du tournoi ») : Match
@@ -104,68 +96,29 @@ export function RankedLobby({ onQuickMatch, onViewBracket, onManageDeck, onBack,
         </div>
       }
     >
-      {/* PROFIL = UN SEUL BLOC (Alex 2026-06-13 "faut pas déstructurer ce qui
-       *  est de base ensemble") : avatar + nom + chips + barre LP + monnaies
-       *  dans la MÊME carte. Le bouton Deck suit, le groupe est centré
-       *  (my-auto) comme le [Ma Voie] + [Deck] du Pro. */}
-      <div className="my-auto flex flex-col gap-2.5">
-        <div
-          className="bg-surface rounded-2xl px-4 py-3.5 flex flex-col gap-3"
-          style={{ border: "1px solid color-mix(in oklab, var(--theme-primary) 35%, transparent)" }}
-        >
-          {/* Avatar + nom + chips */}
-          <div className="flex items-center gap-3">
-            <div
-              className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center text-2xl shrink-0 ring-1 ring-white/15"
-              style={{
-                background:
-                  "linear-gradient(135deg, color-mix(in oklab, var(--theme-primary) 32%, transparent), color-mix(in oklab, var(--theme-secondary) 32%, transparent))",
-              }}
-            >
-              {/^(data:|\/|https?:)/.test(player.avatar) ? (
-                <img src={player.avatar} alt="" className="w-full h-full object-cover" style={avatarImgStyle(player.avatar)} draggable={false} />
-              ) : (
-                player.avatar
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-bold text-base truncate">{player.nickname}</div>
-              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                <LobbyChip tone="accent">{tier.emoji} {tier.label}</LobbyChip>
-                <LobbyChip>Lv.{lvl.level}</LobbyChip>
-                <LobbyChip tone="good">{winrate}% WR</LobbyChip>
-              </div>
-            </div>
-          </div>
-          {/* Barre LP */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-amber-200">Rang · {tier.label}</span>
-                <InfoBubble
-                  size="sm"
-                  title="LP — League Points"
-                  body={
-                    <>
-                      Points de rang. Gagnés en gagnant des matchs Classés / Constellation Classés, perdus en perdant.
-                      Paliers : <b>Bronze</b> (0+), <b>Silver</b> (1100+), <b>Gold</b> (1300+), <b>Platinum</b> (1500+), <b>Diamond</b> (1750+).
-                      Chaque palier débloque une carte ou un cosmétique.
-                    </>
-                  }
-                />
-              </div>
-              <span className="text-[10px] tabular-nums text-ink-muted">
-                {player.rankLp} {tier.ceil !== Infinity && `/ ${tier.ceil}`} LP
-              </span>
-            </div>
-            <LpBar progress={lpProgress} />
-            <div className="text-[10px] text-ink-faint mt-1">{totalGames} matchs · {winrate}% de victoires</div>
-          </div>
-          {/* Monnaies — dans la MÊME carte, séparées par un filet. */}
-          <div className="pt-2.5 border-t border-hairline flex items-center justify-center">
-            <CurrencyBadges size="full" onClick={onGoShop} />
-          </div>
-        </div>
+      {/* Rang du mode (carte PARTAGÉE avec Classé) — sans avatar ni monnaies :
+       *  carte joueur + portefeuille vivent sur l'accueil (doublon de l'audit). */}
+      <div className="flex flex-col gap-2.5">
+        <LobbyRankCard
+          lp={player.rankLp}
+          unit="LP"
+          wins={player.stats.wins}
+          losses={player.stats.losses}
+          draws={player.stats.draws}
+          info={
+            <InfoBubble
+              size="sm"
+              title="LP — League Points"
+              body={
+                <>
+                  Points de rang. Gagnés en gagnant des matchs Classés / Constellation Classés, perdus en perdant.
+                  Paliers : <b>Bronze</b> (0+), <b>Silver</b> (1100+), <b>Gold</b> (1300+), <b>Platinum</b> (1500+), <b>Diamond</b> (1750+).
+                  Chaque palier débloque une carte ou un cosmétique.
+                </>
+              }
+            />
+          }
+        />
 
         {/* Deck — bouton IDENTIQUE au Pro (Alex 2026-06-13 : "mêmes boutons"). */}
         <motion.button

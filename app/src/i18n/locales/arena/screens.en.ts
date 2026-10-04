@@ -194,6 +194,14 @@ const strings: Record<string, string> = {
   // ── Splash d’intro ──
   "arena.splash.goal": "First hero to **0 ❤** loses. Summon, cast spells, play smart.",
   "arena.splash.go": "GO!",
+  // Shared end screen: why the match ended (board.endReason).
+  "arena.endReason.ko": "K.O. — a hero fell to 0 ❤",
+  "arena.endReason.cap-hp": "Turn limit reached: most ❤ wins",
+  "arena.endReason.tiebreak-start-hp": "Tiebreak: ❤ at start of turn",
+  "arena.endReason.tiebreak-board": "Tiebreak: creatures on the board",
+  "arena.endReason.sudden-death": "Decided by sudden death",
+  "arena.endReason.draw": "Perfect tie",
+  "arena.endReason.fatigue": "Fatigue: a hero ran out of cards to draw",
 };
 
 export default strings;
