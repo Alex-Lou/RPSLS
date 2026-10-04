@@ -19,6 +19,7 @@ import {
 import {
   getMyCreatureOnLane, getOppCreatureOnLane,
   withMyCreatureOnLane, withOppCreatureOnLane, withSideHero, oppSide,
+  isSpellProtected,
 } from "./arenaSpellHelpers";
 import { MANA_CAP, type BoardState, type Creature, type LaneIndex, type LaneState, type PlayedSpell, type Side } from "./arenaTypes";
 import { CARDS } from "../ranked/cards";
@@ -59,7 +60,8 @@ export function applyEboulement(board: BoardState, side: Side, spell: PlayedSpel
 
 /** Strate Vive (Montagne) — ma Pierre ciblée gagne IMMÉDIATEMENT +1 Strate
  *  (voieAtkBonus, le MÊME champ que le gain passif gainStrateIfHeld, clampé
- *  STRATE_CAP). Rock-only : fizzle sur une non-Pierre. */
+ *  STRATE_CAP — sans jamais RÉDUIRE un bonus déjà au-dessus, ex. Forteresse).
+ *  Rock-only : fizzle sur une non-Pierre. */
 export function applyStrateVive(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   if (spell.kind !== "lane") return board;
   const me = getMyCreatureOnLane(board, side, spell.lane);
@@ -68,7 +70,7 @@ export function applyStrateVive(board: BoardState, side: Side, spell: PlayedSpel
     return board;
   }
   return withMyCreatureOnLane(board, side, spell.lane, {
-    ...me, voieAtkBonus: Math.min(STRATE_CAP, me.voieAtkBonus + 1),
+    ...me, voieAtkBonus: Math.max(me.voieAtkBonus, Math.min(STRATE_CAP, me.voieAtkBonus + 1)),
   });
 }
 
@@ -94,7 +96,7 @@ export function applyMascaradeEnchainee(board: BoardState, side: Side, spell: Pl
     alog("spell", `💤 ${side} Mascarade Enchaînée L${spell.lane} ne fait rien : pas de Lézard à toi sur cette lane.`);
     return board;
   }
-  return withMyCreatureOnLane(board, side, spell.lane, { ...me, dodgeCharges: Math.min(BALANCE.mirage.dodgeSpellCap, me.dodgeCharges + 1) });
+  return withMyCreatureOnLane(board, side, spell.lane, { ...me, dodgeCharges: Math.max(me.dodgeCharges, Math.min(BALANCE.mirage.dodgeSpellCap, me.dodgeCharges + 1)) });
 }
 
 /** Fuite Masquée (Mirage) — mon Lézard ciblé gagne +2 charges d'Esquive (cap 3)
@@ -106,7 +108,7 @@ export function applyFuiteMasquee(board: BoardState, side: Side, spell: PlayedSp
     alog("spell", `💤 ${side} Fuite Masquée L${spell.lane} ne fait rien : pas de Lézard à toi sur cette lane.`);
     return board;
   }
-  return withMyCreatureOnLane(board, side, spell.lane, { ...me, dodgeCharges: Math.min(BALANCE.mirage.dodgeSpellCap, me.dodgeCharges + 2), atkBuff: me.atkBuff - 1 });
+  return withMyCreatureOnLane(board, side, spell.lane, { ...me, dodgeCharges: Math.max(me.dodgeCharges, Math.min(BALANCE.mirage.dodgeSpellCap, me.dodgeCharges + 2)), atkBuff: me.atkBuff - 1 });
 }
 
 /** Coup de Taille (Tranchant) — mon Ciseau ciblé RÉCUPÈRE sa Perforation
@@ -131,7 +133,7 @@ export function applyAcuite(board: BoardState, side: Side, spell: PlayedSpell): 
     return board;
   }
   return withMyCreatureOnLane(board, side, spell.lane, {
-    ...me, combatBlunted: false, voieAtkBonus: Math.min(BALANCE.tranchant.acuiteAtkCap, me.voieAtkBonus + 1),
+    ...me, combatBlunted: false, voieAtkBonus: Math.max(me.voieAtkBonus, Math.min(BALANCE.tranchant.acuiteAtkCap, me.voieAtkBonus + 1)),
   });
 }
 
@@ -147,7 +149,7 @@ export function applyPhotosynthese(board: BoardState, side: Side, spell: PlayedS
   }
   const healed = healCreature(me, BALANCE.foret.photosyntheseHeal);
   return withMyCreatureOnLane(board, side, spell.lane, {
-    ...healed, voieAtkBonus: Math.min(STRATE_CAP, healed.voieAtkBonus + 1),
+    ...healed, voieAtkBonus: Math.max(healed.voieAtkBonus, Math.min(STRATE_CAP, healed.voieAtkBonus + 1)),
   });
 }
 
@@ -228,13 +230,19 @@ export function applyCoupOeil(board: BoardState, side: Side, rng: Rng): BoardSta
   return b;
 }
 
-/** Permutation — échange ma créature et celle d'en face : changement de camp. */
+/** Permutation — échange ma créature et celle d'en face : changement de camp.
+ *  Vol de créature → la cible adverse ancrée / immunisée (Spock) / en phase
+ *  (Éclipse) résiste (cf. isSpellProtected). */
 export function applyPermutation(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   if (spell.kind !== "lane") return board;
   const me = getMyCreatureOnLane(board, side, spell.lane);
   const opp = getOppCreatureOnLane(board, side, spell.lane);
   if (!me || !opp) {
     alog("spell", `💤 ${side} Permutation L${spell.lane} ne fait rien : il faut une créature DES DEUX côtés.`);
+    return board;
+  }
+  if (isSpellProtected(opp)) {
+    alog("spell", `💤 ${side} Permutation L${spell.lane} ne fait rien : cible ancrée, immunisée (Spock) ou en phase (Éclipse).`);
     return board;
   }
   const lanes = board.lanes.slice() as [LaneState, LaneState, LaneState];
@@ -278,7 +286,8 @@ export function applyGravite(board: BoardState, side: Side, rng: Rng): BoardStat
   return b;
 }
 
-/** Doppelgänger — copie de ma meilleure créature (ATK+PV) sur ma 1re lane vide. */
+/** Doppelgänger — invoque un exemplaire de BASE (frais, sans les buffs/PV
+ *  actuels) du symbole de ma meilleure créature (ATK+PV) sur ma 1re lane vide. */
 export function applyDoppelganger(board: BoardState, side: Side): BoardState {
   let best: Creature | null = null;
   let bestScore = -1;
@@ -336,7 +345,11 @@ export function applyRoueDestin(board: BoardState, side: Side, rng: Rng): BoardS
       alog("spell", `${side} ROUE DU DESTIN → pioche 3`);
       return withSideHero(board, side, drawCards(hero, 3, rng));
     case 3: {
-      const occupied = ([0, 1, 2] as LaneIndex[]).filter((i) => !!(oppS === "a" ? board.lanes[i].a : board.lanes[i].b));
+      // Cibles DESTRUCTIBLES seulement : Ancre / Logique (Spock) / Éclipse résistent.
+      const occupied = ([0, 1, 2] as LaneIndex[]).filter((i) => {
+        const c = oppS === "a" ? board.lanes[i].a : board.lanes[i].b;
+        return !!c && !isSpellProtected(c);
+      });
       if (occupied.length === 0) {
         alog("spell", `${side} ROUE DU DESTIN → wipe sans cible → +4 PV`);
         return withSideHero(board, side, healHero(hero, 4));
@@ -353,8 +366,9 @@ export function applyRoueDestin(board: BoardState, side: Side, rng: Rng): BoardS
   }
 }
 
-/** Phénix — snapshot mes créatures : celles qui meurent ce tour renaissent à
- *  1 PV en fin de tour (cf. endOfTurnCleanup qui consomme phenixReviveA/B). */
+/** Phénix — snapshot mes créatures : la 1re (ordre des lanes) qui meurt ce tour
+ *  renaît à 1 PV en fin de tour (cf. endOfTurnCleanup qui consomme
+ *  phenixReviveA/B ; nerf Forêt 2026-06-30 : une seule résurrection). */
 export function applyPhenix(board: BoardState, side: Side): BoardState {
   const snap: { lane: LaneIndex; move: Creature["move"] }[] = [];
   for (let i = 0; i < 3; i++) {

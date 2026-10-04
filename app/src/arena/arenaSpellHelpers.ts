@@ -31,6 +31,27 @@ export function arenaSpellCost(
   return cost;
 }
 
+/** Carte « précieuse » = Finisher (injecté 1×/match) ou carte de FUSION (forgée
+ *  en partie) : introuvable dans un deck → jamais volée (Larcin/Imposteur) ni
+ *  défaussée au hasard (Juge, Cascade, Reflet-Écho, Tuile, Pile-ou-Face), sinon
+ *  perdue pour de bon. */
+export function isFinisherOrFusion(id: CardId): boolean {
+  return id.startsWith("finisher-") || CARDS[id]?.kind === "fusion";
+}
+
+/** Sort que Réverbération / Écho peuvent dupliquer : ni Réverbération elle-même,
+ *  ni Finisher, ni Légendaire, ni Fusion (cartes 1 usage par partie). */
+export function isReplayableSpell(id: CardId): boolean {
+  return id !== "reverberation" && !isFinisherOrFusion(id) && CARDS[id]?.rarity !== "legendary";
+}
+
+/** Une créature adverse est-elle intouchable pour un sort de RETRAIT/VOL/DÉGÂT
+ *  ciblé ? Ancre (sauf `ignoreAnchor`, ex. Trou Noir), Logique (Spock) et Éclipse
+ *  (phasedOut — l'Ancre posée par Éclipse ne suffit pas face à Trou Noir). */
+export function isSpellProtected(c: Creature, ignoreAnchor = false): boolean {
+  return (!ignoreAnchor && c.anchored) || c.spellImmune || !!c.phasedOut;
+}
+
 /** Read the creature on `lane` owned by `side`. Null if empty. */
 export function getMyCreatureOnLane(
   board: BoardState, side: Side, lane: number,

@@ -19,6 +19,7 @@ import { STRATE_CAP } from "./arenaRules/heroCreature";
 import {
   getMyCreatureOnLane, getOppCreatureOnLane,
   withMyCreatureOnLane, withOppCreatureOnLane, withSideHero, oppSide,
+  isFinisherOrFusion,
 } from "./arenaSpellHelpers";
 import type { BoardState, Creature, LaneIndex, LaneState, PlayedSpell, Side } from "./arenaTypes";
 import { alog } from "./arenaLog";
@@ -156,7 +157,7 @@ export function applyCitadelle(board: BoardState, side: Side): BoardState {
     const me = side === "a" ? lane.a : lane.b;
     if (!me || me.move !== "rock") return lane;
     count += 1;
-    const strated: Creature = { ...me, voieAtkBonus: Math.min(STRATE_CAP, me.voieAtkBonus + 1), hp: me.hp + 2 };
+    const strated: Creature = { ...me, voieAtkBonus: Math.max(me.voieAtkBonus, Math.min(STRATE_CAP, me.voieAtkBonus + 1)), hp: me.hp + 2 };
     return side === "a" ? { ...lane, a: strated } : { ...lane, b: strated };
   }) as [LaneState, LaneState, LaneState];
   alog("spell", `${side} CITADELLE → +1 Strate + 2 PV à ${count} Pierre(s)`);
@@ -222,7 +223,7 @@ export function applyBosquetEpineux(board: BoardState, side: Side, spell: Played
   const guard: Creature = {
     ...healCreature(c, BALANCE.foret.photosyntheseHeal),
     ripostePrimed: true, divineShield: true,
-    voieAtkBonus: Math.min(STRATE_CAP, c.voieAtkBonus + 1),
+    voieAtkBonus: Math.max(c.voieAtkBonus, Math.min(STRATE_CAP, c.voieAtkBonus + 1)),
   };
   alog("spell", `${side} BOSQUET ÉPINEUX → Feuille fortifiée (riposte + bouclier + croissance)`);
   return withMyCreatureOnLane(board, side, spell.lane, guard);
@@ -249,7 +250,8 @@ export function applyEffacement(board: BoardState, side: Side, spell: PlayedSpel
   return b;
 }
 
-/** Omniscience — pioche 3 + la main adverse ENTIÈRE révélée 2 tours. */
+/** Omniscience — pioche 3 + la main adverse ENTIÈRE révélée jusqu'à ta
+ *  prochaine planification (turns=2 : advanceToNextTurn décrémente aussitôt). */
 export function applyOmniscience(board: BoardState, side: Side, rng: Rng): BoardState {
   const hero = side === "a" ? board.a : board.b;
   let b = withSideHero(board, side, drawCards(hero, 3, rng));
@@ -260,7 +262,8 @@ export function applyOmniscience(board: BoardState, side: Side, rng: Rng): Board
 }
 
 /** Cocon — la créature adverse est engluée (n'attaque pas ce tour) ET
- *  affaiblie (−2 ATK persistant). Ancre/Logique protègent. */
+ *  affaiblie (−2 ATK ce tour : atkBuff, remis à zéro en fin de tour).
+ *  Ancre/Logique protègent. */
 export function applyCocon(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   if (spell.kind !== "lane") return board;
   const opp = getOppCreatureOnLane(board, side, spell.lane);
@@ -285,16 +288,18 @@ export function applyApocalypse(board: BoardState, side: Side): BoardState {
 }
 
 /** Imposteur — vole 1 carte au hasard de la main adverse (dans TA main,
- *  cap+1 comme Larcin) ET révèle sa main 1 tour. Main vide : 3 dmg héros. */
+ *  cap+1 comme Larcin) ET révèle sa main 1 tour. Main vide (ou rien de
+ *  volable : Finisher / fusion exclus, comme Larcin) : 3 dmg héros. */
 export function applyImposteur(board: BoardState, side: Side, rng: Rng): BoardState {
   const oppS = oppSide(side);
   const oppHero = oppS === "a" ? board.a : board.b;
   let b = board;
-  if (oppHero.hand.length === 0) {
-    alog("spell", `${side} IMPOSTEUR → main adverse vide, 3 dmg héros ${oppS}`);
+  const pool = oppHero.hand.map((_, i) => i).filter((i) => !isFinisherOrFusion(oppHero.hand[i]));
+  if (pool.length === 0) {
+    alog("spell", `${side} IMPOSTEUR → main adverse vide (ou rien de volable), 3 dmg héros ${oppS}`);
     b = withSideHero(b, oppS, damageHero(oppHero, 3));
   } else {
-    const idx = Math.floor(rng() * oppHero.hand.length);
+    const idx = pool[Math.floor(rng() * pool.length)];
     const stolen = oppHero.hand[idx];
     const newOppHand = [...oppHero.hand.slice(0, idx), ...oppHero.hand.slice(idx + 1)];
     b = withSideHero(b, oppS, { ...oppHero, hand: newOppHand });

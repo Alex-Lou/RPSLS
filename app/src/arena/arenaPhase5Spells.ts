@@ -17,6 +17,7 @@ import { damageHero, creatureEffectiveAtk, dodgeSave } from "./arenaRules";
 import {
   getMyCreatureOnLane, getOppCreatureOnLane,
   withMyCreatureOnLane, withOppCreatureOnLane, withSideHero, oppSide,
+  isSpellProtected,
 } from "./arenaSpellHelpers";
 import { type BoardState, type LaneIndex, type PlayedSpell, type Side } from "./arenaTypes";
 import { alog } from "./arenaLog";
@@ -47,12 +48,20 @@ export function applyDerobade(board: BoardState, side: Side, spell: PlayedSpell)
 /** Frappe Spectrale (Mirage) — mon Lézard ciblé DÉPENSE 1 charge d'Esquive →
  *  inflige son ATK en dégâts IMBLOCABLES à la créature en face (bypass
  *  Esquive/Aegis) ou au héros adverse si la lane est vide. Rend l'évasion
- *  ACTIVE. Lizard-only avec ≥1 charge ; fizzle sinon. */
+ *  ACTIVE. Lizard-only avec ≥1 charge ; fizzle sinon (et sur une cible
+ *  ancrée / Spock / en phase). */
 export function applyFrappeSpectrale(board: BoardState, side: Side, spell: PlayedSpell): BoardState {
   if (spell.kind !== "lane") return board;
   const me = getMyCreatureOnLane(board, side, spell.lane);
   if (!me || me.move !== "lizard" || me.dodgeCharges <= 0) {
     alog("spell", `💤 ${side} Frappe Spectrale L${spell.lane} ne fait rien : pas de Lézard à toi avec une charge d'Esquive.`);
+    return board;
+  }
+  // Cible adverse ancrée / immunisée (Spock) / en phase (Éclipse) : fizzle SANS
+  // dépenser la charge (imblocable ≠ ignore les protections de sort).
+  const target = getOppCreatureOnLane(board, side, spell.lane);
+  if (target && isSpellProtected(target)) {
+    alog("spell", `💤 ${side} Frappe Spectrale L${spell.lane} ne fait rien : cible ancrée, immunisée (Spock) ou en phase (Éclipse).`);
     return board;
   }
   const atk = creatureEffectiveAtk(me);

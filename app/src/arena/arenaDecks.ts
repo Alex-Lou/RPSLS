@@ -53,7 +53,7 @@ export function isDeckable(id: CardId): boolean {
  *  qui mimique la rareté du joueur (Alex feedback équité 2026-06-09). */
 export const CPU_ARENA_DECK: CardId[] = [
   "aegis", "precision", "anchor", "second-wind",
-  "surge", "oracle-inverse", "curse", "mirror", // (augur exclu du Pro, cf. ARENA_EXCLUDED)
+  "surge", "riposte", "curse", "mirror", // (augur exclu du Pro ; oracle-inverse → riposte : l'IA ne sait pas exploiter une main révélée)
   "heist", "tide", "oracle", "supernova",
 ];
 

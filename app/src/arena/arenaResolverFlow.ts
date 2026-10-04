@@ -12,6 +12,7 @@
 import {
   applyAllSpells,
   applySummons,
+  creditManaGrants,
   creatureEffectiveAtk,
   endOfTurnCleanup,
   resolveLaneCombatAt,
@@ -203,6 +204,8 @@ export function runResolverFlow(args: ResolverFlowArgs): () => void {
   window.setTimeout(() => {
     if (aborted) return;
     let b = startBoard;
+    // Mana « tempo » (MANA_GRANTS) crédité D'AVANCE — miroir de resolveTurn.
+    b = creditManaGrants(b, intentA, intentB);
     // INVOCATIONS AVANT SORTS (Alex 2026-06-29) : on POSE + commit les créatures
     // fraîches AVANT de résoudre les sorts → Éboulement & co agissent sur les
     // voisines tout juste invoquées (fini « le sort frappe le ghost, la créature se
