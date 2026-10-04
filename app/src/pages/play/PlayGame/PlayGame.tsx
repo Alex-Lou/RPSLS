@@ -270,7 +270,11 @@ export function Game({
     };
     recordMatch(rec);
     setRecorded(true);
-    onQuit();
+    // Tournoi Classé : un abandon est une DÉFAITE dans le tableau. Avant,
+    // onQuit ramenait au tableau sans résoudre le match → on pouvait abandonner
+    // à 0-2 et relancer le même match.
+    if (onMatchResult) onMatchResult(false);
+    else onQuit();
   };
 
   // Record match on end (once)
@@ -482,7 +486,13 @@ export function Game({
               setIsDailyActive(false);
               setMood(rollAiMood());
               setRecorded(false);
-              setPhase({ kind: "p1-pick" });
+              // Atouts : remis à neuf pour le nouveau match (avant, ceux déjà
+              // dépensés restaient grisés) et nouveau choix si le mode en a.
+              setUsedAtouts([]);
+              setChosenAtouts([]);
+              setLectureMove(null);
+              setVabanqueArmed(false);
+              setPhase(withAtouts ? { kind: "atout-select" } : { kind: "p1-pick" });
             }}
             onQuit={onQuit}
             onMatchResult={onMatchResult}

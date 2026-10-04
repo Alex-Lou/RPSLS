@@ -1,3 +1,4 @@
+import { OnlineMatchGuard } from "./OnlineMatchGuard";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useStore } from "../../store/store";
@@ -69,6 +70,13 @@ export function OnlinePage() {
 
   const [phase, setPhase] = useState<Phase>("menu");
   const [bestOf, setBestOf] = useState(3);
+  // Lus par le repli CPU (startBotFallback), appelé depuis un minuteur armé au
+  // montage : sans refs il voyait le mode/bestOf du 1er rendu (Bo3 « classic »
+  // au lieu du Bo5 demandé par le hub Classé).
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+  const bestOfRef = useRef(bestOf);
+  bestOfRef.current = bestOf;
   // For Lanes mode: win_to (3 → bo5 in round-wins).
   const [lanesWinTo, setLanesWinTo] = useState(2);
   const [lobbyCode, setLobbyCode] = useState("");        // we created it
@@ -400,6 +408,11 @@ export function OnlinePage() {
         }, 1400);
         break;
       case "match_end": {
+        // Match déjà quitté (forfait / « Quitter ») : le serveur envoie AUSSI
+        // match_end au partant. L'ignorer — sinon mRef (déjà remis à zéro,
+        // youAre="a") enregistrait une VICTOIRE au slot B et ramenait l'écran
+        // de fin par-dessus le menu.
+        if (phaseRef.current !== "matched" && phaseRef.current !== "round" && phaseRef.current !== "reveal") break;
         // Log this online 1v1 to history with the real opponent's nickname.
         const prev = mRef.current;
         const outcome = msg.winner == null ? "draw" : msg.winner === prev.youAre ? "win" : "loss";
@@ -727,7 +740,7 @@ export function OnlinePage() {
     setQueueStartAt(null);
 
     // Lanes mode has a full local CPU experience already — use it.
-    if (mode === "lanes") {
+    if (modeRef.current === "lanes") {
       setVsBot(false);
       setPhase("lanes_bot");
       return;
@@ -738,7 +751,7 @@ export function OnlinePage() {
     playerRecentRef.current = [];
     const botName = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)];
     setVsBot(true);
-    setM({ ...emptyMatch(), matchId: `bot-${Date.now()}`, opponent: botName, bestOf, youAre: "a" });
+    setM({ ...emptyMatch(), matchId: `bot-${Date.now()}`, opponent: botName, bestOf: bestOfRef.current, youAre: "a" });
     setPhase("matched");
     hapticMatchStart();
     setShowMatchFoundSplash(true);
@@ -870,6 +883,9 @@ export function OnlinePage() {
   function leaveMatch() {
     ladderRef.current = null; // quitter un match clôt le contexte « vs réel Classé »
     if (vsBot) { backToMenu(); return; } // local match — nothing to tell the server
+    // Synchrone (pas d'attente de l'effet) : le match_end que le serveur renvoie
+    // au partant doit trouver la phase déjà hors match (cf. case "match_end").
+    phaseRef.current = "menu";
     clientRef.current?.send({ type: "leave_match" });
     if (goToClasseHub()) return; // session Classé → retour au hub Classé, pas au menu En ligne
     setPhase("menu");
@@ -1196,7 +1212,7 @@ export function OnlinePage() {
                       onClick={leaveMatch}
                       className="px-4 py-1.5 rounded-xl bg-rose-500/25 hover:bg-rose-500/40 border border-rose-400/50 text-rose-100 text-[11px] font-bold transition"
                     >
-                      Quitter (sans pénalité)
+                      Quitter le match
                     </button>
                   )}
                 </motion.div>
@@ -1209,6 +1225,7 @@ export function OnlinePage() {
             >
               🏳️ Forfeit match
             </button>
+            <OnlineMatchGuard onQuitRequest={() => setQuitOpen(true)} />
             <AnimatePresence>
               {quitOpen && (
                 <QuitConfirmModal
