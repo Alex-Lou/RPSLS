@@ -10,6 +10,8 @@
  */
 
 import { motion } from "motion/react";
+import { useT } from "../i18n";
+import { richText } from "./ArenaHowItWorks";
 
 export interface ArenaMatchSplashProps {
   playerName: string;
@@ -24,6 +26,7 @@ const isAvatarImg = (a?: string) =>
   !!a && (a.startsWith("/") || a.startsWith("http") || a.startsWith("data:"));
 
 export function ArenaMatchSplash({ playerName, playerAvatar, cpuName, cpuAvatar }: ArenaMatchSplashProps) {
+  const t = useT();
   const isImg = isAvatarImg(playerAvatar);
   const cpuIsImg = isAvatarImg(cpuAvatar);
   return (
@@ -108,8 +111,7 @@ export function ArenaMatchSplash({ playerName, playerAvatar, cpuName, cpuAvatar 
         transition={{ delay: 0.95, duration: 0.3 }}
         className="text-xs text-ink-muted text-center max-w-xs mt-2"
       >
-        Premier héros à <span className="text-rose-300 font-black">0 ❤</span> perd.
-        Invoque, lance des sorts, joue intelligent.
+        {richText(t("arena.splash.goal"), "text-rose-300 font-black")}
       </motion.div>
 
       {/* "GO!" beat at the end — Alex feedback 2026-06-09 point #7 : durée
@@ -123,7 +125,7 @@ export function ArenaMatchSplash({ playerName, playerAvatar, cpuName, cpuAvatar 
         className="absolute bottom-12 left-0 right-0 text-center text-5xl font-black tracking-[0.25em] text-amber-300"
         style={{ filter: "drop-shadow(0 0 22px rgba(252,211,77,0.95))" }}
       >
-        GO !
+        {t("arena.splash.go")}
       </motion.div>
     </div>
   );

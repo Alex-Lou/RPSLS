@@ -17,6 +17,7 @@ import { motion } from "motion/react";
 import { MOVE_PALETTE } from "../icons";
 import { VOIE_EMBLEM } from "./voieEmblem";
 import type { Move } from "../engine/game";
+import { useT } from "../i18n";
 
 interface ArenaConstellationBarProps {
   /** Valeur 0–3 du compteur (capée à 3 pour l'affichage, peut excéder). */
@@ -43,6 +44,7 @@ const STAR_COUNT = 3;
 export function ArenaConstellationBar({
   count, affinity, side, finisherUnlocked, calm = false, concealed = false,
 }: ArenaConstellationBarProps) {
+  const t = useT();
   const filledCount = Math.min(STAR_COUNT, count);
   const isComplete = filledCount >= STAR_COUNT;
   const pal = affinity ? MOVE_PALETTE[affinity] : null;
@@ -81,7 +83,7 @@ export function ArenaConstellationBar({
           ? `0 0 22px -1px ${accentColor}cc, 0 0 8px ${accentColor}88, inset 0 0 12px color-mix(in oklab, ${accentColor} 40%, transparent)`
           : `0 0 ${4 + glowIntensity * 10}px -1px ${accentColor}${Math.round(glowIntensity * 200 + 30).toString(16).padStart(2, "0")}, 0 1px 3px rgba(0,0,0,0.4)`,
       }}
-      aria-label={concealed ? "Voie adverse cachée" : `Constellation ${filledCount} sur ${STAR_COUNT}`}
+      aria-label={concealed ? t("arena.constel.hidden") : t("arena.constel.aria", { n: filledCount, max: STAR_COUNT })}
     >
       {/* Voie adverse cachée → « ? » neutre au lieu du glyphe d'affinité (qui
        *  trahirait la Voie). Révélée → glyphe signature. */}
@@ -114,11 +116,11 @@ export function ArenaConstellationBar({
           className="text-[8px] uppercase tracking-wide font-bold leading-none"
           style={{ color: accentColor }}
         >
-          {affinity === "rock" ? "Montagne" :
-           affinity === "paper" ? "Forêt" :
-           affinity === "scissors" ? "Tranchant" :
-           affinity === "lizard" ? "Mirage" :
-           "Cosmos"}
+          {affinity === "rock" ? t("arena.constel.voie.rock") :
+           affinity === "paper" ? t("arena.constel.voie.paper") :
+           affinity === "scissors" ? t("arena.constel.voie.scissors") :
+           affinity === "lizard" ? t("arena.constel.voie.lizard") :
+           t("arena.constel.voie.spock")}
         </span>
       )}
       <div className="flex items-center gap-0.5">

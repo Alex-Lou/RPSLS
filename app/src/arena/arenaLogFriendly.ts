@@ -14,14 +14,13 @@
  */
 
 import type { ArenaLogEntry } from "./arenaLog";
+import { tNow } from "../i18n/core";
 
-const MOVE_FR: Record<string, string> = {
-  rock: "Pierre", paper: "Feuille", scissors: "Ciseau", lizard: "Lézard", spock: "Spock",
-};
-const mv = (m: string): string => MOVE_FR[m] ?? m;
-const who = (s: string): string => (s === "a" ? "Toi" : "Adversaire");
-const heroOf = (s: string): string => (s === "a" ? "TON héros" : "le héros adverse");
-const lane = (l: string): string => `voie ${Number(l) + 1}`;
+const MOVES = new Set(["rock", "paper", "scissors", "lizard", "spock"]);
+const mv = (m: string): string => (MOVES.has(m) ? tNow(`arena.log.move.${m}`) : m);
+const who = (s: string): string => (s === "a" ? tNow("arena.log.you") : tNow("arena.log.opp"));
+const heroOf = (s: string): string => (s === "a" ? tNow("arena.log.yourHero") : tNow("arena.log.oppHero"));
+const lane = (l: string): string => tNow("arena.log.lane", { n: Number(l) + 1 });
 
 /** Traduit une entrée de log en phrase simple, ou null si interne/technique. */
 export function friendlyArenaLog(e: ArenaLogEntry): string | null {
@@ -34,97 +33,99 @@ export function friendlyArenaLog(e: ArenaLogEntry): string | null {
 
   // ── Tours ──
   if ((x = m.match(/^=== Tour (\d+) === a\.hp=(\d+) b\.hp=(\d+)/)))
-    return `🕐 Tour ${x[1]} — Toi ${x[2]} ❤ · Adversaire ${x[3]} ❤`;
-  if (/BUT D'OR|Mort subite/i.test(m)) return "🌟 Égalité parfaite — MORT SUBITE !";
-  if (/HARD CAP/.test(m)) return "⏱ Limite de tours atteinte — le héros le plus blessé s'incline.";
+    return tNow("arena.log.turn", { turn: x[1], a: x[2], b: x[3] });
+  if (/BUT D'OR|Mort subite/i.test(m)) return tNow("arena.log.suddenDeath");
+  if (/HARD CAP/.test(m)) return tNow("arena.log.hardCap");
 
   // ── Invocations ──
   if ((x = m.match(/^([ab]) pose (\w+) L(\d)/)))
-    return `🌟 ${who(x[1])} : ${mv(x[2])} invoqué sur la ${lane(x[3])}`;
+    return tNow("arena.log.summon", { who: who(x[1]), move: mv(x[2]), lane: lane(x[3]) });
 
   // ── Sorts nommés ──
   if ((x = m.match(/^([ab]) SUPERNOVA → 6 dmg hero ([ab])/)))
-    return `💥 ${who(x[1])} : Supernova frappe ${heroOf(x[2])} (−6 ❤)`;
+    return tNow("arena.log.supernovaHero", { who: who(x[1]), hero: heroOf(x[2]) });
   if ((x = m.match(/^([ab]) SUPERNOVA L(\d) → 6 dmg/)))
-    return `💥 ${who(x[1])} : Supernova pulvérise la créature adverse (${lane(x[2])})`;
+    return tNow("arena.log.supernovaLane", { who: who(x[1]), lane: lane(x[2]) });
   if ((x = m.match(/^([ab]) LARCIN → \[([\w-]+)\] volée/)))
-    return `🃏 ${who(x[1])} : Larcin vole la carte « ${x[2]} » !`;
+    return tNow("arena.log.heist", { who: who(x[1]), card: x[2] });
   if ((x = m.match(/^([ab]) LARCIN → main adverse vide.*3 dmg hero ([ab])/)))
-    return `🃏 ${who(x[1])} : Larcin ne trouve rien à voler → 3 dégâts à ${heroOf(x[2])}`;
+    return tNow("arena.log.heistEmpty", { who: who(x[1]), hero: heroOf(x[2]) });
   if ((x = m.match(/^([ab]) MASCARADE L(\d) : (\w+) → (\w+)(?: \(counter (\w+)\))?/)))
-    return `🎭 ${who(x[1])} : sur la ${lane(x[2])}, ${mv(x[3])} se déguise en ${mv(x[4])}${x[5] ? ` pour contrer ${mv(x[5])}` : ""}`;
+    return x[5]
+      ? tNow("arena.log.mascaradeCounter", { who: who(x[1]), lane: lane(x[2]), from: mv(x[3]), to: mv(x[4]), counter: mv(x[5]) })
+      : tNow("arena.log.mascarade", { who: who(x[1]), lane: lane(x[2]), from: mv(x[3]), to: mv(x[4]) });
   if ((x = m.match(/^([ab]) VERGER/)))
-    return `🌿 ${who(x[1])} : le Verger régénère son héros`;
+    return tNow("arena.log.verger", { who: who(x[1]) });
   if ((x = m.match(/^([ab]) MÉTAMORPHOSE/)))
-    return `🦎 ${who(x[1])} : Métamorphose recharge l'esquive des Lézards`;
+    return tNow("arena.log.metamorphose", { who: who(x[1]) });
   if (/FINISHER UNLOCKED/i.test(m)) {
     const side = m.match(/^([ab])/)?.[1];
-    return `⭐ ${side ? who(side) : ""} Constellation complète — FINISHER DÉBLOQUÉ !`;
+    return tNow("arena.log.finisherUnlocked", { who: side ? who(side) : "" });
   }
   if ((x = m.match(/^([ab]).*constellation ⭐ (\d)\/3/i)))
-    return `⭐ ${who(x[1])} : Constellation ${x[2]}/3`;
+    return tNow("arena.log.constellation", { who: who(x[1]), n: x[2] });
 
   // ── ⚗️ Forge / fusions ──
   if ((x = m.match(/^([ab]) FORGE dépôt : ([\w-]+)/)))
-    return `⚗️ ${who(x[1])} : « ${x[2]} » posée sur la Forge (visible, reprenable)`;
+    return tNow("arena.log.forgeDeposit", { who: who(x[1]), card: x[2] });
   if ((x = m.match(/^([ab]) FORGE reprise : ([\w-]+)/)))
-    return `⚗️ ${who(x[1])} : « ${x[2]} » reprise de la Forge`;
+    return tNow("arena.log.forgeTakeBack", { who: who(x[1]), card: x[2] });
   if ((x = m.match(/^([ab]) FUSION ⚗️ : ([\w-]+) \+ ([\w-]+) = ([\w-]+)/)))
-    return `⚗️ FUSION ! ${who(x[1])} : ${x[2]} + ${x[3]} = « ${x[4]} » ✨`;
+    return tNow("arena.log.fusion", { who: who(x[1]), a: x[2], b: x[3], result: x[4] });
 
   // ── Économie expert (exil légendaires, mulligan) ──
   if ((x = m.match(/^([ab]) EXIL légendaire : \[([\w,-]+)\]/)))
-    return `⭐ ${who(x[1])} : « ${x[2]} » exilée — les légendaires ne servent qu'UNE fois par partie`;
+    return tNow("arena.log.legendaryExile", { who: who(x[1]), card: x[2] });
   if (/^mulligan :/.test(m))
-    return `🔁 Mulligan — cartes remplacées, nouvelles cartes piochées`;
+    return tNow("arena.log.mulligan");
 
   // ── Caps / garde-fous ──
   if ((x = m.match(/BYPASS BLOCKED ([ab])/)))
-    return `⚠️ ${who(x[1])} : un sort au-delà des limites du tour a été annulé`;
+    return tNow("arena.log.bypassBlocked", { who: who(x[1]) });
 
   // ── Combat (catégorie combat, messages "L0 ...") ──
   if ((x = m.match(/^L(\d) A wins → B die\. Splash (\d+) → hero b/)))
-    return `⚔️ ${lane(x[1])} : TA créature gagne le duel — ${x[2]} dégâts percent jusqu'au héros adverse !`;
+    return tNow("arena.log.combatAWinsSplash", { lane: lane(x[1]), n: x[2] });
   if ((x = m.match(/^L(\d) B wins → A die\. Splash (\d+) → hero a/)))
-    return `⚔️ ${lane(x[1])} : la créature ADVERSE gagne — ${x[2]} dégâts percent jusqu'à TON héros !`;
+    return tNow("arena.log.combatBWinsSplash", { lane: lane(x[1]), n: x[2] });
   if ((x = m.match(/^L(\d) A wins → B die\. Splash absorbé/)))
-    return `⚔️ ${lane(x[1])} : TA créature détruit l'adversaire — son héros est protégé`;
+    return tNow("arena.log.combatAWinsAbsorbed", { lane: lane(x[1]) });
   if ((x = m.match(/^L(\d) B wins → A die\. Splash absorbé/)))
-    return `⚔️ ${lane(x[1])} : ta créature est détruite — ton héros est protégé`;
+    return tNow("arena.log.combatBWinsAbsorbed", { lane: lane(x[1]) });
   if ((x = m.match(/^L(\d) (A|B) wins → AEGIS save (A|B)/)))
-    return `🛡 ${lane(x[1])} : le bouclier divin absorbe le coup fatal (${x[3] === "A" ? "ta créature" : "créature adverse"} sauvée)`;
+    return tNow("arena.log.aegisSave", { lane: lane(x[1]), creature: x[3] === "A" ? tNow("arena.log.yourCreature") : tNow("arena.log.oppCreature") });
   if ((x = m.match(/^L(\d) (A|B) wins → ESQUIVE save (A|B) \(charge (\d) → (\d)\)/)))
-    return `✨ ${lane(x[1])} : ${x[3] === "A" ? "ta créature" : "la créature adverse"} ESQUIVE l'attaque (${x[5]} esquive(s) restante(s))`;
+    return tNow("arena.log.dodgeSave", { lane: lane(x[1]), creature: x[3] === "A" ? tNow("arena.log.yourCreature") : tNow("arena.log.theOppCreature"), n: x[5] });
   if ((x = m.match(/^L(\d).*Splash (\d+) → DEFLECTED par Pierre L(\d)/)))
-    return `🪨 La Pierre (${lane(x[3])}) PROVOQUE : elle encaisse les dégâts à la place du héros`;
+    return tNow("arena.log.rockTaunt", { lane: lane(x[3]) });
   if ((x = m.match(/^L(\d) (\w+)\(([ab])\)\d+HP undefended → hero ([ab]) atk=(\d+)/)))
-    return `⚔️ ${lane(x[1])} : ${mv(x[2])} attaque sans opposition → −${x[5]} ❤ pour ${heroOf(x[4])}`;
+    return tNow("arena.log.undefended", { lane: lane(x[1]), move: mv(x[2]), n: x[5], hero: heroOf(x[4]) });
   if ((x = m.match(/^L(\d) RIPOSTE/)))
-    return `🗡 ${lane(x[1])} : RIPOSTE — le tueur est emporté avec sa victime !`;
+    return tNow("arena.log.riposte", { lane: lane(x[1]) });
 
   // ── Sorts Phase 2/3 avec logs dédiés (formats alignés sur arenaPhase3Spells) ──
   if ((x = m.match(/^([ab]) PERMUTATION L(\d) : (\w+) ↔ (\w+)/)))
-    return `🔄 ${who(x[1])} : Permutation sur la ${lane(x[2])} — ${mv(x[3])} et ${mv(x[4])} changent de camp !`;
+    return tNow("arena.log.permutation", { who: who(x[1]), lane: lane(x[2]), a: mv(x[3]), b: mv(x[4]) });
   if ((x = m.match(/^([ab]) TOILE GLUANTE L(\d) : (\w+)/)))
-    return `🕸 ${who(x[1])} : Toile Gluante englue ${mv(x[3])} (${lane(x[2])}) — il ne peut plus attaquer ce tour`;
+    return tNow("arena.log.toileGluante", { who: who(x[1]), move: mv(x[3]), lane: lane(x[2]) });
   if ((x = m.match(/^([ab]) GRAVITÉ → .*?(\d+) tuée\(s\) → pioche (\d+)/)))
-    return `🌑 ${who(x[1])} : Gravité écrase les créatures adverses — ${x[2]} détruite(s), ${x[3]} carte(s) piochée(s)`;
+    return tNow("arena.log.gravityKills", { who: who(x[1]), killed: x[2], drawn: x[3] });
   if ((x = m.match(/^([ab]) GRAVITÉ/)))
-    return `🌑 ${who(x[1])} : Gravité écrase toutes les créatures adverses (−1 PV)`;
+    return tNow("arena.log.gravity", { who: who(x[1]) });
   if ((x = m.match(/^([ab]) COUP D'ŒIL → pioche 1 \+ révèle ([\w-]+|\(main vide\))/)))
-    return `🔍 ${who(x[1])} : Coup d'Œil — pioche 1 et révèle « ${x[2]} »`;
+    return tNow("arena.log.peek", { who: who(x[1]), card: x[2] });
   if ((x = m.match(/^([ab]) DOPPELGÄNGER → copie (\w+) sur L(\d)/)))
-    return `👥 ${who(x[1])} : Doppelgänger copie ${mv(x[2])} sur la ${lane(x[3])}`;
+    return tNow("arena.log.doppelganger", { who: who(x[1]), move: mv(x[2]), lane: lane(x[3]) });
   if ((x = m.match(/^([ab]) PURGE/)))
-    return `🧹 ${who(x[1])} : Purge dissipe tous les buffs, boucliers et ancres adverses`;
+    return tNow("arena.log.purge", { who: who(x[1]) });
   if ((x = m.match(/^([ab]) PHÉNIX/i)))
-    return `🔥 ${who(x[1])} : Phénix veille — les créatures mortes ce tour renaîtront !`;
+    return tNow("arena.log.phoenix", { who: who(x[1]) });
   if ((x = m.match(/^([ab]) ROUE DU DESTIN → (.+)/i)))
-    return `🎡 ${who(x[1])} : la Roue du Destin tourne… ${x[2]} !`;
+    return tNow("arena.log.wheel", { who: who(x[1]), result: x[2] });
   if ((x = m.match(/^([ab]) SINGULARITÉ → .*?= (\d+) dmg/i)))
-    return `🌀 ${who(x[1])} : Singularité — ${x[2]} dégâts massifs au héros adverse !`;
+    return tNow("arena.log.singularity", { who: who(x[1]), n: x[2] });
   if ((x = m.match(/^([ab]) RÉVERBÉRATION/i)))
-    return `🔊 ${who(x[1])} : Réverbération répète le dernier sort !`;
+    return tNow("arena.log.reverb", { who: who(x[1]) });
 
   // Interne / technique (steps moteur, snapshots de main, états) → omis.
   return null;

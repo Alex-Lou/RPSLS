@@ -259,7 +259,7 @@ export function ArenaPlanPhase({
             forgeHint={(() => {
               if (!isFusible(inspecting)) return undefined;
               const r = board.forgeA ? findFusionResult(inspecting, board.forgeA) : null;
-              return r ? `⚗ Fusionner → ${t(CARDS[r].nameKey)}` : "⚗ Déposer sur la Forge";
+              return r ? t("arena.plan.forge.fuse", { card: t(CARDS[r].nameKey) }) : t("arena.plan.forge.deposit");
             })()}
             onForge={isFusible(inspecting) && onForgeDeposit
               ? () => { onForgeDeposit(inspecting); setInspecting(null); }
@@ -353,9 +353,11 @@ export function ArenaPlanPhase({
              *  tour avant l'apparition des cartes, à côté des retournées »). Les cartes
              *  se débloquent au tour OPENING_TURNS+1 → tours restants = (OPENING_TURNS+1)−turn. */}
             <div className="flex flex-col items-center leading-tight gap-0.5">
-              <div className="text-[8px] uppercase tracking-[0.32em] font-black text-amber-200/60">Phase 1</div>
+              <div className="text-[8px] uppercase tracking-[0.32em] font-black text-amber-200/60">{t("arena.plan.phase1")}</div>
               <div className="px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-300/40 text-[9px] font-black text-amber-100 tabular-nums uppercase tracking-wide">
-                Cartes dans {OPENING_TURNS + 1 - board.turn} tour{OPENING_TURNS + 1 - board.turn > 1 ? "s" : ""}
+                {OPENING_TURNS + 1 - board.turn > 1
+                  ? t("arena.plan.cardsInTurns", { n: OPENING_TURNS + 1 - board.turn })
+                  : t("arena.plan.cardsInTurn", { n: OPENING_TURNS + 1 - board.turn })}
               </div>
             </div>
           </div>

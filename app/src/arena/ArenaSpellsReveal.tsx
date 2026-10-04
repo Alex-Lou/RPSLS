@@ -15,6 +15,7 @@ import { motion } from "motion/react";
 import { CardImage } from "../ranked/CardImage";
 import { CARDS, RARITY_COLOR } from "../ranked/cards";
 import type { PlayedSpell } from "./arenaTypes";
+import { useT } from "../i18n";
 
 const RARITY_BORDER: Record<string, string> = {
   common: "border-zinc-300/85 shadow-zinc-900/55",
@@ -38,6 +39,7 @@ const STAGGER = 0.22;
 const CARD_DURATION = 1.5;
 
 export function ArenaSpellsReveal({ spells, side }: ArenaSpellsRevealProps) {
+  const t = useT();
   if (spells.length === 0) return null;
   const isOpp = side === "opp";
 
@@ -66,7 +68,7 @@ export function ArenaSpellsReveal({ spells, side }: ArenaSpellsRevealProps) {
             : "bottom-0 left-0 bg-emerald-950/85 border-emerald-300/55 text-emerald-100")
         }
       >
-        {isOpp ? "ADV." : "TOI"}
+        {isOpp ? t("arena.reveal.opp") : t("arena.reveal.you")}
       </div>
       {spells.map((spell, idx) => (
         <RevealCard

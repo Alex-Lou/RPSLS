@@ -24,14 +24,15 @@ import { MoveGlyph } from "../icons";
 import { moveCountersMove } from "./arenaTypes";
 import type { Move } from "../engine/game";
 import type { Side } from "./arenaTypes";
+import { useT } from "../i18n";
 
 const MOVES: Move[] = ["rock", "paper", "scissors", "lizard", "spock"];
 const MOVE_LABEL: Record<Move, string> = {
-  rock: "Pierre",
-  paper: "Feuille",
-  scissors: "Ciseau",
-  lizard: "Lézard",
-  spock: "Spock",
+  rock: "arena.sd.move.rock",
+  paper: "arena.sd.move.paper",
+  scissors: "arena.sd.move.scissors",
+  lizard: "arena.sd.move.lizard",
+  spock: "arena.sd.move.spock",
 };
 
 export interface ArenaSuddenDeathProps {
@@ -42,6 +43,7 @@ export interface ArenaSuddenDeathProps {
 }
 
 export function ArenaSuddenDeath({ onResolved }: ArenaSuddenDeathProps) {
+  const t = useT();
   const [playerPick, setPlayerPick] = useState<Move | null>(null);
   const [cpuPick, setCpuPick] = useState<Move | null>(null);
   const [reveal, setReveal] = useState(false);
@@ -102,10 +104,10 @@ export function ArenaSuddenDeath({ onResolved }: ArenaSuddenDeathProps) {
           transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
           className="text-4xl font-black tracking-[0.3em] text-amber-300"
         >
-          🌟 BUT D'OR 🌟
+          {t("arena.sd.banner")}
         </motion.div>
         <div className="mt-2 text-[12px] uppercase tracking-[0.4em] font-bold text-amber-200/80">
-          Mort subite — Round {round}
+          {t("arena.sd.round", { n: round })}
         </div>
       </motion.div>
 
@@ -113,7 +115,7 @@ export function ArenaSuddenDeath({ onResolved }: ArenaSuddenDeathProps) {
       <div className="flex items-center gap-8 mb-8">
         {/* Toi */}
         <div className="flex flex-col items-center gap-1">
-          <span className="text-[10px] uppercase tracking-wider font-black text-emerald-300">TOI</span>
+          <span className="text-[10px] uppercase tracking-wider font-black text-emerald-300">{t("arena.sd.you")}</span>
           <div className="w-20 h-20 rounded-2xl bg-zinc-900/80 border-2 border-emerald-400/40 flex items-center justify-center">
             <AnimatePresence>
               {reveal && playerPick && (
@@ -132,10 +134,10 @@ export function ArenaSuddenDeath({ onResolved }: ArenaSuddenDeathProps) {
             </AnimatePresence>
           </div>
         </div>
-        <span className="text-2xl font-black text-amber-300/60">vs</span>
+        <span className="text-2xl font-black text-amber-300/60">{t("arena.sd.vs")}</span>
         {/* CPU */}
         <div className="flex flex-col items-center gap-1">
-          <span className="text-[10px] uppercase tracking-wider font-black text-rose-300">CPU</span>
+          <span className="text-[10px] uppercase tracking-wider font-black text-rose-300">{t("arena.sd.cpu")}</span>
           <div className="w-20 h-20 rounded-2xl bg-zinc-900/80 border-2 border-rose-400/40 flex items-center justify-center">
             <AnimatePresence>
               {reveal && cpuPick && (
@@ -165,7 +167,7 @@ export function ArenaSuddenDeath({ onResolved }: ArenaSuddenDeathProps) {
           className="flex flex-col items-center gap-3"
         >
           <span className="text-[11px] uppercase tracking-wider font-bold text-amber-100/70">
-            Choisis ton symbole — 1 seul, aveugle
+            {t("arena.sd.pick")}
           </span>
           <div className="flex gap-2">
             {MOVES.map((move) => (
@@ -174,7 +176,7 @@ export function ArenaSuddenDeath({ onResolved }: ArenaSuddenDeathProps) {
                 onClick={() => handlePick(move)}
                 className="group w-14 h-14 rounded-xl bg-zinc-900/85 border-2 border-amber-400/50 hover:border-amber-300 active:scale-95 transition-all flex items-center justify-center"
                 style={{ boxShadow: "0 0 12px rgba(252,211,77,0.25)" }}
-                aria-label={MOVE_LABEL[move]}
+                aria-label={t(MOVE_LABEL[move])}
               >
                 <MoveGlyph move={move} className="w-7 h-7 text-amber-200 group-hover:text-amber-100" />
               </button>
@@ -190,7 +192,7 @@ export function ArenaSuddenDeath({ onResolved }: ArenaSuddenDeathProps) {
           animate={{ opacity: 1 }}
           className="text-[11px] uppercase tracking-[0.3em] font-bold text-amber-200/70 animate-pulse"
         >
-          CPU réfléchit…
+          {t("arena.sd.cpuThinking")}
         </motion.div>
       )}
 
@@ -208,9 +210,9 @@ export function ArenaSuddenDeath({ onResolved }: ArenaSuddenDeathProps) {
             transition={{ delay: 1.0, duration: 0.5, type: "spring", stiffness: 240, damping: 18 }}
             className="text-center"
           >
-            {isWin && <div className="text-3xl font-black text-emerald-300 tracking-wider">🏆 VICTOIRE !</div>}
-            {isLoss && <div className="text-3xl font-black text-rose-300 tracking-wider">💀 DÉFAITE</div>}
-            {isMirror && <div className="text-2xl font-black text-amber-200 tracking-wider">⚔ Égalité — Re-spin</div>}
+            {isWin && <div className="text-3xl font-black text-emerald-300 tracking-wider">{t("arena.sd.win")}</div>}
+            {isLoss && <div className="text-3xl font-black text-rose-300 tracking-wider">{t("arena.sd.loss")}</div>}
+            {isMirror && <div className="text-2xl font-black text-amber-200 tracking-wider">{t("arena.sd.mirror")}</div>}
           </motion.div>
         );
       })()}

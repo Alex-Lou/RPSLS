@@ -47,10 +47,10 @@ export function ArenaCardInspect({
 }: ArenaCardInspectProps) {
   const card = CARDS[id];
   const targetLabel =
-    targetKind === "lane" ? "🎯 Touche une LANE après confirmation"
-    : targetKind === "self" ? "🎯 Cible : ton héros (auto)"
-    : targetKind === "hero" ? "🎯 Cible : héros adverse (auto)"
-    : "🎯 Effet global — pas de cible à choisir";
+    targetKind === "lane" ? t("arena.inspect.target.lane")
+    : targetKind === "self" ? t("arena.inspect.target.self")
+    : targetKind === "hero" ? t("arena.inspect.target.hero")
+    : t("arena.inspect.target.global");
   const rarityRingMap: Record<string, string> = {
     common: "ring-zinc-400/70",
     rare: "ring-blue-400/70",
@@ -92,7 +92,7 @@ export function ArenaCardInspect({
           <button
             onClick={onClose}
             className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/70 text-white text-base font-bold flex items-center justify-center hover:bg-black/85"
-            aria-label="Fermer"
+            aria-label={t("arena.inspect.close")}
           >✕</button>
         </div>
         {/* Text panel below */}
@@ -115,7 +115,7 @@ export function ArenaCardInspect({
            *  clairement quand fusionnable »). Absent = non fusionnable. */}
           {fusionRecipes && fusionRecipes.length > 0 && (
             <div className="rounded-lg bg-fuchsia-950/40 border border-fuchsia-600/40 px-2.5 py-1.5">
-              <div className="text-[10px] uppercase tracking-wider font-black text-fuchsia-200">⚗ Fusionnable</div>
+              <div className="text-[10px] uppercase tracking-wider font-black text-fuchsia-200">{t("arena.inspect.fusible")}</div>
               {fusionRecipes.map((r, k) => (
                 <div key={k} className="text-[11px] text-fuchsia-100/90 leading-snug">
                   + {t(CARDS[r.partner].nameKey)} <span className="text-amber-300">→</span> <b>{t(CARDS[r.result].nameKey)}</b>
@@ -126,7 +126,7 @@ export function ArenaCardInspect({
           {readOnly ? (
             // Carte ADVERSE révélée (Augure) — aucune action, juste apprendre.
             <div className="mt-1 w-full py-2 rounded-xl text-center text-[11px] font-black uppercase tracking-wider text-amber-200 bg-amber-500/15 border border-amber-400/50">
-              👁 Carte adverse révélée — fiche en lecture
+              {t("arena.inspect.readOnly")}
             </div>
           ) : (
             <>
@@ -134,7 +134,7 @@ export function ArenaCardInspect({
                 onClick={onCommit}
                 className="mt-1 w-full py-2.5 rounded-xl font-black uppercase tracking-wider text-white text-sm bg-gradient-to-r from-emerald-500 to-teal-500 ring-2 ring-emerald-300/40 shadow-lg"
               >
-                ✨ Lancer la carte
+                {t("arena.inspect.cast")}
               </button>
               {/* Bouton FORGE — chemin FIABLE de dépôt/fusion pour toute carte
                *  fusionnable (les utilitaires ne s'auto-jouent plus avant de
@@ -144,7 +144,7 @@ export function ArenaCardInspect({
                   onClick={onForge}
                   className="w-full py-2.5 rounded-xl font-black uppercase tracking-wider text-amber-50 text-sm bg-gradient-to-r from-fuchsia-600 to-amber-500 ring-2 ring-amber-300/40 shadow-lg"
                 >
-                  {forgeHint ?? "⚗ Déposer sur la Forge"}
+                  {forgeHint ?? t("arena.plan.forge.deposit")}
                 </button>
               )}
             </>

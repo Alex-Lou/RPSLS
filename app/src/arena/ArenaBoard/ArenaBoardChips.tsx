@@ -8,6 +8,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import type { LaneIndex, Side, TurnIntent } from "../arenaTypes";
 import type { ArenaBoardProps } from "./ArenaBoard";
+import { useT } from "../../i18n";
 
 /** AUGUR FLASH — when EITHER side cast Augur this turn, a banner pops
  *  at the center during the spells phase so the player KNOWS the
@@ -20,6 +21,7 @@ export function AugurFlash({
   oppPreview: TurnIntent | null | undefined;
   playerPreview: TurnIntent | null | undefined;
 }) {
+  const t = useT();
   return (
     <AnimatePresence>
       {(resolveStep === "spells" || resolveStep === "summons") &&
@@ -50,10 +52,10 @@ export function AugurFlash({
             </motion.span>
             <div className="flex flex-col items-start leading-none">
               <span className="text-[8.5px] uppercase tracking-[0.22em] font-black text-amber-50/95">
-                Augur
+                {t("arena.chip.augur.title")}
               </span>
               <span className="text-[12px] uppercase tracking-[0.14em] font-black text-white drop-shadow">
-                Main révélée
+                {t("arena.chip.augur.handRevealed")}
               </span>
             </div>
           </div>
@@ -74,6 +76,7 @@ export function TauntBlockChip({
   tauntBlock: { defenderSide: "a" | "b"; rockLane: LaneIndex; key: number } | null;
   playerSide: Side;
 }) {
+  const t = useT();
   return (
     <AnimatePresence>
       {tauntBlock && (
@@ -131,10 +134,10 @@ export function TauntBlockChip({
             <span className="text-base leading-none drop-shadow">🪨</span>
             <div className="flex flex-col items-start leading-none">
               <span className="text-[7.5px] uppercase tracking-[0.2em] font-black text-amber-50/95">
-                Pierre protège
+                {t("arena.chip.taunt.title")}
               </span>
               <span className="text-[10.5px] uppercase tracking-[0.12em] font-black text-white drop-shadow">
-                Attaque détournée
+                {t("arena.chip.taunt.deflected")}
               </span>
             </div>
           </div>
@@ -156,6 +159,7 @@ export function AntiTauntChip({
   antiTaunt: { bypassedSide: "a" | "b"; rockLane: LaneIndex; cause: "paper" | "spock"; key: number } | null;
   playerSide: Side;
 }) {
+  const t = useT();
   return (
     <AnimatePresence>
       {antiTaunt && (
@@ -186,10 +190,10 @@ export function AntiTauntChip({
             <span className="text-base leading-none drop-shadow">🚫🪨</span>
             <div className="flex flex-col items-start leading-none">
               <span className="text-[7.5px] uppercase tracking-[0.2em] font-black text-white/90">
-                {antiTaunt.cause === "paper" ? "🍃 Étouffe" : "🖖 Logique"}
+                {antiTaunt.cause === "paper" ? t("arena.chip.antiTaunt.paper") : t("arena.chip.antiTaunt.spock")}
               </span>
               <span className="text-[10.5px] uppercase tracking-[0.12em] font-black text-white drop-shadow">
-                Provoc annulée
+                {t("arena.chip.antiTaunt.cancelled")}
               </span>
             </div>
           </div>
@@ -208,6 +212,7 @@ export function RiposteChip({
   riposteFX: { attackerSide: "a" | "b"; lane: LaneIndex; key: number } | null;
   playerSide: Side;
 }) {
+  const t = useT();
   return (
     <AnimatePresence>
       {riposteFX && (
@@ -236,10 +241,10 @@ export function RiposteChip({
             <span className="text-base leading-none drop-shadow">✨⚔</span>
             <div className="flex flex-col items-start leading-none">
               <span className="text-[7.5px] uppercase tracking-[0.2em] font-black text-white/90">
-                🦎 Esquive
+                {t("arena.chip.riposte.title")}
               </span>
               <span className="text-[10.5px] uppercase tracking-[0.12em] font-black text-white drop-shadow">
-                Riposte !
+                {t("arena.chip.riposte.text")}
               </span>
             </div>
           </div>

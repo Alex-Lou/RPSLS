@@ -13,6 +13,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { MOVE_PALETTE } from "../icons";
 import { engineEffectText } from "./arenaEngines";
 import type { Move } from "../engine/game";
+import { useT } from "../i18n";
 
 export interface TraceCue {
   /** Nouvelle valeur de la jauge de Voie (1, 2 ou 3). */
@@ -22,10 +23,11 @@ export interface TraceCue {
 }
 
 const VOIE_NAME: Record<Move, string> = {
-  rock: "Montagne", paper: "Forêt", scissors: "Tranchant", lizard: "Mirage", spock: "Cosmos",
+  rock: "arena.constel.voie.rock", paper: "arena.constel.voie.paper", scissors: "arena.constel.voie.scissors", lizard: "arena.constel.voie.lizard", spock: "arena.constel.voie.spock",
 };
 
 export function ArenaTraceCue({ cue }: { cue: TraceCue | null }) {
+  const t = useT();
   const color = cue?.affinity ? (MOVE_PALETTE[cue.affinity]?.hex ?? "#a78bfa") : "#a78bfa";
   const complete = (cue?.count ?? 0) >= 3;
   return (
@@ -57,19 +59,19 @@ export function ArenaTraceCue({ cue }: { cue: TraceCue | null }) {
               className="text-[11px] font-black uppercase tracking-[0.3em]"
               style={{ color, textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}
             >
-              Counter gagné
+              {t("arena.trace.won")}
             </div>
             <div
               className="text-base font-black uppercase tracking-widest"
               style={{ color: "#fff", textShadow: `0 0 12px ${color}, 0 2px 4px rgba(0,0,0,0.75)` }}
             >
-              {VOIE_NAME[cue.affinity ?? "rock"]} {cue.count}/3
+              {t(VOIE_NAME[cue.affinity ?? "rock"])} {cue.count}/3
             </div>
             <div
               className="text-sm font-bold"
               style={{ color, textShadow: "0 1px 2px rgba(0,0,0,0.85)" }}
             >
-              {complete ? "✦ FINISHER PRÊT !" : `→ ${engineEffectText(cue.affinity)}`}
+              {complete ? t("arena.trace.finisher") : `→ ${engineEffectText(cue.affinity)}`}
             </div>
           </motion.div>
         )}

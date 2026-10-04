@@ -201,7 +201,7 @@ export function ArenaHandFanout({
                   ) +
                   (!supported ? " grayscale opacity-30" : cannotAfford ? " opacity-40" : "")
                 }
-                title={supported ? undefined : "Carte pas encore disponible en Arena"}
+                title={supported ? undefined : t("arena.hand.unsupported")}
               >
                 <CardImage id={id} glyphSize="text-2xl" />
 
@@ -219,7 +219,7 @@ export function ArenaHandFanout({
                 {!supported && (
                   <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                     <span className="text-[7px] uppercase tracking-wider text-ink-muted font-bold text-center px-1 leading-tight">
-                      Bientôt
+                      {t("arena.hand.soon")}
                     </span>
                   </div>
                 )}
@@ -234,7 +234,7 @@ export function ArenaHandFanout({
                 {board.forgeA && isFusible(id) && findFusionResult(id, board.forgeA) && (
                   <div
                     className="absolute bottom-5 right-0.5 z-10 w-5 h-5 rounded-full flex items-center justify-center text-[11px] leading-none shadow bg-amber-400 text-zinc-900 animate-pulse ring-1 ring-amber-200"
-                    title="Fusion possible — tape la Forge !"
+                    title={t("arena.hand.fuseReady")}
                   >
                     <FuseGlyph className="w-3 h-3" />
                   </div>
@@ -249,7 +249,7 @@ export function ArenaHandFanout({
                 }) && (
                   <div
                     className="absolute bottom-5 right-0.5 z-10 w-5 h-5 rounded-full flex items-center justify-center text-[11px] leading-none shadow bg-fuchsia-500 text-white ring-1 ring-fuchsia-300"
-                    title="Fusionnable : tu as le partenaire en main — dépose une carte sur la Forge puis fusionne"
+                    title={t("arena.hand.fusible")}
                   >
                     <FuseGlyph className="w-3 h-3" />
                   </div>
@@ -257,7 +257,7 @@ export function ArenaHandFanout({
                 {id === "second-wind" && me.hp >= me.maxHp && (
                   <div
                     className="absolute top-0.5 right-0.5 z-10 px-1 py-0.5 rounded-md bg-amber-500/90 text-[8px] font-black text-zinc-900 leading-none shadow"
-                    title="Tu es à pleine vie — la carte sera dépensée sans effet"
+                    title={t("arena.hand.fullHp")}
                   >
                     <WarnGlyph className="w-2.5 h-2.5" />
                   </div>
@@ -276,10 +276,10 @@ export function ArenaHandFanout({
                   className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50 pointer-events-none flex items-center gap-1 whitespace-nowrap"
                 >
                   <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-zinc-900 text-[8px] font-black uppercase tracking-wide shadow-lg flex items-center gap-0.5 animate-pulse">
-                    <span className="text-[10px] leading-none">▸</span>Retape = jouer
+                    <span className="text-[10px] leading-none">▸</span>{t("arena.hand.tapAgain")}
                   </span>
                   <span className="px-1.5 py-0.5 rounded-full bg-fuchsia-500 text-white text-[8px] font-black uppercase tracking-wide shadow-lg ring-1 ring-fuchsia-300 flex items-center gap-0.5">
-                    <FuseGlyph className="w-2.5 h-2.5" />ou Forge
+                    <FuseGlyph className="w-2.5 h-2.5" />{t("arena.hand.orForge")}
                   </span>
                 </motion.div>
               )}
@@ -310,10 +310,10 @@ export function ArenaHandFanout({
           </div>
           <span className="text-[10px] text-ink-faint italic">
             {me.hand.length === 0 && me.deck.length + me.discard.length === 0
-              ? "Plus de cartes à piocher (deck + défausse vides)"
+              ? t("arena.hand.noCardsLeft")
               : me.hand.length === 0
-              ? "Main vide — fin de tour pour piocher"
-              : "Toutes les cartes en main sont déjà planifiées"}
+              ? t("arena.hand.emptyHand")
+              : t("arena.hand.allPlanned")}
           </span>
         </div>
       );

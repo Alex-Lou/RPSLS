@@ -1,5 +1,14 @@
 // Translation dictionary — fr. Extracted from the old monolithic i18n.ts.
+import arena_screens_fr from "./arena/screens.fr";
+import arena_board_fr from "./arena/board.fr";
+import arena_flow_fr from "./arena/flow.fr";
+import arena_fx_fr from "./arena/fx.fr";
 const fr: Record<string, string> = {
+  // ── Arena (fragments par zone, cf. locales/arena/) ──
+  ...arena_screens_fr,
+  ...arena_board_fr,
+  ...arena_flow_fr,
+  ...arena_fx_fr,
   // ── Nav / shell ──
   "nav.play": "Jouer",
   "nav.home": "Accueil",

@@ -1,6 +1,7 @@
 import { motion } from "motion/react";
 import { hapticTap } from "../../haptic";
 import type { ArenaTargeting } from "../arenaTypes";
+import { useT } from "../../i18n";
 
 /** FIN DE TOUR — bouton ROND doré fixe (ancre visuelle façon Hearthstone),
  *  badge MANA PLANIFIÉ intégré. Remplace l'ancien pill centré + la ligne texte
@@ -13,6 +14,7 @@ export function ArenaLockButton({
   setTargeting: (t: ArenaTargeting) => void;
   onLock: () => void;
 }) {
+  const t = useT();
   return (
     <div className="relative shrink-0 pb-1.5 pr-0.5">
       {canLock && (
@@ -51,8 +53,8 @@ export function ArenaLockButton({
         {/* Badge mana retiré (Alex 2026-06-13 : "le chiffre + flèche pas
          *  clair") — le mana est déjà lisible sur le strip you. Le bouton
          *  ne dit plus que "FIN". */}
-        <span className="text-[12px] font-black tracking-wider leading-none">FIN</span>
-        <span className="text-[8px] font-bold uppercase tracking-wider opacity-80 leading-none mt-0.5">de tour</span>
+        <span className="text-[12px] font-black tracking-wider leading-none">{t("arena.plan.endTurn.top")}</span>
+        <span className="text-[8px] font-bold uppercase tracking-wider opacity-80 leading-none mt-0.5">{t("arena.plan.endTurn.bottom")}</span>
       </button>
     </div>
   );

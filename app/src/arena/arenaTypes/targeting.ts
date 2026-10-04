@@ -3,6 +3,7 @@ import type { CardId } from "../../ranked/rankedTypes";
 import type { Side } from "./hero";
 import type { LaneIndex } from "./creatures";
 import type { TurnIntent } from "./board";
+import { tNow } from "../../i18n/core";
 
 /* ───────────────────────── Targeting (UI-level) ───────────────────────── */
 
@@ -226,9 +227,10 @@ export const LANE_TARGET_MOVE: Partial<Record<CardId, Move>> = {
   eclipse:            "lizard",
 };
 
-/** Libellé court FR d'un symbole, pour les labels de ciblage (« Cible ta Pierre »). */
-const MOVE_LABEL_FR: Record<Move, string> = {
-  rock: "Pierre", paper: "Feuille", scissors: "Ciseau", lizard: "Lézard", spock: "Spock",
+/** Clé i18n du libellé court d'un symbole, pour les labels de ciblage (« Cible ta Pierre »). */
+const MOVE_LABEL_KEY: Record<Move, string> = {
+  rock: "arena.target.move.rock", paper: "arena.target.move.paper", scissors: "arena.target.move.scissors",
+  lizard: "arena.target.move.lizard", spock: "arena.target.move.spock",
 };
 
 /** Mana GAGNÉ IMMÉDIATEMENT ce tour par une carte « tempo » (façon Pièce de
@@ -288,16 +290,16 @@ export function isValidLaneTarget(
 export function targetLabelFor(targeting: ArenaTargeting, slotHasCreature = false): string {
   if (!targeting) return "";
   if (targeting.kind === "summon") {
-    return slotHasCreature ? "↻ Remplacer" : "✦ Invoquer ici";
+    return slotHasCreature ? tNow("arena.target.replace") : tNow("arena.target.summonHere");
   }
   if (targeting.kind === "spell" && targeting.targetKind === "lane") {
     const tgtSide = LANE_SPELL_TARGET_SIDE[targeting.id] ?? "my-creature";
     const reqMove = LANE_TARGET_MOVE[targeting.id];
-    if (tgtSide === "my-creature") return reqMove ? `✦ Cible ta ${MOVE_LABEL_FR[reqMove]}` : "✦ Cible ta créature";
-    if (tgtSide === "opp-creature") return reqMove ? `✦ Cible cette ${MOVE_LABEL_FR[reqMove]}` : "✦ Cible cette créature";
-    if (tgtSide === "my-empty-opp-occupied") return "✦ Mirror ici";
-    if (tgtSide === "my-empty") return "✦ Ici";
-    if (tgtSide === "both-occupied") return "✦ Échanger";
+    if (tgtSide === "my-creature") return reqMove ? tNow("arena.target.myMove", { move: tNow(MOVE_LABEL_KEY[reqMove]) }) : tNow("arena.target.myCreature");
+    if (tgtSide === "opp-creature") return reqMove ? tNow("arena.target.oppMove", { move: tNow(MOVE_LABEL_KEY[reqMove]) }) : tNow("arena.target.oppCreature");
+    if (tgtSide === "my-empty-opp-occupied") return tNow("arena.target.mirrorHere");
+    if (tgtSide === "my-empty") return tNow("arena.target.here");
+    if (tgtSide === "both-occupied") return tNow("arena.target.swap");
   }
   return "✦";
 }

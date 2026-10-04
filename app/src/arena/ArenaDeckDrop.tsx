@@ -13,8 +13,15 @@ import { motion } from "motion/react";
 import { CardImage } from "../ranked/CardImage";
 import { ArenaCardBack } from "./ArenaCardBack";
 import type { CardId } from "../ranked/rankedTypes";
+import { useT } from "../i18n";
+
+/** Noms de phase connus → clé i18n (l’appelant passe encore le libellé FR). */
+const PHASE_NAME_KEY: Record<string, string> = {
+  "Déploiement": "arena.deckdrop.deploy",
+};
 
 export function ArenaDeckDrop({ cards, phaseName }: { cards: CardId[]; phaseName: string }) {
+  const t = useT();
   const shown = cards.slice(0, 5);
   return (
     <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center pointer-events-none" aria-hidden>
@@ -33,14 +40,14 @@ export function ArenaDeckDrop({ cards, phaseName }: { cards: CardId[]; phaseName
         animate={{ opacity: [0, 1, 1, 0], y: [-18, 0, 0, -10], scale: [0.8, 1, 1, 1] }}
         transition={{ duration: 2.0, times: [0, 0.18, 0.8, 1], ease: "easeOut" }}
       >
-        <div className="text-[11px] uppercase tracking-[0.3em] font-black text-amber-200/80">Phase 2</div>
+        <div className="text-[11px] uppercase tracking-[0.3em] font-black text-amber-200/80">{t("arena.deckdrop.phase", { n: 2 })}</div>
         <div
           className="text-[26px] uppercase tracking-wider font-black text-amber-50"
           style={{ textShadow: "0 0 16px rgba(252,211,77,0.85), 0 2px 6px rgba(0,0,0,0.7)" }}
         >
-          {phaseName}
+          {PHASE_NAME_KEY[phaseName] ? t(PHASE_NAME_KEY[phaseName]) : phaseName.startsWith("arena.") ? t(phaseName) : phaseName}
         </div>
-        <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-violet-200/70 mt-0.5">Cartes débloquées</div>
+        <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-violet-200/70 mt-0.5">{t("arena.deckdrop.unlocked")}</div>
       </motion.div>
       {/* Les cartes TOMBENT du haut + se RETOURNENT (dos → face), décalées. */}
       <div className="relative flex items-end justify-center gap-2" style={{ perspective: 900 }}>
