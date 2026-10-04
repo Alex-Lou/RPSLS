@@ -58,6 +58,9 @@ async fn pipeline(Json(cmds): Json<Vec<Vec<String>>>) -> Result<Json<Value>, Sta
                     json!({ "result": "OK" })
                 }
             }
+            ["MGET", keys @ ..] => {
+                json!({ "result": keys.iter().map(|k| read(k)).collect::<Vec<_>>() })
+            }
             _ => return Err(StatusCode::BAD_REQUEST),
         };
         out.push(res);

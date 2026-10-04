@@ -1,15 +1,21 @@
 //! A connected client session — wraps the WebSocket send half and metadata.
 
 use std::net::IpAddr;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Mutex;
 
 use tokio::sync::mpsc;
 
 use crate::protocol::ServerMessage;
 
-/// Channel sender for messages to be forwarded to the WebSocket.
-pub type Tx = mpsc::UnboundedSender<ServerMessage>;
+/// Channel sender for messages to be forwarded to the WebSocket. BORNÉ : un
+/// client trop lent (ou qui ne lit plus) ne peut plus faire grossir la mémoire
+/// du serveur sans limite — au-delà, les messages sont abandonnés.
+pub type Tx = mpsc::Sender<ServerMessage>;
+
+/// Capacité de la file d'envoi par connexion (largement au-dessus d'une rafale
+/// légitime : état de match + chat + portefeuille).
+pub const OUTGOING_CAPACITY: usize = 256;
 
 #[derive(Debug)]
 pub struct Session {
@@ -27,7 +33,14 @@ pub struct Session {
     /// fresh session_id). Behind Render this is `security::client_ip`
     /// (CF-Connecting-IP), never the proxy's address.
     pub peer_ip: IpAddr,
+    /// Nombre de Hello reçus sur CETTE connexion. Chaque Hello coûte ~4
+    /// requêtes Upstash : on le plafonne (cf. MAX_HELLOS_PER_CONNECTION).
+    pub hellos: AtomicU32,
 }
+
+/// Un client légitime envoie 1 Hello par connexion (une reconnexion ouvre une
+/// nouvelle connexion). Marge pour un changement de pseudo en cours de route.
+pub const MAX_HELLOS_PER_CONNECTION: u32 = 5;
 
 impl Session {
     pub fn new(id: String, nickname: String, tx: Tx, peer_ip: IpAddr) -> Self {
@@ -38,11 +51,17 @@ impl Session {
             tx,
             in_match: AtomicBool::new(false),
             peer_ip,
+            hellos: AtomicU32::new(0),
         }
     }
 
     pub fn send(&self, msg: ServerMessage) {
-        let _ = self.tx.send(msg);
+        match self.tx.try_send(msg) {
+            Ok(()) | Err(mpsc::error::TrySendError::Closed(_)) => {}
+            Err(mpsc::error::TrySendError::Full(_)) => {
+                tracing::warn!(session_id = %self.id, "outgoing queue full — message dropped (client too slow)");
+            }
+        }
     }
 
     pub fn nickname(&self) -> String {

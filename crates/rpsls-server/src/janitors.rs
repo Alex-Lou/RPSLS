@@ -70,12 +70,20 @@ pub fn spawn_inactive_user_sweeper() {
                     break;
                 };
                 scanned += keys.len() as u32;
-                for key in &keys {
-                    let Some(pid) = player_state::player_id_from_key(key) else { continue };
-                    let (Ok(holder), Ok(wallet), Ok(seen)) = (
+                let pids: Vec<&str> = keys.iter().filter_map(|k| player_state::player_id_from_key(k)).collect();
+                // Activité de TOUTE la page en une commande. Un joueur actif
+                // (la grande majorité) est gardé sans aucune autre lecture ;
+                // les vérifs coûteuses (compte, portefeuille) ne visent que les
+                // candidats. Avant : ~4 commandes PAR joueur inscrit, chaque jour.
+                // Erreur backend → liste vide → page sautée, rien supprimé.
+                let seens = player_state::read_seen_many(&pids).await.unwrap_or_default();
+                for (pid, seen) in pids.iter().copied().zip(seens) {
+                    if matches!(seen, Some(ts) if ts >= cutoff_ms) {
+                        continue; // actif récemment → Keep (verdict identique)
+                    }
+                    let (Ok(holder), Ok(wallet)) = (
                         crate::account::is_account_holder(pid).await,
                         crate::wallet::store::get(pid).await,
-                        player_state::read_seen(pid).await,
                     ) else {
                         continue; // erreur backend → on ne touche à rien
                     };
@@ -157,12 +165,23 @@ pub fn spawn_dead_match_sweeper(state: Arc<AppState>) {
                 .filter(|e| e.value().0.is_closed())
                 .map(|e| e.key().clone())
                 .collect();
-            let total = dead_classic.len() + dead_lanes.len();
+            // CCG (Constellation Pro en ligne) : oublié jusqu'ici → une entrée
+            // morte comptait à vie dans le plafond de matchs simultanés.
+            let dead_ccg: Vec<String> = state
+                .in_ccg
+                .iter()
+                .filter(|e| e.value().0.is_closed())
+                .map(|e| e.key().clone())
+                .collect();
+            let total = dead_classic.len() + dead_lanes.len() + dead_ccg.len();
             for id in &dead_classic {
                 state.in_match.remove_if(id, |_, v| v.0.is_closed());
             }
             for id in &dead_lanes {
                 state.in_lanes.remove_if(id, |_, v| v.0.is_closed());
+            }
+            for id in &dead_ccg {
+                state.in_ccg.remove_if(id, |_, v| v.0.is_closed());
             }
             if total > 0 {
                 warn!(removed = total, "dead match channels swept (on_end skipped?)");

@@ -60,7 +60,15 @@ fn config() -> Option<&'static (String, String)> {
 
 fn http() -> &'static reqwest::Client {
     static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
-    CLIENT.get_or_init(reqwest::Client::new)
+    // Délais BORNÉS : sans eux, un Upstash lent gardait indéfiniment les tâches
+    // (et les verrous du portefeuille) → accumulation sous charge.
+    CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(3))
+            .timeout(std::time::Duration::from_secs(8))
+            .build()
+            .unwrap_or_default()
+    })
 }
 
 /// True when the leaderboard is configured (used for a startup log line).

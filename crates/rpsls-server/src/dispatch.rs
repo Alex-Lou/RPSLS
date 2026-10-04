@@ -23,6 +23,12 @@ pub(crate) async fn handle_client_message(
 ) {
     match msg {
         ClientMessage::Hello { nickname, player_id, claim_token, auth_token } => {
+            // Rafale de Hello sur une même connexion = amplification Upstash
+            // (~4 requêtes chacun) : refusée au-delà du plafond.
+            let n = session.hellos.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            if n >= crate::session::MAX_HELLOS_PER_CONNECTION {
+                return reply_error(session, "hello_limited", "too many hello on this connection");
+            }
             hello::handle_hello(session, nickname, player_id, claim_token, auth_token);
         }
 
@@ -73,6 +79,11 @@ pub(crate) async fn handle_client_message(
                 state.lobby_attempts.record_failed(session.peer_ip);
                 return reply_error(session, "bad_code", "lobby codes are 6 chars A-Z 2-9");
             }
+            // Capacité vérifiée AVANT d'apparier : sinon l'adversaire (déjà
+            // retiré de la file / salon consommé) restait bloqué, sans match.
+            if matches_full(state) {
+                return reply_error(session, "server_full", "too many active matches right now — try again in a moment");
+            }
             let Some(lobby) = state.lobbies.join_lobby(&normalized) else {
                 state.lobby_attempts.record_failed(session.peer_ip);
                 return reply_error(session, "lobby_not_found", "no lobby with that code");
@@ -80,9 +91,6 @@ pub(crate) async fn handle_client_message(
             // Don't let yourself join your own lobby.
             if lobby.host.id == session.id {
                 return reply_error(session, "self_lobby", "cannot join your own lobby");
-            }
-            if state.in_match.len() + state.in_lanes.len() + state.in_ccg.len() >= state.max_matches {
-                return reply_error(session, "server_full", "too many active matches right now — try again in a moment");
             }
             // Legit join — clear any pent-up counter for this IP.
             state.lobby_attempts.record_success(session.peer_ip);
@@ -105,10 +113,12 @@ pub(crate) async fn handle_client_message(
             if !validate_best_of(best_of) {
                 return reply_error(session, "bad_best_of", "best_of must be odd 1..=9");
             }
+            // Capacité vérifiée AVANT d'apparier : sinon l'adversaire (déjà
+            // retiré de la file / salon consommé) restait bloqué, sans match.
+            if matches_full(state) {
+                return reply_error(session, "server_full", "too many active matches right now — try again in a moment");
+            }
             if let Some(opp) = state.lobbies.join_or_match(session.clone(), best_of).await {
-                if state.in_match.len() + state.in_lanes.len() + state.in_ccg.len() >= state.max_matches {
-                    return reply_error(session, "server_full", "too many active matches right now — try again in a moment");
-                }
                 let a_id = opp.id.clone();
                 let b_id = session.id.clone();
                 let st = state.clone();
@@ -132,14 +142,16 @@ pub(crate) async fn handle_client_message(
             if !validate_win_to(win_to) {
                 return reply_error(session, "bad_win_to", "win_to must be in 1..=5");
             }
+            // Capacité vérifiée AVANT d'apparier : sinon l'adversaire (déjà
+            // retiré de la file / salon consommé) restait bloqué, sans match.
+            if matches_full(state) {
+                return reply_error(session, "server_full", "too many active matches right now — try again in a moment");
+            }
             if let Some(opp) = state
                 .lobbies
                 .join_or_match_lanes(session.clone(), win_to)
                 .await
             {
-                if state.in_match.len() + state.in_lanes.len() + state.in_ccg.len() >= state.max_matches {
-                    return reply_error(session, "server_full", "too many active matches right now — try again in a moment");
-                }
                 let a_id = opp.id.clone();
                 let b_id = session.id.clone();
                 let st = state.clone();
@@ -168,10 +180,12 @@ pub(crate) async fn handle_client_message(
             if variant.len() > 32 || ruleset_hash.len() > 64 {
                 return reply_error(session, "bad_ccg_join", "variant/ruleset_hash too long");
             }
+            // Capacité vérifiée AVANT d'apparier : sinon l'adversaire (déjà
+            // retiré de la file / salon consommé) restait bloqué, sans match.
+            if matches_full(state) {
+                return reply_error(session, "server_full", "too many active matches right now — try again in a moment");
+            }
             if let Some(opp) = state.lobbies.join_or_match_ccg(session.clone(), win_to, variant, ruleset_hash).await {
-                if state.in_match.len() + state.in_lanes.len() + state.in_ccg.len() >= state.max_matches {
-                    return reply_error(session, "server_full", "too many active matches right now — try again in a moment");
-                }
                 let a_id = opp.id.clone();
                 let b_id = session.id.clone();
                 let st = state.clone();
@@ -339,4 +353,9 @@ fn validate_best_of(n: u8) -> bool {
 /// Number of round-wins to take a Lanes match (3 → bo5, 5 → bo9, etc.).
 fn validate_win_to(n: u8) -> bool {
     (1..=5).contains(&n)
+}
+
+/// Plafond de matchs simultanés atteint (tous modes confondus).
+fn matches_full(state: &AppState) -> bool {
+    state.in_match.len() + state.in_lanes.len() + state.in_ccg.len() >= state.max_matches
 }
