@@ -5,8 +5,8 @@
   "eclatsPerWin": {
     "casual": 5,
     "ranked": 15,
-    "hotseat": 5,
-    "training": 5,
+    "hotseat": 0,
+    "training": 0,
     "online": 15,
     "constellation": 12
   },
@@ -50,43 +50,43 @@
   ],
   "codexTiers": [
     {
-      "threshold": 5,
+      "threshold": 20,
       "eclats": 50,
       "dust": 0
     },
     {
-      "threshold": 10,
-      "eclats": 120,
-      "dust": 30
-    },
-    {
-      "threshold": 15,
-      "eclats": 300,
-      "dust": 80
-    },
-    {
-      "threshold": 20,
-      "eclats": 450,
-      "dust": 120
-    },
-    {
-      "threshold": 26,
-      "eclats": 700,
-      "dust": 200
-    },
-    {
-      "threshold": 32,
-      "eclats": 850,
-      "dust": 250
+      "threshold": 30,
+      "eclats": 100,
+      "dust": 25
     },
     {
       "threshold": 40,
-      "eclats": 1100,
-      "dust": 350
+      "eclats": 150,
+      "dust": 50
     },
     {
-      "threshold": 46,
-      "eclats": 1500,
+      "threshold": 55,
+      "eclats": 250,
+      "dust": 100
+    },
+    {
+      "threshold": 70,
+      "eclats": 350,
+      "dust": 150
+    },
+    {
+      "threshold": 85,
+      "eclats": 450,
+      "dust": 200
+    },
+    {
+      "threshold": 100,
+      "eclats": 600,
+      "dust": 300
+    },
+    {
+      "threshold": 110,
+      "eclats": 1000,
       "dust": 500
     }
   ],
@@ -94,49 +94,54 @@
     {
       "minLp": 0,
       "eclats": 50,
-      "dust": 0
+      "dust": 0,
+      "stars": 10
     },
     {
       "minLp": 1100,
       "eclats": 150,
-      "dust": 20
+      "dust": 20,
+      "stars": 20
     },
     {
       "minLp": 1300,
       "eclats": 300,
-      "dust": 50
+      "dust": 50,
+      "stars": 40
     },
     {
       "minLp": 1500,
       "eclats": 500,
-      "dust": 100
+      "dust": 100,
+      "stars": 60
     },
     {
       "minLp": 1750,
       "eclats": 700,
-      "dust": 200
+      "dust": 200,
+      "stars": 100
     }
   ],
   "premiumSetCosts": {
-    "quartz": 800,
-    "eclipse": 800,
-    "phantom": 800,
-    "emberforge": 800,
-    "tempus": 800,
-    "storm": 800,
-    "coral": 800,
-    "rust": 800,
-    "void": 900,
-    "prism": 800,
-    "ink": 900,
-    "bloom": 800
+    "quartz": 300,
+    "eclipse": 300,
+    "phantom": 300,
+    "emberforge": 300,
+    "tempus": 300,
+    "storm": 300,
+    "coral": 300,
+    "rust": 300,
+    "void": 300,
+    "prism": 300,
+    "ink": 300,
+    "bloom": 300
   },
   "arenaEclats": {
-    "win": 20,
-    "draw": 10,
-    "loss": 5
+    "win": 40,
+    "draw": 20,
+    "loss": 10
   },
-  "cpuEclatsDailyCap": 300,
+  "cpuEclatsDailyCap": 375,
   "unlockCards": [
     "bouffee-air",
     "cafeine",
@@ -163,5 +168,152 @@
     "tuile",
     "vortex"
   ],
-  "seasonDurationMs": 2592000000
+  "unlockRules": [
+    {
+      "card": "bouffee-air",
+      "kind": "constellWins",
+      "min": 1
+    },
+    {
+      "card": "cafeine",
+      "kind": "constellWins",
+      "min": 1
+    },
+    {
+      "card": "chronomancien",
+      "kind": "constellWins",
+      "min": 1
+    },
+    {
+      "card": "coup-de-bol",
+      "kind": "constellWins",
+      "min": 1
+    },
+    {
+      "card": "curse",
+      "kind": "constellWins",
+      "min": 10
+    },
+    {
+      "card": "double-mot",
+      "kind": "constellWins",
+      "min": 1
+    },
+    {
+      "card": "echo",
+      "kind": "constellWins",
+      "min": 1
+    },
+    {
+      "card": "eclair-genie",
+      "kind": "constellWins",
+      "min": 2
+    },
+    {
+      "card": "gambit",
+      "kind": "rankLp",
+      "min": 1200
+    },
+    {
+      "card": "heist",
+      "kind": "rankLp",
+      "min": 1100
+    },
+    {
+      "card": "mirror",
+      "kind": "constellWins",
+      "min": 3
+    },
+    {
+      "card": "oracle",
+      "kind": "rankLp",
+      "min": 1300
+    },
+    {
+      "card": "patate-chaude",
+      "kind": "constellWins",
+      "min": 2
+    },
+    {
+      "card": "pile-ou-face",
+      "kind": "constellWins",
+      "min": 2
+    },
+    {
+      "card": "rappel",
+      "kind": "constellWins",
+      "min": 1
+    },
+    {
+      "card": "razzia",
+      "kind": "constellWins",
+      "min": 1
+    },
+    {
+      "card": "riposte",
+      "kind": "constellWins",
+      "min": 5
+    },
+    {
+      "card": "supernova",
+      "kind": "rankLp",
+      "min": 1500
+    },
+    {
+      "card": "surcharge",
+      "kind": "constellWins",
+      "min": 1
+    },
+    {
+      "card": "sursaut",
+      "kind": "constellWins",
+      "min": 4
+    },
+    {
+      "card": "toxine",
+      "kind": "constellWins",
+      "min": 1
+    },
+    {
+      "card": "trefle-chance",
+      "kind": "constellWins",
+      "min": 4
+    },
+    {
+      "card": "tuile",
+      "kind": "constellWins",
+      "min": 1
+    },
+    {
+      "card": "vortex",
+      "kind": "constellSweeps",
+      "min": 3
+    }
+  ],
+  "starterCards": [
+    "aegis",
+    "precision",
+    "anchor",
+    "second-wind",
+    "surge",
+    "augur"
+  ],
+  "seasonDurationMs": 2592000000,
+  "lengthMultBestOf": {
+    "1": 40,
+    "3": 100,
+    "5": 140,
+    "7": 180
+  },
+  "lengthMultWinTo": {
+    "1": 50,
+    "2": 100,
+    "3": 140
+  },
+  "levelUpEclatsBase": 25,
+  "levelUpEclatsPerLevel": 5,
+  "levelUpStars": 10,
+  "levelUpDailyMax": 5,
+  "dailyChallengeEclats": 25,
+  "dailyChallengesPerDay": 3
 }

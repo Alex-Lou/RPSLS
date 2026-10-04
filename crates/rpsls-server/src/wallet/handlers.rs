@@ -9,8 +9,8 @@ use tracing::warn;
 
 use super::store::{self, now_ms, StoreError};
 use super::{PackResult, Wallet, WalletError};
-use crate::player_state::{self, PlayerProgress};
-use crate::protocol::{CpuReward, PlayerSlot, ServerMessage};
+use crate::player_state::PlayerProgress;
+use crate::protocol::{CpuReward, DailyClaim, PlayerSlot, ServerMessage};
 use crate::session::Session;
 
 /// Opération demandée par le client.
@@ -23,6 +23,8 @@ pub enum WalletOp {
     ClaimCpuRewards(Vec<CpuReward>),
     ClaimUnlocks(Vec<String>),
     ClaimSeason,
+    ClaimLevel(u32),
+    ClaimDailies(Vec<DailyClaim>),
 }
 
 impl WalletOp {
@@ -36,6 +38,8 @@ impl WalletOp {
             Self::ClaimCpuRewards(_) => "claim_cpu_rewards",
             Self::ClaimUnlocks(_) => "claim_unlocks",
             Self::ClaimSeason => "claim_season",
+            Self::ClaimLevel(_) => "claim_level",
+            Self::ClaimDailies(_) => "claim_dailies",
         }
     }
 }
@@ -46,6 +50,7 @@ struct Outcome {
     pack: Option<PackResult>,
     eclats: Option<u64>,
     dust: Option<u64>,
+    stars: Option<u64>,
     cards: Vec<String>,
 }
 
@@ -56,6 +61,7 @@ fn reply(session: &Session, op: &str, wallet: Wallet, o: Outcome) {
         pack: o.pack,
         eclats: o.eclats,
         dust: o.dust,
+        stars: o.stars,
         cards: o.cards,
     });
 }
@@ -101,36 +107,50 @@ async fn run(pid: &str, op: WalletOp) -> Result<(Outcome, Wallet), StoreError> {
             .await
             .map(|((), w)| (Outcome::default(), w)),
         WalletOp::ClaimCpuRewards(rewards) => {
-            // Une entrée invalide est ignorée (pas de refus du lot entier : le
-            // client la retire de sa file comme les autres).
+            // Entrées invalides / rejouées ignorées (pas de refus du lot entier :
+            // le client la retire de sa file comme les autres).
             let rewards: Vec<CpuReward> = rewards.into_iter().take(50).collect();
+            store::update(pid, |w| Ok::<_, WalletError>(w.claim_cpu_batch(&rewards, now)))
+                .await
+                .map(|(granted, w)| (Outcome { eclats: Some(granted), ..Default::default() }, w))
+        }
+        WalletOp::ClaimUnlocks(ids) => {
+            let ids: Vec<String> = ids.into_iter().take(64).collect();
+            // Score SERVEUR (leaderboard) seulement si une carte demandée a une
+            // règle de LP (évite une lecture Redis à chaque déblocage CPU).
+            let needs_lp = ids
+                .iter()
+                .any(|id| crate::economy::unlock_rule(id).is_some_and(|r| r.kind == "rankLp"));
+            let lp = if needs_lp {
+                crate::leaderboard::score_of(pid).await.map_err(|_| StoreError::Backend)?
+            } else {
+                0
+            };
+            store::update(pid, |w| Ok::<_, WalletError>(w.claim_unlocks(&ids, lp)))
+                .await
+                .map(|(cards, w)| (Outcome { cards, ..Default::default() }, w))
+        }
+        WalletOp::ClaimSeason => {
+            // LP = score du leaderboard SERVEUR (plus le rank_lp écrit par le client).
+            let lp = crate::leaderboard::score_of(pid).await.map_err(|_| StoreError::Backend)?;
+            store::update(pid, |w| w.claim_season(lp, now)).await.map(|((e, d, st), w)| {
+                (Outcome { eclats: Some(e), dust: Some(d), stars: Some(st), ..Default::default() }, w)
+            })
+        }
+        WalletOp::ClaimLevel(level) => store::update(pid, |w| Ok::<_, WalletError>(w.claim_level(level, now)))
+            .await
+            .map(|((e, st), w)| (Outcome { eclats: Some(e), stars: Some(st), ..Default::default() }, w)),
+        WalletOp::ClaimDailies(claims) => {
+            let claims: Vec<DailyClaim> = claims.into_iter().take(10).collect();
             store::update(pid, |w| {
-                let granted = rewards
+                let granted = claims
                     .iter()
-                    .filter_map(|r| w.claim_cpu_reward(&r.mode, &r.outcome, now).ok())
+                    .filter_map(|c| w.claim_daily(&c.date, &c.id, now).ok())
                     .sum::<u64>();
                 Ok::<_, WalletError>(granted)
             })
             .await
             .map(|(granted, w)| (Outcome { eclats: Some(granted), ..Default::default() }, w))
-        }
-        WalletOp::ClaimUnlocks(ids) => {
-            let ids: Vec<String> = ids.into_iter().take(64).collect();
-            store::update(pid, |w| Ok::<_, WalletError>(w.claim_unlocks(&ids)))
-                .await
-                .map(|(cards, w)| (Outcome { cards, ..Default::default() }, w))
-        }
-        WalletOp::ClaimSeason => {
-            // LP de la ligne player (client, borné à 5000 par sanitize) : au
-            // pire un tricheur touche le palier diamant, une fois par saison.
-            let lp = player_state::load(pid)
-                .await
-                .map_err(|_| StoreError::Backend)?
-                .map(|p| p.rank_lp)
-                .unwrap_or(0);
-            store::update(pid, |w| w.claim_season(lp, now))
-                .await
-                .map(|((e, d), w)| (Outcome { eclats: Some(e), dust: Some(d), ..Default::default() }, w))
         }
     }
 }
@@ -147,13 +167,12 @@ pub async fn overlay_best_effort(pid: &str, p: &mut PlayerProgress) {
 }
 
 /// ACTIVATION FORCÉE (éco lot 3), appelée au `Hello` : tout joueur qui a déjà
-/// une ligne `player:{pid}` reçoit son portefeuille (même migration plafonnée que
-/// `WalletInit`), même si son app ne l'a jamais demandé (anciennes versions).
-/// Dès lors le serveur fait foi sur l'éco, quelle que soit la version de l'app.
+/// une ligne `player:{pid}` reçoit son portefeuille (même règle que
+/// `WalletInit` : migration bornée si l'identité précède `WALLET_LAUNCH_MS`,
+/// sinon portefeuille neuf), même si son app ne l'a jamais demandé.
 ///
-/// `row_exists = false` (joueur tout neuf) : on NE crée PAS ici — l'app à jour
-/// pousse d'abord son état local (`SyncState`) puis envoie `WalletInit`, qui
-/// migre cet état ; créer maintenant figerait un portefeuille vide.
+/// `row_exists = false` (joueur tout neuf) : on ne crée pas ici, `WalletInit`
+/// s'en charge (portefeuille neuf : la ligne poussée par l'app n'est jamais lue).
 /// Au mieux : en cas d'erreur, la progression part telle quelle.
 pub async fn ensure_and_overlay(pid: &str, p: &mut PlayerProgress, row_exists: bool) {
     match store::get(pid).await {
@@ -186,7 +205,20 @@ pub async fn grant_welcome(pid: &str) {
 /// (classique), "constellation" (lanes) ou "arena" (Constellation Pro). Même
 /// barème que l'app : le perdant par forfait ne touche rien (Arena compris :
 /// la défaite « normale » y paie comme `recordArenaMatch`, pas l'abandon).
-pub fn credit_match_end(a: &Arc<Session>, b: &Arc<Session>, winner: Option<PlayerSlot>, forfeit: bool, mode: &'static str) {
+///
+/// `sweep` : le vainqueur n'a concédé aucune manche. Une victoire en
+/// Constellation / Arena compte aussi pour les déblocages (`count_constell_win`,
+/// même borne quotidienne que le CPU) — miroir de rankedUnlocks.ts, qui compte
+/// toute entrée d'historique « constellation » gagnée (Arena comprise, toujours
+/// journalisée en 1-0 → blanchissage).
+pub fn credit_match_end(
+    a: &Arc<Session>,
+    b: &Arc<Session>,
+    winner: Option<PlayerSlot>,
+    forfeit: bool,
+    mode: &'static str,
+    sweep: bool,
+) {
     for (slot, s) in [(PlayerSlot::A, a), (PlayerSlot::B, b)] {
         let outcome = match winner {
             None => "draw",
@@ -194,14 +226,20 @@ pub fn credit_match_end(a: &Arc<Session>, b: &Arc<Session>, winner: Option<Playe
             Some(_) => "loss",
         };
         let amount = match_reward(mode, outcome, forfeit);
+        let counts_win = outcome == "win" && matches!(mode, "constellation" | "arena");
         let pid = s.player_id();
-        if amount == 0 || pid.is_empty() {
+        if (amount == 0 && !counts_win) || pid.is_empty() {
             continue;
         }
+        let swept = sweep || mode == "arena";
         let session = s.clone();
         tokio::spawn(async move {
+            let now = now_ms();
             match store::update(&pid, |w| {
                 w.credit_eclats(amount);
+                if counts_win {
+                    w.count_constell_win(swept, now);
+                }
                 Ok::<_, WalletError>(())
             })
             .await {

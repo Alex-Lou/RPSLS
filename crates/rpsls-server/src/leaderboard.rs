@@ -162,6 +162,23 @@ async fn read_cmd(args: Vec<String>) -> Result<serde_json::Value, StatusCode> {
     Ok(body["result"].take())
 }
 
+/// Score (LP) SERVEUR d'un joueur, lu dans le ZSET `leaderboard` : sert aux
+/// récompenses de saison et aux déblocages par LP (le `rank_lp` de la ligne
+/// player est écrit par le client). Absent du classement → `START_LP` (1000).
+/// Leaderboard non configuré → `START_LP` aussi. Err = panne de lecture.
+pub async fn score_of(player_id: &str) -> Result<u64, ()> {
+    if config().is_none() {
+        return Ok(START_LP as u64);
+    }
+    let v = read_cmd(vec!["ZSCORE".into(), KEY.into(), player_id.to_string()]).await.map_err(|_| ())?;
+    Ok(lp_or_default(&v))
+}
+
+/// Score lu → LP (jamais négatif) ; null / illisible → `START_LP`.
+fn lp_or_default(v: &serde_json::Value) -> u64 {
+    as_lp(v).map(|lp| lp.max(0) as u64).unwrap_or(START_LP as u64)
+}
+
 /// Upstash returns scores as strings ("1020") — accept numbers too.
 fn as_lp(v: &serde_json::Value) -> Option<i64> {
     match v {
@@ -294,6 +311,13 @@ mod tests {
         );
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].nickname, "Anonyme");
+    }
+
+    #[test]
+    fn server_score_defaults_to_start_lp() {
+        assert_eq!(lp_or_default(&serde_json::Value::Null), 1000);
+        assert_eq!(lp_or_default(&serde_json::json!("1320")), 1320);
+        assert_eq!(lp_or_default(&serde_json::json!(-5)), 0);
     }
 
     #[test]

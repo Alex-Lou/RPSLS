@@ -22,6 +22,7 @@ const THEMES = readFileSync(join(ROOT, "app", "src", "theme", "themes.ts"), "utf
 const TYPES = readFileSync(join(ROOT, "app", "src", "types.ts"), "utf8");
 const CATALOG = readFileSync(join(ROOT, "app", "src", "pages", "ProfilePage", "premiumCatalog.tsx"), "utf8");
 const UNLOCKS = readFileSync(join(ROOT, "app", "src", "store", "rankedUnlocks.ts"), "utf8");
+const CARDS_SRC = readFileSync(join(ROOT, "app", "src", "ranked", "cards.ts"), "utf8");
 const OUT = join(ROOT, "crates", "rpsls-server", "economy_meta.json");
 
 const fail = (msg) => { throw new Error(`gen-economy-meta: ${msg}`); };
@@ -84,8 +85,8 @@ if (!codexTiers.length) fail("CODEX_TIERS vide");
 // SEASON_REWARDS = RANK_TIERS.map(floor) + SEASON_REWARD_AMOUNTS[id] (cf. economy.ts).
 const seasonAmounts = {};
 for (const m of objectBody(ECO, "SEASON_REWARD_AMOUNTS").matchAll(
-  /(\w+):\s*\{\s*eclats:\s*(\d+),\s*dust:\s*(\d+)\s*\}/g)) {
-  seasonAmounts[m[1]] = { eclats: Number(m[2]), dust: Number(m[3]) };
+  /(\w+):\s*\{\s*eclats:\s*(\d+),\s*dust:\s*(\d+),\s*stars:\s*(\d+)\s*\}/g)) {
+  seasonAmounts[m[1]] = { eclats: Number(m[2]), dust: Number(m[3]), stars: Number(m[4]) };
 }
 const rankTiers = [];
 for (const m of arrayBody(RANK, "RANK_TIERS").matchAll(/id:\s*"(\w+)"[\s\S]*?floor:\s*(\d+)/g)) {
@@ -95,7 +96,7 @@ if (!rankTiers.length) fail("RANK_TIERS vide");
 const seasonRewards = rankTiers.map((t) => {
   const a = seasonAmounts[t.id];
   if (!a) fail(`SEASON_REWARD_AMOUNTS manque le tier "${t.id}"`);
-  return { minLp: t.floor, eclats: a.eclats, dust: a.dust };
+  return { minLp: t.floor, eclats: a.eclats, dust: a.dust, stars: a.stars };
 });
 
 // Prix des sets premium (✦) — PREMIUM_SETS de premiumCatalog.tsx. Chaque set
@@ -108,14 +109,36 @@ for (const id of premiumSetIds) {
   if (!(id in premiumSetCosts)) fail(`set premium "${id}" sans prix dans premiumCatalog.tsx`);
 }
 
-// Cartes de déblocage (rankedUnlocks.ts) : le serveur ne peut pas vérifier la
-// condition (victoires vs CPU), mais il borne la réclamation à CETTE liste.
-const unlockCards = [...new Set([
+// Règles de déblocage (rankedUnlocks.ts) : { card, kind, min } avec kind ∈
+// constellWins | constellSweeps | rankLp. Le serveur les vérifie contre SES
+// compteurs (victoires Constellation/Arena comptées par lui) et le score du
+// leaderboard. Formes reconnues :
+//   if (KIND >= N) set.add("x");
+//   if (KIND >= N) { for (const c of ["x", "y"]) set.add(c); }
+const unlockRules = [];
+for (const m of UNLOCKS.matchAll(
+  /if \((constellWins|constellSweeps|rankLp) >= (\d+)\)\s*(?:set\.add\("([a-z0-9-]+)"\)|\{\s*for \(const c of \[([^\]]*)\]\) set\.add\(c\);\s*\})/g)) {
+  const cards = m[3] ? [m[3]] : [...m[4].matchAll(/"([a-z0-9-]+)"/g)].map((x) => x[1]);
+  for (const card of cards) unlockRules.push({ card, kind: m[1], min: Number(m[2]) });
+}
+// Garde-fou : toute carte ajoutée par rankedUnlocks.ts doit avoir sa règle
+// (sinon une nouvelle forme de condition passerait inaperçue → refus serveur).
+const allAdded = new Set([
   ...[...UNLOCKS.matchAll(/set\.add\("([a-z0-9-]+)"\)/g)].map((m) => m[1]),
   ...[...UNLOCKS.matchAll(/for \(const c of \[([^\]]*)\]\)/g)]
     .flatMap((m) => [...m[1].matchAll(/"([a-z0-9-]+)"/g)].map((x) => x[1])),
-])].sort();
+]);
+for (const c of allAdded) {
+  if (!unlockRules.some((r) => r.card === c)) fail(`carte de déblocage "${c}" sans règle reconnue dans rankedUnlocks.ts`);
+}
+unlockRules.sort((a, b) => a.card.localeCompare(b.card));
+const unlockCards = [...new Set(unlockRules.map((r) => r.card))].sort();
 if (!unlockCards.length) fail("aucune carte de déblocage trouvée dans rankedUnlocks.ts");
+
+// Collection de départ (STARTER_COLLECTION, cards.ts) : base de la migration
+// bornée et du portefeuille neuf côté serveur.
+const starterCards = [...arrayBody(CARDS_SRC, "STARTER_COLLECTION").matchAll(/"([a-z0-9-]+)"/g)].map((m) => m[1]);
+if (!starterCards.length) fail("STARTER_COLLECTION vide");
 
 // SEASON_DURATION_MS = produit d'entiers (ex. 30 * 24 * 3600 * 1000).
 const seasonExpr = ECO.match(/export const SEASON_DURATION_MS\s*=\s*([\d\s*]+);/);
@@ -138,7 +161,17 @@ const meta = {
   arenaEclats: numMap(objectBody(ECO, "ARENA_ECLATS")),
   cpuEclatsDailyCap: scalar("CPU_ECLATS_DAILY_CAP"),
   unlockCards,
+  unlockRules,
+  starterCards,
   seasonDurationMs,
+  lengthMultBestOf: numMap(objectBody(ECO, "LENGTH_MULT_BEST_OF")),
+  lengthMultWinTo: numMap(objectBody(ECO, "LENGTH_MULT_WIN_TO")),
+  levelUpEclatsBase: scalar("LEVEL_UP_ECLATS_BASE"),
+  levelUpEclatsPerLevel: scalar("LEVEL_UP_ECLATS_PER_LEVEL"),
+  levelUpStars: scalar("LEVEL_UP_STARS"),
+  levelUpDailyMax: scalar("LEVEL_UP_DAILY_MAX"),
+  dailyChallengeEclats: scalar("DAILY_CHALLENGE_ECLATS"),
+  dailyChallengesPerDay: scalar("DAILY_CHALLENGES_PER_DAY"),
 };
 writeFileSync(OUT, JSON.stringify(meta, null, 2) + "\n");
 console.log(`gen-economy-meta : ${codexTiers.length} paliers codex, ${seasonRewards.length} paliers saison → ${OUT}`);

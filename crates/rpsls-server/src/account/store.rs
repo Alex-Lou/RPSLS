@@ -48,6 +48,12 @@ pub async fn try_mark_welcomed(player_id: &str) -> Result<bool, ()> {
     player_state::set_nx(&key, "1").await
 }
 
+/// True si ce player_id a déjà reçu le bonus de bienvenue (`welcomed:{id}`) —
+/// lu à la création d'un portefeuille NEUF. Err = panne backend.
+pub async fn is_welcomed(player_id: &str) -> Result<bool, ()> {
+    Ok(player_state::get_opt(&format!("{WELCOMED_PREFIX}{player_id}")).await?.is_some())
+}
+
 /// Marque ATOMIQUEMENT une BOÎTE e-mail (forme canonique) comme « bonus reçu »
 /// (`SET welcomed_email:{canonical} NX`). Ok(true) = première fois pour cette
 /// boîte (don autorisé), Ok(false) = déjà reçu (refuser), Err = panne (défaut

@@ -2,7 +2,7 @@ import { motion } from "motion/react";
 import { useT } from "../../i18n";
 import { ALL_CARD_IDS, CARDS, RARITY_COLOR } from "../../ranked/cards";
 import { CardImage } from "../../ranked/CardImage";
-import { CODEX_TIERS, MASTERY_MAX_LEVEL, masteryLevel } from "../../engine/economy";
+import { CODEX_TIERS, MASTERY_MAX_LEVEL, PACKABLE_IDS, masteryLevel } from "../../engine/economy";
 
 /* ─────────── Codex view (B3) ─────────── */
 
@@ -16,8 +16,9 @@ export function CodexView({
 }) {
   const t = useT();
   const ownedSet = new Set(collection);
-  const ownedCount = ownedSet.size;
-  const total = ALL_CARD_IDS.length;
+  // Seules les cartes OBTENABLES comptent (miroir serveur de claim_codex).
+  const ownedCount = PACKABLE_IDS.filter((id) => ownedSet.has(id)).length;
+  const total = PACKABLE_IDS.length;
   const progress = total > 0 ? ownedCount / total : 0;
   const masteredCount = ALL_CARD_IDS.filter(
     (id) => ownedSet.has(id) && masteryLevel(cardMastery[id] ?? 0) === MASTERY_MAX_LEVEL,

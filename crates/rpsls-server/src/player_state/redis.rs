@@ -22,11 +22,14 @@ fn http() -> &'static reqwest::Client {
     // Délais BORNÉS : sans eux, un Upstash lent gardait indéfiniment les tâches
     // (et les verrous du portefeuille) → accumulation sous charge.
     CLIENT.get_or_init(|| {
-        reqwest::Client::builder()
+        let b = reqwest::Client::builder()
             .connect_timeout(std::time::Duration::from_secs(3))
-            .timeout(std::time::Duration::from_secs(8))
-            .build()
-            .unwrap_or_default()
+            .timeout(std::time::Duration::from_secs(8));
+        // Tests : chaque #[tokio::test] a son runtime ; une connexion gardée en
+        // pool par un runtime terminé faisait échouer (au hasard) le test suivant.
+        #[cfg(test)]
+        let b = b.pool_max_idle_per_host(0);
+        b.build().unwrap_or_default()
     })
 }
 
@@ -161,7 +164,7 @@ pub async fn scan_player_keys(cursor: &str, count: u32) -> Option<(String, Vec<S
 /// stamp) in one round-trip. Used by the 6-month inactive-user janitor, which
 /// never calls it for an account-linked player.
 pub async fn delete_player(player_id: &str) -> bool {
-    let cmds: Vec<Vec<String>> = [KEY_PREFIX, CLAIM_PREFIX, "wallet:", SEEN_PREFIX]
+    let cmds: Vec<Vec<String>> = [KEY_PREFIX, CLAIM_PREFIX, "wallet:", SEEN_PREFIX, BORN_PREFIX]
         .iter()
         .map(|p| vec!["DEL".into(), format!("{p}{player_id}")])
         .collect();
@@ -172,6 +175,20 @@ pub async fn delete_player(player_id: &str) -> bool {
 /// l'ancien `updatedAt` de la ligne player, écrit par le client (un client
 /// pouvait y mettre n'importe quoi → compte supprimé par le janitor).
 const SEEN_PREFIX: &str = "seen:";
+
+/// Date de CRÉATION de l'identité (epoch ms), posée par le SERVEUR à la création
+/// du jeton TOFU (`try_create_claim_token`). Absente = identité antérieure à ce
+/// marquage → cf. `wallet::WALLET_LAUNCH_MS` (migration bornée vs portefeuille neuf).
+const BORN_PREFIX: &str = "born:";
+
+/// Date de création de l'identité : `Ok(None)` si jamais marquée (identité
+/// ancienne), `Err` sur erreur backend.
+pub async fn born_ms(player_id: &str) -> Result<Option<u64>, ()> {
+    match get_opt(&format!("{BORN_PREFIX}{player_id}")).await? {
+        None => Ok(None),
+        Some(s) => s.parse().map(Some).map_err(|_| ()),
+    }
+}
 
 fn now_ms() -> u64 {
     std::time::SystemTime::now()
@@ -360,6 +377,10 @@ pub async fn try_create_claim_token(player_id: &str) -> Result<Option<String>, (
     }
     let new_token = uuid::Uuid::new_v4().to_string();
     let key = format!("{CLAIM_PREFIX}{player_id}");
+    // Horodatage de naissance AVANT le jeton (SET NX : jamais réécrit). Échec →
+    // on refuse la création (transitoire) : sans `born:`, l'identité passerait
+    // pour antérieure au lancement du portefeuille.
+    set_nx(&format!("{BORN_PREFIX}{player_id}"), &now_ms().to_string()).await?;
     if set_nx(&key, &new_token).await? {
         Ok(Some(new_token))
     } else {

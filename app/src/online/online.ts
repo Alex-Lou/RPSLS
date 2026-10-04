@@ -166,9 +166,24 @@ export type WalletRequest =
   | { type: "craft_card"; card_id: string }
   | { type: "buy_premium_set"; set_id: string }
   | { type: "claim_codex"; threshold: number }
-  | { type: "claim_cpu_rewards"; rewards: { mode: string; outcome: string }[] }
+  | { type: "claim_cpu_rewards"; rewards: CpuRewardClaim[] }
   | { type: "claim_unlocks"; card_ids: string[] }
-  | { type: "claim_season" };
+  | { type: "claim_season" }
+  // Niveau ACTUEL (calculé depuis l'XP) : le serveur paie les niveaux pas
+  // encore payés, au plus 5 par jour UTC.
+  | { type: "claim_level"; level: number }
+  | { type: "claim_dailies"; claims: { date: string; id: string }[] };
+
+/** Gain d'un match vs CPU réclamé. `id` : anti-rejeu serveur ; `best_of` :
+ *  bestOf (classique) ou winTo (Constellation) → multiplicateur de longueur ;
+ *  `sweep` : victoire sans manche concédée (déblocage « vortex »). */
+export interface CpuRewardClaim {
+  mode: string;
+  outcome: string;
+  id?: string;
+  best_of?: number;
+  sweep?: boolean;
+}
 
 /** Portefeuille tel que renvoyé par le serveur (`wallet:{pid}`). */
 export interface Wallet {
@@ -182,6 +197,11 @@ export interface Wallet {
   cpuEclatsToday: number;
   seasonNumber: number;
   seasonStartedAt: number;
+  /** Dernier niveau payé (null = base posée à la prochaine réclamation). */
+  levelRewarded?: number | null;
+  /** Victoires Constellation/Arena comptées par le serveur (déblocages). */
+  constellWins?: number;
+  constellSweeps?: number;
 }
 
 /* Server → Client */
@@ -276,6 +296,7 @@ export type ServerMessage =
       pack?: { cards: string[]; isNew: boolean[]; dustGained: number };
       eclats?: number;
       dust?: number;
+      stars?: number;
       cards?: string[];
     }
   // Opération refusée, rien n'a changé (code stable, cf. protocol.rs).

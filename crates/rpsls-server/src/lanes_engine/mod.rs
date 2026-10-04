@@ -359,7 +359,14 @@ fn broadcast_lanes_end(
     };
     a.send(msg.clone());
     b.send(msg);
-    crate::wallet::handlers::credit_match_end(a, b, winner, forfeit, "constellation");
+    // Blanchissage (déblocage « vortex ») : le perdant n'a marqué aucune manche.
+    let sweep = !forfeit
+        && match winner {
+            Some(PlayerSlot::A) => round_wins_b == 0,
+            Some(PlayerSlot::B) => round_wins_a == 0,
+            None => false,
+        };
+    crate::wallet::handlers::credit_match_end(a, b, winner, forfeit, "constellation", sweep);
 
     // Record the decisive result on the global ladder (winner +LP, loser -LP).
     if let Some(slot) = winner {
