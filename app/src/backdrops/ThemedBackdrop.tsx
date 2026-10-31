@@ -293,7 +293,6 @@ export function ThemedBackdrop({ scene }: { scene: BackdropScene }) {
       glRef.current = null;
       uSceneRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Scene switch → just re-point the uniform on the live context. No teardown,

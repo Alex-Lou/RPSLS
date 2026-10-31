@@ -1,4 +1,5 @@
 import type { GameMode } from "../../../types";
+import { ARENA_PRO_ENABLED } from "../../../features";
 
 /* ─────────── Zone menu — coutures partagées ─────────── */
 
@@ -7,13 +8,21 @@ import type { GameMode } from "../../../types";
 // recorded matches.
 export type ModeCardId = GameMode | "online" | "constellation" | "ranked_constellation" | "arena_pro";
 
-// Ordre 3×2 (Alex 2026-06-12) — familles + complexité croissante :
+// Ordre 3×2 — familles + complexité croissante :
 //   Entraînement      | En ligne
 //   Classé            | Constellation Classique
-//   Constellation Cl. | Constellation Pro
-export const ALL_CARDS: ModeCardId[] = [
-  "training", "online", "ranked", "constellation", "ranked_constellation", "arena_pro",
-];
+//   Constellation Cl. | Constellation Pro (si activé)
+export function menuCards(arenaProEnabled: boolean): ModeCardId[] {
+  const cards: ModeCardId[] = ["training", "online", "ranked", "constellation", "ranked_constellation"];
+  return arenaProEnabled ? [...cards, "arena_pro"] : cards;
+}
+
+export const ALL_CARDS: ModeCardId[] = menuCards(ARENA_PRO_ENABLED);
+
+/** Une dernière tuile impaire s'étend sur les 2 colonnes (portrait) pour ne pas rester seule. */
+export function isWideTile(index: number, count: number): boolean {
+  return index === count - 1 && count % 2 === 1;
+}
 
 // Hand-drawn icons that replace the emoji on each mode tile. Lives in
 // public/MenuIcons (renamed to kebab-case to dodge URL-encoding traps).

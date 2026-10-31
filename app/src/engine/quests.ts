@@ -1,6 +1,7 @@
 import type { Move, AiMood } from "./game";
 import type { GameMode, MatchRecord, Player } from "../types";
 import { levelFromXp } from "./leveling";
+import { ARENA_PRO_ENABLED } from "../features";
 
 export interface QuestDef {
   id: string;
@@ -75,7 +76,7 @@ function matchesInMode(h: MatchRecord[], mode: GameMode): number {
   return h.filter((m) => m.mode === mode).length;
 }
 
-export const QUESTS: QuestDef[] = [
+const CORE_QUESTS: QuestDef[] = [
   {
     id: "first-win",
     emoji: "🎯",
@@ -184,7 +185,9 @@ export const QUESTS: QuestDef[] = [
     xpReward: 100,
     progress: (_p, h) => (hasUsedAll5InAnyMatch(h) ? 1 : 0),
   },
-  // Constellation Pro (Arena) : le mode le plus profond n'avait AUCUNE quête.
+];
+
+const ARENA_QUESTS: QuestDef[] = [
   {
     id: "arena-initiate",
     emoji: "⚔️",
@@ -204,6 +207,13 @@ export const QUESTS: QuestDef[] = [
     progress: (p) => Math.min(p.arenaStats?.wins ?? 0, 10),
   },
 ];
+
+/** Les quêtes Constellation Pro ne sont proposées que si le mode est actif. */
+export function questsFor(arenaProEnabled: boolean): QuestDef[] {
+  return arenaProEnabled ? [...CORE_QUESTS, ...ARENA_QUESTS] : CORE_QUESTS;
+}
+
+export const QUESTS: QuestDef[] = questsFor(ARENA_PRO_ENABLED);
 
 export interface QuestState {
   value: number;

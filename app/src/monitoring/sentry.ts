@@ -22,7 +22,7 @@ let _initialized = false;
 
 /** Read the DSN injected at build time. Empty string → Sentry disabled. */
 function getDsn(): string {
-  return (import.meta.env.VITE_SENTRY_DSN as string | undefined) ?? "";
+  return import.meta.env.VITE_SENTRY_DSN ?? "";
 }
 
 /** Initialise Sentry once. No-op when the DSN is missing or `enabled` is
@@ -40,7 +40,7 @@ export function initSentry(enabled: boolean): void {
     replaysSessionSampleRate: 0,
     // Tag every event so we know which build it came from. The version
     // string is wired in by Vite from package.json.
-    release: (import.meta.env.VITE_APP_VERSION as string | undefined) ?? "dev",
+    release: import.meta.env.VITE_APP_VERSION ?? "dev",
     environment: import.meta.env.MODE,
   });
   _initialized = true;

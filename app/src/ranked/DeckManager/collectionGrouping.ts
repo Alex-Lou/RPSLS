@@ -1,22 +1,31 @@
 import type { Move } from "../../engine/game";
 import { isDeckable } from "../../arena/arenaDecks";
 import { ALL_CARD_IDS, CARDS, isPassiveCard, RARITY_ORDER } from "../cards";
+import { isRankedDeckable } from "../rankedPool";
 import type { CardId, CardRarity } from "../rankedTypes";
 import type { VoieFilter } from "./deckManagerConstants";
 
-/** Fonctions PURES de la collection du DeckManager (extraites VERBATIM des
- *  useMemo du composant — mêmes dépendances côté appelant). */
+/** Fonctions PURES de la collection du DeckManager (mêmes dépendances côté appelant). */
+
+export type DeckMode = "ranked" | "arena";
+
+/** Cartes que le deck builder propose : seulement celles qui ont un effet dans
+ *  le mode. Arène : isDeckable (source unique, cf. arenaDecks) écarte aussi les
+ *  Finishers, injectés à jauge pleine. Classé : isRankedDeckable. */
+export function deckPool(mode: DeckMode): CardId[] {
+  return ALL_CARD_IDS.filter((id) => (mode === "arena" ? isDeckable(id) : isRankedDeckable(id)));
+}
 
 /** Count owned cards per rarity — shown in the rarity tab pills so the
  *  player knows at a glance "how much of each tier I've collected". */
-export function countOwnedByRarity(collection: readonly string[]) {
+export function countOwnedByRarity(collection: readonly string[], pool: readonly CardId[]) {
   const counts: Record<CardRarity, { owned: number; total: number }> = {
     common: { owned: 0, total: 0 },
     rare: { owned: 0, total: 0 },
     epic: { owned: 0, total: 0 },
     legendary: { owned: 0, total: 0 },
   };
-  for (const id of ALL_CARD_IDS) {
+  for (const id of pool) {
     const r = CARDS[id].rarity;
     counts[r].total += 1;
     if (collection.includes(id)) counts[r].owned += 1;
@@ -26,7 +35,7 @@ export function countOwnedByRarity(collection: readonly string[]) {
 
 export interface CollectionFilterArgs {
   searchQuery: string;
-  mode: "ranked" | "arena";
+  mode: DeckMode;
   rarityFilter: CardRarity | "all";
   ownedOnly: boolean;
   inDeckOnly: boolean;
@@ -46,15 +55,8 @@ export function groupCollectionByMana({
   voieFilter, arenaAffinity, collection, usedInDeck, t,
 }: CollectionFilterArgs): { cost: number; ids: CardId[] }[] {
   const q = searchQuery.trim().toLowerCase();
-  const filtered = ALL_CARD_IDS.filter((id) => {
+  const filtered = deckPool(mode).filter((id) => {
     const card = CARDS[id];
-    // ARÈNE : ne montrer que les cartes réellement équipables (isDeckable =
-    // source unique, cf. arenaDecks). Masque les cartes sans effet Arène
-    // (no-op Classé : gambit, boussole…) et les Finishers (injectés à jauge
-    // pleine, non draftables) — sinon le builder les laissait équiper puis
-    // buildPlayerDeck les retirait au match (UX trompeuse). Le Classé reste
-    // inchangé (montre toute la collection).
-    if (mode === "arena" && !isDeckable(id)) return false;
     if (rarityFilter !== "all" && card.rarity !== rarityFilter) return false;
     if (ownedOnly && !collection.includes(id)) return false;
     if (inDeckOnly && !usedInDeck.has(id)) return false;

@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -27,6 +28,27 @@ export default defineConfig(async ({ command }) => ({
       : undefined,
     watch: {
       ignored: ["**/src-tauri/**"],
+    },
+  },
+
+  // Logique pure en Node (`*.test.ts`), composants en jsdom (`*.test.tsx`).
+  test: {
+    projects: [
+      { extends: true, test: { name: "logic", environment: "node", include: ["src/**/*.test.ts"] } },
+      {
+        extends: true,
+        test: {
+          name: "ui",
+          environment: "jsdom",
+          include: ["src/**/*.test.tsx"],
+          setupFiles: ["src/test/setup.ts"],
+        },
+      },
+    ],
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/**/*.test.{ts,tsx}", "src/test/**", "src/arena/**", "src/balancelab/**", "src/i18n/locales/**"],
     },
   },
 }));

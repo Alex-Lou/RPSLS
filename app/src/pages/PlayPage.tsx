@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { useStore } from "../store/store";
 import { GameMode } from "../types";
@@ -13,11 +13,7 @@ import { BracketPage } from "../ranked/BracketPage";
 import { DeckManager } from "../ranked/DeckManager";
 import { MatchPrepScreen, type Arena } from "../ranked/MatchPrepScreen";
 import { ArenaPadProvider } from "../ranked/arena";
-import { ArenaPage } from "../arena/ArenaPage";
-import { ArenaLobby } from "../arena/ArenaLobby";
-import { ArenaTutorialPage } from "../arena/tutorial/ArenaTutorialPage";
 import { skipArenaTutorial } from "../arena/tutorial/tutorialProgress";
-import { ArenaOnlineGame } from "../arena/ArenaOnlineGame";
 import { useArenaOverride } from "../ranked/arenaOverride";
 import { oppPersona } from "../ranked/personaSeed";
 import { applyTheme } from "../theme/theme";
@@ -28,6 +24,15 @@ import { setOnlineIntent } from "../online/onlineIntent";
 import { consumePlayReturnView } from "../online/playReturnView";
 import { backPromptActive } from "../match/sharedMatchUI/androidBack";
 import { MatchStage } from "../nav/MatchStage";
+import { RouteFallback } from "../AppRouteParts";
+
+// Constellation Pro (en veille) : chargé à la demande, hors du chunk principal.
+const ArenaPage = lazy(() => import("../arena/ArenaPage").then((m) => ({ default: m.ArenaPage })));
+const ArenaLobby = lazy(() => import("../arena/ArenaLobby").then((m) => ({ default: m.ArenaLobby })));
+const ArenaTutorialPage = lazy(() =>
+  import("../arena/tutorial/ArenaTutorialPage").then((m) => ({ default: m.ArenaTutorialPage })),
+);
+const ArenaOnlineGame = lazy(() => import("../arena/ArenaOnlineGame").then((m) => ({ default: m.ArenaOnlineGame })));
 
 type View =
   | { kind: "select" }
@@ -67,6 +72,7 @@ export function PlayPage({
   // reste stable entre deux rendus. Avant, `Date.now()` dans la clé remontait
   // (et effaçait sans l'enregistrer) le match en cours à chaque re-rendu de la
   // page (saison posée par le portefeuille, autodétection graphique…).
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- dépendance voulue : une clé neuve par vue
   const viewNonce = useMemo(() => Date.now(), [view]);
   const [tournament, setTournament] = useState<TournamentState>(() => {
     const p = useStore.getState().player;
@@ -166,33 +172,40 @@ export function PlayPage({
           />
         )}
         {view.kind === "arena_lobby" && (
-          <ArenaLobby
-            key="arena-lobby"
-            onTraining={() => setView({ kind: "arena_pro" })}
-            onGoOnline={() => setView({ kind: "arena_online" })}
-            onManageDeck={() => setView({ kind: "ranked_deck", from: "arena" })}
-            onBack={() => setView({ kind: "select" })}
-            onTutorial={() => setView({ kind: "arena_tutorial" })}
-          />
+          <Suspense key="arena-lobby" fallback={<RouteFallback />}>
+            <ArenaLobby
+              onTraining={() => setView({ kind: "arena_pro" })}
+              onGoOnline={() => setView({ kind: "arena_online" })}
+              onManageDeck={() => setView({ kind: "ranked_deck", from: "arena" })}
+              onBack={() => setView({ kind: "select" })}
+              onTutorial={() => setView({ kind: "arena_tutorial" })}
+            />
+          </Suspense>
         )}
         {view.kind === "arena_tutorial" && (
           <MatchStage key="arena_tutorial">
-            <ArenaTutorialPage
-              // Quitter en cours de route = tuto « passé » (plus proposé d'office) ;
-              // sans effet s'il est déjà réussi.
-              onBack={() => { skipArenaTutorial(); setView({ kind: "arena_lobby" }); }}
-              onPlayReal={() => setView({ kind: "arena_pro" })}
-            />
+            <Suspense fallback={<RouteFallback />}>
+              <ArenaTutorialPage
+                // Quitter en cours de route = tuto « passé » (plus proposé d'office) ;
+                // sans effet s'il est déjà réussi.
+                onBack={() => { skipArenaTutorial(); setView({ kind: "arena_lobby" }); }}
+                onPlayReal={() => setView({ kind: "arena_pro" })}
+              />
+            </Suspense>
           </MatchStage>
         )}
         {view.kind === "arena_online" && (
           <MatchStage key="arena_online">
-            <ArenaOnlineGame onBack={() => setView({ kind: "arena_lobby" })} />
+            <Suspense fallback={<RouteFallback />}>
+              <ArenaOnlineGame onBack={() => setView({ kind: "arena_lobby" })} />
+            </Suspense>
           </MatchStage>
         )}
         {view.kind === "arena_pro" && (
           <MatchStage key="arena_pro">
-            <ArenaPage onBack={() => setView({ kind: "arena_lobby" })} />
+            <Suspense fallback={<RouteFallback />}>
+              <ArenaPage onBack={() => setView({ kind: "arena_lobby" })} />
+            </Suspense>
           </MatchStage>
         )}
         {view.kind === "constellation_prep" && (
