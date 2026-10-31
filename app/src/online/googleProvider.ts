@@ -19,7 +19,7 @@ import { setGoogleTokenProvider } from "./accountAuth";
 // OAuth client (package + SHA-1) is configured in Google Cloud so Google trusts
 // the app, but is NEVER used in code — the ID token's `aud` is THIS web id, and
 // the server's GOOGLE_OAUTH_CLIENT_IDS must contain it.
-const WEB_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim();
+const WEB_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim();
 
 if (WEB_CLIENT_ID) {
   setGoogleTokenProvider(async () => {

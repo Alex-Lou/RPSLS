@@ -1,7 +1,7 @@
 # CI — vérifie chaque PR et chaque push sur main AVANT que Render ne déploie.
 # Ce que fait un contributeur à la main (HANDOFF §3), en automatique :
 #  - serveur : tests Rust (rpsls-core + rpsls-server) ;
-#  - app : typecheck, build release, scripts de contrôle lockstep (Pro online) ;
+#  - app : typecheck, lint, tests, build release, scripts de contrôle lockstep (Pro online) ;
 #  - métas serveur : cards_meta.json / economy_meta.json doivent être à jour
 #    avec le code TS (sinon le serveur valide l'économie sur des barèmes faux).
 
@@ -49,6 +49,8 @@ jobs:
           cache-dependency-path: app/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec tsc --noEmit -p tsconfig.json
+      - run: pnpm lint
+      - run: pnpm test
       - run: pnpm exec vite build
       - name: Contrôles cartes Pro + lockstep (Pro online)
         run: |

@@ -95,7 +95,6 @@ export function LocalLanesGame({
     hapticMatchStart();
     const t = window.setTimeout(() => startNextRound(), MATCH_FOUND_SPLASH_MS);
     return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function startNextRound() {

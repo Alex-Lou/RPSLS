@@ -33,7 +33,7 @@ let failures = 0;
 const fail = (msg: string) => { failures++; console.error(`  ÉCHEC  ${msg}`); };
 
 const used = new Map<string, string>();
-const CALL = /\b(?:t|tNow|tr)\(\s*["'`]([A-Za-z0-9_.\-]+)["'`]/g;
+const CALL = /\b(?:t|tNow|tr)\(\s*["'`]([A-Za-z0-9_.-]+)["'`]/g;
 for (const file of walk(SRC)) {
   const src = readFileSync(file, "utf8");
   for (const m of src.matchAll(CALL)) {

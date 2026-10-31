@@ -19,13 +19,13 @@ interface State {
 }
 
 export class AppErrorBoundary extends Component<{ children: ReactNode }, State> {
-  state: State = { error: null };
+  override state: State = { error: null };
 
   static getDerivedStateFromError(error: Error): State {
     return { error };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo): void {
+  override componentDidCatch(error: Error, info: ErrorInfo): void {
     // We log to console even in prod — Android logcat captures it which is
     // the lowest-friction way to grab a stack when a tester reports a bug.
     // Sentry already gets the structured event via its own boundary.
@@ -33,7 +33,7 @@ export class AppErrorBoundary extends Component<{ children: ReactNode }, State> 
     console.error("[RPSLS] Unhandled render error", error, info.componentStack);
   }
 
-  render(): ReactNode {
+  override render(): ReactNode {
     if (this.state.error) {
       return <CrashScreen error={this.state.error} onReset={() => this.setState({ error: null })} />;
     }
