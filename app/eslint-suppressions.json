@@ -29,11 +29,6 @@
       "count": 1
     }
   },
-  "src/pages/PlayPage.tsx": {
-    "react-hooks/exhaustive-deps": {
-      "count": 1
-    }
-  },
   "src/ranked/DeckManager/DeckManager.tsx": {
     "react-hooks/exhaustive-deps": {
       "count": 4

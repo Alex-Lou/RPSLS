@@ -23,7 +23,7 @@ import { DeckSlot } from "./DeckSlot";
 import { CardDetailModal } from "./CardDetailModal";
 import { CollectionFilterBar } from "./CollectionFilterBar";
 import { CollectionHeader } from "./CollectionHeader";
-import { countOwnedByRarity, groupCollectionByMana } from "./collectionGrouping";
+import { countOwnedByRarity, deckPool, groupCollectionByMana } from "./collectionGrouping";
 import { DeckToast } from "./DeckToast";
 import { ManaGroup } from "./ManaGroup";
 import { EmptyState } from "./EmptyState";
@@ -193,11 +193,12 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
 
   const usedInDeck = new Set(deck.filter(Boolean));
 
-  const ownedCount = ALL_CARD_IDS.filter((id) => collection.includes(id)).length;
+  const pool = useMemo(() => deckPool(mode), [mode]);
+  const ownedCount = pool.filter((id) => collection.includes(id)).length;
 
   /** Count owned cards per rarity — shown in the rarity tab pills so the
    *  player knows at a glance "how much of each tier I've collected". */
-  const ownedByRarity = useMemo(() => countOwnedByRarity(collection), [collection]);
+  const ownedByRarity = useMemo(() => countOwnedByRarity(collection, pool), [collection, pool]);
 
   /** Filtered + grouped collection. Grouping is by mana cost within the
    *  active rarity filter — gives the player a natural curve view inside
@@ -268,7 +269,7 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
             divider inside each tab gives the player a deck-builder's curve view. */}
         <div className="flex flex-col gap-2">
           <CollectionHeader
-            ownedCount={ownedCount} totalCount={ALL_CARD_IDS.length}
+            ownedCount={ownedCount} totalCount={pool.length}
             collectionOpen={collectionOpen}
             onToggle={() => setCollectionOpen((o) => !o)}
             t={t}
@@ -288,7 +289,7 @@ export function DeckManager({ onClose, mode = "ranked" }: { onClose: () => void;
                   <CollectionFilterBar
                     searchQuery={searchQuery} setSearchQuery={setSearchQuery}
                     rarityFilter={rarityFilter} setRarityFilter={setRarityFilter}
-                    ownedCount={ownedCount} totalCount={ALL_CARD_IDS.length}
+                    ownedCount={ownedCount} totalCount={pool.length}
                     ownedByRarity={ownedByRarity} mode={mode}
                     voieFilter={voieFilter} setVoieFilter={setVoieFilter}
                     ownedOnly={ownedOnly} setOwnedOnly={setOwnedOnly}

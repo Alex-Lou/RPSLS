@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { setBurgerHidden } from "../../../Sidebar";
 import { useT } from "../../../i18n";
 import { GameMode, REWARDS } from "../../../types";
-import { ALL_CARDS, TILE_ACCENT, TILE_BASE, MENU_SCROLL_LOCKED, ModeIcon } from "./menuShared";
+import { ALL_CARDS, TILE_ACCENT, TILE_BASE, MENU_SCROLL_LOCKED, ModeIcon, isWideTile } from "./menuShared";
 import { ModeConfirmModal } from "./ModeConfirmModal";
 import { DailyChallengesPanel } from "./DailyChallengesPanel";
 
@@ -119,7 +119,7 @@ export function ModeSelect({
 
       <DailyChallengesPanel onStart={onStart} onGoOnline={onGoOnline} onGoConstellation={onGoConstellation} />
 
-      {/* Mode tiles — 2 columns even on mobile so the 6 tiles fit one viewport.
+      {/* Mode tiles — 2 columns even on mobile so every tile fits one viewport.
        *  Compacté (Alex 2026-06-12) : tout le menu doit tenir SANS scroll.
        *  min-h-min : la grille ne descend jamais sous la hauteur de ses tuiles
        *  (avant : min-h-0 + max-h 46vh → tuiles superposées et rognées en 360×760) ;
@@ -191,6 +191,7 @@ export function ModeSelect({
             );
           }
           if (m === "ranked_constellation") {
+            const wide = isWideTile(i, ALL_CARDS.length);
             return (
               <motion.button
                 key="ranked_constellation"
@@ -202,15 +203,16 @@ export function ModeSelect({
                 onClick={() => onGoRanked?.()}
                 disabled={!onGoRanked}
                 className={
-                  "text-left p-2 sm:p-4 rounded-2xl border transition flex flex-col items-start justify-center gap-1 relative overflow-hidden min-h-[100px] landscape:min-h-[88px] " +
+                  "p-2 sm:p-4 rounded-2xl border transition flex flex-col justify-center gap-1 relative overflow-hidden min-h-[100px] landscape:min-h-[88px] " +
                   TILE_BASE + " border-amber-400/40 from-amber-500/22 via-rose-500/14 to-fuchsia-500/22 " +
                   "hover:from-amber-500/32 hover:via-rose-500/26 hover:to-fuchsia-500/32 hover:border-amber-400/70 " +
-                  "shadow-lg shadow-amber-500/10"
+                  "shadow-lg shadow-amber-500/10 " +
+                  (wide ? "col-span-2 landscape:col-span-1 items-center landscape:items-start text-center landscape:text-left" : "text-left items-start")
                 }
               >
                 <ModeIcon mode="ranked_constellation" />
-                <div className="min-w-0 w-full">
-                  <div className="flex items-center gap-1.5 flex-wrap">
+                <div className={"min-w-0 w-full" + (wide ? " flex flex-col items-center" : "")}>
+                  <div className={"flex items-center gap-1.5 flex-wrap" + (wide ? " justify-center" : "")}>
                     <span className="font-semibold text-xs sm:text-sm">{t("mode.ranked_constellation")}</span>
                     <span className="text-[9px] uppercase tracking-wider text-amber-200 bg-amber-500/30 px-1 rounded-full">
                       {t("play.badge.newCards")}
@@ -257,9 +259,7 @@ export function ModeSelect({
             );
           }
           const rewards = REWARDS[m];
-          // An odd last tile would sit alone in a 2-col grid — span it across
-          // both columns so the menu stays balanced.
-          const wide = i === ALL_CARDS.length - 1 && ALL_CARDS.length % 2 === 1;
+          const wide = isWideTile(i, ALL_CARDS.length);
           return (
             <motion.button
               key={m}
